@@ -91,7 +91,7 @@ interface SubtitleCue {
 | `open_project` | 加载已有项目 |
 | `check_ffmpeg` | 检测 FFmpeg |
 | `get_settings` / `set_settings` | 全局配置 |
-| `extract_audio` | FFmpeg 提取 16kHz WAV（待实现） |
+| `extract_audio` | FFmpeg 提取 16kHz WAV + 进度事件 |
 | `start_asr` / `get_asr_progress` | ASR 任务（待实现） |
 | `save_ass` / `load_ass` | ASS 读写（待实现） |
 | `burn_subtitles` | FFmpeg 压制（待实现） |
@@ -111,7 +111,7 @@ interface SubtitleCue {
 
 - [x] 项目脚手架（Tauri + React + Tailwind + Zustand + pnpm workspace）
 - [x] `ass-core`：ASS 解析/序列化、双语展开/合并
-- [ ] 项目管理 + FFmpeg 音轨提取
+- [x] 项目管理 + FFmpeg 音轨提取（含 FFmpeg 捆绑/分层解析）
 - [ ] Python ASR sidecar（faster-whisper 首个适配器）
 - [ ] 转录工作流 UI
 - [ ] OpenAI 兼容翻译管线

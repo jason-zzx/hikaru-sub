@@ -13,6 +13,7 @@ pub fn run() {
             settings::get_settings,
             settings::set_settings,
             ffmpeg::check_ffmpeg,
+            ffmpeg::extract_audio,
             project::create_project,
             project::open_project,
         ])
