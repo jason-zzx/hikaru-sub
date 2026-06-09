@@ -113,8 +113,8 @@ interface SubtitleCue {
 - [x] 项目脚手架（Tauri + React + Tailwind + Zustand + pnpm workspace）
 - [x] `ass-core`：ASS 解析/序列化、双语展开/合并
 - [x] 项目管理 + FFmpeg 音轨提取（含 FFmpeg 捆绑/分层解析）
-- [ ] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录）
-- [ ] 设置页 UI（SettingsView：FFmpeg/Python 路径、默认引擎、翻译 API/Key）
+- [x] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录）
+- [x] 设置页 UI（SettingsView：FFmpeg/Python 路径、默认引擎、翻译 API/Key）
 - [ ] Python ASR sidecar（faster-whisper 首个适配器）
 - [ ] 转录工作流 UI（TranscribeView）
 - [ ] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView）

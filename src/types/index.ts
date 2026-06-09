@@ -45,6 +45,12 @@ export interface AppSettings {
   ffmpegPath?: string;
   pythonPath?: string;
   asrServicePath?: string;
+  asrEngine: string;
+  asrModel: string;
+  asrDevice: string;
+  translationBaseUrl: string;
+  translationModel: string;
+  translationApiKey?: string;
   defaultSourceLang: string;
   defaultTargetLang: string;
 }

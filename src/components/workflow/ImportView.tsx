@@ -6,7 +6,7 @@ import {
   checkFfmpeg,
   createProject,
   openProject,
-  pickProjectDir,
+  pickDirectory,
   pickVideoFile,
   projectDirFromMeta,
 } from "../../services/tauri";
@@ -62,7 +62,7 @@ export function ImportView() {
     setError(null);
     let dir: string | null;
     try {
-      dir = await pickProjectDir();
+      dir = await pickDirectory();
     } catch (e) {
       setError(`无法打开目录对话框：${String(e)}`);
       return;
