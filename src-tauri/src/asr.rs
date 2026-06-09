@@ -68,8 +68,8 @@ fn resolve_service_dir(app: &AppHandle, settings: &AppSettings) -> Result<PathBu
     Err("未找到 asr-service（main.py）。请在设置中配置「ASR 服务目录」。".into())
 }
 
-/// 候选 Python 解释器：设置优先，再按平台回退。
-fn python_candidates(settings: &AppSettings) -> Vec<String> {
+/// 候选 Python 解释器：设置优先 → 服务目录下虚拟环境 → 按平台回退到系统解释器。
+fn python_candidates(settings: &AppSettings, dir: &Path) -> Vec<String> {
     let mut v = Vec::new();
     if let Some(p) = settings
         .python_path
@@ -77,6 +77,18 @@ fn python_candidates(settings: &AppSettings) -> Vec<String> {
         .filter(|s| !s.trim().is_empty())
     {
         v.push(p.clone());
+    }
+    // 本地开发常见：在 asr-service 下创建 .venv / venv 并安装依赖。
+    // 优先使用其中的解释器，否则系统 python 读不到这些依赖。
+    for venv in ["venv", ".venv"] {
+        let py = if cfg!(windows) {
+            dir.join(venv).join("Scripts").join("python.exe")
+        } else {
+            dir.join(venv).join("bin").join("python")
+        };
+        if py.is_file() {
+            v.push(py.to_string_lossy().into_owned());
+        }
     }
     if cfg!(windows) {
         v.push("python".into());
@@ -158,7 +170,7 @@ async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, St
 
     let settings = load_settings(app).unwrap_or_default();
     let dir = resolve_service_dir(app, &settings)?;
-    let pythons = python_candidates(&settings);
+    let pythons = python_candidates(&settings, &dir);
 
     let sidecar = tauri::async_runtime::spawn_blocking(move || {
         let mut last = String::from("无可用的 Python 解释器");
@@ -244,6 +256,73 @@ pub async fn get_asr_progress(
         .map_err(|e| format!("无法连接 sidecar：{e}"))?;
     if resp.status().as_u16() == 404 {
         return Err("转录任务不存在".into());
+    }
+    resp.json::<serde_json::Value>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn check_asr_model(
+    app: AppHandle,
+    state: State<'_, AsrState>,
+    engine: String,
+    model: String,
+) -> Result<serde_json::Value, String> {
+    let base = ensure_base_url(&app, &state).await?;
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(format!("{base}/models/status"))
+        .query(&[("engine", engine.as_str()), ("model", model.as_str())])
+        .send()
+        .await
+        .map_err(|e| format!("无法连接 sidecar：{e}"))?;
+    resp.json::<serde_json::Value>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn download_asr_model(
+    app: AppHandle,
+    state: State<'_, AsrState>,
+    engine: String,
+    model: String,
+) -> Result<String, String> {
+    let base = ensure_base_url(&app, &state).await?;
+    let client = reqwest::Client::new();
+    let body = serde_json::json!({ "engine": engine, "model": model });
+    let resp = client
+        .post(format!("{base}/models/download"))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("无法连接 sidecar：{e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("下载请求失败：HTTP {}", resp.status().as_u16()));
+    }
+    let v: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    v.get("jobId")
+        .and_then(|x| x.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "sidecar 响应缺少 jobId".to_string())
+}
+
+#[tauri::command]
+pub async fn get_model_download_progress(
+    app: AppHandle,
+    state: State<'_, AsrState>,
+    job_id: String,
+) -> Result<serde_json::Value, String> {
+    let base = ensure_base_url(&app, &state).await?;
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(format!("{base}/models/download/{job_id}"))
+        .send()
+        .await
+        .map_err(|e| format!("无法连接 sidecar：{e}"))?;
+    if resp.status().as_u16() == 404 {
+        return Err("下载任务不存在".into());
     }
     resp.json::<serde_json::Value>()
         .await

@@ -5,8 +5,10 @@ import type {
   AppSettings,
   AsrEngineInfo,
   AsrJobSnapshot,
+  AsrModelStatus,
   AudioExtractProgress,
   FfmpegStatus,
+  ModelDownloadSnapshot,
   ProjectMeta,
   StartAsrArgs,
 } from "../types";
@@ -115,4 +117,27 @@ export async function getAsrProgress(
 /** 取消转录任务。 */
 export async function cancelAsr(jobId: string): Promise<void> {
   await invoke("cancel_asr", { jobId });
+}
+
+/** 查询指定引擎/模型在本地缓存的就绪状态。 */
+export async function checkAsrModel(
+  engine: string,
+  model: string,
+): Promise<AsrModelStatus> {
+  return invoke<AsrModelStatus>("check_asr_model", { engine, model });
+}
+
+/** 触发模型下载，返回下载任务 jobId。 */
+export async function downloadAsrModel(
+  engine: string,
+  model: string,
+): Promise<string> {
+  return invoke<string>("download_asr_model", { engine, model });
+}
+
+/** 查询模型下载进度。 */
+export async function getModelDownloadProgress(
+  jobId: string,
+): Promise<ModelDownloadSnapshot> {
+  return invoke<ModelDownloadSnapshot>("get_model_download_progress", { jobId });
 }

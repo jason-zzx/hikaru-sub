@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Type
+from typing import Callable, Dict, List, Optional, Type
 
 from .base import AsrEngine
 from .faster_whisper import FasterWhisperEngine
@@ -31,3 +31,28 @@ def create_engine(
         known = ", ".join(_REGISTRY) or "(无)"
         raise KeyError(f"未知 ASR 引擎: {name}（已注册: {known}）")
     return cls(model=model, device=device, compute_type=compute_type)
+
+
+def _require(name: str) -> Type[AsrEngine]:
+    cls = _REGISTRY.get(name)
+    if cls is None:
+        known = ", ".join(_REGISTRY) or "(无)"
+        raise KeyError(f"未知 ASR 引擎: {name}（已注册: {known}）")
+    return cls
+
+
+def is_model_downloaded(name: str, model: str) -> bool:
+    """查询指定引擎的模型是否已在本地缓存就绪。"""
+    cls = _REGISTRY.get(name)
+    if cls is None:
+        return False
+    return cls.is_model_downloaded(model)
+
+
+def download_model(
+    name: str,
+    model: str,
+    progress: Optional[Callable[[int, int], None]] = None,
+) -> None:
+    """触发指定引擎的模型下载（阻塞）。"""
+    _require(name).download_model(model, progress=progress)

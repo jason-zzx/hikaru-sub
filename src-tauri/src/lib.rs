@@ -25,6 +25,9 @@ pub fn run() {
             asr::start_asr,
             asr::get_asr_progress,
             asr::cancel_asr,
+            asr::check_asr_model,
+            asr::download_asr_model,
+            asr::get_model_download_progress,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

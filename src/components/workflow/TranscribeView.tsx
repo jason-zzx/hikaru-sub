@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PRIMARY_STYLE,
   mergeShortCues,
@@ -10,6 +10,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { IconCheck } from "../layout/NavIcons";
 import { Select } from "../ui/Select";
+import { ModelManager } from "./ModelManager";
 import {
   cancelAsr,
   checkFfmpeg,
@@ -170,7 +171,7 @@ export function TranscribeView() {
     }
   };
 
-  const handleDetectEngines = async () => {
+  const detectEngines = useCallback(async () => {
     setEngineMsg("检测中…");
     try {
       const list = await listAsrEngines();
@@ -185,7 +186,12 @@ export function TranscribeView() {
       setEngines(null);
       setEngineMsg(`无法启动 sidecar：${String(e)}`);
     }
-  };
+  }, [engine]);
+
+  // 进入页面（及引擎变更）自动检测引擎可用性
+  useEffect(() => {
+    void detectEngines();
+  }, [detectEngines]);
 
   const pollLoop = async (jobId: string) => {
     pollingRef.current = true;
@@ -198,6 +204,7 @@ export function TranscribeView() {
         updateTask("asr", { status: "error" });
         break;
       }
+      if (!pollingRef.current) break; // 轮询期间已被取消，丢弃本次结果
       setJob(snap);
       updateTask("asr", { progress: Math.round(snap.progress * 100) });
 
@@ -262,9 +269,16 @@ export function TranscribeView() {
   };
 
   const handleCancel = async () => {
-    if (!jobIdRef.current) return;
+    const jobId = jobIdRef.current;
+    // 立即停止轮询并恢复 UI，给出即时反馈
+    pollingRef.current = false;
+    jobIdRef.current = null;
+    setJob(null);
+    setTranscribing(false);
+    updateTask("asr", { status: "idle" });
+    if (!jobId) return;
     try {
-      await cancelAsr(jobIdRef.current);
+      await cancelAsr(jobId); // 通知后端在下个片段边界停止
     } catch {
       // 忽略取消请求本身的错误，轮询会反映最终状态
     }
@@ -372,27 +386,21 @@ export function TranscribeView() {
             />
           </Labeled>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={handleDetectEngines}
-            disabled={transcribing}
-            className="rounded-lg border border-border px-3 py-2 text-sm text-text-muted hover:border-accent/50 hover:text-text disabled:opacity-50"
-          >
-            检测引擎可用性
-          </button>
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <span className="text-text-muted">引擎状态：</span>
           {engineMsg && (
             <span
-              className={`text-xs ${
+              className={
                 engines?.find((e) => e.name === engine)?.available === false
                   ? "text-warning"
                   : "text-text-muted"
-              }`}
+              }
             >
               {engineMsg}
             </span>
           )}
         </div>
+        <ModelManager engine={engine} model={model} />
       </StepCard>
 
       {/* 步骤 3：转录 */}

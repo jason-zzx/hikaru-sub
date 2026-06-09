@@ -114,3 +114,25 @@ export interface StartAsrArgs {
   device: string;
   language?: string | null;
 }
+
+/** ASR 模型在本地缓存中的就绪状态。 */
+export interface AsrModelStatus {
+  engine: string;
+  model: string;
+  /** 引擎依赖是否就绪（不就绪时无法检测/下载） */
+  available: boolean;
+  /** 模型文件是否已在本地缓存 */
+  downloaded: boolean;
+}
+
+export type ModelDownloadStatus = "running" | "completed" | "failed";
+
+export interface ModelDownloadSnapshot {
+  id: string;
+  status: ModelDownloadStatus;
+  /** 0~1，总大小未知时为 0 */
+  progress: number;
+  downloadedBytes: number;
+  totalBytes: number;
+  error: string | null;
+}

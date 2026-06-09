@@ -17,3 +17,10 @@ class TranscribeRequest(BaseModel):
     device: str = "auto"
     language: Optional[str] = None
     compute_type: Optional[str] = Field(default=None, alias="computeType")
+
+
+class DownloadModelRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
+
+    engine: str = "faster-whisper"
+    model: str = "large-v3"
