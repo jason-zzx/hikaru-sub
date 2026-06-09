@@ -93,6 +93,11 @@ pub fn create_project(app: tauri::AppHandle, video_path: String) -> Result<Proje
 }
 
 #[tauri::command]
+pub fn path_exists(path: String) -> bool {
+    PathBuf::from(path).exists()
+}
+
+#[tauri::command]
 pub fn open_project(project_dir: String) -> Result<ProjectMeta, String> {
     let dir = PathBuf::from(&project_dir);
     let json_path = project_json_path(&dir);

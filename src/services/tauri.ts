@@ -3,9 +3,12 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import type {
   AppSettings,
+  AsrEngineInfo,
+  AsrJobSnapshot,
   AudioExtractProgress,
   FfmpegStatus,
   ProjectMeta,
+  StartAsrArgs,
 } from "../types";
 
 const VIDEO_EXTENSIONS = [
@@ -83,4 +86,33 @@ export async function createProject(videoPath: string): Promise<ProjectMeta> {
 
 export async function openProject(projectDir: string): Promise<ProjectMeta> {
   return invoke<ProjectMeta>("open_project", { projectDir });
+}
+
+/** 判断文件/目录是否存在（如检测已提取的 audio.wav）。 */
+export async function pathExists(path: string): Promise<boolean> {
+  return invoke<boolean>("path_exists", { path });
+}
+
+/** 列出 sidecar 已注册的 ASR 引擎（首次调用会按需拉起 sidecar）。 */
+export async function listAsrEngines(): Promise<AsrEngineInfo[]> {
+  const res = await invoke<{ engines: AsrEngineInfo[] }>("list_asr_engines");
+  return res.engines;
+}
+
+/** 创建转录任务，返回 jobId。 */
+export async function startAsr(args: StartAsrArgs): Promise<string> {
+  return invoke<string>("start_asr", { args });
+}
+
+/** 查询转录进度；running 阶段可传 includeSegments=false 仅取进度。 */
+export async function getAsrProgress(
+  jobId: string,
+  includeSegments = true,
+): Promise<AsrJobSnapshot> {
+  return invoke<AsrJobSnapshot>("get_asr_progress", { jobId, includeSegments });
+}
+
+/** 取消转录任务。 */
+export async function cancelAsr(jobId: string): Promise<void> {
+  await invoke("cancel_asr", { jobId });
 }

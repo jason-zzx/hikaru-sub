@@ -72,3 +72,45 @@ export interface AudioExtractProgress {
   /** 0~1，总时长未知时为 null */
   percent: number | null;
 }
+
+/** ASR sidecar 输出的时间片段（与 ass-core AsrSegment 同构）。 */
+export interface AsrSegment {
+  startMs: number;
+  endMs: number;
+  text: string;
+}
+
+export interface AsrEngineInfo {
+  name: string;
+  /** 依赖是否就绪（如 faster-whisper 是否已安装） */
+  available: boolean;
+}
+
+export type AsrJobStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface AsrJobSnapshot {
+  id: string;
+  status: AsrJobStatus;
+  /** 0~1 */
+  progress: number;
+  durationMs: number;
+  processedMs: number;
+  segmentCount: number;
+  detectedLanguage: string | null;
+  error: string | null;
+  /** 仅在请求包含片段时返回 */
+  segments?: AsrSegment[];
+}
+
+export interface StartAsrArgs {
+  audioPath: string;
+  engine: string;
+  model: string;
+  device: string;
+  language?: string | null;
+}

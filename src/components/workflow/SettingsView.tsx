@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   checkFfmpeg,
   getSettings,
@@ -6,7 +6,7 @@ import {
   pickExecutableFile,
   setSettings,
 } from "../../services/tauri";
-import { IconChevronDown } from "../layout/NavIcons";
+import { Select } from "../ui/Select";
 import type { AppSettings, FfmpegStatus } from "../../types";
 
 const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
@@ -40,11 +40,6 @@ const ASR_DEVICES = [
 
 const inputClass =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent/60";
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
 
 export function SettingsView() {
   const [settings, setLocal] = useState<AppSettings | null>(null);
@@ -258,80 +253,6 @@ function Section({
       </div>
       <div className="flex flex-col gap-4">{children}</div>
     </section>
-  );
-}
-
-function Select({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: SelectOption[];
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find((o) => o.value === value);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`${inputClass} flex cursor-pointer items-center justify-between gap-2 pr-3 text-left`}
-      >
-        <span className="truncate">{selected?.label ?? value}</span>
-        <IconChevronDown
-          className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-      </button>
-      {open && (
-        <ul className="absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-auto rounded-lg border border-border bg-surface-raised py-1 shadow-lg">
-          {options.map((opt) => {
-            const active = opt.value === value;
-            return (
-              <li key={opt.value}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value);
-                    setOpen(false);
-                  }}
-                  className={`w-full px-3 py-2 text-left text-sm ${
-                    active
-                      ? "bg-accent/20 text-accent"
-                      : "text-text hover:bg-surface-overlay"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
   );
 }
 
