@@ -56,14 +56,14 @@ fn default_project(video_path: &str, settings: &crate::settings::AppSettings) ->
         source_lang: settings.default_source_lang.clone(),
         target_lang: settings.default_target_lang.clone(),
         asr: AsrConfig {
-            engine: "faster-whisper".into(),
-            model: "large-v3".into(),
-            device: "auto".into(),
+            engine: settings.asr_engine.clone(),
+            model: settings.asr_model.clone(),
+            device: settings.asr_device.clone(),
         },
         translation: TranslationConfig {
             provider: "openai-compatible".into(),
-            base_url: "https://api.openai.com/v1".into(),
-            model: "gpt-4o-mini".into(),
+            base_url: settings.translation_base_url.clone(),
+            model: settings.translation_model.clone(),
             temperature: Some(0.3),
         },
     }

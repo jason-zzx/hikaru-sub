@@ -4,11 +4,17 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct AppSettings {
     pub ffmpeg_path: Option<String>,
     pub python_path: Option<String>,
     pub asr_service_path: Option<String>,
+    pub asr_engine: String,
+    pub asr_model: String,
+    pub asr_device: String,
+    pub translation_base_url: String,
+    pub translation_model: String,
+    pub translation_api_key: Option<String>,
     pub default_source_lang: String,
     pub default_target_lang: String,
 }
@@ -19,6 +25,12 @@ impl Default for AppSettings {
             ffmpeg_path: None,
             python_path: None,
             asr_service_path: None,
+            asr_engine: "faster-whisper".into(),
+            asr_model: "large-v3".into(),
+            asr_device: "auto".into(),
+            translation_base_url: "https://api.openai.com/v1".into(),
+            translation_model: "gpt-4o-mini".into(),
+            translation_api_key: None,
             default_source_lang: "auto".into(),
             default_target_lang: "zh-CN".into(),
         }

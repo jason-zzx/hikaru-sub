@@ -29,9 +29,15 @@ export async function pickVideoFile(): Promise<string | null> {
   return typeof selected === "string" ? selected : null;
 }
 
-/** 弹出目录对话框选择已有项目目录（含 project.json），取消返回 null。 */
-export async function pickProjectDir(): Promise<string | null> {
+/** 弹出目录对话框，取消返回 null（如选择项目目录、sidecar 目录）。 */
+export async function pickDirectory(): Promise<string | null> {
   const selected = await open({ multiple: false, directory: true });
+  return typeof selected === "string" ? selected : null;
+}
+
+/** 弹出文件对话框选择可执行文件（如 ffmpeg、python），取消返回 null。 */
+export async function pickExecutableFile(): Promise<string | null> {
+  const selected = await open({ multiple: false, directory: false });
   return typeof selected === "string" ? selected : null;
 }
 
