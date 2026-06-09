@@ -1,11 +1,46 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import type {
   AppSettings,
   AudioExtractProgress,
   FfmpegStatus,
   ProjectMeta,
 } from "../types";
+
+const VIDEO_EXTENSIONS = [
+  "mp4",
+  "mkv",
+  "mov",
+  "avi",
+  "webm",
+  "flv",
+  "ts",
+  "m4v",
+];
+
+/** 弹出文件对话框选择视频，取消返回 null。 */
+export async function pickVideoFile(): Promise<string | null> {
+  const selected = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: "视频文件", extensions: VIDEO_EXTENSIONS }],
+  });
+  return typeof selected === "string" ? selected : null;
+}
+
+/** 弹出目录对话框选择已有项目目录（含 project.json），取消返回 null。 */
+export async function pickProjectDir(): Promise<string | null> {
+  const selected = await open({ multiple: false, directory: true });
+  return typeof selected === "string" ? selected : null;
+}
+
+/** 从项目元数据推断 .hikaru 目录（取 audio/ass 路径的父目录）。 */
+export function projectDirFromMeta(meta: ProjectMeta): string {
+  const ref = meta.audioPath ?? meta.assPath ?? "";
+  const idx = Math.max(ref.lastIndexOf("/"), ref.lastIndexOf("\\"));
+  return idx >= 0 ? ref.slice(0, idx) : ref;
+}
 
 export async function checkFfmpeg(): Promise<FfmpegStatus> {
   return invoke<FfmpegStatus>("check_ffmpeg");

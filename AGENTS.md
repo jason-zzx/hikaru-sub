@@ -105,18 +105,22 @@ interface SubtitleCue {
 3. **类型优先**：前后端共享概念在 `src/types/` 与 `ass-core` 保持一致
 4. **不提交密钥**：API Key 走 keychain/设置，不进源码
 5. **中文 UI 文案**：用户面向字符串用简体中文
-6. **不编辑计划文件**：`.cursor/plans/` 下的方案文档除非用户明确要求
+6. **图标用 SVG**：UI 图标一律使用 SVG（统一放 `src/components/layout/NavIcons.tsx`，lucide 风格 `stroke="currentColor"`），不要用 emoji/字符当图标，避免跨平台字形缺失渲染成方块
+7. **不编辑计划文件**：`.cursor/plans/` 下的方案文档除非用户明确要求
 
 ## 分阶段实现（当前进度）
 
 - [x] 项目脚手架（Tauri + React + Tailwind + Zustand + pnpm workspace）
 - [x] `ass-core`：ASS 解析/序列化、双语展开/合并
 - [x] 项目管理 + FFmpeg 音轨提取（含 FFmpeg 捆绑/分层解析）
+- [ ] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录）
+- [ ] 设置页 UI（SettingsView：FFmpeg/Python 路径、默认引擎、翻译 API/Key）
 - [ ] Python ASR sidecar（faster-whisper 首个适配器）
-- [ ] 转录工作流 UI
-- [ ] OpenAI 兼容翻译管线
-- [ ] 字幕编辑器（列表、时间轴、播放同步、撤销重做）
-- [ ] FFmpeg 压制 + 设置页
+- [ ] 转录工作流 UI（TranscribeView）
+- [ ] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView）
+- [ ] 字幕编辑器（EditorView：列表、时间轴、播放同步、撤销重做）
+- [ ] FFmpeg 压制（BurnView 输出向导）
+- [ ] 错误处理、任务队列、安装脚本等整体打磨
 
 ## 首期不做
 
