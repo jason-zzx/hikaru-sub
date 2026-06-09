@@ -65,12 +65,12 @@ export function createDefaultStyles(): AssStyle[] {
   ];
 }
 
-export function createDefaultScriptInfo(title = "Hikaru-Sub"): AssScriptInfo {
+export function createDefaultScriptInfo(title = "Hikaru-Sub", resX?: number, resY?: number): AssScriptInfo {
   return {
     title,
     scriptType: "v4.00+",
-    playResX: DEFAULT_PLAY_RES_X,
-    playResY: DEFAULT_PLAY_RES_Y,
+    playResX: resX ?? DEFAULT_PLAY_RES_X,
+    playResY: resY ?? DEFAULT_PLAY_RES_Y,
     wrapStyle: 0,
     scaledBorderAndShadow: true,
     extra: {},
@@ -78,9 +78,9 @@ export function createDefaultScriptInfo(title = "Hikaru-Sub"): AssScriptInfo {
 }
 
 /** 创建空白双语 ASS 文档（含默认样式）。 */
-export function createDefaultDocument(title = "Hikaru-Sub"): AssDocument {
+export function createDefaultDocument(title = "Hikaru-Sub", resX?: number, resY?: number): AssDocument {
   return {
-    scriptInfo: createDefaultScriptInfo(title),
+    scriptInfo: createDefaultScriptInfo(title, resX, resY),
     styles: createDefaultStyles(),
     cues: [],
   };

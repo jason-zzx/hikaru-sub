@@ -216,6 +216,51 @@ export function SettingsView() {
                 onChange={(e) => update("translationApiKey", e.target.value || undefined)}
               />
             </Field>
+            <Field label="每批翻译条数">
+              <input
+                className={inputClass}
+                type="number"
+                min="5"
+                max="50"
+                value={settings.translationBatchSize}
+                onChange={(e) => update("translationBatchSize", Number(e.target.value))}
+              />
+              <p className="mt-1 text-xs text-text-muted">
+                范围：5-50，批量翻译时每次请求包含的字幕条数
+              </p>
+            </Field>
+            <Field label="额外上下文条数">
+              <input
+                className={inputClass}
+                type="number"
+                min="1"
+                max="10"
+                value={settings.translationContextWindow}
+                onChange={(e) => update("translationContextWindow", Number(e.target.value))}
+              />
+              <p className="mt-1 text-xs text-text-muted">
+                范围：1-10，每批前后附加的上下文字幕条数，用于提高连贯性
+              </p>
+            </Field>
+            <Field label="自定义 Prompt">
+              <textarea
+                className={`${inputClass} min-h-[80px] resize-y`}
+                value={settings.translationCustomPrompt ?? ""}
+                placeholder="可选，将附加在系统提示词之后"
+                onChange={(e) => update("translationCustomPrompt", e.target.value || undefined)}
+              />
+            </Field>
+            <Field label="术语表（Glossary）">
+              <textarea
+                className={`${inputClass} min-h-[100px] resize-y`}
+                value={settings.translationGlossary ?? ""}
+                placeholder="每行一个术语映射，格式：原文 -> 译文&#10;例如：&#10;Kubernetes -> K8s&#10;Machine Learning -> 机器学习"
+                onChange={(e) => update("translationGlossary", e.target.value || undefined)}
+              />
+              <p className="mt-1 text-xs text-text-muted">
+                每行一个术语映射，格式：原文 -&gt; 译文
+              </p>
+            </Field>
           </Section>
 
           <Section title="默认语言" desc="新建项目时的源语言与目标语言">

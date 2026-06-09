@@ -1,4 +1,5 @@
 mod asr;
+mod ass;
 mod ffmpeg;
 mod project;
 mod settings;
@@ -18,6 +19,7 @@ pub fn run() {
             settings::set_settings,
             ffmpeg::check_ffmpeg,
             ffmpeg::extract_audio,
+            ffmpeg::get_video_info,
             project::create_project,
             project::open_project,
             project::path_exists,
@@ -28,6 +30,8 @@ pub fn run() {
             asr::check_asr_model,
             asr::download_asr_model,
             asr::get_model_download_progress,
+            ass::save_ass_text,
+            ass::load_ass_text,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

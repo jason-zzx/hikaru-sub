@@ -73,6 +73,25 @@ export function ImportView() {
     try {
       const meta = await openProject(dir);
       setProject(meta, dir);
+
+      // 如果存在 ASS 文件，加载字幕到 store
+      if (meta.assPath) {
+        try {
+          const { loadAssText, pathExists } = await import("../../services/tauri");
+          const exists = await pathExists(meta.assPath);
+          if (exists) {
+            const assText = await loadAssText(meta.assPath);
+            const { parseAss } = await import("@hikaru/ass-core");
+            const doc = parseAss(assText);
+            const { setCues } = useProjectStore.getState();
+            setCues(doc.cues);
+          }
+        } catch (loadErr) {
+          console.warn("加载 ASS 文件失败:", loadErr);
+          // 不阻塞主流程
+        }
+      }
+
       setStep("transcribe");
     } catch (e) {
       setError(`打开项目失败：${String(e)}`);

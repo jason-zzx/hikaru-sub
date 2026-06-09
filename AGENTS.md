@@ -102,7 +102,8 @@ interface SubtitleCue {
 | `start_asr` | 创建转录任务，返回 jobId |
 | `get_asr_progress` | 轮询任务进度/片段 |
 | `cancel_asr` | 取消转录任务 |
-| `save_ass` / `load_ass` | ASS 读写（待实现） |
+| `save_ass_text` / `load_ass_text` | ASS 文件读写 |
+| `get_video_info` | 获取视频分辨率、时长等元信息 |
 | `burn_subtitles` | FFmpeg 压制（待实现） |
 
 新增 command 时：在 `src-tauri/src/` 实现 → `lib.rs` 注册 → `src/services/tauri.ts` 封装 → 更新 capabilities 权限。
@@ -122,11 +123,12 @@ interface SubtitleCue {
 - [x] 项目脚手架（Tauri + React + Tailwind + Zustand + pnpm workspace）
 - [x] `ass-core`：ASS 解析/序列化、双语展开/合并
 - [x] 项目管理 + FFmpeg 音轨提取（含 FFmpeg 捆绑/分层解析）
-- [x] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录）
-- [x] 设置页 UI（SettingsView：FFmpeg/Python 路径、默认引擎、翻译 API/Key）
+- [x] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录；支持打开已有项目并加载 ASS）
+- [x] 设置页 UI（SettingsView：FFmpeg/Python 路径、默认引擎、翻译 API/Key、翻译高级配置）
 - [x] Python ASR sidecar（AsrEngine 抽象 + faster-whisper 适配器 + HTTP 进度 API）
-- [x] 转录工作流 UI（TranscribeView：音轨提取 + 转录进度 + 生成单语 ASS cue；Rust 侧 sidecar 管理与 start_asr）
-- [ ] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView）
+- [x] 转录工作流 UI（TranscribeView：音轨提取 + 转录进度 + 生成单语 ASS；使用视频实际分辨率，不强制换行）
+- [x] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView：批量翻译 + 进度显示 + 术语表/自定义 prompt 支持）
+- [x] ASS 文件持久化（转录后自动保存，打开项目时自动加载）
 - [ ] 字幕编辑器（EditorView：列表、时间轴、播放同步、撤销重做）
 - [ ] FFmpeg 压制（BurnView 输出向导）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨

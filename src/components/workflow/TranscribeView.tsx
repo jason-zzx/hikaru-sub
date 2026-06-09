@@ -3,7 +3,6 @@ import {
   PRIMARY_STYLE,
   mergeShortCues,
   segmentsToCues,
-  splitLongCues,
 } from "@hikaru/ass-core";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -212,13 +211,38 @@ export function TranscribeView() {
         try {
           const full = await getAsrProgress(jobId, true);
           const segments = full.segments ?? [];
-          const cues = splitLongCues(
-            mergeShortCues(segmentsToCues(segments, PRIMARY_STYLE)),
-          );
+          const cues = mergeShortCues(segmentsToCues(segments, PRIMARY_STYLE));
           setCues(cues);
           setResultCount(cues.length);
           setJob(full);
           updateTask("asr", { status: "success", progress: 100 });
+
+          // 保存字幕到文件
+          if (project?.assPath && cues.length > 0) {
+            try {
+              const { serializeAss, createDefaultDocument } = await import("@hikaru/ass-core");
+              const { getVideoInfo } = await import("../../services/tauri");
+
+              // 获取视频分辨率
+              let resX: number | undefined;
+              let resY: number | undefined;
+              try {
+                const videoInfo = await getVideoInfo(project.videoPath);
+                resX = videoInfo.width;
+                resY = videoInfo.height;
+              } catch {
+                // 获取失败时使用默认值（1920x1080）
+              }
+
+              const doc = createDefaultDocument("Hikaru-Sub", resX, resY);
+              doc.cues = cues;
+              const assText = serializeAss(doc);
+              const { saveAssText } = await import("../../services/tauri");
+              await saveAssText(project.assPath, assText);
+            } catch (saveErr) {
+              console.warn("保存 ASS 文件失败:", saveErr);
+            }
+          }
         } catch (e) {
           setAsrError(`生成字幕失败：${String(e)}`);
           updateTask("asr", { status: "error" });
