@@ -21,6 +21,7 @@ pub struct AppSettings {
     pub translation_context_window: u32,
     pub translation_custom_prompt: Option<String>,
     pub translation_glossary: Option<String>,
+    pub subtitle_merge_mode: String,
 }
 
 impl Default for AppSettings {
@@ -41,6 +42,7 @@ impl Default for AppSettings {
             translation_context_window: 2,
             translation_custom_prompt: None,
             translation_glossary: None,
+            subtitle_merge_mode: "inline".into(),
         }
     }
 }

@@ -261,6 +261,19 @@ export function SettingsView() {
                 每行一个术语映射，格式：原文 -&gt; 译文
               </p>
             </Field>
+            <Field label="字幕合并模式">
+              <Select
+                value={settings.subtitleMergeMode}
+                onChange={(v) => update("subtitleMergeMode", v as "inline" | "separate")}
+                options={[
+                  { value: "inline", label: "行内拼接（译文 / 原文）" },
+                  { value: "separate", label: "分离双行（上下两条字幕）" },
+                ]}
+              />
+              <p className="mt-1 text-xs text-text-muted">
+                行内拼接：单条字幕显示「译文 / 原文」；分离双行：生成两条时间轴相同的字幕
+              </p>
+            </Field>
           </Section>
 
           <Section title="默认语言" desc="新建项目时的源语言与目标语言">

@@ -33,26 +33,38 @@ function makeEvent(
 
 /**
  * 单条 cue 展开为 Dialogue 事件：
- * 原文一行；若有译文，再加一行（同 start/end，使用 secondaryStyle）。
+ * - mergeMode = "inline"（默认）: 译文存在时，单行显示「译文 / 原文」
+ * - mergeMode = "separate": 原文一行；若有译文，再加一行（同 start/end，使用 secondaryStyle）
  */
 export function cueToEvents(
   cue: SubtitleCue,
-  options: Partial<BilingualOptions> = {},
+  options: Partial<import("./types").SerializeOptions> = {},
 ): AssEvent[] {
   const opts = { ...DEFAULT_BILINGUAL_OPTIONS, ...options };
+  const mergeMode = options.mergeMode ?? "inline";
   const events: AssEvent[] = [];
   const primaryStyle = cue.style || opts.primaryStyle;
+
+  // 行内拼接模式：译文 / 原文
+  if (mergeMode === "inline" && cue.secondaryText && cue.secondaryText.trim() !== "") {
+    const mergedText = `${cue.secondaryText} / ${cue.primaryText}`;
+    events.push(makeEvent(cue, primaryStyle, mergedText));
+    return events;
+  }
+
+  // 分离双行模式或无译文：原文单独一行
   events.push(makeEvent(cue, primaryStyle, cue.primaryText));
-  if (cue.secondaryText && cue.secondaryText.trim() !== "") {
+  if (mergeMode === "separate" && cue.secondaryText && cue.secondaryText.trim() !== "") {
     events.push(makeEvent(cue, opts.secondaryStyle, cue.secondaryText));
   }
+
   return events;
 }
 
 /** 多条 cue 展开为事件列表（按时间排序后输出）。 */
 export function cuesToEvents(
   cues: SubtitleCue[],
-  options: Partial<BilingualOptions> = {},
+  options: Partial<import("./types").SerializeOptions> = {},
 ): AssEvent[] {
   const sorted = [...cues].sort(
     (a, b) => a.startMs - b.startMs || a.endMs - b.endMs,

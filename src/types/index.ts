@@ -57,6 +57,7 @@ export interface AppSettings {
   translationContextWindow: number;
   translationCustomPrompt?: string;
   translationGlossary?: string;
+  subtitleMergeMode: "inline" | "separate";
 }
 
 export type FfmpegSource = "settings" | "bundled" | "system";
