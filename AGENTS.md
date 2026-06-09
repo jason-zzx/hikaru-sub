@@ -110,7 +110,7 @@ interface SubtitleCue {
 ## 分阶段实现（当前进度）
 
 - [x] 项目脚手架（Tauri + React + Tailwind + Zustand + pnpm workspace）
-- [ ] `ass-core`：ASS 解析/序列化、双语展开/合并
+- [x] `ass-core`：ASS 解析/序列化、双语展开/合并
 - [ ] 项目管理 + FFmpeg 音轨提取
 - [ ] Python ASR sidecar（faster-whisper 首个适配器）
 - [ ] 转录工作流 UI
