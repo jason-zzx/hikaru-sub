@@ -43,6 +43,7 @@ src/                          # React 前端
 src-tauri/                    # Rust 后端
   src/
     ffmpeg.rs                 # FFmpeg 检测与调用
+    asr.rs                    # ASR sidecar 进程管理 + HTTP 代理
     project.rs                # .hikaru/project.json
     settings.rs               # 全局设置持久化
 packages/ass-core/              # ASS 解析/序列化（workspace 包）
@@ -96,7 +97,11 @@ interface SubtitleCue {
 | `check_ffmpeg` | 检测 FFmpeg |
 | `get_settings` / `set_settings` | 全局配置 |
 | `extract_audio` | FFmpeg 提取 16kHz WAV + 进度事件 |
-| `start_asr` / `get_asr_progress` | ASR 任务（待实现） |
+| `path_exists` | 判断文件/目录是否存在 |
+| `list_asr_engines` | 列出 sidecar 已注册引擎及可用性（按需拉起 sidecar） |
+| `start_asr` | 创建转录任务，返回 jobId |
+| `get_asr_progress` | 轮询任务进度/片段 |
+| `cancel_asr` | 取消转录任务 |
 | `save_ass` / `load_ass` | ASS 读写（待实现） |
 | `burn_subtitles` | FFmpeg 压制（待实现） |
 
@@ -120,7 +125,7 @@ interface SubtitleCue {
 - [x] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录）
 - [x] 设置页 UI（SettingsView：FFmpeg/Python 路径、默认引擎、翻译 API/Key）
 - [x] Python ASR sidecar（AsrEngine 抽象 + faster-whisper 适配器 + HTTP 进度 API）
-- [ ] 转录工作流 UI（TranscribeView，含 Rust 侧 sidecar 管理与 start_asr）
+- [x] 转录工作流 UI（TranscribeView：音轨提取 + 转录进度 + 生成单语 ASS cue；Rust 侧 sidecar 管理与 start_asr）
 - [ ] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView）
 - [ ] 字幕编辑器（EditorView：列表、时间轴、播放同步、撤销重做）
 - [ ] FFmpeg 压制（BurnView 输出向导）

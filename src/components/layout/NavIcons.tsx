@@ -153,6 +153,23 @@ export function IconFolderOpen({ className = defaults }: IconProps) {
   );
 }
 
+export function IconCheck({ className = defaults }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
 export function IconChevronDown({ className = defaults }: IconProps) {
   return (
     <svg
