@@ -46,7 +46,11 @@ src-tauri/                    # Rust 后端
     project.rs                # .hikaru/project.json
     settings.rs               # 全局设置持久化
 packages/ass-core/              # ASS 解析/序列化（workspace 包）
-asr-service/                  # Python ASR sidecar
+asr-service/                  # Python ASR sidecar（FastAPI HTTP）
+  main.py                     # 入口：选端口 + uvicorn + stdout 就绪协议
+  server.py                   # FastAPI 路由
+  jobs.py                     # JobManager：后台线程转录 + 进度/取消
+  engines/                    # AsrEngine 抽象 + faster-whisper + registry
 ```
 
 ## 架构边界
@@ -115,8 +119,8 @@ interface SubtitleCue {
 - [x] 项目管理 + FFmpeg 音轨提取（含 FFmpeg 捆绑/分层解析）
 - [x] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录）
 - [x] 设置页 UI（SettingsView：FFmpeg/Python 路径、默认引擎、翻译 API/Key）
-- [ ] Python ASR sidecar（faster-whisper 首个适配器）
-- [ ] 转录工作流 UI（TranscribeView）
+- [x] Python ASR sidecar（AsrEngine 抽象 + faster-whisper 适配器 + HTTP 进度 API）
+- [ ] 转录工作流 UI（TranscribeView，含 Rust 侧 sidecar 管理与 start_asr）
 - [ ] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView）
 - [ ] 字幕编辑器（EditorView：列表、时间轴、播放同步、撤销重做）
 - [ ] FFmpeg 压制（BurnView 输出向导）
