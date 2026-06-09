@@ -34,6 +34,14 @@ struct ExtractProgress {
     percent: Option<f64>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoInfo {
+    pub width: u32,
+    pub height: u32,
+    pub duration_ms: i64,
+}
+
 const EXECUTABLE_NAME: &str = if cfg!(windows) {
     "ffmpeg.exe"
 } else {
@@ -240,6 +248,69 @@ fn run_extract(
         },
     );
     Ok(())
+}
+
+/// 使用 ffprobe 获取视频信息（分辨率、时长）
+#[tauri::command]
+pub async fn get_video_info(
+    app: AppHandle,
+    video_path: String,
+) -> Result<VideoInfo, String> {
+    let video = PathBuf::from(&video_path);
+    if !video.is_file() {
+        return Err(format!("视频文件不存在: {video_path}"));
+    }
+
+    let settings = load_settings(&app).unwrap_or_default();
+    let (ffmpeg_path, _) = resolve_ffmpeg(&app, &settings);
+
+    // ffprobe 通常与 ffmpeg 在同一目录
+    let ffprobe = if ffmpeg_path.ends_with("ffmpeg.exe") || ffmpeg_path.ends_with("ffmpeg") {
+        ffmpeg_path.replace("ffmpeg", "ffprobe")
+    } else {
+        "ffprobe".to_string()
+    };
+
+    let output = Command::new(&ffprobe)
+        .args([
+            "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height,duration",
+            "-of", "csv=p=0",
+            &video_path,
+        ])
+        .output()
+        .map_err(|e| format!("执行 ffprobe 失败: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "ffprobe 失败: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parts: Vec<&str> = stdout.trim().split(',').collect();
+
+    if parts.len() < 2 {
+        return Err("无法解析视频信息".to_string());
+    }
+
+    let width: u32 = parts[0].parse().map_err(|_| "无法解析宽度")?;
+    let height: u32 = parts[1].parse().map_err(|_| "无法解析高度")?;
+
+    // duration 可能为空或 N/A
+    let duration_ms = if parts.len() >= 3 {
+        parts[2].parse::<f64>().ok().map(|d| (d * 1000.0) as i64).unwrap_or(0)
+    } else {
+        0
+    };
+
+    Ok(VideoInfo {
+        width,
+        height,
+        duration_ms,
+    })
 }
 
 fn handle_stderr_line(app: &AppHandle, text: &str, duration_ms: &mut i64, tail: &mut String) {

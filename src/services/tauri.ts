@@ -141,3 +141,21 @@ export async function getModelDownloadProgress(
 ): Promise<ModelDownloadSnapshot> {
   return invoke<ModelDownloadSnapshot>("get_model_download_progress", { jobId });
 }
+
+/** 保存 ASS 文本到文件。 */
+export async function saveAssText(
+  assPath: string,
+  assText: string,
+): Promise<void> {
+  return invoke("save_ass_text", { assPath, assText });
+}
+
+/** 加载 ASS 文件内容。 */
+export async function loadAssText(assPath: string): Promise<string> {
+  return invoke<string>("load_ass_text", { assPath });
+}
+
+/** 获取视频信息（分辨率、时长）。 */
+export async function getVideoInfo(videoPath: string): Promise<import("../types").VideoInfo> {
+  return invoke<import("../types").VideoInfo>("get_video_info", { videoPath });
+}

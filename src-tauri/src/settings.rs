@@ -17,6 +17,10 @@ pub struct AppSettings {
     pub translation_api_key: Option<String>,
     pub default_source_lang: String,
     pub default_target_lang: String,
+    pub translation_batch_size: u32,
+    pub translation_context_window: u32,
+    pub translation_custom_prompt: Option<String>,
+    pub translation_glossary: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -33,6 +37,10 @@ impl Default for AppSettings {
             translation_api_key: None,
             default_source_lang: "auto".into(),
             default_target_lang: "zh-CN".into(),
+            translation_batch_size: 25,
+            translation_context_window: 2,
+            translation_custom_prompt: None,
+            translation_glossary: None,
         }
     }
 }

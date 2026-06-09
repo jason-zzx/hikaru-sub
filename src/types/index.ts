@@ -53,6 +53,10 @@ export interface AppSettings {
   translationApiKey?: string;
   defaultSourceLang: string;
   defaultTargetLang: string;
+  translationBatchSize: number;
+  translationContextWindow: number;
+  translationCustomPrompt?: string;
+  translationGlossary?: string;
 }
 
 export type FfmpegSource = "settings" | "bundled" | "system";
@@ -135,4 +139,10 @@ export interface ModelDownloadSnapshot {
   downloadedBytes: number;
   totalBytes: number;
   error: string | null;
+}
+
+export interface VideoInfo {
+  width: number;
+  height: number;
+  durationMs: number;
 }
