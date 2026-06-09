@@ -142,7 +142,10 @@ export function TranslateView() {
 
           // 生成译文文件路径：原文件名 + .translated.ass
           const translatedPath = project.assPath.replace(/\.ass$/i, '.translated.ass');
-          await saveAssText(translatedPath, serializeAss(doc));
+          await saveAssText(
+            translatedPath,
+            serializeAss(doc, { mergeMode: settings.subtitleMergeMode })
+          );
 
           console.log(`翻译后的字幕已保存到: ${translatedPath}`);
         } catch (saveErr) {

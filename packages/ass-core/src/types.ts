@@ -97,4 +97,7 @@ export interface ParseOptions extends Partial<BilingualOptions> {
 }
 
 /** 序列化选项。 */
-export interface SerializeOptions extends Partial<BilingualOptions> {}
+export interface SerializeOptions extends Partial<BilingualOptions> {
+  /** 字幕合并模式：inline = 单行拼接（译文 / 原文），separate = 分离双行 */
+  mergeMode?: "inline" | "separate";
+}
