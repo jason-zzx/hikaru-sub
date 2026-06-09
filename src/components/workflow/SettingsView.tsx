@@ -7,6 +7,7 @@ import {
   setSettings,
 } from "../../services/tauri";
 import { Select } from "../ui/Select";
+import { ModelManager } from "./ModelManager";
 import type { AppSettings, FfmpegStatus } from "../../types";
 
 const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
@@ -175,6 +176,9 @@ export function SettingsView() {
                 onChange={(v) => update("asrModel", v)}
                 options={ASR_MODELS.map((m) => ({ value: m, label: m }))}
               />
+              <div className="mt-1.5">
+                <ModelManager engine={settings.asrEngine} model={settings.asrModel} />
+              </div>
             </Field>
             <Field label="设备">
               <Select

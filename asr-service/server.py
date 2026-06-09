@@ -6,7 +6,8 @@ from fastapi import FastAPI, HTTPException
 
 from engines.registry import list_engines
 from jobs import JobManager
-from schemas import TranscribeRequest
+from models import DownloadManager
+from schemas import DownloadModelRequest, TranscribeRequest
 
 VERSION = "0.1.0"
 
@@ -14,6 +15,7 @@ VERSION = "0.1.0"
 def create_app() -> FastAPI:
     app = FastAPI(title="Hikaru-Sub ASR Sidecar", version=VERSION)
     manager = JobManager()
+    downloads = DownloadManager()
 
     @app.get("/health")
     def health() -> dict:
@@ -22,6 +24,33 @@ def create_app() -> FastAPI:
     @app.get("/engines")
     def engines() -> dict:
         return {"engines": list_engines()}
+
+    @app.get("/models/status")
+    def model_status(
+        engine: str = "faster-whisper", model: str = "large-v3"
+    ) -> dict:
+        available = any(
+            e["name"] == engine and e["available"] for e in list_engines()
+        )
+        downloaded = downloads.is_downloaded(engine, model) if available else False
+        return {
+            "engine": engine,
+            "model": model,
+            "available": available,
+            "downloaded": downloaded,
+        }
+
+    @app.post("/models/download")
+    def model_download(req: DownloadModelRequest) -> dict:
+        job = downloads.start(req.engine, req.model)
+        return {"jobId": job.id, "status": job.status.value}
+
+    @app.get("/models/download/{job_id}")
+    def model_download_progress(job_id: str) -> dict:
+        job = downloads.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        return job.snapshot()
 
     @app.post("/transcribe")
     def transcribe(req: TranscribeRequest) -> dict:

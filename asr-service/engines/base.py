@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterator, Optional
+from typing import Callable, Iterator, Optional
 
 
 @dataclass
@@ -57,6 +57,20 @@ class AsrEngine(ABC):
     def is_available() -> bool:
         """运行依赖是否就绪（如对应的 Python 包是否已安装）。"""
         return True
+
+    @staticmethod
+    def is_model_downloaded(model: str) -> bool:
+        """模型是否已就绪。无需单独下载的引擎默认返回 True。"""
+        return True
+
+    @staticmethod
+    def download_model(
+        model: str,
+        *,
+        progress: Optional[Callable[[int, int], None]] = None,
+    ) -> None:
+        """下载模型到本地缓存。不支持下载的引擎应抛出 AsrError。"""
+        raise AsrError("该引擎不支持模型下载")
 
     @abstractmethod
     def load(self) -> None:
