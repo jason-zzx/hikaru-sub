@@ -42,10 +42,13 @@ src/                          # React 前端
   types/                      # 共享 TS 类型
 src-tauri/                    # Rust 后端
   src/
-    ffmpeg.rs                 # FFmpeg 检测与调用
+    ffmpeg.rs                 # FFmpeg 检测、音轨提取、视频信息、波形提取
     asr.rs                    # ASR sidecar 进程管理 + HTTP 代理
+    ass.rs                    # ASS 文件读写
+    asset_scope.rs            # Tauri asset protocol 动态授权
     project.rs                # .hikaru/project.json
     settings.rs               # 全局设置持久化
+    transcode.rs              # 不兼容视频编码的代理视频转码与缓存
 packages/ass-core/              # ASS 解析/序列化（workspace 包）
 asr-service/                  # Python ASR sidecar（FastAPI HTTP）
   main.py                     # 入口：选端口 + uvicorn + stdout 就绪协议
@@ -56,10 +59,10 @@ asr-service/                  # Python ASR sidecar（FastAPI HTTP）
 
 ## 架构边界
 
-- **Tauri Rust**：文件 I/O、FFmpeg、启动 ASR sidecar、项目元数据
+- **Tauri Rust**：文件 I/O、FFmpeg、音频波形、视频代理转码、启动 ASR sidecar、项目元数据
 - **React**：全部 UI、ASS 文本编辑、翻译 API 调用
 - **Python sidecar**：ASR 推理，通过 HTTP localhost 通信，不阻塞 UI
-- **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`，保存时展开为双语 Dialogue 行
+- **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`，保存时按配置输出行内合并或分离双行
 
 ```mermaid
 flowchart LR
@@ -70,7 +73,7 @@ flowchart LR
 
 ### 项目 `.hikaru/project.json`
 
-与视频同目录的 `.hikaru/` 文件夹，含 `project.json`、`audio.wav`、`subtitles.ass`。
+与视频同目录的 `.hikaru/` 文件夹，含 `project.json`、`audio.wav`、`subtitles.ass`。翻译后字幕保存为 `subtitles.translated.ass`。
 
 ### SubtitleCue（逻辑字幕条）
 
@@ -86,9 +89,19 @@ interface SubtitleCue {
 }
 ```
 
-双语 ASS 默认：`Primary`（原文偏下）+ `Secondary`（译文偏上），同时间轴两行 Dialogue。
+双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary`（原文）+ `Secondary`（译文），同时间轴两行 Dialogue。
 
-## Tauri Commands
+### 视频编辑兼容策略
+
+编辑页优先通过 Tauri asset protocol 直接加载原视频。WebView2 不支持的编码（如 HEVC/H.265、VP9、AV1）会通过 FFmpeg 生成 480p H.264 全关键帧代理视频：
+
+```text
+-vf scale=-2:480 -c:v libx264 -preset ultrafast -g 1 -crf 22 -c:a aac -b:a 128k -movflags +faststart
+```
+
+代理视频写入应用缓存目录 `transcode/*.mp4`，用于快速 seek；时间轴另行提取音频波形用于细致对轴。
+
+## 已实现 Tauri Commands
 
 | Command | 职责 |
 |---------|------|
@@ -97,14 +110,24 @@ interface SubtitleCue {
 | `check_ffmpeg` | 检测 FFmpeg |
 | `get_settings` / `set_settings` | 全局配置 |
 | `extract_audio` | FFmpeg 提取 16kHz WAV + 进度事件 |
+| `extract_waveform` | 提取音频波形峰值数据 |
 | `path_exists` | 判断文件/目录是否存在 |
 | `list_asr_engines` | 列出 sidecar 已注册引擎及可用性（按需拉起 sidecar） |
 | `start_asr` | 创建转录任务，返回 jobId |
 | `get_asr_progress` | 轮询任务进度/片段 |
 | `cancel_asr` | 取消转录任务 |
+| `check_asr_model` | 检查本地 ASR 模型状态 |
+| `download_asr_model` | 下载 ASR 模型 |
+| `get_model_download_progress` | 获取 ASR 模型下载进度 |
 | `save_ass_text` / `load_ass_text` | ASS 文件读写 |
 | `get_video_info` | 获取视频分辨率、时长等元信息 |
-| `burn_subtitles` | FFmpeg 压制（待实现） |
+| `allow_asset_path` | 将本地视频/代理视频路径加入 asset scope |
+| `detect_video_codec` | 检测视频编码格式 |
+| `start_transcode` | 启动代理视频转码 |
+| `check_transcode_progress` | 查询代理视频转码状态 |
+| `stop_transcode` | 清理转码任务记录 |
+
+计划中 command：`burn_subtitles`（FFmpeg 压制输出向导）。
 
 新增 command 时：在 `src-tauri/src/` 实现 → `lib.rs` 注册 → `src/services/tauri.ts` 封装 → 更新 capabilities 权限。
 
@@ -129,7 +152,9 @@ interface SubtitleCue {
 - [x] 转录工作流 UI（TranscribeView：音轨提取 + 转录进度 + 生成单语 ASS；使用视频实际分辨率，不强制换行）
 - [x] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView：批量翻译 + 进度显示 + 术语表/自定义 prompt 支持）
 - [x] ASS 文件持久化（转录后自动保存，打开项目时自动加载）
-- [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 时间轴 + 撤销重做）
+- [x] 字幕合并模式配置（默认行内 `译文 / 原文`，可切换分离双行）
+- [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做）
+- [x] 视频播放兼容处理（asset protocol 加载；不兼容编码生成 480p H.264 全关键帧代理视频并缓存）
 - [ ] FFmpeg 压制（BurnView 输出向导）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 
