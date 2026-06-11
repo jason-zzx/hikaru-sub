@@ -1,8 +1,10 @@
 mod asr;
 mod ass;
+mod asset_scope;
 mod ffmpeg;
 mod project;
 mod settings;
+mod transcode;
 
 use tauri::Manager;
 
@@ -13,6 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_persisted_scope::init())
         .manage(asr::AsrState::default())
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
@@ -20,6 +23,7 @@ pub fn run() {
             ffmpeg::check_ffmpeg,
             ffmpeg::extract_audio,
             ffmpeg::get_video_info,
+            ffmpeg::extract_waveform,
             project::create_project,
             project::open_project,
             project::path_exists,
@@ -32,7 +36,16 @@ pub fn run() {
             asr::get_model_download_progress,
             ass::save_ass_text,
             ass::load_ass_text,
+            asset_scope::allow_asset_path,
+            transcode::detect_video_codec,
+            transcode::start_transcode,
+            transcode::check_transcode_progress,
+            transcode::stop_transcode,
         ])
+        .setup(|app| {
+            transcode::init_transcode_state(app);
+            Ok(())
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {

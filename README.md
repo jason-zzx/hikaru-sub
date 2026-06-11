@@ -6,16 +6,28 @@ AI 字幕桌面应用：本地 ASR 转录、大模型翻译、字幕编辑与 FF
 
 ✅ **已实现**：
 - 项目管理（创建/打开项目，`.hikaru` 元数据）
-- FFmpeg 集成（音轨提取、视频信息获取）
+- FFmpeg 集成（音轨提取、视频信息获取、H.265 代理视频转码）
 - Python ASR sidecar（faster-whisper 适配器 + HTTP 进度 API）
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
 - 翻译工作流（配置界面 + 进度显示 → 生成双语 ASS）
 - 设置页（FFmpeg/Python 路径、ASR 引擎、翻译 API、高级配置）
 - ASS 文件持久化（自动保存/加载字幕文件）
+- 字幕编辑器（视频播放 + 字幕列表 + 编辑面板 + 音频波形时间轴 + 撤销重做）
+- 视频代理转码（480p 全关键帧 H.264，逐帧精准 seek）
 
-🚧 **进行中**：
-- 字幕编辑器（列表、时间轴、播放同步、撤销重做）
+🚧 **待优化**：
+1. 首页增加显示最近项目列表
+2. 转录页添加 VAD 等细节设置，提升转录效果
+3. 翻译页进度条显示优化
+4. 翻译页支持单独配置每批翻译条数、上下文条数、自定义 prompt 和术语表、字幕合并模式（当前使用全局设置）
+5. 编辑页功能完善：
+   - 快捷键操作（上下切换字幕、时间轴左右移动）
+   - 字幕随时间轴选定位置实时渲染预览
+   - 字幕样式编辑（字体、颜色、位置）
+   - 多行字幕渲染支持
+
+📋 **计划中**：
 - FFmpeg 压制（硬/软字幕输出向导）
 
 ## 技术栈
@@ -54,8 +66,14 @@ src/                          # React 前端
   components/
     layout/                   # 布局、侧边栏、状态栏
     workflow/                 # 导入、转录、翻译、设置页
-    editor/                   # 字幕编辑器（待实现）
-    player/                   # 视频预览（待实现）
+    editor/                   # 字幕编辑器组件
+      EditorView.tsx          # 编辑器主视图
+      SubtitleList.tsx        # 字幕列表
+      SubtitleEditor.tsx      # 编辑面板
+      Timeline.tsx            # 时间轴可视化
+    player/                   # 视频播放器
+      VideoPlayer.tsx         # 视频播放 + 字幕叠加
+      PlaybackControls.tsx    # 播放控制栏
   stores/                     # Zustand 状态管理
   services/                   # Tauri 命令封装 + 翻译服务
 src-tauri/                    # Tauri Rust 后端

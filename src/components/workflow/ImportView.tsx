@@ -74,17 +74,29 @@ export function ImportView() {
       const meta = await openProject(dir);
       setProject(meta, dir);
 
-      // 如果存在 ASS 文件，加载字幕到 store
+      // 优先加载翻译后的字幕文件，回退到原始字幕
       if (meta.assPath) {
         try {
           const { loadAssText, pathExists } = await import("../../services/tauri");
-          const exists = await pathExists(meta.assPath);
-          if (exists) {
-            const assText = await loadAssText(meta.assPath);
-            const { parseAss } = await import("@hikaru/ass-core");
+          const { parseAss } = await import("@hikaru/ass-core");
+          const { setCues } = useProjectStore.getState();
+
+          // 尝试加载 .translated.ass
+          const translatedPath = meta.assPath.replace(/\.ass$/, ".translated.ass");
+          const translatedExists = await pathExists(translatedPath);
+
+          if (translatedExists) {
+            const assText = await loadAssText(translatedPath);
             const doc = parseAss(assText);
-            const { setCues } = useProjectStore.getState();
             setCues(doc.cues);
+          } else {
+            // 回退到原始字幕
+            const exists = await pathExists(meta.assPath);
+            if (exists) {
+              const assText = await loadAssText(meta.assPath);
+              const doc = parseAss(assText);
+              setCues(doc.cues);
+            }
           }
         } catch (loadErr) {
           console.warn("加载 ASS 文件失败:", loadErr);

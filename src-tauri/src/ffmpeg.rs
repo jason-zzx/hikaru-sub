@@ -313,6 +313,76 @@ pub async fn get_video_info(
     })
 }
 
+/// 提取音频波形数据（峰值数组），用于 Timeline 渲染
+#[tauri::command]
+pub async fn extract_waveform(
+    app: AppHandle,
+    video_path: String,
+    samples: usize,
+) -> Result<Vec<f32>, String> {
+    let settings = load_settings(&app).unwrap_or_default();
+    let (ffmpeg, _) = resolve_ffmpeg(&app, &settings);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        run_extract_waveform(&ffmpeg, &video_path, samples)
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {e}"))?
+}
+
+fn run_extract_waveform(ffmpeg: &str, video_path: &str, samples: usize) -> Result<Vec<f32>, String> {
+    // FFmpeg 提取 16bit PCM，单声道，16kHz
+    let mut child = Command::new(ffmpeg)
+        .args([
+            "-i", video_path,
+            "-vn",
+            "-f", "s16le",
+            "-acodec", "pcm_s16le",
+            "-ar", "16000",
+            "-ac", "1",
+            "-",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("无法启动 FFmpeg: {e}"))?;
+
+    let mut stdout = child.stdout.take().ok_or("无法读取输出")?;
+    let mut pcm_data = Vec::new();
+    stdout.read_to_end(&mut pcm_data).map_err(|e| format!("读取失败: {e}"))?;
+
+    let status = child.wait().map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err("FFmpeg 提取音频失败".to_string());
+    }
+
+    // 转换为 i16 样本
+    let mut audio_samples = Vec::with_capacity(pcm_data.len() / 2);
+    for chunk in pcm_data.chunks_exact(2) {
+        let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
+        audio_samples.push(sample);
+    }
+
+    // 下采样计算峰值
+    let chunk_size = audio_samples.len() / samples.max(1);
+    let mut peaks = Vec::with_capacity(samples);
+
+    for i in 0..samples {
+        let start = i * chunk_size;
+        let end = ((i + 1) * chunk_size).min(audio_samples.len());
+        if start >= audio_samples.len() {
+            peaks.push(0.0);
+            continue;
+        }
+
+        let chunk = &audio_samples[start..end];
+        let max = chunk.iter().map(|&s| s.abs_diff(0)).max().unwrap_or(0);
+        peaks.push(max as f32 / 32768.0); // 归一化到 0-1
+    }
+
+    Ok(peaks)
+}
+
 fn handle_stderr_line(app: &AppHandle, text: &str, duration_ms: &mut i64, tail: &mut String) {
     if *duration_ms == 0 {
         if let Some(d) = parse_duration_line(text) {
