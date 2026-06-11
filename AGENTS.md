@@ -129,7 +129,7 @@ interface SubtitleCue {
 - [x] 转录工作流 UI（TranscribeView：音轨提取 + 转录进度 + 生成单语 ASS；使用视频实际分辨率，不强制换行）
 - [x] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView：批量翻译 + 进度显示 + 术语表/自定义 prompt 支持）
 - [x] ASS 文件持久化（转录后自动保存，打开项目时自动加载）
-- [ ] 字幕编辑器（EditorView：列表、时间轴、播放同步、撤销重做）
+- [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 时间轴 + 撤销重做）
 - [ ] FFmpeg 压制（BurnView 输出向导）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 
