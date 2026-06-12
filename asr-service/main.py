@@ -20,6 +20,7 @@ import sys
 
 import uvicorn
 
+from diagnostics import debug_exception, debug_log
 from server import create_app
 
 
@@ -39,9 +40,11 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=0, help="0 = 自动选择空闲端口")
     parser.add_argument("--log-level", default="warning")
     args = parser.parse_args()
+    debug_log("main_start", host=args.host, port=args.port, argv=sys.argv)
 
     sock = _bind_socket(args.host, args.port)
     actual_port = sock.getsockname()[1]
+    debug_log("socket_bound", host=args.host, port=actual_port)
 
     app = create_app()
     config = uvicorn.Config(app, log_level=args.log_level)
@@ -52,12 +55,18 @@ def main() -> None:
         json.dumps({"event": "ready", "host": args.host, "port": actual_port}),
         flush=True,
     )
+    debug_log("ready_printed", host=args.host, port=actual_port)
 
     try:
         server.run(sockets=[sock])
+    except Exception as exc:
+        debug_exception("server_run_error", exc)
+        raise
     except KeyboardInterrupt:
+        debug_log("keyboard_interrupt")
         pass
     finally:
+        debug_log("main_shutdown")
         sock.close()
         sys.stdout.flush()
 

@@ -9,6 +9,11 @@ import {
 import { Select } from "../ui/Select";
 import { ModelManager } from "./ModelManager";
 import type { AppSettings, FfmpegStatus } from "../../types";
+import {
+  ASR_ENGINE_OPTIONS,
+  asrModelOptions,
+  defaultAsrModel,
+} from "../../constants/asr";
 
 const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
   settings: "自定义路径",
@@ -32,7 +37,6 @@ const TARGET_LANGS = [
   { value: "ko", label: "韩语" },
 ];
 
-const ASR_MODELS = ["tiny", "base", "small", "medium", "large-v2", "large-v3"];
 const ASR_DEVICES = [
   { value: "auto", label: "自动" },
   { value: "cpu", label: "CPU" },
@@ -84,6 +88,11 @@ export function SettingsView() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateAsrEngine = (engine: string) => {
+    update("asrEngine", engine);
+    update("asrModel", defaultAsrModel(engine));
   };
 
   if (!settings) {
@@ -166,16 +175,21 @@ export function SettingsView() {
             <Field label="引擎">
               <Select
                 value={settings.asrEngine}
-                onChange={(v) => update("asrEngine", v)}
-                options={[{ value: "faster-whisper", label: "faster-whisper" }]}
+                onChange={updateAsrEngine}
+                options={ASR_ENGINE_OPTIONS}
               />
             </Field>
             <Field label="模型">
               <Select
                 value={settings.asrModel}
                 onChange={(v) => update("asrModel", v)}
-                options={ASR_MODELS.map((m) => ({ value: m, label: m }))}
+                options={asrModelOptions(settings.asrEngine)}
               />
+              {settings.asrEngine === "parakeet" && (
+                <p className="mt-1 text-xs text-text-muted">
+                  Parakeet 使用 NVIDIA NeMo，可选依赖需单独安装；当前集成针对日语模型。
+                </p>
+              )}
               <div className="mt-1.5">
                 <ModelManager engine={settings.asrEngine} model={settings.asrModel} />
               </div>

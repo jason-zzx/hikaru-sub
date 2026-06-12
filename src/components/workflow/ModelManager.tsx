@@ -106,7 +106,9 @@ export function ModelManager({
     statusText = <span className="text-danger">检测失败</span>;
   } else if (status && !status.available) {
     statusText = (
-      <span className="text-danger">引擎不可用（未安装 faster-whisper）</span>
+      <span className="text-danger">
+        引擎不可用（未安装 {engine === "parakeet" ? "NeMo/Parakeet 可选依赖" : engine}）
+      </span>
     );
   } else if (status?.downloaded) {
     statusText = <span className="text-success">已下载</span>;

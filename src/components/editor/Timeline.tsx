@@ -137,7 +137,7 @@ export function Timeline() {
         ctx.save();
         ctx.rect(Math.max(0, startX), trackTop, Math.min(w, width - startX), trackHeight);
         ctx.clip();
-        ctx.fillText(text, Math.max(2, startX + 2), trackTop + 20);
+        ctx.fillText(text, Math.max(2, startX + 2), trackTop + 20, maxWidth);
         ctx.restore();
       }
     });

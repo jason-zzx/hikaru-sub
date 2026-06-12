@@ -118,6 +118,7 @@ export interface StartAsrArgs {
   model: string;
   device: string;
   language?: string | null;
+  outputAssPath?: string | null;
 }
 
 /** ASR 模型在本地缓存中的就绪状态。 */

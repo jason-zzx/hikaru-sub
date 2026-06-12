@@ -5,6 +5,8 @@
 
 use crate::settings::{load_settings, AppSettings};
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -15,6 +17,7 @@ use tokio::sync::Mutex;
 pub struct Sidecar {
     base_url: String,
     child: Child,
+    pid: u32,
 }
 
 impl Sidecar {
@@ -24,8 +27,21 @@ impl Sidecar {
 }
 
 /// 受 Tauri 托管的全局 sidecar 状态（至多一个进程）。
-#[derive(Default)]
-pub struct AsrState(pub Mutex<Option<Sidecar>>);
+pub struct AsrState {
+    pub sidecar: Mutex<Option<Sidecar>>,
+    job_base_urls: Mutex<HashMap<String, String>>,
+    job_recovery_paths: Mutex<HashMap<String, PathBuf>>,
+}
+
+impl Default for AsrState {
+    fn default() -> Self {
+        Self {
+            sidecar: Mutex::new(None),
+            job_base_urls: Mutex::new(HashMap::new()),
+            job_recovery_paths: Mutex::new(HashMap::new()),
+        }
+    }
+}
 
 #[derive(Deserialize)]
 struct ReadyLine {
@@ -41,6 +57,7 @@ pub struct StartAsrArgs {
     model: String,
     device: String,
     language: Option<String>,
+    output_ass_path: Option<String>,
 }
 
 /// 解析 asr-service 目录（含 main.py）：设置 → 资源目录 → 当前目录及其上级。
@@ -102,14 +119,23 @@ fn python_candidates(settings: &AppSettings, dir: &Path) -> Vec<String> {
 
 /// 启动 sidecar 并阻塞读取其就绪端口；成功后保留进程并持续排空 stdout。
 fn spawn_sidecar(python: &str, dir: &Path) -> Result<Sidecar, String> {
+    let debug_log_path = dir.join("asr-debug.log");
+    eprintln!(
+        "[asr] spawning sidecar python={python} dir={} debug_log={}",
+        dir.display(),
+        debug_log_path.display()
+    );
     let mut child = Command::new(python)
         .args(["main.py", "--host", "127.0.0.1", "--port", "0"])
         .current_dir(dir)
+        .env("HIKARU_ASR_DEBUG_LOG", &debug_log_path)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| format!("启动 sidecar 失败（{python}）：{e}"))?;
+    let pid = child.id();
+    eprintln!("[asr] sidecar spawned pid={pid}");
 
     let stdout = child
         .stdout
@@ -140,6 +166,7 @@ fn spawn_sidecar(python: &str, dir: &Path) -> Result<Sidecar, String> {
             return Err("sidecar 未输出就绪端口（请检查 Python 依赖是否已安装）".into());
         }
     };
+    eprintln!("[asr] sidecar ready pid={pid} base_url={base_url}");
 
     // 持续排空剩余 stdout，避免管道写满阻塞子进程
     std::thread::spawn(move || {
@@ -152,17 +179,32 @@ fn spawn_sidecar(python: &str, dir: &Path) -> Result<Sidecar, String> {
         }
     });
 
-    Ok(Sidecar { base_url, child })
+    Ok(Sidecar {
+        base_url,
+        child,
+        pid,
+    })
 }
 
 /// 确保 sidecar 在运行并返回其 base_url（必要时拉起新进程）。
 async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, String> {
-    let mut guard = state.0.lock().await;
+    let mut guard = state.sidecar.lock().await;
 
     if let Some(sc) = guard.as_mut() {
         match sc.child.try_wait() {
             Ok(None) => return Ok(sc.base_url.clone()), // 仍在运行
-            _ => {
+            Ok(Some(status)) => {
+                eprintln!(
+                    "[asr] sidecar exited pid={} base_url={} status={status}",
+                    sc.pid, sc.base_url
+                );
+                *guard = None; // 已退出，丢弃后重启
+            }
+            Err(err) => {
+                eprintln!(
+                    "[asr] failed to inspect sidecar pid={} base_url={} error={err}",
+                    sc.pid, sc.base_url
+                );
                 *guard = None; // 已退出，丢弃后重启
             }
         }
@@ -188,6 +230,80 @@ async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, St
     let base = sidecar.base_url.clone();
     *guard = Some(sidecar);
     Ok(base)
+}
+
+async fn remember_job_base_url(state: &AsrState, job_id: &str, base_url: &str) {
+    state
+        .job_base_urls
+        .lock()
+        .await
+        .insert(job_id.to_string(), base_url.to_string());
+}
+
+async fn known_job_base_url(state: &AsrState, job_id: &str) -> Option<String> {
+    state.job_base_urls.lock().await.get(job_id).cloned()
+}
+
+fn recovery_snapshot_path_for_audio(audio_path: &str, job_id: &str) -> Option<PathBuf> {
+    Path::new(audio_path)
+        .parent()
+        .map(|parent| parent.join("asr-jobs").join(format!("{job_id}.json")))
+}
+
+async fn remember_job_recovery_path(state: &AsrState, job_id: &str, audio_path: &str) {
+    if let Some(path) = recovery_snapshot_path_for_audio(audio_path, job_id) {
+        state
+            .job_recovery_paths
+            .lock()
+            .await
+            .insert(job_id.to_string(), path);
+    }
+}
+
+async fn known_job_recovery_path(state: &AsrState, job_id: &str) -> Option<PathBuf> {
+    state.job_recovery_paths.lock().await.get(job_id).cloned()
+}
+
+fn read_recovery_snapshot(
+    path: &Path,
+    job_id: &str,
+    include_segments: bool,
+) -> Result<Option<serde_json::Value>, String> {
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let text = fs::read_to_string(path)
+        .map_err(|e| format!("读取 ASR 恢复结果失败（{}）：{e}", path.display()))?;
+    let mut value: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| format!("解析 ASR 恢复结果失败（{}）：{e}", path.display()))?;
+    let recovered_id = value.get("id").and_then(|x| x.as_str());
+    if recovered_id != Some(job_id) {
+        return Ok(None);
+    }
+    if !include_segments {
+        if let Some(obj) = value.as_object_mut() {
+            obj.remove("segments");
+        }
+    }
+    Ok(Some(value))
+}
+
+fn try_recover_job_snapshot(
+    recovery_path: Option<&Path>,
+    job_id: &str,
+    include_segments: bool,
+) -> Result<Option<serde_json::Value>, String> {
+    let Some(path) = recovery_path else {
+        return Ok(None);
+    };
+    let snapshot = read_recovery_snapshot(path, job_id, include_segments)?;
+    if snapshot.is_some() {
+        eprintln!(
+            "[asr] recovered job snapshot job_id={job_id} recovery_path={}",
+            path.display()
+        );
+    }
+    Ok(snapshot)
 }
 
 #[tauri::command]
@@ -221,6 +337,7 @@ pub async fn start_asr(
         "model": args.model,
         "device": args.device,
         "language": args.language,
+        "outputAssPath": args.output_ass_path,
     });
     let resp = client
         .post(format!("{base}/transcribe"))
@@ -232,10 +349,15 @@ pub async fn start_asr(
         return Err(format!("转录请求失败：HTTP {}", resp.status().as_u16()));
     }
     let v: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    v.get("jobId")
+    let job_id = v
+        .get("jobId")
         .and_then(|x| x.as_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| "sidecar 响应缺少 jobId".to_string())
+        .ok_or_else(|| "sidecar 响应缺少 jobId".to_string())?;
+    remember_job_base_url(&state, &job_id, &base).await;
+    remember_job_recovery_path(&state, &job_id, &args.audio_path).await;
+    eprintln!("[asr] start_asr job_id={job_id} base_url={base}");
+    Ok(job_id)
 }
 
 #[tauri::command]
@@ -245,17 +367,36 @@ pub async fn get_asr_progress(
     job_id: String,
     include_segments: Option<bool>,
 ) -> Result<serde_json::Value, String> {
-    let base = ensure_base_url(&app, &state).await?;
+    let base = match known_job_base_url(&state, &job_id).await {
+        Some(url) => url,
+        None => ensure_base_url(&app, &state).await?,
+    };
     let client = reqwest::Client::new();
     let seg = include_segments.unwrap_or(true);
-    let resp = client
+    let recovery_path = known_job_recovery_path(&state, &job_id).await;
+    let resp = match client
         .get(format!("{base}/jobs/{job_id}"))
         .query(&[("segments", if seg { "true" } else { "false" })])
         .send()
         .await
-        .map_err(|e| format!("无法连接 sidecar：{e}"))?;
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            if let Some(snapshot) =
+                try_recover_job_snapshot(recovery_path.as_deref(), &job_id, seg)?
+            {
+                return Ok(snapshot);
+            }
+            return Err(format!(
+                "无法连接 sidecar（jobId={job_id}, sidecar={base}）：{e}"
+            ));
+        }
+    };
     if resp.status().as_u16() == 404 {
-        return Err("转录任务不存在".into());
+        if let Some(snapshot) = try_recover_job_snapshot(recovery_path.as_deref(), &job_id, seg)? {
+            return Ok(snapshot);
+        }
+        return Err(format!("转录任务不存在（jobId={job_id}, sidecar={base}）"));
     }
     resp.json::<serde_json::Value>()
         .await
@@ -335,15 +476,76 @@ pub async fn cancel_asr(
     state: State<'_, AsrState>,
     job_id: String,
 ) -> Result<(), String> {
-    let base = ensure_base_url(&app, &state).await?;
+    let base = match known_job_base_url(&state, &job_id).await {
+        Some(url) => url,
+        None => ensure_base_url(&app, &state).await?,
+    };
     let client = reqwest::Client::new();
     let resp = client
         .post(format!("{base}/jobs/{job_id}/cancel"))
         .send()
         .await
-        .map_err(|e| format!("无法连接 sidecar：{e}"))?;
+        .map_err(|e| format!("无法连接 sidecar（jobId={job_id}, sidecar={base}）：{e}"))?;
     if !resp.status().is_success() {
         return Err(format!("取消失败：HTTP {}", resp.status().as_u16()));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("hikaru_sub_{name}_{unique}"))
+    }
+
+    #[test]
+    fn recovery_snapshot_path_is_derived_from_audio_parent() {
+        let path =
+            recovery_snapshot_path_for_audio(r"C:\video\.hikaru\audio.wav", "abc123").unwrap();
+
+        assert!(path.ends_with(Path::new(".hikaru").join("asr-jobs").join("abc123.json")));
+    }
+
+    #[test]
+    fn read_recovery_snapshot_strips_segments_when_not_requested() {
+        let dir = temp_dir("asr_recovery");
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("job.json");
+        fs::write(
+            &path,
+            r#"{
+              "id": "job-1",
+              "status": "completed",
+              "progress": 1.0,
+              "durationMs": 1200,
+              "processedMs": 1200,
+              "segmentCount": 1,
+              "detectedLanguage": "ja",
+              "error": null,
+              "segments": [{"startMs": 0, "endMs": 1200, "text": "こんにちは"}]
+            }"#,
+        )
+        .unwrap();
+
+        let without_segments = read_recovery_snapshot(&path, "job-1", false)
+            .unwrap()
+            .unwrap();
+        assert!(without_segments.get("segments").is_none());
+        assert_eq!(without_segments["status"], "completed");
+
+        let with_segments = read_recovery_snapshot(&path, "job-1", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(with_segments["segments"].as_array().unwrap().len(), 1);
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
 }

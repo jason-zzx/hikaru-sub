@@ -13,6 +13,7 @@ asr-service/
 ├── engines/
 │   ├── base.py        # AsrEngine 抽象、AsrSegment、Transcription
 │   ├── faster_whisper.py  # 首个适配器
+│   ├── parakeet.py    # NVIDIA NeMo Parakeet 日语适配器
 │   └── registry.py    # 引擎注册表
 └── requirements.txt
 ```
@@ -29,6 +30,18 @@ pip install -r requirements.txt
 ```
 
 GPU 加速（faster-whisper CUDA）需另行安装匹配的 CUDA / cuDNN，详见 faster-whisper 文档。
+
+### 可选：NVIDIA Parakeet 日语模型
+
+`parakeet` 引擎使用 `nvidia/parakeet-tdt_ctc-0.6b-ja`，依赖 NVIDIA NeMo 与 PyTorch。为避免影响默认 faster-whisper 安装，Parakeet 依赖单独安装：
+
+```bash
+pip install -r requirements.txt
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
+pip install -r requirements-parakeet.txt
+```
+
+NeMo 2.7.x 需要 `torch>=2.6.0`，旧的 `cu121` wheel 源可能只解析到过旧版本；NVIDIA 驱动较新时优先使用 `cu126`。如果只使用 CPU，可按 PyTorch 官方指引安装 CPU 版本 torch。未安装 NeMo 时 sidecar 仍可启动，但 `/engines` 会将 `parakeet` 标为不可用。
 
 ## 运行
 
@@ -59,8 +72,8 @@ python main.py --host 127.0.0.1 --port 0
 ```json
 {
   "audioPath": "/path/to/.hikaru/audio.wav",
-  "engine": "faster-whisper",
-  "model": "large-v3",
+  "engine": "parakeet",
+  "model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
   "device": "auto",
   "language": "ja",
   "computeType": null
@@ -70,6 +83,7 @@ python main.py --host 127.0.0.1 --port 0
 - `device`：`auto` / `cpu` / `cuda`
 - `language`：`auto` 或 `null` 表示自动检测
 - `computeType`：留空时按设备推导（cpu→int8，cuda→float16）
+- `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段。
 
 响应：
 

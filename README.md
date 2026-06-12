@@ -7,7 +7,7 @@ AI 字幕桌面应用：本地 ASR 转录、大模型翻译、字幕编辑与 FF
 ✅ **已实现**：
 - 项目管理（创建/打开项目，`.hikaru` 元数据）
 - FFmpeg 集成（音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
-- Python ASR sidecar（faster-whisper 适配器 + HTTP 进度 API）
+- Python ASR sidecar（faster-whisper + NVIDIA Parakeet 日语适配器 + HTTP 进度 API）
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
 - 翻译工作流（配置界面 + 进度显示 → 生成 `.translated.ass`）
@@ -106,9 +106,11 @@ asr-service/                  # Python ASR sidecar
 
 ### 转录配置
 - 引擎选择：faster-whisper（支持 CPU/CUDA/auto）
+- 可选引擎：parakeet（NVIDIA NeMo `nvidia/parakeet-tdt_ctc-0.6b-ja`，日语专用）
 - 模型选择：tiny/base/small/medium/large-v2/large-v3
 - 自动模型下载与 CUDA 回退
 - 实时进度显示与任务取消
+- Parakeet 优先使用 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段
 
 ### 翻译配置
 - OpenAI 兼容 API（支持 OpenAI、DeepSeek、Ollama 等）

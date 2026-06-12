@@ -17,6 +17,7 @@ class TranscribeRequest(BaseModel):
     device: str = "auto"
     language: Optional[str] = None
     compute_type: Optional[str] = Field(default=None, alias="computeType")
+    output_ass_path: Optional[str] = Field(default=None, alias="outputAssPath")
 
 
 class DownloadModelRequest(BaseModel):
