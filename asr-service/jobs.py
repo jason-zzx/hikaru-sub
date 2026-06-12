@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Dict, List, Optional
 
+from ass_writer import write_ass_file
+from diagnostics import debug_exception, debug_log
 from engines.base import AsrError, AsrSegment
 from engines.registry import create_engine
 
@@ -31,6 +35,7 @@ class AsrJob:
     device: str
     language: Optional[str]
     compute_type: Optional[str] = None
+    output_ass_path: Optional[str] = None
     status: JobStatus = JobStatus.PENDING
     progress: float = 0.0
     duration_ms: int = 0
@@ -77,6 +82,7 @@ class JobManager:
         device: str,
         language: Optional[str],
         compute_type: Optional[str] = None,
+        output_ass_path: Optional[str] = None,
     ) -> AsrJob:
         job = AsrJob(
             id=uuid.uuid4().hex,
@@ -86,9 +92,20 @@ class JobManager:
             device=device,
             language=language,
             compute_type=compute_type,
+            output_ass_path=output_ass_path,
         )
         with self._lock:
             self._jobs[job.id] = job
+        debug_log(
+            "job_created",
+            jobId=job.id,
+            engine=engine,
+            model=model,
+            device=device,
+            language=language,
+            audioPath=audio_path,
+            outputAssPath=output_ass_path,
+        )
         thread = threading.Thread(target=self._run, args=(job,), daemon=True)
         thread.start()
         return job
@@ -104,20 +121,73 @@ class JobManager:
         job._cancel.set()
         return True
 
+    def _recovery_path(self, job: AsrJob) -> Path:
+        return Path(job.audio_path).parent / "asr-jobs" / f"{job.id}.json"
+
+    def _write_recovery_snapshot(self, job: AsrJob) -> None:
+        path = self._recovery_path(job)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{path.name}.tmp")
+        tmp.write_text(
+            json.dumps(job.snapshot(with_segments=True), ensure_ascii=False),
+            encoding="utf-8",
+        )
+        tmp.replace(path)
+        debug_log("job_recovery_saved", jobId=job.id, path=str(path))
+
+    def _write_completed_ass(self, job: AsrJob) -> None:
+        with job._lock:
+            if job.status != JobStatus.COMPLETED or not job.segments:
+                return
+            segments = list(job.segments)
+            output_ass_path = job.output_ass_path
+        ass_path = (
+            Path(output_ass_path)
+            if output_ass_path
+            else Path(job.audio_path).parent / "subtitles.ass"
+        )
+        write_ass_file(ass_path, segments)
+        debug_log(
+            "job_ass_saved",
+            jobId=job.id,
+            path=str(ass_path),
+            segmentCount=len(segments),
+        )
+
+    def _persist_terminal_outputs(self, job: AsrJob) -> None:
+        try:
+            self._write_recovery_snapshot(job)
+        except Exception as exc:  # noqa: BLE001 diagnostics only
+            debug_exception("job_recovery_save_error", exc, jobId=job.id)
+        try:
+            self._write_completed_ass(job)
+        except Exception as exc:  # noqa: BLE001 diagnostics only
+            debug_exception("job_ass_save_error", exc, jobId=job.id)
+
     def _run(self, job: AsrJob) -> None:
         with job._lock:
             job.status = JobStatus.RUNNING
+        debug_log("job_thread_start", jobId=job.id)
         try:
             if not os.path.isfile(job.audio_path):
                 raise AsrError(f"音频文件不存在: {job.audio_path}")
 
+            debug_log("job_create_engine_start", jobId=job.id, engine=job.engine)
             engine = create_engine(
                 job.engine,
                 model=job.model,
                 device=job.device,
                 compute_type=job.compute_type,
             )
+            debug_log("job_create_engine_done", jobId=job.id, engine=job.engine)
+            debug_log("job_transcribe_start", jobId=job.id)
             transcription = engine.transcribe(job.audio_path, language=job.language)
+            debug_log(
+                "job_transcribe_handle_ready",
+                jobId=job.id,
+                durationMs=transcription.duration_ms,
+                language=transcription.language,
+            )
             with job._lock:
                 job.duration_ms = transcription.duration_ms
                 job.detected_language = transcription.language
@@ -126,27 +196,44 @@ class JobManager:
                 if job._cancel.is_set():
                     with job._lock:
                         job.status = JobStatus.CANCELLED
+                    self._persist_terminal_outputs(job)
                     return
                 with job._lock:
                     job.segments.append(seg)
                     job.processed_ms = seg.end_ms
                     if job.duration_ms > 0:
                         job.progress = min(seg.end_ms / job.duration_ms, 1.0)
+                    count = len(job.segments)
+                if count == 1 or count % 20 == 0:
+                    debug_log(
+                        "job_segment",
+                        jobId=job.id,
+                        segmentCount=count,
+                        processedMs=seg.end_ms,
+                    )
 
             with job._lock:
                 # 取消可能恰在最后一段后触发
                 if job._cancel.is_set():
                     job.status = JobStatus.CANCELLED
+                    debug_log("job_cancelled_after_segments", jobId=job.id)
+                    self._persist_terminal_outputs(job)
                     return
                 job.status = JobStatus.COMPLETED
                 job.progress = 1.0
                 if job.duration_ms > 0:
                     job.processed_ms = job.duration_ms
+            self._persist_terminal_outputs(job)
+            debug_log("job_completed", jobId=job.id, segmentCount=len(job.segments))
         except AsrError as exc:
+            debug_exception("job_asr_error", exc, jobId=job.id)
             with job._lock:
                 job.status = JobStatus.FAILED
                 job.error = str(exc)
+            self._persist_terminal_outputs(job)
         except Exception as exc:  # noqa: BLE001 兜底，避免线程静默崩溃
+            debug_exception("job_internal_error", exc, jobId=job.id)
             with job._lock:
                 job.status = JobStatus.FAILED
                 job.error = f"内部错误: {exc}"
+            self._persist_terminal_outputs(job)

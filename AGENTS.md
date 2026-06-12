@@ -12,7 +12,7 @@ AI 字幕桌面应用：导入视频 → 本地 ASR 转录 → LLM 批量翻译 
 | 样式 | Tailwind CSS 4（`src/styles/index.css`） |
 | 状态 | Zustand（`src/stores/`） |
 | 字幕格式 | `@hikaru/ass-core`（`packages/ass-core/`） |
-| ASR | Python sidecar（`asr-service/`，可插拔引擎） |
+| ASR | Python sidecar（`asr-service/`，可插拔引擎：faster-whisper / parakeet） |
 | 翻译 | OpenAI 兼容 API 适配器（前端） |
 | 音视频 | 系统 FFmpeg（首期） |
 
@@ -54,7 +54,7 @@ asr-service/                  # Python ASR sidecar（FastAPI HTTP）
   main.py                     # 入口：选端口 + uvicorn + stdout 就绪协议
   server.py                   # FastAPI 路由
   jobs.py                     # JobManager：后台线程转录 + 进度/取消
-  engines/                    # AsrEngine 抽象 + faster-whisper + registry
+  engines/                    # AsrEngine 抽象 + faster-whisper + parakeet + registry
 ```
 
 ## 架构边界
@@ -90,6 +90,11 @@ interface SubtitleCue {
 ```
 
 双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary`（原文）+ `Secondary`（译文），同时间轴两行 Dialogue。
+
+### ASR 引擎
+
+- `faster-whisper`：默认引擎，模型列表为 tiny/base/small/medium/large-v2/large-v3。
+- `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，使用 `asr-service/requirements-parakeet.txt` 单独安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段。
 
 ### 视频编辑兼容策略
 
@@ -148,7 +153,7 @@ interface SubtitleCue {
 - [x] 项目管理 + FFmpeg 音轨提取（含 FFmpeg 捆绑/分层解析）
 - [x] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录；支持打开已有项目并加载 ASS）
 - [x] 设置页 UI（SettingsView：FFmpeg/Python 路径、默认引擎、翻译 API/Key、翻译高级配置）
-- [x] Python ASR sidecar（AsrEngine 抽象 + faster-whisper 适配器 + HTTP 进度 API）
+- [x] Python ASR sidecar（AsrEngine 抽象 + faster-whisper / parakeet 适配器 + HTTP 进度 API）
 - [x] 转录工作流 UI（TranscribeView：音轨提取 + 转录进度 + 生成单语 ASS；使用视频实际分辨率，不强制换行）
 - [x] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView：批量翻译 + 进度显示 + 术语表/自定义 prompt 支持）
 - [x] ASS 文件持久化（转录后自动保存，打开项目时自动加载）

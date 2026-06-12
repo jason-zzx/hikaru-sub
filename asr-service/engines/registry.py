@@ -6,9 +6,11 @@ from typing import Callable, Dict, List, Optional, Type
 
 from .base import AsrEngine
 from .faster_whisper import FasterWhisperEngine
+from .parakeet import ParakeetEngine
 
 _REGISTRY: Dict[str, Type[AsrEngine]] = {
     FasterWhisperEngine.name: FasterWhisperEngine,
+    ParakeetEngine.name: ParakeetEngine,
 }
 
 

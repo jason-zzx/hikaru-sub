@@ -52,7 +52,7 @@ pub fn run() {
             // 应用退出时尽力终止 sidecar 进程，避免残留
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 if let Some(state) = app_handle.try_state::<asr::AsrState>() {
-                    if let Ok(mut guard) = state.0.try_lock() {
+                    if let Ok(mut guard) = state.sidecar.try_lock() {
                         if let Some(mut sidecar) = guard.take() {
                             sidecar.kill();
                         }

@@ -11,6 +11,11 @@ import { IconCheck } from "../layout/NavIcons";
 import { Select } from "../ui/Select";
 import { ModelManager } from "./ModelManager";
 import {
+  ASR_ENGINE_OPTIONS,
+  asrModelOptions,
+  defaultAsrModel,
+} from "../../constants/asr";
+import {
   cancelAsr,
   checkFfmpeg,
   extractAudio,
@@ -26,7 +31,6 @@ import type {
   FfmpegStatus,
 } from "../../types";
 
-const ASR_MODELS = ["tiny", "base", "small", "medium", "large-v2", "large-v3"];
 const ASR_DEVICES = [
   { value: "auto", label: "自动" },
   { value: "cpu", label: "CPU" },
@@ -39,8 +43,19 @@ const SOURCE_LANGS = [
   { value: "zh", label: "中文" },
   { value: "ko", label: "韩语" },
 ];
+const ASR_POLL_INTERVAL_MS = 700;
+const ASR_PROGRESS_RETRY_LIMIT = 90;
+const ASR_PROGRESS_RETRY_MAX_DELAY_MS = 3000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function progressRetryDelay(attempt: number): number {
+  return Math.min(ASR_PROGRESS_RETRY_MAX_DELAY_MS, ASR_POLL_INTERVAL_MS + attempt * 200);
+}
+
+function isMissingJobError(message: string): boolean {
+  return message.includes("转录任务不存在") || message.includes("HTTP 404");
+}
 
 function formatMs(ms: number): string {
   if (!ms || ms < 0) return "0:00";
@@ -78,6 +93,7 @@ export function TranscribeView() {
   const [job, setJob] = useState<AsrJobSnapshot | null>(null);
   const [asrError, setAsrError] = useState<string | null>(null);
   const [resultCount, setResultCount] = useState<number | null>(null);
+  const [savedAssPath, setSavedAssPath] = useState<string | null>(null);
 
   const pollingRef = useRef(false);
   const jobIdRef = useRef<string | null>(null);
@@ -192,14 +208,35 @@ export function TranscribeView() {
     void detectEngines();
   }, [detectEngines]);
 
+  const handleEngineChange = (nextEngine: string) => {
+    setEngine(nextEngine);
+    setModel(defaultAsrModel(nextEngine));
+    if (nextEngine === "parakeet") {
+      setLanguage("ja");
+    }
+  };
+
   const pollLoop = async (jobId: string) => {
     pollingRef.current = true;
+    let progressQueryFailures = 0;
     while (pollingRef.current) {
       let snap: AsrJobSnapshot;
       try {
         snap = await getAsrProgress(jobId, false);
+        progressQueryFailures = 0;
+        setAsrError(null);
       } catch (e) {
-        setAsrError(`查询进度失败：${String(e)}`);
+        if (!pollingRef.current) break;
+        const message = String(e);
+        if (!isMissingJobError(message) && progressQueryFailures < ASR_PROGRESS_RETRY_LIMIT) {
+          progressQueryFailures += 1;
+          setAsrError(
+            `sidecar 暂时无响应，正在重试进度查询（${progressQueryFailures}/${ASR_PROGRESS_RETRY_LIMIT}）：${message}`,
+          );
+          await sleep(progressRetryDelay(progressQueryFailures));
+          continue;
+        }
+        setAsrError(`查询进度失败：${message}`);
         updateTask("asr", { status: "error" });
         break;
       }
@@ -239,9 +276,15 @@ export function TranscribeView() {
               const assText = serializeAss(doc);
               const { saveAssText } = await import("../../services/tauri");
               await saveAssText(project.assPath, assText);
+              setSavedAssPath(project.assPath);
             } catch (saveErr) {
               console.warn("保存 ASS 文件失败:", saveErr);
+              setAsrError(`转录完成，但保存 ASS 失败：${String(saveErr)}`);
             }
+          } else if (!project?.assPath) {
+            setAsrError("转录完成，但项目缺少字幕输出路径，未保存 ASS");
+          } else if (cues.length === 0) {
+            setAsrError("转录完成，但没有生成字幕片段，未保存 ASS");
           }
         } catch (e) {
           setAsrError(`生成字幕失败：${String(e)}`);
@@ -258,7 +301,7 @@ export function TranscribeView() {
         updateTask("asr", { status: "idle" });
         break;
       }
-      await sleep(700);
+      await sleep(ASR_POLL_INTERVAL_MS);
     }
     pollingRef.current = false;
     setTranscribing(false);
@@ -267,6 +310,7 @@ export function TranscribeView() {
   const handleTranscribe = async () => {
     setAsrError(null);
     setResultCount(null);
+    setSavedAssPath(null);
     setJob(null);
     setTranscribing(true);
     upsertTask({
@@ -282,6 +326,7 @@ export function TranscribeView() {
         model,
         device,
         language: language === "auto" ? null : language,
+        outputAssPath: project.assPath ?? null,
       });
       jobIdRef.current = jobId;
       void pollLoop(jobId);
@@ -380,9 +425,9 @@ export function TranscribeView() {
           <Labeled label="引擎">
             <Select
               value={engine}
-              onChange={setEngine}
+              onChange={handleEngineChange}
               disabled={transcribing}
-              options={[{ value: "faster-whisper", label: "faster-whisper" }]}
+              options={ASR_ENGINE_OPTIONS}
             />
           </Labeled>
           <Labeled label="模型">
@@ -390,8 +435,13 @@ export function TranscribeView() {
               value={model}
               onChange={setModel}
               disabled={transcribing}
-              options={ASR_MODELS.map((m) => ({ value: m, label: m }))}
+              options={asrModelOptions(engine)}
             />
+            {engine === "parakeet" && (
+              <p className="mt-1 text-xs text-text-muted">
+                Parakeet 日语模型优先使用 char timestamps，并会重新按日语标点与长度切分字幕。
+              </p>
+            )}
           </Labeled>
           <Labeled label="设备">
             <Select
@@ -458,6 +508,14 @@ export function TranscribeView() {
           <p className="text-sm text-success">
             转录完成，已生成 {resultCount} 条字幕
             {job?.detectedLanguage ? `（语言 ${job.detectedLanguage}）` : ""}
+            {savedAssPath ? (
+              <>
+                ，已保存到{" "}
+                <span className="break-all font-mono" title={savedAssPath}>
+                  {savedAssPath}
+                </span>
+              </>
+            ) : null}
           </p>
         )}
 
