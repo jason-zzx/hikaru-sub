@@ -99,6 +99,7 @@ export function TranscribeView() {
   const [language, setLanguage] = useState("auto");
   const [engines, setEngines] = useState<AsrEngineInfo[] | null>(null);
   const [engineMsg, setEngineMsg] = useState<string | null>(null);
+  const [modelCheckTrigger, setModelCheckTrigger] = useState(0);
 
   // VAD 高级配置（仅当前会话有效，不写入项目/全局设置）
   const [useVad, setUseVad] = useState(false);
@@ -113,6 +114,7 @@ export function TranscribeView() {
 
   const pollingRef = useRef(false);
   const jobIdRef = useRef<string | null>(null);
+  const engineCheckRequestRef = useRef(0);
 
   useEffect(() => {
     checkFfmpeg()
@@ -203,9 +205,12 @@ export function TranscribeView() {
   };
 
   const detectEngines = useCallback(async () => {
+    const requestId = engineCheckRequestRef.current + 1;
+    engineCheckRequestRef.current = requestId;
     setEngineMsg("检测中…");
     try {
       const list = await listAsrEngines();
+      if (engineCheckRequestRef.current !== requestId) return;
       setEngines(list);
       const current = list.find((e) => e.name === engine);
       if (current && !current.available) {
@@ -214,15 +219,17 @@ export function TranscribeView() {
         setEngineMsg("sidecar 就绪");
       }
     } catch (e) {
+      if (engineCheckRequestRef.current !== requestId) return;
       setEngines(null);
       setEngineMsg(`无法启动 sidecar：${String(e)}`);
     }
   }, [engine]);
 
-  // 进入页面（及引擎变更）自动检测引擎可用性
+  // 进入页面、引擎或模型变更时自动检测引擎和模型可用性
   useEffect(() => {
     void detectEngines();
-  }, [detectEngines]);
+    setModelCheckTrigger((value) => value + 1);
+  }, [detectEngines, model]);
 
   const handleEngineChange = (nextEngine: string) => {
     setEngine(nextEngine);
@@ -629,7 +636,12 @@ export function TranscribeView() {
           </div>
         </details>
 
-        <ModelManager engine={engine} model={model} />
+        <ModelManager
+          engine={engine}
+          model={model}
+          auto={false}
+          trigger={modelCheckTrigger}
+        />
       </StepCard>
 
       {/* 步骤 3：转录 */}

@@ -231,6 +231,7 @@ class FasterWhisperEngine(AsrEngine):
         *,
         language: Optional[str] = None,
         cancel_check: Optional[Callable[[], bool]] = None,
+        progress_callback: Optional[Callable[[int], None]] = None,
     ) -> Transcription:
         self.load()
         assert self._model is not None

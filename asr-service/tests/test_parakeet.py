@@ -4,12 +4,13 @@ import math
 import sys
 import tempfile
 import wave
-from unittest.mock import patch
+from typing import Optional
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import engines.parakeet as parakeet
-from engines.base import AsrSegment
+from engines.base import AsrSegment, yield_unseen_segments
 from engines.parakeet import (
     ParakeetEngine,
     build_segments_from_char_timestamps,
@@ -644,6 +645,120 @@ class ParakeetVadIntegrationTests(unittest.TestCase):
 
             # 120s / 45s ≈ 3 chunks
             self.assertEqual(len(engine.calls), 3)
+
+    def test_vad_enabled_on_short_audio_uses_chunked_path(self):
+        """不足 60s 且启用 VAD 时也应走分块路径"""
+        import engines.vad as vad_module
+
+        engine = _BackfillFakeEngine([AsrSegment(0, 1000, "短音频")])
+        engine.use_vad = True
+        speech_segments = [
+            vad_module.SpeechSegment(start_ms=0, end_ms=3_000),
+            vad_module.SpeechSegment(start_ms=5_000, end_ms=8_000),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio = Path(tmp) / "audio.wav"
+            _write_silence_wav(audio, 10_000)
+
+            with (
+                patch.object(parakeet, "_duration_ms", return_value=10_000),
+                patch.object(
+                    vad_module.VadEngine,
+                    "detect_speech_segments",
+                    return_value=speech_segments,
+                ),
+            ):
+                segments = list(
+                    engine._iter_transcribe_chunks(str(audio), 10_000),
+                )
+
+        self.assertEqual(len(engine.calls), 2)
+        self.assertEqual(len(segments), 2)
+
+    def test_iter_transcribe_chunks_yields_backfill_inserted_segments(self):
+        """backfill 插入中间时间轴的片段也应被下发"""
+        engine = _BackfillFakeEngine([AsrSegment(0, 4000, "main")])
+
+        def fake_backfill(audio_path, duration_ms, segments, *, cancel_check=None):
+            return sorted(
+                segments + [AsrSegment(5000, 6000, "gap-fill")],
+                key=lambda s: (s.start_ms, s.end_ms),
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio = Path(tmp) / "audio.wav"
+            _write_silence_wav(audio, 10_000)
+            with (
+                patch.object(engine, "_plan_transcribe_chunks", return_value=[(0, 10_000)]),
+                patch.object(engine, "_backfill_missing_segments", side_effect=fake_backfill),
+            ):
+                segments = list(engine._iter_transcribe_chunks(str(audio), 10_000))
+
+        texts = [seg.text for seg in segments]
+        self.assertEqual(texts, ["main", "gap-fill"])
+
+    def test_context_backfill_passes_cancel_check(self):
+        """第二轮 context backfill 应透传 cancel_check"""
+        engine = _BackfillFakeEngine([])
+        cancel = MagicMock(return_value=False)
+        captured: list[Optional[object]] = []
+
+        def fake_transcribe_backfill_windows(
+            audio_path,
+            windows,
+            *,
+            temp_prefix,
+            log_prefix,
+            cancel_check=None,
+        ):
+            captured.append(cancel_check)
+            return []
+
+        primary_windows = [(0, 1000, 0, 1000)]
+        context_windows = [(0, 2000, 0, 1000)]
+
+        with (
+            patch.object(parakeet, "_plan_backfill_windows", side_effect=[primary_windows, context_windows]),
+            patch.object(engine, "_transcribe_backfill_windows", side_effect=fake_transcribe_backfill_windows),
+        ):
+            engine._backfill_missing_segments(
+                "audio.wav",
+                10_000,
+                [],
+                cancel_check=cancel,
+            )
+
+        self.assertEqual(len(captured), 2)
+        self.assertIs(captured[0], cancel)
+        self.assertIs(captured[1], cancel)
+
+
+class YieldUnseenSegmentsTests(unittest.TestCase):
+    def test_yield_unseen_segments_skips_duplicates_and_preserves_order(self):
+        yielded: set[tuple[int, int, str]] = set()
+        first = list(
+            yield_unseen_segments(
+                yielded,
+                [
+                    AsrSegment(0, 1000, "a"),
+                    AsrSegment(5000, 6000, "b"),
+                ],
+            ),
+        )
+        second = list(
+            yield_unseen_segments(
+                yielded,
+                [
+                    AsrSegment(0, 1000, "a"),
+                    AsrSegment(2000, 3000, "inserted"),
+                    AsrSegment(5000, 6000, "b"),
+                ],
+            ),
+        )
+
+        self.assertEqual([seg.text for seg in first], ["a", "b"])
+        self.assertEqual([seg.text for seg in second], ["inserted"])
 
 
 if __name__ == "__main__":

@@ -36,24 +36,36 @@ export function ModelManager({
     null,
   );
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const checkRequestRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const requestId = checkRequestRef.current + 1;
+    checkRequestRef.current = requestId;
     setChecking(true);
     setCheckError(null);
     try {
       const s = await checkAsrModel(engine, model);
-      setStatus(s);
+      if (checkRequestRef.current === requestId) {
+        setStatus(s);
+      }
     } catch (e) {
-      setStatus(null);
-      setCheckError(String(e));
+      if (checkRequestRef.current === requestId) {
+        setStatus(null);
+        setCheckError(String(e));
+      }
     } finally {
-      setChecking(false);
+      if (checkRequestRef.current === requestId) {
+        setChecking(false);
+      }
     }
   }, [engine, model]);
 
   // engine/model 变更：清除旧结果，避免显示过期状态
   useEffect(() => {
+    checkRequestRef.current += 1;
     setStatus(null);
+    setChecking(false);
+    setCheckError(null);
     setProgress(null);
     setDownloadError(null);
   }, [engine, model]);
