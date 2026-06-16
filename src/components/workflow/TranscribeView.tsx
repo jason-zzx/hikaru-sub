@@ -29,6 +29,7 @@ import type {
   AsrEngineInfo,
   AsrJobSnapshot,
   FfmpegStatus,
+  VadConfig,
 } from "../../types";
 
 const ASR_DEVICES = [
@@ -46,6 +47,17 @@ const SOURCE_LANGS = [
 const ASR_POLL_INTERVAL_MS = 700;
 const ASR_PROGRESS_RETRY_LIMIT = 90;
 const ASR_PROGRESS_RETRY_MAX_DELAY_MS = 3000;
+
+const VAD_INPUT_CLASS =
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent/60";
+
+const DEFAULT_VAD_CONFIG: Required<VadConfig> = {
+  threshold: 0.5,
+  minSpeechDurationMs: 500,
+  minSilenceDurationMs: 300,
+  speechPadMs: 400,
+  maxSegmentDurationMs: 25000,
+};
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -87,6 +99,10 @@ export function TranscribeView() {
   const [language, setLanguage] = useState("auto");
   const [engines, setEngines] = useState<AsrEngineInfo[] | null>(null);
   const [engineMsg, setEngineMsg] = useState<string | null>(null);
+
+  // VAD 高级配置（仅当前会话有效，不写入项目/全局设置）
+  const [useVad, setUseVad] = useState(false);
+  const [vadConfig, setVadConfig] = useState<VadConfig>({});
 
   // 转录任务
   const [transcribing, setTranscribing] = useState(false);
@@ -327,6 +343,19 @@ export function TranscribeView() {
         device,
         language: language === "auto" ? null : language,
         outputAssPath: project.assPath ?? null,
+        useVad,
+        vadConfig: useVad
+          ? {
+              threshold: vadConfig.threshold ?? DEFAULT_VAD_CONFIG.threshold,
+              minSpeechDurationMs:
+                vadConfig.minSpeechDurationMs ?? DEFAULT_VAD_CONFIG.minSpeechDurationMs,
+              minSilenceDurationMs:
+                vadConfig.minSilenceDurationMs ?? DEFAULT_VAD_CONFIG.minSilenceDurationMs,
+              speechPadMs: vadConfig.speechPadMs ?? DEFAULT_VAD_CONFIG.speechPadMs,
+              maxSegmentDurationMs:
+                vadConfig.maxSegmentDurationMs ?? DEFAULT_VAD_CONFIG.maxSegmentDurationMs,
+            }
+          : null,
       });
       jobIdRef.current = jobId;
       void pollLoop(jobId);
@@ -474,6 +503,132 @@ export function TranscribeView() {
             </span>
           )}
         </div>
+
+        <details className="rounded-lg border border-border bg-surface">
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-text">
+            VAD 语音检测配置（高级）
+          </summary>
+          <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useVad}
+                disabled={transcribing}
+                onChange={(e) => setUseVad(e.target.checked)}
+                className="h-4 w-4 accent-accent"
+              />
+              <span className="text-sm text-text">启用 VAD 预处理</span>
+            </label>
+            <p className="text-xs text-text-muted">
+              对两个引擎均生效：faster-whisper 透传内置 Silero VAD 参数；Parakeet
+              用 VAD 切分语音段后逐段转录，缓解长音频遗漏。VAD 加载失败时自动回退。
+            </p>
+
+            {useVad && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Labeled label="语音阈值 (0.0–1.0)">
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    disabled={transcribing}
+                    value={vadConfig.threshold ?? DEFAULT_VAD_CONFIG.threshold}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      setVadConfig({
+                        ...vadConfig,
+                        threshold: Number.isNaN(v) ? undefined : v,
+                      });
+                    }}
+                    className={VAD_INPUT_CLASS}
+                  />
+                  <p className="mt-1 text-xs text-text-muted">
+                    默认 0.5。提高减少误检，降低提升灵敏度。
+                  </p>
+                </Labeled>
+
+                <Labeled label="最小语音段长度 (ms)">
+                  <input
+                    type="number"
+                    min={0}
+                    max={2000}
+                    step={100}
+                    disabled={transcribing}
+                    value={
+                      vadConfig.minSpeechDurationMs ??
+                      DEFAULT_VAD_CONFIG.minSpeechDurationMs
+                    }
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setVadConfig({
+                        ...vadConfig,
+                        minSpeechDurationMs: Number.isNaN(v) ? undefined : v,
+                      });
+                    }}
+                    className={VAD_INPUT_CLASS}
+                  />
+                  <p className="mt-1 text-xs text-text-muted">
+                    过滤短于此时长的语音片段，避免噪声干扰。
+                  </p>
+                </Labeled>
+
+                <Labeled label="最小静音间隔 (ms)">
+                  <input
+                    type="number"
+                    min={100}
+                    max={3000}
+                    step={100}
+                    disabled={transcribing}
+                    value={
+                      vadConfig.minSilenceDurationMs ??
+                      DEFAULT_VAD_CONFIG.minSilenceDurationMs
+                    }
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setVadConfig({
+                        ...vadConfig,
+                        minSilenceDurationMs: Number.isNaN(v) ? undefined : v,
+                      });
+                    }}
+                    className={VAD_INPUT_CLASS}
+                  />
+                  <p className="mt-1 text-xs text-text-muted">
+                    语音段之间需多长静音才分割。降低会产生更多更短的语音段。
+                  </p>
+                </Labeled>
+
+                {engine === "parakeet" && (
+                  <Labeled label="最大语音段长度 (ms)">
+                    <input
+                      type="number"
+                      min={15000}
+                      max={35000}
+                      step={1000}
+                      disabled={transcribing}
+                      value={
+                        vadConfig.maxSegmentDurationMs ??
+                        DEFAULT_VAD_CONFIG.maxSegmentDurationMs
+                      }
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setVadConfig({
+                          ...vadConfig,
+                          maxSegmentDurationMs: Number.isNaN(v) ? undefined : v,
+                        });
+                      }}
+                      className={VAD_INPUT_CLASS}
+                    />
+                    <p className="mt-1 text-xs text-text-muted">
+                      Parakeet 专用：超过此长度的语音段会被切分。默认 25 秒。
+                    </p>
+                  </Labeled>
+                )}
+              </div>
+            )}
+          </div>
+        </details>
+
         <ModelManager engine={engine} model={model} />
       </StepCard>
 

@@ -36,6 +36,8 @@ class AsrJob:
     language: Optional[str]
     compute_type: Optional[str] = None
     output_ass_path: Optional[str] = None
+    use_vad: bool = False
+    vad_config: Optional[dict] = None
     status: JobStatus = JobStatus.PENDING
     progress: float = 0.0
     duration_ms: int = 0
@@ -83,6 +85,8 @@ class JobManager:
         language: Optional[str],
         compute_type: Optional[str] = None,
         output_ass_path: Optional[str] = None,
+        use_vad: bool = False,
+        vad_config: Optional[dict] = None,
     ) -> AsrJob:
         job = AsrJob(
             id=uuid.uuid4().hex,
@@ -93,6 +97,8 @@ class JobManager:
             language=language,
             compute_type=compute_type,
             output_ass_path=output_ass_path,
+            use_vad=use_vad,
+            vad_config=vad_config,
         )
         with self._lock:
             self._jobs[job.id] = job
@@ -178,10 +184,16 @@ class JobManager:
                 model=job.model,
                 device=job.device,
                 compute_type=job.compute_type,
+                use_vad=job.use_vad,
+                vad_config=job.vad_config,
             )
             debug_log("job_create_engine_done", jobId=job.id, engine=job.engine)
             debug_log("job_transcribe_start", jobId=job.id)
-            transcription = engine.transcribe(job.audio_path, language=job.language)
+            transcription = engine.transcribe(
+                job.audio_path,
+                language=job.language,
+                cancel_check=job._cancel.is_set,
+            )
             debug_log(
                 "job_transcribe_handle_ready",
                 jobId=job.id,
@@ -212,17 +224,21 @@ class JobManager:
                         processedMs=seg.end_ms,
                     )
 
+            cancelled_after_segments = False
             with job._lock:
                 # 取消可能恰在最后一段后触发
                 if job._cancel.is_set():
                     job.status = JobStatus.CANCELLED
-                    debug_log("job_cancelled_after_segments", jobId=job.id)
-                    self._persist_terminal_outputs(job)
-                    return
-                job.status = JobStatus.COMPLETED
-                job.progress = 1.0
-                if job.duration_ms > 0:
-                    job.processed_ms = job.duration_ms
+                    cancelled_after_segments = True
+                else:
+                    job.status = JobStatus.COMPLETED
+                    job.progress = 1.0
+                    if job.duration_ms > 0:
+                        job.processed_ms = job.duration_ms
+            if cancelled_after_segments:
+                debug_log("job_cancelled_after_segments", jobId=job.id)
+                self._persist_terminal_outputs(job)
+                return
             self._persist_terminal_outputs(job)
             debug_log("job_completed", jobId=job.id, segmentCount=len(job.segments))
         except AsrError as exc:

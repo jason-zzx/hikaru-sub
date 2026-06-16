@@ -54,7 +54,7 @@ asr-service/                  # Python ASR sidecar（FastAPI HTTP）
   main.py                     # 入口：选端口 + uvicorn + stdout 就绪协议
   server.py                   # FastAPI 路由
   jobs.py                     # JobManager：后台线程转录 + 进度/取消
-  engines/                    # AsrEngine 抽象 + faster-whisper + parakeet + registry
+  engines/                    # AsrEngine 抽象 + faster-whisper + parakeet + vad + registry
 ```
 
 ## 架构边界
@@ -95,6 +95,17 @@ interface SubtitleCue {
 
 - `faster-whisper`：默认引擎，模型列表为 tiny/base/small/medium/large-v2/large-v3。
 - `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，使用 `asr-service/requirements-parakeet.txt` 单独安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段。
+- Parakeet 经 VAD 预切分和 gap backfill 后，当前真实转录效果已基本可接受，仅偶发少量句子遗漏；但时轴精度明显不如 faster-whisper，后续优化方案待定。
+
+### VAD 预处理
+
+转录页提供统一的 VAD（语音活动检测）高级配置，`use_vad` 与 `vad_config` 经 `start_asr` 透传到 sidecar，各引擎按原生方式集成：
+
+- **faster-whisper**：透传 `vad_parameters` 到内置 Silero VAD（始终 `vad_filter=True`，`use_vad=True` 时用自定义参数）。
+- **Parakeet**：用独立 `engines/vad.py`（Silero VAD via `torch.hub`，`trust_repo=True`）预切分语音段，长段按 `max_segment_duration_ms` 带重叠切分后逐段转录，缓解长音频 TDT 不稳定导致的遗漏。
+- 两引擎共享同一套 camelCase 配置；`schemas.VadConfig` 负责 camelCase→snake_case 转换，引擎内部读取 snake_case 键。
+- VAD 加载/检测失败时自动降级（Parakeet 回退固定分块，faster-whisper 回退默认参数），不中断转录。
+- VAD 配置仅当前会话有效，不写入项目/全局设置。
 
 ### 视频编辑兼容策略
 
@@ -145,6 +156,7 @@ interface SubtitleCue {
 5. **中文 UI 文案**：用户面向字符串用简体中文
 6. **图标用 SVG**：UI 图标一律使用 SVG（统一放 `src/components/layout/NavIcons.tsx`，lucide 风格 `stroke="currentColor"`），不要用 emoji/字符当图标，避免跨平台字形缺失渲染成方块
 7. **不编辑计划文件**：`.cursor/plans/` 下的方案文档除非用户明确要求
+8. **不主动提交代码**：没有用户明确要求，不允许主动执行 `git commit` 或 `git push`
 
 ## 分阶段实现（当前进度）
 
@@ -160,6 +172,7 @@ interface SubtitleCue {
 - [x] 字幕合并模式配置（默认行内 `译文 / 原文`，可切换分离双行）
 - [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做）
 - [x] 视频播放兼容处理（asset protocol 加载；不兼容编码生成 480p H.264 全关键帧代理视频并缓存）
+- [x] VAD 预处理（统一配置 UI；faster-whisper 透传内置 VAD，Parakeet 独立 Silero VAD 预切分；失败自动降级）
 - [ ] FFmpeg 压制（BurnView 输出向导）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 

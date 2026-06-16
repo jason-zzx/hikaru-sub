@@ -48,10 +48,14 @@ class AsrEngine(ABC):
         model: str,
         device: str = "auto",
         compute_type: Optional[str] = None,
+        use_vad: bool = False,
+        vad_config: Optional[dict] = None,
     ) -> None:
         self.model = model
         self.device = device
         self.compute_type = compute_type
+        self.use_vad = use_vad
+        self.vad_config = vad_config or {}
 
     @staticmethod
     def is_available() -> bool:
@@ -82,5 +86,9 @@ class AsrEngine(ABC):
         audio_path: str,
         *,
         language: Optional[str] = None,
+        cancel_check: Optional[Callable[[], bool]] = None,
     ) -> Transcription:
-        """开始转录，返回携带时长与片段迭代器的 `Transcription`。"""
+        """开始转录，返回携带时长与片段迭代器的 `Transcription`。
+
+        `cancel_check` 在惰性产出片段时调用；返回 True 表示应尽快停止转录。
+        """

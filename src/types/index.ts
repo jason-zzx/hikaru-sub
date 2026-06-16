@@ -112,6 +112,16 @@ export interface AsrJobSnapshot {
   segments?: AsrSegment[];
 }
 
+/** VAD（语音活动检测）配置。所有字段可选，未设置时引擎使用各自默认值。 */
+export interface VadConfig {
+  threshold?: number;
+  minSpeechDurationMs?: number;
+  minSilenceDurationMs?: number;
+  speechPadMs?: number;
+  /** Parakeet 专用：超过此长度的语音段会被切分 */
+  maxSegmentDurationMs?: number;
+}
+
 export interface StartAsrArgs {
   audioPath: string;
   engine: string;
@@ -119,6 +129,10 @@ export interface StartAsrArgs {
   device: string;
   language?: string | null;
   outputAssPath?: string | null;
+  /** 是否启用可配置 VAD 预处理 */
+  useVad?: boolean;
+  /** VAD 参数；仅在 useVad 为真时生效 */
+  vadConfig?: VadConfig | null;
 }
 
 /** ASR 模型在本地缓存中的就绪状态。 */

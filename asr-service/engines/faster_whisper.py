@@ -96,8 +96,16 @@ class FasterWhisperEngine(AsrEngine):
         model: str = "large-v3",
         device: str = "auto",
         compute_type: Optional[str] = None,
+        use_vad: bool = False,
+        vad_config: Optional[dict] = None,
     ) -> None:
-        super().__init__(model=model, device=device, compute_type=compute_type)
+        super().__init__(
+            model=model,
+            device=device,
+            compute_type=compute_type,
+            use_vad=use_vad,
+            vad_config=vad_config,
+        )
         self._model = None
 
     @staticmethod
@@ -222,16 +230,33 @@ class FasterWhisperEngine(AsrEngine):
         audio_path: str,
         *,
         language: Optional[str] = None,
+        cancel_check: Optional[Callable[[], bool]] = None,
     ) -> Transcription:
         self.load()
         assert self._model is not None
 
         lang = None if not language or language == "auto" else language
+
+        # VAD 配置：始终启用内置 VAD；use_vad=True 时透传用户自定义参数
+        vad_filter = True
+        vad_parameters = None
+        if self.use_vad:
+            vad_parameters = {
+                'threshold': self.vad_config.get('threshold', 0.5),
+                'min_speech_duration_ms': self.vad_config.get('min_speech_duration_ms', 500),
+                'min_silence_duration_ms': self.vad_config.get('min_silence_duration_ms', 300),
+                'speech_pad_ms': self.vad_config.get('speech_pad_ms', 400),
+            }
+            max_seg_ms = self.vad_config.get('max_segment_duration_ms')
+            if max_seg_ms is not None:
+                vad_parameters['max_speech_duration_s'] = max_seg_ms / 1000.0
+
         try:
             segments, info = self._model.transcribe(
                 audio_path,
                 language=lang,
-                vad_filter=True,
+                vad_filter=vad_filter,
+                vad_parameters=vad_parameters,
                 beam_size=5,
             )
         except Exception as exc:
@@ -242,6 +267,8 @@ class FasterWhisperEngine(AsrEngine):
 
         def _iter() -> Iterator[AsrSegment]:
             for seg in segments:
+                if cancel_check and cancel_check():
+                    return
                 text = (seg.text or "").strip()
                 if not text:
                     continue
