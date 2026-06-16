@@ -189,10 +189,23 @@ class JobManager:
             )
             debug_log("job_create_engine_done", jobId=job.id, engine=job.engine)
             debug_log("job_transcribe_start", jobId=job.id)
+
+            def report_progress(processed_ms: int) -> None:
+                with job._lock:
+                    if job.status != JobStatus.RUNNING or job.duration_ms <= 0:
+                        return
+                    next_processed = max(
+                        job.processed_ms,
+                        min(max(0, processed_ms), job.duration_ms),
+                    )
+                    job.processed_ms = next_processed
+                    job.progress = min(next_processed / job.duration_ms, 1.0)
+
             transcription = engine.transcribe(
                 job.audio_path,
                 language=job.language,
                 cancel_check=job._cancel.is_set,
+                progress_callback=report_progress,
             )
             debug_log(
                 "job_transcribe_handle_ready",
@@ -212,9 +225,15 @@ class JobManager:
                     return
                 with job._lock:
                     job.segments.append(seg)
-                    job.processed_ms = seg.end_ms
                     if job.duration_ms > 0:
-                        job.progress = min(seg.end_ms / job.duration_ms, 1.0)
+                        next_processed = max(
+                            job.processed_ms,
+                            min(seg.end_ms, job.duration_ms),
+                        )
+                        job.processed_ms = next_processed
+                        job.progress = min(next_processed / job.duration_ms, 1.0)
+                    else:
+                        job.processed_ms = max(job.processed_ms, seg.end_ms)
                     count = len(job.segments)
                 if count == 1 or count % 20 == 0:
                     debug_log(

@@ -19,7 +19,7 @@ import sys
 from typing import Callable, Iterable, Iterator, Optional
 
 from diagnostics import debug_exception, debug_log
-from .base import AsrEngine, AsrError, AsrSegment, Transcription
+from .base import AsrEngine, AsrError, AsrSegment, Transcription, yield_unseen_segments
 
 MODEL_ID = "nvidia/parakeet-tdt_ctc-0.6b-ja"
 MODEL_FILE = "parakeet-tdt_ctc-0.6b-ja.nemo"
@@ -897,12 +897,13 @@ class ParakeetEngine(AsrEngine):
         *,
         language: Optional[str] = None,
         cancel_check: Optional[Callable[[], bool]] = None,
+        progress_callback: Optional[Callable[[int], None]] = None,
     ) -> Transcription:
         self.load()
         assert self._model is not None
 
         duration = _duration_ms(audio_path)
-        if duration >= CHUNKING_MIN_DURATION_MS:
+        if duration >= CHUNKING_MIN_DURATION_MS or self.use_vad:
             debug_log("parakeet_chunked_transcribe_start", audioPath=audio_path, durationMs=duration)
 
             def _iter_chunked() -> Iterator[AsrSegment]:
@@ -910,6 +911,7 @@ class ParakeetEngine(AsrEngine):
                     audio_path,
                     duration,
                     cancel_check=cancel_check,
+                    progress_callback=progress_callback,
                 )
 
             return Transcription(
@@ -984,10 +986,11 @@ class ParakeetEngine(AsrEngine):
         duration_ms: int,
         *,
         cancel_check: Optional[Callable[[], bool]] = None,
+        progress_callback: Optional[Callable[[int], None]] = None,
     ) -> Iterator[AsrSegment]:
         chunks = self._plan_transcribe_chunks(audio_path, duration_ms)
         chunk_results: list[tuple[int, list[AsrSegment]]] = []
-        yielded_count = 0
+        yielded: set[tuple[int, int, str]] = set()
 
         with tempfile.TemporaryDirectory(prefix="hikaru_parakeet_") as tmp:
             tmp_dir = Path(tmp)
@@ -1032,15 +1035,15 @@ class ParakeetEngine(AsrEngine):
                 )
                 chunk_results.append((start_ms, segments))
                 merged = merge_chunk_segments(chunk_results)
-                for seg in merged[yielded_count:]:
-                    yield seg
-                yielded_count = len(merged)
+                yield from yield_unseen_segments(yielded, merged)
+                if progress_callback:
+                    progress_callback(end_ms)
 
         if cancel_check and cancel_check():
             debug_log(
                 "parakeet_chunking_cancelled",
                 chunkCount=len(chunks),
-                segmentCount=yielded_count,
+                segmentCount=len(yielded),
             )
             return
 
@@ -1056,8 +1059,7 @@ class ParakeetEngine(AsrEngine):
             chunkCount=len(chunks),
             segmentCount=len(final),
         )
-        for seg in final[yielded_count:]:
-            yield seg
+        yield from yield_unseen_segments(yielded, final)
 
     def _plan_transcribe_chunks(
         self,
@@ -1235,6 +1237,7 @@ class ParakeetEngine(AsrEngine):
                 context_windows,
                 temp_prefix="hikaru_parakeet_backfill_context_",
                 log_prefix="parakeet_backfill_context",
+                cancel_check=cancel_check,
             )
             merged = _merge_supplemental_segments(
                 merged,

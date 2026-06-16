@@ -1,6 +1,6 @@
 export const ASR_ENGINE_OPTIONS = [
   { value: "faster-whisper", label: "faster-whisper" },
-  { value: "parakeet", label: "parakeet（NVIDIA Parakeet 日语）" },
+  { value: "parakeet", label: "parakeet" },
 ];
 
 export const ASR_ENGINE_MODELS: Record<string, Array<{ value: string; label: string }>> = {
@@ -11,7 +11,7 @@ export const ASR_ENGINE_MODELS: Record<string, Array<{ value: string; label: str
   parakeet: [
     {
       value: "nvidia/parakeet-tdt_ctc-0.6b-ja",
-      label: "nvidia/parakeet-tdt_ctc-0.6b-ja",
+      label: "parakeet-tdt_ctc-0.6b-ja",
     },
   ],
 };

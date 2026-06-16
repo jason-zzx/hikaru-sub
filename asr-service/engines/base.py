@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Iterator, Optional
+from typing import Callable, Iterable, Iterator, Optional
 
 
 @dataclass
@@ -18,6 +18,23 @@ class AsrSegment:
     start_ms: int
     end_ms: int
     text: str
+
+
+def segment_key(seg: AsrSegment) -> tuple[int, int, str]:
+    return (seg.start_ms, seg.end_ms, seg.text)
+
+
+def yield_unseen_segments(
+    yielded: set[tuple[int, int, str]],
+    segments: Iterable[AsrSegment],
+) -> Iterator[AsrSegment]:
+    """惰性产出尚未下发过的片段（用于 backfill 插入中间时间轴的场景）。"""
+    for seg in segments:
+        key = segment_key(seg)
+        if key in yielded:
+            continue
+        yielded.add(key)
+        yield seg
 
 
 @dataclass
@@ -87,8 +104,10 @@ class AsrEngine(ABC):
         *,
         language: Optional[str] = None,
         cancel_check: Optional[Callable[[], bool]] = None,
+        progress_callback: Optional[Callable[[int], None]] = None,
     ) -> Transcription:
         """开始转录，返回携带时长与片段迭代器的 `Transcription`。
 
         `cancel_check` 在惰性产出片段时调用；返回 True 表示应尽快停止转录。
+        `progress_callback` 可在尚未产出字幕片段时上报已处理到的音频时间（毫秒）。
         """
