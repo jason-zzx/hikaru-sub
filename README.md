@@ -7,7 +7,7 @@ AI 字幕桌面应用：本地 ASR 转录、大模型翻译、字幕编辑与 FF
 ✅ **已实现**：
 - 项目管理（创建/打开项目，`.hikaru` 元数据）
 - FFmpeg 集成（音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
-- Python ASR sidecar（faster-whisper + NVIDIA Parakeet 日语适配器 + HTTP 进度 API）
+- Python ASR sidecar（faster-whisper + NVIDIA Parakeet 日语适配器 + VAD 预处理 + HTTP 进度 API）
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
 - 翻译工作流（配置界面 + 进度显示 → 生成 `.translated.ass`）
@@ -15,10 +15,11 @@ AI 字幕桌面应用：本地 ASR 转录、大模型翻译、字幕编辑与 FF
 - ASS 文件持久化（自动保存/加载字幕文件）
 - 字幕编辑器（视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
+- VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet 独立 VAD 切分语音段，失败自动降级）
 
 🚧 **待优化**：
 1. 首页增加显示最近项目列表
-2. 转录页添加 VAD 等细节设置，提升转录效果
+2. Parakeet 转录时轴精度仍明显弱于 faster-whisper，优化方案待定
 3. 翻译页进度条显示优化
 4. 翻译页支持单独配置每批翻译条数、上下文条数、自定义 prompt 和术语表、字幕合并模式（当前使用全局设置）
 5. 编辑页功能完善：
@@ -37,7 +38,7 @@ AI 字幕桌面应用：本地 ASR 转录、大模型翻译、字幕编辑与 FF
 - **样式**: Tailwind CSS 4
 - **状态**: Zustand
 - **包管理**: pnpm workspace
-- **ASR**: Python sidecar（faster-whisper）
+- **ASR**: Python sidecar（faster-whisper / Parakeet + VAD）
 - **翻译**: OpenAI 兼容 API 适配器
 
 ## 环境要求
@@ -111,6 +112,14 @@ asr-service/                  # Python ASR sidecar
 - 自动模型下载与 CUDA 回退
 - 实时进度显示与任务取消
 - Parakeet 优先使用 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段
+- Parakeet + VAD 当前转录完整性已基本可接受，但仍可能有少量句子遗漏；时轴精度暂不如 faster-whisper
+- **VAD 高级配置**（可选，对两个引擎均生效）：
+  - 启用 VAD 预处理：faster-whisper 透传内置 Silero VAD 参数；Parakeet 用 VAD 切分语音段后逐段转录，缓解长音频遗漏
+  - 语音阈值（threshold）：0.0-1.0，默认 0.5
+  - 最小语音段长度：过滤短噪声，默认 500ms
+  - 最小静音间隔：语音段分割灵敏度，默认 300ms
+  - 最大语音段长度（Parakeet 专用）：长段切分阈值，默认 25s
+  - VAD 加载失败时自动降级（Parakeet 回退固定分块，faster-whisper 回退默认参数）
 
 ### 翻译配置
 - OpenAI 兼容 API（支持 OpenAI、DeepSeek、Ollama 等）

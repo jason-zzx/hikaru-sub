@@ -13,7 +13,7 @@ from jobs import JobManager
 
 
 class _FakeEngine:
-    def transcribe(self, audio_path, *, language=None):
+    def transcribe(self, audio_path, *, language=None, cancel_check=None):
         return Transcription(
             duration_ms=1200,
             language=language or "ja",
@@ -24,6 +24,21 @@ class _FakeEngine:
                 ]
             ),
         )
+
+
+class _CancellableEngine:
+    """首个片段产出后阻塞，直到 cancel_check 为 True。"""
+
+    def transcribe(self, audio_path, *, language=None, cancel_check=None):
+        def _iter():
+            yield AsrSegment(start_ms=0, end_ms=500, text="first")
+            for _ in range(50):
+                if cancel_check and cancel_check():
+                    return
+                time.sleep(0.02)
+            yield AsrSegment(start_ms=500, end_ms=1000, text="should-not-appear")
+
+        return Transcription(duration_ms=1000, language="ja", segments=_iter())
 
 
 def _wait_for_completion(job):
@@ -69,6 +84,29 @@ class JobPersistenceTests(unittest.TestCase):
             self.assertIn("[Events]", ass_text)
             self.assertIn("Dialogue: 0,0:00:00.00,0:00:00.60,Primary", ass_text)
             self.assertIn("こんにちは", ass_text)
+
+    def test_cancelled_job_stops_during_segment_iteration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / ".hikaru"
+            project_dir.mkdir()
+            audio = project_dir / "audio.wav"
+            audio.write_bytes(b"fake audio")
+
+            manager = JobManager()
+            with patch("jobs.create_engine", return_value=_CancellableEngine()):
+                job = manager.create(
+                    audio_path=str(audio),
+                    engine="parakeet",
+                    model="nvidia/parakeet-tdt_ctc-0.6b-ja",
+                    device="auto",
+                    language="ja",
+                )
+                time.sleep(0.05)
+                manager.cancel(job.id)
+                snapshot = _wait_for_completion(job)
+
+            self.assertEqual(snapshot["status"], "cancelled")
+            self.assertEqual(snapshot["segmentCount"], 1)
 
 
 if __name__ == "__main__":

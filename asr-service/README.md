@@ -14,6 +14,7 @@ asr-service/
 │   ├── base.py        # AsrEngine 抽象、AsrSegment、Transcription
 │   ├── faster_whisper.py  # 首个适配器
 │   ├── parakeet.py    # NVIDIA NeMo Parakeet 日语适配器
+│   ├── vad.py         # Silero VAD 封装，供 Parakeet 预切分语音段
 │   └── registry.py    # 引擎注册表
 └── requirements.txt
 ```
@@ -76,14 +77,23 @@ python main.py --host 127.0.0.1 --port 0
   "model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
   "device": "auto",
   "language": "ja",
-  "computeType": null
+  "computeType": null,
+  "useVad": true,
+  "vadConfig": {
+    "threshold": 0.5,
+    "minSpeechDurationMs": 500,
+    "minSilenceDurationMs": 300,
+    "speechPadMs": 400,
+    "maxSegmentDurationMs": 25000
+  }
 }
 ```
 
 - `device`：`auto` / `cpu` / `cuda`
 - `language`：`auto` 或 `null` 表示自动检测
 - `computeType`：留空时按设备推导（cpu→int8，cuda→float16）
-- `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段。
+- `useVad` / `vadConfig`：可选 VAD 高级配置。faster-whisper 透传到内置 Silero VAD；Parakeet 用 `engines/vad.py` 先切分语音段，再逐段转录。
+- `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段。VAD + gap backfill 后转录完整性基本可接受，但仍可能有少量遗漏，且时轴精度弱于 faster-whisper。
 
 响应：
 

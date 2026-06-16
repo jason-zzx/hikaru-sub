@@ -4,7 +4,7 @@
 //! 代理转录任务的创建/查询/取消，使前端无需直接处理本地 HTTP 与端口。
 
 use crate::settings::{load_settings, AppSettings};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
@@ -49,6 +49,21 @@ struct ReadyLine {
     port: u16,
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VadConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    threshold: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min_speech_duration_ms: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min_silence_duration_ms: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    speech_pad_ms: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_segment_duration_ms: Option<u32>,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartAsrArgs {
@@ -58,6 +73,10 @@ pub struct StartAsrArgs {
     device: String,
     language: Option<String>,
     output_ass_path: Option<String>,
+    #[serde(default)]
+    use_vad: bool,
+    #[serde(default)]
+    vad_config: Option<VadConfig>,
 }
 
 /// 解析 asr-service 目录（含 main.py）：设置 → 资源目录 → 当前目录及其上级。
@@ -338,6 +357,8 @@ pub async fn start_asr(
         "device": args.device,
         "language": args.language,
         "outputAssPath": args.output_ass_path,
+        "useVad": args.use_vad,
+        "vadConfig": args.vad_config,
     });
     let resp = client
         .post(format!("{base}/transcribe"))

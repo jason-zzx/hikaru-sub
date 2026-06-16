@@ -59,6 +59,11 @@ def create_app() -> FastAPI:
 
     @app.post("/transcribe")
     def transcribe(req: TranscribeRequest) -> dict:
+        vad_config = (
+            req.vad_config.model_dump(exclude_none=True)
+            if req.vad_config is not None
+            else {}
+        )
         debug_log(
             "transcribe_request",
             engine=req.engine,
@@ -67,6 +72,8 @@ def create_app() -> FastAPI:
             language=req.language,
             outputAssPath=req.output_ass_path,
             audioPath=req.audio_path,
+            useVad=req.use_vad,
+            vadConfig=vad_config,
         )
         job = manager.create(
             audio_path=req.audio_path,
@@ -76,6 +83,8 @@ def create_app() -> FastAPI:
             language=req.language,
             compute_type=req.compute_type,
             output_ass_path=req.output_ass_path,
+            use_vad=req.use_vad,
+            vad_config=vad_config,
         )
         debug_log("transcribe_response", jobId=job.id, status=job.status.value)
         return {"jobId": job.id, "status": job.status.value}

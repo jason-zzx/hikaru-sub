@@ -27,12 +27,20 @@ def create_engine(
     model: str,
     device: str = "auto",
     compute_type: Optional[str] = None,
+    use_vad: bool = False,
+    vad_config: Optional[dict] = None,
 ) -> AsrEngine:
     cls = _REGISTRY.get(name)
     if cls is None:
         known = ", ".join(_REGISTRY) or "(无)"
         raise KeyError(f"未知 ASR 引擎: {name}（已注册: {known}）")
-    return cls(model=model, device=device, compute_type=compute_type)
+    return cls(
+        model=model,
+        device=device,
+        compute_type=compute_type,
+        use_vad=use_vad,
+        vad_config=vad_config,
+    )
 
 
 def _require(name: str) -> Type[AsrEngine]:
