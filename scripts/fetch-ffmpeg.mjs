@@ -19,30 +19,39 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const binDir = join(__dirname, "..", "src-tauri", "binaries");
 
 // 各平台默认静态构建下载源（可通过 FFMPEG_URL 覆盖）。
+// 每个条目列出需复制到 binaries/ 的可执行文件。
 const SOURCES = {
   "win32-x64": {
     url: "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
     archive: "zip",
-    member: "ffmpeg.exe",
-    out: "ffmpeg.exe",
+    binaries: [
+      { member: "ffmpeg.exe", out: "ffmpeg.exe" },
+      { member: "ffprobe.exe", out: "ffprobe.exe" },
+    ],
   },
   "linux-x64": {
     url: "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
     archive: "tar.xz",
-    member: "ffmpeg",
-    out: "ffmpeg",
+    binaries: [
+      { member: "ffmpeg", out: "ffmpeg" },
+      { member: "ffprobe", out: "ffprobe" },
+    ],
   },
   "darwin-x64": {
     url: "https://evermeet.cx/ffmpeg/getrelease/zip",
     archive: "zip",
-    member: "ffmpeg",
-    out: "ffmpeg",
+    binaries: [
+      { member: "ffmpeg", out: "ffmpeg" },
+      { member: "ffprobe", out: "ffprobe" },
+    ],
   },
   "darwin-arm64": {
     url: "https://www.osxexperts.net/ffmpeg7arm.zip",
     archive: "zip",
-    member: "ffmpeg",
-    out: "ffmpeg",
+    binaries: [
+      { member: "ffmpeg", out: "ffmpeg" },
+      { member: "ffprobe", out: "ffprobe" },
+    ],
   },
 };
 
@@ -131,20 +140,22 @@ async function main() {
     await download(url, archivePath);
     await extract(archivePath, source.archive, work);
 
-    const member = await findMember(work, source.member);
-    if (!member) {
-      fail(`压缩包内未找到 ${source.member}`);
-    }
+    for (const { member, out } of source.binaries) {
+      const found = await findMember(work, member);
+      if (!found) {
+        fail(`压缩包内未找到 ${member}`);
+      }
 
-    const dest = join(binDir, source.out);
-    await copyFile(member, dest);
-    if (process.platform !== "win32") {
-      await chmod(dest, 0o755);
+      const dest = join(binDir, out);
+      await copyFile(found, dest);
+      if (process.platform !== "win32") {
+        await chmod(dest, 0o755);
+      }
+      const info = await stat(dest);
+      console.log(
+        `[fetch-ffmpeg] 完成：${dest}（${(info.size / 1e6).toFixed(1)} MB）`,
+      );
     }
-    const info = await stat(dest);
-    console.log(
-      `[fetch-ffmpeg] 完成：${dest}（${(info.size / 1e6).toFixed(1)} MB）`,
-    );
   } finally {
     await rm(work, { recursive: true, force: true });
   }
