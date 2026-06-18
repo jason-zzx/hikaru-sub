@@ -108,7 +108,7 @@ export function TranslateView() {
       const result = await provider.translateBatch(
         cues,
         {
-          sourceLang: project.sourceLang || "ja",
+          sourceLang: "ja",
           targetLang: targetLang,
           batchSize: settings.translationBatchSize,
           contextWindow: settings.translationContextWindow,
@@ -220,13 +220,7 @@ export function TranslateView() {
           <div className="flex items-center gap-4">
             <label className="w-24 text-sm text-text-muted">源语言</label>
             <div className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-muted">
-              {project?.sourceLang === "ja"
-                ? "日语"
-                : project?.sourceLang === "en"
-                  ? "英语"
-                  : project?.sourceLang === "zh"
-                    ? "中文"
-                    : project?.sourceLang || "自动检测"}
+              日语
             </div>
           </div>
 

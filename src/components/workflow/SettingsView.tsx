@@ -21,14 +21,6 @@ const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
   system: "系统 PATH",
 };
 
-const SOURCE_LANGS = [
-  { value: "auto", label: "自动检测" },
-  { value: "ja", label: "日语" },
-  { value: "en", label: "英语" },
-  { value: "zh", label: "中文" },
-  { value: "ko", label: "韩语" },
-];
-
 const TARGET_LANGS = [
   { value: "zh-CN", label: "简体中文" },
   { value: "zh-TW", label: "繁体中文" },
@@ -171,7 +163,7 @@ export function SettingsView() {
             </Field>
           </Section>
 
-          <Section title="转录（ASR）默认" desc="新建项目时使用的默认转录配置">
+          <Section title="日语转录（ASR）默认" desc="新建项目时使用的默认转录配置（源语言固定为日语）">
             <Field label="引擎">
               <Select
                 value={settings.asrEngine}
@@ -290,14 +282,7 @@ export function SettingsView() {
             </Field>
           </Section>
 
-          <Section title="默认语言" desc="新建项目时的源语言与目标语言">
-            <Field label="源语言">
-              <Select
-                value={settings.defaultSourceLang}
-                onChange={(v) => update("defaultSourceLang", v)}
-                options={SOURCE_LANGS}
-              />
-            </Field>
+          <Section title="默认目标语言" desc="新建项目时使用的翻译目标语言">
             <Field label="目标语言">
               <Select
                 value={settings.defaultTargetLang}

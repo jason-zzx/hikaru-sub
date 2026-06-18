@@ -2,6 +2,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { WelcomeView } from "../workflow/WelcomeView";
+import { DownloadView } from "../workflow/DownloadView";
 import { ImportView } from "../workflow/ImportView";
 import { TranscribeView } from "../workflow/TranscribeView";
 import { TranslateView } from "../workflow/TranslateView";
@@ -11,6 +12,7 @@ import { SettingsView } from "../workflow/SettingsView";
 
 const stepViews = {
   welcome: WelcomeView,
+  download: DownloadView,
   import: ImportView,
   transcribe: TranscribeView,
   translate: TranslateView,

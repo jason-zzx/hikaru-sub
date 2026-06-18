@@ -4,6 +4,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import type { WorkflowStep } from "../../types";
 import {
   IconBurn,
+  IconDownload,
   IconEditor,
   IconHome,
   IconImport,
@@ -20,6 +21,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { step: "welcome", label: "首页", icon: <IconHome /> },
+  { step: "download", label: "下载", icon: <IconDownload /> },
   { step: "import", label: "导入", icon: <IconImport /> },
   { step: "transcribe", label: "转录", icon: <IconTranscribe /> },
   { step: "translate", label: "翻译", icon: <IconTranslate /> },

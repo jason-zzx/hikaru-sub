@@ -55,6 +55,18 @@ fn bundled_ffmpeg(app: &AppHandle) -> Option<PathBuf> {
     candidate.is_file().then_some(candidate)
 }
 
+/// 与 `resolve_ffmpeg` 同目录解析 ffprobe 可执行路径。
+pub fn resolve_ffprobe(app: &AppHandle, settings: &AppSettings) -> String {
+    let (ffmpeg_path, _) = resolve_ffmpeg(app, settings);
+    if ffmpeg_path.ends_with("ffmpeg.exe") {
+        ffmpeg_path.replace("ffmpeg.exe", "ffprobe.exe")
+    } else if ffmpeg_path.ends_with("ffmpeg") {
+        ffmpeg_path.replace("ffmpeg", "ffprobe")
+    } else {
+        "ffprobe".to_string()
+    }
+}
+
 /// 按优先级解析 ffmpeg 可执行路径：用户设置 → 捆绑 → 系统 PATH。
 pub fn resolve_ffmpeg(app: &AppHandle, settings: &AppSettings) -> (String, FfmpegSource) {
     if let Some(path) = settings

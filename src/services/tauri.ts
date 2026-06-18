@@ -7,10 +7,14 @@ import type {
   AsrJobSnapshot,
   AsrModelStatus,
   AudioExtractProgress,
+  DownloadSnapshot,
   FfmpegStatus,
   ModelDownloadSnapshot,
+  ProbeDownloadMediaArgs,
   ProjectMeta,
   StartAsrArgs,
+  StartVideoDownloadArgs,
+  DownloadMediaProbe,
 } from "../types";
 
 const VIDEO_EXTENSIONS = [
@@ -158,4 +162,30 @@ export async function loadAssText(assPath: string): Promise<string> {
 /** 获取视频信息（分辨率、时长）。 */
 export async function getVideoInfo(videoPath: string): Promise<import("../types").VideoInfo> {
   return invoke<import("../types").VideoInfo>("get_video_info", { videoPath });
+}
+
+/** 探测 m3u8 媒体流信息。 */
+export async function probeDownloadMedia(
+  args: ProbeDownloadMediaArgs,
+): Promise<DownloadMediaProbe> {
+  return invoke<DownloadMediaProbe>("probe_download_media", { args });
+}
+
+/** 启动 m3u8 视频下载，返回 jobId。 */
+export async function startVideoDownload(
+  args: StartVideoDownloadArgs,
+): Promise<string> {
+  return invoke<string>("start_video_download", { args });
+}
+
+/** 查询视频下载进度。 */
+export async function getVideoDownloadProgress(
+  jobId: string,
+): Promise<DownloadSnapshot> {
+  return invoke<DownloadSnapshot>("get_video_download_progress", { jobId });
+}
+
+/** 取消视频下载。 */
+export async function cancelVideoDownload(jobId: string): Promise<void> {
+  await invoke("cancel_video_download", { jobId });
 }

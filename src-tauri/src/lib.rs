@@ -1,6 +1,11 @@
 mod asr;
 mod ass;
 mod asset_scope;
+mod download;
+mod hls_download;
+mod hls_fetch;
+mod hls_playlist;
+mod hls_types;
 mod ffmpeg;
 mod project;
 mod settings;
@@ -41,9 +46,14 @@ pub fn run() {
             transcode::start_transcode,
             transcode::check_transcode_progress,
             transcode::stop_transcode,
+            download::probe_download_media,
+            download::start_video_download,
+            download::get_video_download_progress,
+            download::cancel_video_download,
         ])
         .setup(|app| {
             transcode::init_transcode_state(app);
+            download::init_download_state(app);
             Ok(())
         })
         .build(tauri::generate_context!())

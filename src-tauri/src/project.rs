@@ -53,7 +53,7 @@ fn default_project(video_path: &str, settings: &crate::settings::AppSettings) ->
         video_path: video_path.to_string(),
         audio_path: None,
         ass_path: None,
-        source_lang: settings.default_source_lang.clone(),
+        source_lang: "ja".into(),
         target_lang: settings.default_target_lang.clone(),
         asr: AsrConfig {
             engine: settings.asr_engine.clone(),
