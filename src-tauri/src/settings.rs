@@ -36,7 +36,7 @@ impl Default for AppSettings {
             translation_base_url: "https://api.openai.com/v1".into(),
             translation_model: "gpt-4o-mini".into(),
             translation_api_key: None,
-            default_source_lang: "auto".into(),
+            default_source_lang: "ja".into(),
             default_target_lang: "zh-CN".into(),
             translation_batch_size: 25,
             translation_context_window: 2,

@@ -1,10 +1,11 @@
 # Hikaru-Sub
 
-AI 字幕桌面应用：本地 ASR 转录、大模型翻译、字幕编辑与 FFmpeg 压制。
+日语 AI 字幕桌面应用：m3u8 视频下载 → 本地 ASR 日语转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
 
 ## 当前进度
 
 ✅ **已实现**：
+- m3u8 视频下载（Rust 分片并发优先、FFmpeg 兼容回退；单 URL / 分离音视频；AES-128 加密 VOD；自定义请求头；自动并发与 HTTP/2；进度与取消；完成后可导入项目）
 - 项目管理（创建/打开项目，`.hikaru` 元数据）
 - FFmpeg 集成（音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
 - Python ASR sidecar（faster-whisper + NVIDIA Parakeet 日语适配器 + VAD 预处理 + HTTP 进度 API）
@@ -84,6 +85,11 @@ src-tauri/                    # Tauri Rust 后端
     ass.rs                    # ASS 文件读写
     asset_scope.rs            # Tauri asset protocol 动态授权
     transcode.rs              # 不兼容视频编码的代理转码与缓存
+    download.rs               # m3u8 下载 command、任务状态与策略编排
+    hls_playlist.rs           # m3u8 解析与分片计划
+    hls_fetch.rs              # 分片 HTTP 下载与 AES 解密
+    hls_download.rs           # 并发调度与媒体组装
+    hls_types.rs              # 下载类型与自动并发配置
     project.rs                # 项目元数据管理
     settings.rs               # 全局设置持久化
 packages/ass-core/            # ASS 解析/序列化库（workspace）
@@ -96,8 +102,12 @@ asr-service/                  # Python ASR sidecar
 
 ## 工作流
 
+0. **下载**（可选）→ 从 m3u8 下载音视频到本地
+
+默认 `auto` 策略：解析 VOD m3u8 后按 CPU 核数自动并发（8–32）下载分片，共享 HTTP/2 连接；支持 Byte-Range 与 AES-128-CBC 加密流（如 Niconico domand fMP4）。分片按播放列表顺序流式拼接为临时媒体文件，再用 FFmpeg `-c copy` remux。直播或分片策略无法处理时自动回退 FFmpeg 兼容模式。
+
 1. **导入视频** → 创建 `.hikaru` 项目目录
-2. **转录** → 提取音轨 → faster-whisper 转录 → 生成单语 ASS
+2. **日语转录** → 提取音轨 → ASR 转录（源语言固定日语）→ 生成单语 ASS
 3. **翻译** → OpenAI 兼容 API 批量翻译 → 生成双语 ASS（`.translated.ass`）
 4. **编辑** → 载入字幕 → 视频/波形辅助校对 → 调整文本与时间轴 → 保存 ASS
 5. **压制**（计划中）→ FFmpeg 硬/软字幕输出
@@ -105,7 +115,16 @@ asr-service/                  # Python ASR sidecar
 
 ## 核心功能
 
-### 转录配置
+### m3u8 下载
+- 单 URL 或分离音视频 URL；可粘贴自定义 HTTP 请求头（如 Referer、Cookie）
+- 自动选择输出扩展名；分离模式分别下载后由 FFmpeg 合并
+- Rust 分片路径：自动并发、流式写盘、临时分片保留原始扩展名
+- 加密 VOD：AES-128-CBC；init 段按 KEY/MAP 行序判断是否解密
+- 进度轮询与取消；失败或不可解析时回退 FFmpeg
+- 下载完成后可打开保存目录或直接进入导入流程
+
+### 转录配置（日语源语言）
+- 源语言固定为日语（`ja`），转录页不提供语言选择
 - 引擎选择：faster-whisper（支持 CPU/CUDA/auto）
 - 可选引擎：parakeet（NVIDIA NeMo `nvidia/parakeet-tdt_ctc-0.6b-ja`，日语专用）
 - 模型选择：tiny/base/small/medium/large-v2/large-v3
@@ -195,3 +214,7 @@ interface SubtitleCue {
 | `start_transcode` | 启动不兼容视频编码的代理视频转码 |
 | `check_transcode_progress` | 查询代理转码是否完成 |
 | `stop_transcode` | 停止并清理转码任务记录 |
+| `probe_download_media` | 探测 m3u8 媒体流（视频/音频/扩展名） |
+| `start_video_download` | 启动 m3u8 下载任务 |
+| `get_video_download_progress` | 查询下载进度 |
+| `cancel_video_download` | 取消下载并清理部分文件 |

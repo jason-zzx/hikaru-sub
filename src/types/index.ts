@@ -1,5 +1,6 @@
 export type WorkflowStep =
   | "welcome"
+  | "download"
   | "import"
   | "transcribe"
   | "translate"
@@ -161,4 +162,49 @@ export interface VideoInfo {
   width: number;
   height: number;
   durationMs: number;
+}
+
+export type DownloadMode = "single" | "separate";
+
+export type DownloadStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface DownloadMediaProbe {
+  hasVideo: boolean;
+  hasAudio: boolean;
+  extension: string;
+  durationMs: number;
+}
+
+export interface ProbeDownloadMediaArgs {
+  mode: DownloadMode;
+  videoUrl: string;
+  audioUrl?: string | null;
+  headers?: string | null;
+}
+
+export type DownloadStrategy = "auto" | "segments" | "ffmpeg";
+
+export interface StartVideoDownloadArgs {
+  mode: DownloadMode;
+  name: string;
+  videoUrl: string;
+  audioUrl?: string | null;
+  headers?: string | null;
+  saveDir?: string | null;
+  strategy?: DownloadStrategy | null;
+}
+
+export interface DownloadSnapshot {
+  id: string;
+  status: DownloadStatus;
+  progress: number | null;
+  processedMs: number;
+  durationMs: number;
+  outputPath: string | null;
+  error: string | null;
 }

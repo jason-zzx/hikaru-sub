@@ -1,6 +1,6 @@
 # Hikaru-Sub — Agent 指南
 
-AI 字幕桌面应用：导入视频 → 本地 ASR 转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
+AI 日语字幕桌面应用：下载 m3u8 视频 → 本地 ASR 日语转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
 
 ## 技术栈
 
@@ -49,6 +49,11 @@ src-tauri/                    # Rust 后端
     project.rs                # .hikaru/project.json
     settings.rs               # 全局设置持久化
     transcode.rs              # 不兼容视频编码的代理视频转码与缓存
+    download.rs               # 下载 command、任务状态、FFmpeg fallback 与策略编排
+    hls_types.rs              # 分片计划类型、自动并发配置、取消令牌
+    hls_playlist.rs           # m3u8 解析、URL 解析、AES-128 规划、分片计划构建
+    hls_fetch.rs              # HTTP headers、Range 请求、流式分片下载与重试
+    hls_download.rs           # HTTP/2 共享 client、并发调度、临时文件组装与 remux
 packages/ass-core/              # ASS 解析/序列化（workspace 包）
 asr-service/                  # Python ASR sidecar（FastAPI HTTP）
   main.py                     # 入口：选端口 + uvicorn + stdout 就绪协议
@@ -66,7 +71,7 @@ asr-service/                  # Python ASR sidecar（FastAPI HTTP）
 
 ```mermaid
 flowchart LR
-  Video --> FFmpeg --> ASR --> ASS --> Translate --> Editor --> Burn
+  Download --> Import --> Video --> FFmpeg --> ASR --> ASS --> Translate --> Editor --> Burn
 ```
 
 ## 核心数据模型
@@ -90,6 +95,8 @@ interface SubtitleCue {
 ```
 
 双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary`（原文）+ `Secondary`（译文），同时间轴两行 Dialogue。
+
+**源语言**：产品面向日语转录与翻译，新建项目固定 `sourceLang: "ja"`；转录与翻译 UI 不再暴露源语言选择。旧项目中的其他 `sourceLang` 仍可打开。
 
 ### ASR 引擎
 
@@ -117,6 +124,27 @@ interface SubtitleCue {
 
 代理视频写入应用缓存目录 `transcode/*.mp4`，用于快速 seek；时间轴另行提取音频波形用于细致对轴。
 
+### m3u8 视频下载
+
+下载页（`DownloadView`）支持单 URL 或分离音视频 URL、自定义请求头、保存目录选择与完成后一键导入项目。后端策略默认为 `auto`：优先 Rust 分片并发下载，失败时回退 FFmpeg。
+
+**分片并发流程**（`hls_*` + `download.rs`）：
+
+1. 解析 VOD m3u8 → 构建 `HlsMediaPlan`（init 段、媒体分片、Byte-Range、AES-128 解密信息）
+2. 预取加密密钥；按 CPU 核数自动并发（`clamp(核数×2, 8, 32)`），每 job 共享一个 HTTP/2 `reqwest` client
+3. 并发下载分片到临时目录（保留 URL 原始扩展名如 `.cmfv`/`.ts`，便于调试）；明文分片流式写盘，AES-128 媒体分片整段缓冲解密
+4. 流式拼接 `video.bin`/`audio.bin` → FFmpeg `-c copy` remux 为最终文件
+5. 分离模式音视频并行下载，共享同一 semaphore 上限
+
+**加密与兼容**：
+
+- 支持 AES-128-CBC 加密 VOD（如 Niconico domand fMP4）
+- `EXT-X-MAP` 在 `EXT-X-KEY` 之后时 init 段为明文（按 playlist 行序判定，符合 HLS 规范）
+- 直播、无法解析的播放列表、分片策略失败等场景自动回退 FFmpeg
+- 下载过程支持取消；取消时清理子进程与临时目录
+
+前端不暴露并发数或策略选择；`start_video_download` 的 `strategy` 参数保留供调试，缺省 `auto`。
+
 ## 已实现 Tauri Commands
 
 | Command | 职责 |
@@ -142,6 +170,10 @@ interface SubtitleCue {
 | `start_transcode` | 启动代理视频转码 |
 | `check_transcode_progress` | 查询代理视频转码状态 |
 | `stop_transcode` | 清理转码任务记录 |
+| `probe_download_media` | 探测 m3u8 流（视频/音频/扩展名） |
+| `start_video_download` | 启动 m3u8 下载，返回 jobId |
+| `get_video_download_progress` | 轮询下载进度 |
+| `cancel_video_download` | 取消下载并清理部分输出 |
 
 计划中 command：`burn_subtitles`（FFmpeg 压制输出向导）。
 
@@ -173,6 +205,8 @@ interface SubtitleCue {
 - [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做）
 - [x] 视频播放兼容处理（asset protocol 加载；不兼容编码生成 480p H.264 全关键帧代理视频并缓存）
 - [x] VAD 预处理（统一配置 UI；faster-whisper 透传内置 VAD，Parakeet 独立 Silero VAD 预切分；失败自动降级）
+- [x] 日语专用化（源语言固定 ja；移除转录/设置页源语言选择）
+- [x] m3u8 视频下载（DownloadView；Rust 分片并发 + AES-128 + 自动并发/HTTP/2；FFmpeg fallback）
 - [ ] FFmpeg 压制（BurnView 输出向导）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 

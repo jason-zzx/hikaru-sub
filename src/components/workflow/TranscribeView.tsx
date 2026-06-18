@@ -37,13 +37,6 @@ const ASR_DEVICES = [
   { value: "cpu", label: "CPU" },
   { value: "cuda", label: "CUDA（NVIDIA GPU）" },
 ];
-const SOURCE_LANGS = [
-  { value: "auto", label: "自动检测" },
-  { value: "ja", label: "日语" },
-  { value: "en", label: "英语" },
-  { value: "zh", label: "中文" },
-  { value: "ko", label: "韩语" },
-];
 const ASR_POLL_INTERVAL_MS = 700;
 const ASR_PROGRESS_RETRY_LIMIT = 90;
 const ASR_PROGRESS_RETRY_MAX_DELAY_MS = 3000;
@@ -96,7 +89,6 @@ export function TranscribeView() {
   const [engine, setEngine] = useState("faster-whisper");
   const [model, setModel] = useState("large-v3");
   const [device, setDevice] = useState("auto");
-  const [language, setLanguage] = useState("auto");
   const [engines, setEngines] = useState<AsrEngineInfo[] | null>(null);
   const [engineMsg, setEngineMsg] = useState<string | null>(null);
   const [modelCheckTrigger, setModelCheckTrigger] = useState(0);
@@ -128,7 +120,6 @@ export function TranscribeView() {
     setEngine(project.asr.engine || "faster-whisper");
     setModel(project.asr.model || "large-v3");
     setDevice(project.asr.device || "auto");
-    setLanguage(project.sourceLang || "auto");
     if (project.audioPath) {
       pathExists(project.audioPath)
         .then(setAudioReady)
@@ -147,9 +138,9 @@ export function TranscribeView() {
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">
         <header>
-          <h2 className="text-xl font-semibold">ASR 转录</h2>
+          <h2 className="text-xl font-semibold">日语转录</h2>
           <p className="mt-1 text-sm text-text-muted">
-            提取音轨并使用本地 ASR 模型生成 ASS 字幕
+            提取音轨并使用本地 ASR 模型生成日语 ASS 字幕
           </p>
         </header>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface-raised">
@@ -234,9 +225,6 @@ export function TranscribeView() {
   const handleEngineChange = (nextEngine: string) => {
     setEngine(nextEngine);
     setModel(defaultAsrModel(nextEngine));
-    if (nextEngine === "parakeet") {
-      setLanguage("ja");
-    }
   };
 
   const pollLoop = async (jobId: string) => {
@@ -338,7 +326,7 @@ export function TranscribeView() {
     setTranscribing(true);
     upsertTask({
       id: "asr",
-      label: "ASR 转录",
+      label: "日语转录",
       status: "running",
       progress: 0,
     });
@@ -348,7 +336,7 @@ export function TranscribeView() {
         engine,
         model,
         device,
-        language: language === "auto" ? null : language,
+        language: "ja",
         outputAssPath: project.assPath ?? null,
         useVad,
         vadConfig: useVad
@@ -394,10 +382,10 @@ export function TranscribeView() {
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
       <header>
-        <h2 className="text-xl font-semibold">ASR 转录</h2>
-        <p className="mt-1 text-sm text-text-muted">
-          提取音轨并使用本地 ASR 模型生成单语 ASS 字幕
-        </p>
+          <h2 className="text-xl font-semibold">日语转录</h2>
+          <p className="mt-1 text-sm text-text-muted">
+            提取音轨并使用本地 ASR 模型生成日语 ASS 字幕
+          </p>
       </header>
 
       {ffmpegMissing && (
@@ -455,7 +443,7 @@ export function TranscribeView() {
       <StepCard
         index={2}
         title="转录设置"
-        desc="选择引擎、模型、设备与源语言"
+        desc="选择引擎、模型与设备（源语言固定为日语）"
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Labeled label="引擎">
@@ -485,14 +473,6 @@ export function TranscribeView() {
               onChange={setDevice}
               disabled={transcribing}
               options={ASR_DEVICES}
-            />
-          </Labeled>
-          <Labeled label="源语言">
-            <Select
-              value={language}
-              onChange={setLanguage}
-              disabled={transcribing}
-              options={SOURCE_LANGS}
             />
           </Labeled>
         </div>
