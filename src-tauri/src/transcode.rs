@@ -1,11 +1,35 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
+use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
+
+use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
+use crate::settings::load_settings;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProxyVideoFormat {
+    Mp4H264,
+}
+
+impl ProxyVideoFormat {
+    fn for_current_platform() -> Self {
+        Self::Mp4H264
+    }
+
+    fn extension(self) -> &'static str {
+        "mp4"
+    }
+
+    fn is_valid_video_codec(self, codec: &str) -> bool {
+        let codec = codec.to_ascii_lowercase();
+        codec == "h264"
+    }
+}
 
 #[derive(Clone, serde::Serialize)]
 struct TranscodeProgressEvent {
@@ -34,14 +58,119 @@ impl TranscodeState {
 }
 
 #[tauri::command]
-pub async fn detect_video_codec(path: String) -> Result<String, String> {
-    let output = Command::new("ffprobe")
+pub async fn detect_video_codec(app: AppHandle, path: String) -> Result<String, String> {
+    let settings = load_settings(&app)?;
+    let ffprobe = resolve_ffprobe(&app, &settings);
+    probe_video_codec(&ffprobe, &path)
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoPlaybackProbe {
+    pub video_codec: String,
+    pub audio_codec: Option<String>,
+    pub format_name: String,
+    pub needs_transcode: bool,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfprobeOutput {
+    streams: Vec<FfprobeStream>,
+    format: FfprobeFormat,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfprobeStream {
+    codec_type: String,
+    codec_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfprobeFormat {
+    format_name: String,
+}
+
+/// 判断 WebView `<video>` 能否直接播放该文件（经本地 HTTP 服务提供）。
+pub fn evaluate_playback_compat(
+    format_name: &str,
+    video_codec: &str,
+    audio_codec: Option<&str>,
+) -> (bool, Option<String>) {
+    let video = video_codec.to_ascii_lowercase();
+    const UNSUPPORTED_VIDEO: &[&str] =
+        &["hevc", "h265", "av1", "mpeg2video", "vc1", "prores"];
+    if UNSUPPORTED_VIDEO.iter().any(|codec| video.contains(codec)) {
+        return (
+            true,
+            Some(format!("视频编码 {video_codec} 不受 WebView 直接播放支持")),
+        );
+    }
+
+    let formats: Vec<&str> = format_name
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect();
+
+    if formats.iter().any(|f| *f == "webm") {
+        if video.contains("vp") {
+            return (false, None);
+        }
+        return (
+            true,
+            Some(format!("WebM 容器内的 {video_codec} 无法直接播放")),
+        );
+    }
+
+    if formats.iter().any(|f| matches!(*f, "matroska" | "avi" | "mpegts" | "flv" | "asf" | "wmv")) {
+        return (
+            true,
+            Some(format!(
+                "容器格式 {format_name} 无法通过 HTML5 视频标签直接播放"
+            )),
+        );
+    }
+
+    const MP4_FAMILY: &[&str] = &["mov", "mp4", "m4v", "3gp", "3g2", "mj2"];
+    if formats.iter().any(|f| MP4_FAMILY.contains(f)) {
+        if video != "h264" && !video.contains("avc") {
+            return (
+                true,
+                Some(format!("MP4 内视频编码 {video_codec} 可能无法直接播放")),
+            );
+        }
+        if let Some(audio_codec) = audio_codec {
+            let audio = audio_codec.to_ascii_lowercase();
+            const SUPPORTED_AUDIO: &[&str] = &["aac", "mp3", "opus", "mpeg4generic", "mp4a"];
+            if !SUPPORTED_AUDIO.iter().any(|codec| audio.contains(codec)) {
+                return (
+                    true,
+                    Some(format!("MP4 内音频编码 {audio_codec} 可能无法直接播放")),
+                );
+            }
+        }
+        return (false, None);
+    }
+
+    (
+        true,
+        Some(format!("未知或不支持的容器格式 {format_name}")),
+    )
+}
+
+fn probe_video_codec(ffprobe: &str, path: &str) -> Result<String, String> {
+    let output = Command::new(ffprobe)
         .args([
-            "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=codec_name",
-            "-of", "default=noprint_wrappers=1:nokey=1",
-            &path,
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_name",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            path,
         ])
         .output()
         .map_err(|e| format!("执行 ffprobe 失败: {}", e))?;
@@ -50,8 +179,140 @@ pub async fn detect_video_codec(path: String) -> Result<String, String> {
         return Err("ffprobe 执行失败".to_string());
     }
 
-    let codec = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok(codec)
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn probe_video_playback_with_ffprobe(
+    ffprobe: &str,
+    path: &str,
+) -> Result<VideoPlaybackProbe, String> {
+    let output = Command::new(ffprobe)
+        .args([
+            "-v",
+            "error",
+            "-print_format",
+            "json",
+            "-show_streams",
+            "-show_format",
+            path,
+        ])
+        .output()
+        .map_err(|e| format!("执行 ffprobe 失败: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "ffprobe 执行失败: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    let parsed: FfprobeOutput = serde_json::from_slice(&output.stdout)
+        .map_err(|e| format!("解析 ffprobe 输出失败: {}", e))?;
+
+    let video_codec = parsed
+        .streams
+        .iter()
+        .find(|stream| stream.codec_type == "video")
+        .map(|stream| stream.codec_name.clone())
+        .ok_or_else(|| "未找到视频流".to_string())?;
+
+    let audio_codec = parsed
+        .streams
+        .iter()
+        .find(|stream| stream.codec_type == "audio")
+        .map(|stream| stream.codec_name.clone());
+
+    let format_name = parsed.format.format_name;
+    let (needs_transcode, reason) = evaluate_playback_compat(
+        &format_name,
+        &video_codec,
+        audio_codec.as_deref(),
+    );
+
+    Ok(VideoPlaybackProbe {
+        video_codec,
+        audio_codec,
+        format_name,
+        needs_transcode,
+        reason,
+    })
+}
+
+#[tauri::command]
+pub async fn probe_video_playback(app: AppHandle, path: String) -> Result<VideoPlaybackProbe, String> {
+    let settings = load_settings(&app)?;
+    let ffprobe = resolve_ffprobe(&app, &settings);
+    probe_video_playback_with_ffprobe(&ffprobe, &path)
+}
+
+fn proxy_cache_path(cache_dir: &PathBuf, hash: &str, format: ProxyVideoFormat) -> PathBuf {
+    cache_dir.join(format!("{hash}.{}", format.extension()))
+}
+
+fn remove_stale_proxy_caches(cache_dir: &PathBuf, hash: &str) {
+    for ext in ["webm"] {
+        let stale = cache_dir.join(format!("{hash}.{ext}"));
+        if stale.exists() {
+            let _ = fs::remove_file(stale);
+        }
+    }
+}
+
+fn is_valid_proxy_cache(ffprobe: &str, cache_path: &Path, format: ProxyVideoFormat) -> bool {
+    let Ok(metadata) = fs::metadata(cache_path) else {
+        return false;
+    };
+    if metadata.len() < 10240 {
+        return false;
+    }
+
+    let output = Command::new(ffprobe)
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_name",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            cache_path.to_str().unwrap_or_default(),
+        ])
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => {
+            let codec = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            format.is_valid_video_codec(&codec)
+        }
+        _ => false,
+    }
+}
+
+fn transcode_ffmpeg_args(input: &str, output: &str, _format: ProxyVideoFormat) -> Vec<String> {
+    vec![
+        "-hide_banner".into(),
+        "-i".into(),
+        input.into(),
+        "-vf".into(),
+        "scale=-2:480".into(),
+        "-c:v".into(),
+        "libx264".into(),
+        "-preset".into(),
+        "ultrafast".into(),
+        "-g".into(),
+        "1".into(),
+        "-crf".into(),
+        "22".into(),
+        "-c:a".into(),
+        "aac".into(),
+        "-b:a".into(),
+        "128k".into(),
+        "-movflags".into(),
+        "+faststart".into(),
+        "-y".into(),
+        output.into(),
+    ]
 }
 
 #[tauri::command]
@@ -59,6 +320,11 @@ pub async fn start_transcode(
     app: AppHandle,
     video_path: String,
 ) -> Result<String, String> {
+    let settings = load_settings(&app)?;
+    let ffmpeg = resolve_ffmpeg(&app, &settings).0;
+    let ffprobe = resolve_ffprobe(&app, &settings);
+    let proxy_format = ProxyVideoFormat::for_current_platform();
+
     let state = app.state::<TranscodeState>();
     let mut jobs = state.jobs.lock().await;
 
@@ -75,58 +341,26 @@ pub async fn start_transcode(
     }
 
     let hash = format!("{:x}", md5::compute(&video_path));
-    let cache_path = state.cache_dir.join(format!("{}.mp4", hash));
+    let cache_path = proxy_cache_path(&state.cache_dir, &hash, proxy_format);
+    remove_stale_proxy_caches(&state.cache_dir, &hash);
 
     if cache_path.exists() {
         println!("Cache file exists, validating: {:?}", cache_path);
-
-        // 检查文件大小（太小说明不完整）
-        if let Ok(metadata) = fs::metadata(&cache_path) {
-            if metadata.len() < 10240 {  // 至少 10KB
-                println!("Cache file too small ({}), removing", metadata.len());
-                let _ = fs::remove_file(&cache_path);
-            } else {
-                // 验证是否是完整的 h264 视频
-                let check = Command::new("ffprobe")
-                    .args([
-                        "-v", "error",
-                        "-select_streams", "v:0",
-                        "-show_entries", "stream=codec_name",
-                        "-of", "default=noprint_wrappers=1:nokey=1",
-                        cache_path.to_str().unwrap()
-                    ])
-                    .output();
-
-                if let Ok(output) = check {
-                    if output.status.success() {
-                        let info = String::from_utf8_lossy(&output.stdout);
-                        println!("ffprobe output: {:?}", info.trim());
-                        // 只验证编码格式是 h264
-                        if info.trim() == "h264" {
-                            println!("Using existing cache: {:?}", cache_path);
-                            jobs.insert(
-                                video_path.clone(),
-                                TranscodeJob {
-                                    cache_path: cache_path.clone(),
-                                    completed: true,
-                                    progress: 100.0,
-                                },
-                            );
-                            return Ok(cache_path.to_string_lossy().to_string());
-                        } else {
-                            println!("Unexpected codec: {}", info.trim());
-                        }
-                    } else {
-                        println!("ffprobe failed: {}", String::from_utf8_lossy(&output.stderr));
-                    }
-                } else {
-                    println!("Failed to run ffprobe");
-                }
-
-                println!("Cache file invalid or corrupted, removing");
-                let _ = fs::remove_file(&cache_path);
-            }
+        if is_valid_proxy_cache(&ffprobe, &cache_path, proxy_format) {
+            println!("Using existing cache: {:?}", cache_path);
+            jobs.insert(
+                video_path.clone(),
+                TranscodeJob {
+                    cache_path: cache_path.clone(),
+                    completed: true,
+                    progress: 100.0,
+                },
+            );
+            return Ok(cache_path.to_string_lossy().to_string());
         }
+
+        println!("Cache file invalid or corrupted, removing");
+        let _ = fs::remove_file(&cache_path);
     }
 
     jobs.insert(
@@ -144,15 +378,21 @@ pub async fn start_transcode(
     let app_handle = app.clone();
 
     tokio::spawn(async move {
-        println!("Starting transcode: {} -> {}", input_path, output_path);
+        println!(
+            "Starting transcode ({:?}): {} -> {}",
+            proxy_format, input_path, output_path
+        );
 
         // 先获取视频时长
-        let duration_output = Command::new("ffprobe")
+        let duration_output = Command::new(&ffprobe)
             .args([
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                &input_path
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                &input_path,
             ])
             .output();
 
@@ -161,23 +401,11 @@ pub async fn start_transcode(
             .and_then(|out| String::from_utf8_lossy(&out.stdout).trim().parse().ok())
             .unwrap_or(0.0);
 
-        let args = vec![
-            "-i", &input_path,
-            "-vf", "scale=-2:480",
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-g", "1",
-            "-crf", "22",
-            "-c:a", "aac",
-            "-b:a", "128k",
-            "-movflags", "+faststart",
-            "-y",
-            &output_path,
-        ];
+        let args = transcode_ffmpeg_args(&input_path, &output_path, proxy_format);
 
         println!("FFmpeg args: {:?}", args);
 
-        let child = Command::new("ffmpeg")
+        let child = Command::new(&ffmpeg)
             .args(&args)
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
@@ -316,4 +544,43 @@ pub fn init_transcode_state(app: &mut tauri::App) {
         .join("transcode");
 
     app.manage(TranscodeState::new(cache_dir));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::evaluate_playback_compat;
+
+    #[test]
+    fn h264_in_mkv_needs_transcode() {
+        let (needs, reason) = evaluate_playback_compat("matroska", "h264", Some("aac"));
+        assert!(needs);
+        assert!(reason.unwrap().contains("容器格式"));
+    }
+
+    #[test]
+    fn h264_aac_mp4_can_play_directly() {
+        let (needs, _) = evaluate_playback_compat(
+            "mov,mp4,m4v,3gp,3g2,mj2",
+            "h264",
+            Some("aac"),
+        );
+        assert!(!needs);
+    }
+
+    #[test]
+    fn mp4_with_ac3_needs_transcode() {
+        let (needs, reason) = evaluate_playback_compat(
+            "mov,mp4,m4v,3gp,3g2,mj2",
+            "h264",
+            Some("ac3"),
+        );
+        assert!(needs);
+        assert!(reason.unwrap().contains("音频编码"));
+    }
+
+    #[test]
+    fn webm_vp8_can_play_directly() {
+        let (needs, _) = evaluate_playback_compat("matroska,webm", "vp8", Some("opus"));
+        assert!(!needs);
+    }
 }

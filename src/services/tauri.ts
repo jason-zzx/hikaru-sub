@@ -185,6 +185,11 @@ export async function getVideoDownloadProgress(
   return invoke<DownloadSnapshot>("get_video_download_progress", { jobId });
 }
 
+/** 注册本地视频路径到媒体 HTTP 服务，返回可播放的 http://127.0.0.1 URL。 */
+export async function registerMediaPlayback(path: string): Promise<string> {
+  return invoke<string>("register_media_playback", { path });
+}
+
 /** 取消视频下载。 */
 export async function cancelVideoDownload(jobId: string): Promise<void> {
   await invoke("cancel_video_download", { jobId });

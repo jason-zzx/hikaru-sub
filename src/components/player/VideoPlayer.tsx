@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
-import type { SubtitleCue } from "../../types";
+import type { SubtitleCue, VideoPlaybackProbe } from "../../types";
 
 interface VideoPlayerProps {
   videoPath: string;
@@ -11,6 +11,9 @@ interface VideoPlayerProps {
 
 export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const transcodeFallbackRef = useRef(false);
+  const recoverAttemptRef = useRef(0);
+  const isSeekingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string>("");
   const [transcoding, setTranscoding] = useState(false);
@@ -26,6 +29,43 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
 
   const cues = useProjectStore((s) => s.cues);
 
+  const loadHttpVideo = useCallback(async (path: string) => {
+    const url = await invoke<string>("register_media_playback", { path });
+    console.log("Media HTTP URL:", url);
+    setVideoSrc(url);
+  }, []);
+
+  const waitForTranscodedVideo = useCallback(
+    async (sourcePath: string) => {
+      console.log("Starting transcode for:", sourcePath);
+      setTranscoding(true);
+      setTranscodePercent(0);
+      setVideoSrc("");
+
+      await invoke<string>("start_transcode", { videoPath: sourcePath });
+
+      const checkReady = async (): Promise<void> => {
+        const progress = await invoke<{ ready: boolean; cache_path: string }>(
+          "check_transcode_progress",
+          { videoPath: sourcePath },
+        );
+
+        if (progress.ready) {
+          console.log("Transcode ready, using cache:", progress.cache_path);
+          setTranscoding(false);
+          await loadHttpVideo(progress.cache_path);
+          return;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await checkReady();
+      };
+
+      await checkReady();
+    },
+    [loadHttpVideo],
+  );
+
   // 监听转码进度
   useEffect(() => {
     const unlisten = listen<{ percent: number }>("transcode_progress", (event) => {
@@ -37,82 +77,95 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     };
   }, []);
 
-  // 使用 asset protocol 加载视频
+  // 通过本地 HTTP 服务加载视频（Linux WebKit 无法经 asset 协议播放音视频）
   useEffect(() => {
-    if (videoPath) {
-      console.log("Loading video from path:", videoPath);
+    if (!videoPath) return;
+
+    let cancelled = false;
+    transcodeFallbackRef.current = false;
+    console.log("Loading video from path:", videoPath);
+    setError(null);
+    setTranscoding(false);
+    setTranscodePercent(0);
+    setVideoSrc("");
+
+    invoke<VideoPlaybackProbe>("probe_video_playback", { path: videoPath })
+      .then(async (probe) => {
+        if (cancelled) return;
+
+        console.log("Video playback probe:", probe);
+        if (probe.needsTranscode) {
+          console.log(
+            "Direct playback not supported, starting transcode:",
+            probe.reason ?? "unknown",
+          );
+          await waitForTranscodedVideo(videoPath);
+          return;
+        }
+
+        console.log("Codec/container supported, using local HTTP media server");
+        await loadHttpVideo(videoPath);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load video:", err);
+        setError(`视频加载失败: ${String(err)}`);
+      });
+
+    return () => {
+      cancelled = true;
+      invoke("stop_transcode", { videoPath }).catch(console.error);
+    };
+  }, [videoPath, loadHttpVideo, waitForTranscodedVideo]);
+
+  const handleVideoError = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video?.error) return;
+
+    const code = video.error.code;
+    const errorMsg = video.error.message
+      ? `${video.error.message} (code: ${code})`
+      : `播放失败 (code: ${code})`;
+
+    console.error("Video error:", errorMsg, video.error);
+
+    // seek 时 WebKit 可能中止旧 Range 请求并误报网络/中止错误，尝试恢复播放
+    if ((code === 1 || code === 2) && videoSrc && recoverAttemptRef.current < 3) {
+      recoverAttemptRef.current += 1;
+      const resumeSec = currentTimeMs / 1000;
+      console.warn(
+        `Transient video error during seek, recovering (attempt ${recoverAttemptRef.current})`,
+      );
       setError(null);
-      setTranscoding(false);
-      setTranscodePercent(0);
-
-      // 先检测视频编码格式
-      invoke<string>("detect_video_codec", { path: videoPath })
-        .then((codec) => {
-          console.log("Video codec:", codec);
-
-          // 检查是否需要转码
-          const needsTranscode = ["hevc", "h265", "vp9", "av1"].includes(codec.toLowerCase());
-
-          if (needsTranscode) {
-            console.log("Codec not supported by WebView2, starting transcode...");
-            setTranscoding(true);
-            // 启动后台转码任务
-            return invoke<string>("start_transcode", { videoPath }).then((cachePath) => {
-              console.log("Transcode cache path:", cachePath);
-
-              // 等待转码文件可用
-              const checkReady = async () => {
-                try {
-                  const progress = await invoke<{ ready: boolean; cache_path: string }>(
-                    "check_transcode_progress",
-                    { videoPath }
-                  );
-
-                  if (progress.ready) {
-                    console.log("Transcode ready, using cache:", progress.cache_path);
-                    setTranscoding(false);
-                    // 添加缓存文件到 asset scope
-                    await invoke("allow_asset_path", { path: progress.cache_path });
-                    const assetUrl = convertFileSrc(progress.cache_path);
-                    console.log("Converted cache to asset URL:", assetUrl);
-                    setVideoSrc(assetUrl);
-                  } else {
-                    // 转码中，1 秒后重试
-                    console.log("Transcode in progress, retrying in 1s...");
-                    setTimeout(checkReady, 1000);
-                  }
-                } catch (err) {
-                  console.error("Error checking transcode progress:", err);
-                  setTranscoding(false);
-                  setError(`检查转码进度失败: ${String(err)}`);
-                }
-              };
-
-              checkReady();
-            });
-          } else {
-            console.log("Codec supported, using direct asset protocol");
-            // 支持的格式，直接使用 asset protocol
-            return invoke("allow_asset_path", { path: videoPath }).then(() => {
-              const assetUrl = convertFileSrc(videoPath);
-              console.log("Asset URL:", assetUrl);
-              setVideoSrc(assetUrl);
-            });
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to load video:", err);
-          setError(`视频加载失败: ${String(err)}`);
-        });
+      video.src = videoSrc;
+      video.load();
+      const onLoaded = () => {
+        video.removeEventListener("loadedmetadata", onLoaded);
+        video.currentTime = resumeSec;
+        if (isPlaying) {
+          video.play().catch(() => setPlaying(false));
+        }
+      };
+      video.addEventListener("loadedmetadata", onLoaded);
+      return;
     }
 
-    // 清理：停止转码任务
-    return () => {
-      if (videoPath) {
-        invoke("stop_transcode", { videoPath }).catch(console.error);
+    // MEDIA_ERR_SRC_NOT_SUPPORTED：探测遗漏时回退代理转码
+    if (code === 4 && !transcodeFallbackRef.current) {
+      transcodeFallbackRef.current = true;
+      try {
+        setError(null);
+        await waitForTranscodedVideo(videoPath);
+        return;
+      } catch (err) {
+        console.error("Transcode fallback failed:", err);
+        setError(`视频无法播放，转码回退失败: ${String(err)}`);
+        return;
       }
-    };
-  }, [videoPath]);
+    }
+
+    setError(errorMsg);
+  }, [videoPath, videoSrc, currentTimeMs, isPlaying, waitForTranscodedVideo, setPlaying]);
 
   // 同步播放状态
   useEffect(() => {
@@ -132,13 +185,15 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     if (!video || !videoSrc) return;
 
     const handleTimeUpdate = () => {
+      if (isSeekingRef.current) return;
+      recoverAttemptRef.current = 0;
       const ms = Math.floor(video.currentTime * 1000);
       setCurrentTime(ms);
 
       // 仅在播放时自动选中当前时间轴的字幕
       if (isPlaying) {
         const activeCue = cues.find(
-          (c) => ms >= c.startMs && ms <= c.endMs
+          (c) => ms >= c.startMs && ms <= c.endMs,
         );
         setSelectedCueId(activeCue?.id || null);
       }
@@ -172,12 +227,33 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     };
   }, [videoSrc, cues, isPlaying, setCurrentTime, setDuration, setPlaying, setSelectedCueId]);
 
-  // 外部跳转到指定时间
+  // 外部跳转到指定时间（拖动进度条 / 时间轴）
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || Math.abs(video.currentTime * 1000 - currentTimeMs) < 100) return;
-    video.currentTime = currentTimeMs / 1000;
-  }, [currentTimeMs]);
+    if (!video || !videoSrc) return;
+    if (Math.abs(video.currentTime * 1000 - currentTimeMs) < 100) return;
+
+    isSeekingRef.current = true;
+    const targetSec = currentTimeMs / 1000;
+
+    const onSeeked = () => {
+      isSeekingRef.current = false;
+      video.removeEventListener("seeked", onSeeked);
+    };
+    video.addEventListener("seeked", onSeeked);
+
+    if ("fastSeek" in video && typeof video.fastSeek === "function") {
+      try {
+        video.fastSeek(targetSec);
+        return () => video.removeEventListener("seeked", onSeeked);
+      } catch {
+        // fastSeek 不可用时回退 currentTime
+      }
+    }
+
+    video.currentTime = targetSec;
+    return () => video.removeEventListener("seeked", onSeeked);
+  }, [currentTimeMs, videoSrc]);
 
   // 获取当前显示的字幕（只显示当前选中的或当前播放位置的）
   const activeCue = isPlaying
@@ -201,7 +277,9 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
               style={{ width: `${transcodePercent}%` }}
             ></div>
           </div>
-          <p className="mt-2 text-xs">{transcodePercent.toFixed(1)}% - 生成 480p 全关键帧代理视频</p>
+          <p className="mt-2 text-xs">
+            {transcodePercent.toFixed(1)}% - 生成 480p 全关键帧代理视频
+          </p>
         </div>
       ) : !videoSrc ? (
         <div className="text-text-muted">加载中...</div>
@@ -211,13 +289,8 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
             ref={videoRef}
             src={videoSrc}
             className="h-full w-full"
-            onError={(e) => {
-              const video = e.target as HTMLVideoElement;
-              const errorMsg = video.error
-                ? `${video.error.message} (code: ${video.error.code})`
-                : "未知错误";
-              console.error("Video error:", errorMsg, video.error);
-              setError(errorMsg);
+            onError={() => {
+              void handleVideoError();
             }}
           />
 

@@ -164,6 +164,14 @@ export interface VideoInfo {
   durationMs: number;
 }
 
+export interface VideoPlaybackProbe {
+  videoCodec: string;
+  audioCodec?: string;
+  formatName: string;
+  needsTranscode: boolean;
+  reason?: string;
+}
+
 export type DownloadMode = "single" | "separate";
 
 export type DownloadStatus =
