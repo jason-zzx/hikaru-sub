@@ -860,7 +860,8 @@ class ParakeetEngine(AsrEngine):
         except ImportError as exc:
             debug_exception("parakeet_import_error", exc)
             raise AsrError(
-                "未安装 Parakeet 依赖，请安装 asr-service/requirements-parakeet.txt"
+                "未安装 Parakeet 引擎，请运行 ./scripts/setup-asr.sh parakeet "
+                "（或 parakeet-cpu / parakeet-cuda）"
             ) from exc
 
         try:

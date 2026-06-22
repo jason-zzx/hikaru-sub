@@ -24,9 +24,22 @@ pnpm dev              # 仅 Vite 前端
 pnpm tauri dev        # Tauri 桌面开发
 pnpm build            # 构建前端
 pnpm tauri build      # 打包桌面应用
+./scripts/setup-asr.sh        # ASR sidecar（默认 faster-whisper）
 ```
 
 **始终使用 pnpm**，不要用 npm/yarn。workspace 根目录安装依赖时加 `-w`。
+
+### ASR sidecar 依赖
+
+Python 3.10+。`./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎；**Parakeet 仅在使用 `parakeet` / `parakeet-cpu` / `parakeet-cuda` 参数时安装**。
+
+| 场景 | 命令 |
+|------|------|
+| 日常开发（默认） | `./scripts/setup-asr.sh` 或 `pnpm asr:setup` |
+| 有 NVIDIA GPU、试 Parakeet | `./scripts/setup-asr.sh parakeet-cuda` |
+| 无 GPU 但想试 Parakeet | `./scripts/setup-asr.sh parakeet-cpu` |
+
+手动安装见 `asr-service/README.md`。
 
 ## 目录结构
 
@@ -59,7 +72,10 @@ asr-service/                  # Python ASR sidecar（FastAPI HTTP）
   main.py                     # 入口：选端口 + uvicorn + stdout 就绪协议
   server.py                   # FastAPI 路由
   jobs.py                     # JobManager：后台线程转录 + 进度/取消
+  requirements-parakeet*.txt    # 可选 Parakeet 依赖（cpu / cuda 分轨）
   engines/                    # AsrEngine 抽象 + faster-whisper + parakeet + vad + registry
+scripts/
+  setup-asr.sh                # ASR 虚拟环境与依赖安装脚本
 ```
 
 ## 架构边界
@@ -101,7 +117,7 @@ interface SubtitleCue {
 ### ASR 引擎
 
 - `faster-whisper`：默认引擎，模型列表为 tiny/base/small/medium/large-v2/large-v3。
-- `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，使用 `asr-service/requirements-parakeet.txt` 单独安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段。
+- `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，须显式执行 `./scripts/setup-asr.sh parakeet`（或 `parakeet-cpu` / `parakeet-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段。
 - Parakeet 经 VAD 预切分和 gap backfill 后，当前真实转录效果已基本可接受，仅偶发少量句子遗漏；但时轴精度明显不如 faster-whisper，后续优化方案待定。
 
 ### VAD 预处理

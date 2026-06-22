@@ -16,33 +16,53 @@ asr-service/
 │   ├── parakeet.py    # NVIDIA NeMo Parakeet 日语适配器
 │   ├── vad.py         # Silero VAD 封装，供 Parakeet 预切分语音段
 │   └── registry.py    # 引擎注册表
-└── requirements.txt
+├── requirements.txt                # faster-whisper 引擎（默认）
+├── requirements-parakeet.txt       # NeMo 本体（不含 torch）
+├── requirements-parakeet-cpu.txt   # CPU torch + NeMo
+└── requirements-parakeet-cuda.txt  # CUDA 12.6 torch + NeMo
 ```
 
 ## 安装
 
 需要 Python 3.10+。
 
+### 推荐：使用安装脚本
+
+在仓库根目录执行（自动创建 `asr-service/.venv`）：
+
+```bash
+./scripts/setup-asr.sh              # 默认：faster-whisper
+./scripts/setup-asr.sh parakeet-cuda  # 额外安装 Parakeet（CUDA torch）
+pnpm asr:setup                      # 同上，通过 pnpm 调用
+pnpm asr:setup -- parakeet-cuda
+```
+
+| 场景 | 命令 |
+|------|------|
+| 日常开发（默认引擎） | `./scripts/setup-asr.sh` |
+| 有 N 卡、想试 Parakeet | `./scripts/setup-asr.sh parakeet-cuda` |
+| 无 GPU 但想试 Parakeet（CPU，慢且重） | `./scripts/setup-asr.sh parakeet-cpu` |
+| 让脚本按 GPU 选择 Parakeet 的 torch | `./scripts/setup-asr.sh parakeet` |
+
+**默认不会安装 Parakeet。** 该引擎依赖 NeMo + PyTorch，体积大（含 onnx 测试数据等）。非 N 卡环境请勿安装；sidecar 仍可正常启动，`/engines` 会将 `parakeet` 标为不可用。
+
+### 手动安装
+
 ```bash
 cd asr-service
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt    # faster-whisper
 ```
 
-GPU 加速（faster-whisper CUDA）需另行安装匹配的 CUDA / cuDNN，详见 faster-whisper 文档。
-
-### 可选：NVIDIA Parakeet 日语模型
-
-`parakeet` 引擎使用 `nvidia/parakeet-tdt_ctc-0.6b-ja`，依赖 NVIDIA NeMo 与 PyTorch。为避免影响默认 faster-whisper 安装，Parakeet 依赖单独安装：
+可选 Parakeet（须先装好 `requirements.txt`）：
 
 ```bash
-pip install -r requirements.txt
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
-pip install -r requirements-parakeet.txt
+pip install -r requirements-parakeet-cpu.txt    # CPU 版 torch，无 nvidia-cudnn 等
+pip install -r requirements-parakeet-cuda.txt     # CUDA 12.6 torch（需 NVIDIA GPU）
 ```
 
-NeMo 2.7.x 需要 `torch>=2.6.0`，旧的 `cu121` wheel 源可能只解析到过旧版本；NVIDIA 驱动较新时优先使用 `cu126`。如果只使用 CPU，可按 PyTorch 官方指引安装 CPU 版本 torch。未安装 NeMo 时 sidecar 仍可启动，但 `/engines` 会将 `parakeet` 标为不可用。
+GPU 加速（faster-whisper CUDA）需另行安装匹配的 CUDA / cuDNN，详见 faster-whisper 文档；与 Parakeet 的 torch 安装相互独立。
 
 ## 运行
 

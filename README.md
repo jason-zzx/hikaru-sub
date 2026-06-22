@@ -49,17 +49,30 @@
 - Rust（[安装指南](https://www.rust-lang.org/learn/get-started)）
 - FFmpeg（PATH 或可配置路径）
 - Python 3.10+（ASR sidecar）
-- 可选：CUDA（faster-whisper GPU 加速）
+- 可选：CUDA（faster-whisper GPU 加速；Parakeet 需单独安装 CUDA 版依赖）
 
 ## 开发
 
 ```bash
 pnpm install
+./scripts/setup-asr.sh        # ASR 依赖（默认 faster-whisper）
 pnpm dev          # 仅前端
 pnpm tauri dev    # 桌面开发模式
 pnpm build        # 构建前端
 pnpm tauri build  # 打包应用
 ```
+
+### ASR sidecar 依赖
+
+`./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎（`requirements.txt`）。Parakeet（NeMo + PyTorch）体积大，**须显式传参**才会安装：
+
+| 场景 | 命令 |
+|------|------|
+| 日常开发 | `./scripts/setup-asr.sh` |
+| 有 NVIDIA GPU、试 Parakeet | `./scripts/setup-asr.sh parakeet-cuda` |
+| 无 GPU 但想试 Parakeet | `./scripts/setup-asr.sh parakeet-cpu` |
+
+亦可用 `pnpm asr:setup`。已误装 Parakeet 时：`./scripts/setup-asr.sh --recreate`。详情见 `asr-service/README.md`。
 
 ## 项目结构
 
@@ -97,7 +110,10 @@ asr-service/                  # Python ASR sidecar
   main.py                     # FastAPI HTTP 服务
   server.py                   # 路由定义
   jobs.py                     # 后台转录任务管理
+  requirements-parakeet*.txt    # 可选 Parakeet（cpu / cuda）
   engines/                    # ASR 引擎抽象与实现
+scripts/
+  setup-asr.sh                # ASR 依赖安装（推荐）
 ```
 
 ## 工作流

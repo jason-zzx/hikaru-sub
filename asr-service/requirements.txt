@@ -1,4 +1,4 @@
-# ASR sidecar 运行依赖
+# faster-whisper 引擎及 sidecar 运行依赖（默认引擎，由 setup-asr.sh 安装）
 faster-whisper>=1.0.0
 fastapi>=0.110.0
 uvicorn>=0.29.0
