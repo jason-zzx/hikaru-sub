@@ -7,6 +7,7 @@ mod hls_fetch;
 mod hls_playlist;
 mod hls_types;
 mod ffmpeg;
+mod media_server;
 mod project;
 mod settings;
 mod transcode;
@@ -42,7 +43,9 @@ pub fn run() {
             ass::save_ass_text,
             ass::load_ass_text,
             asset_scope::allow_asset_path,
+            media_server::register_media_playback,
             transcode::detect_video_codec,
+            transcode::probe_video_playback,
             transcode::start_transcode,
             transcode::check_transcode_progress,
             transcode::stop_transcode,
@@ -54,6 +57,9 @@ pub fn run() {
         .setup(|app| {
             transcode::init_transcode_state(app);
             download::init_download_state(app);
+            let server = tauri::async_runtime::block_on(media_server::MediaServer::start())
+                .expect("failed to start media server");
+            app.manage(server);
             Ok(())
         })
         .build(tauri::generate_context!())

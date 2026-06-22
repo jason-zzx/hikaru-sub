@@ -1742,6 +1742,8 @@ dependencies = [
  "cbc",
  "futures",
  "hex",
+ "http 1.4.1",
+ "http-range",
  "httpmock",
  "m3u8-rs",
  "md5",
