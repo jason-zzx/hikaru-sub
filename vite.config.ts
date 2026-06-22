@@ -29,7 +29,8 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      ignored: ["**/src-tauri/**"],
+      // Rust 后端由 cargo watch 处理；Python venv 文件极多，会耗尽 inotify 配额
+      ignored: ["**/src-tauri/**", "**/.venv/**", "**/venv/**"],
     },
   },
 }));

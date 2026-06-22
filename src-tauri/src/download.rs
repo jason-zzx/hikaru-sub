@@ -1,6 +1,6 @@
 use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
 use crate::hls_download::{
-    build_hls_http_client, download_hls_media_with_client, hls_temp_root, remove_hls_temp_dir,
+    build_hls_http_client, download_hls_media_with_client, remove_hls_temp_dir,
 };
 use crate::hls_types::{
     CancellationToken, DownloadStrategy, HlsDownloadError, HlsDownloadRequest, MediaKind,
@@ -84,7 +84,6 @@ struct DownloadJobInner {
     output_path: PathBuf,
     children: Vec<RunningChild>,
     cancel_flag: Arc<AtomicBool>,
-    temp_dirs: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -854,9 +853,15 @@ async fn kill_all_children_async(job: &Arc<Mutex<DownloadJobInner>>) {
 }
 
 async fn cleanup_hls_job_temp_async(job: &Arc<Mutex<DownloadJobInner>>) {
-    let guard = job.lock().await;
-    for dir in &guard.temp_dirs {
-        let _ = fs::remove_dir_all(dir);
+    let (parent, job_id) = {
+        let guard = job.lock().await;
+        (
+            guard.output_path.parent().map(|p| p.to_path_buf()),
+            guard.snapshot.id.clone(),
+        )
+    };
+    if let Some(parent) = parent {
+        remove_hls_temp_dir(&parent, &job_id);
     }
 }
 
@@ -904,7 +909,6 @@ async fn run_segment_strategy(
     };
     {
         let mut guard = job.lock().await;
-        guard.temp_dirs.push(hls_temp_root(&output_parent, &job_id));
         guard.snapshot.status = DownloadStatus::Running;
     }
 
@@ -1107,7 +1111,6 @@ async fn run_segment_strategy(
             let fallback_allowed =
                 strategy == DownloadStrategy::Auto && err.is_auto_fallback_eligible();
             cleanup_hls_job_temp_async(&job).await;
-            remove_hls_temp_dir(&output_parent, &job_id);
             if fallback_allowed {
                 let app = app.clone();
                 let job = job.clone();
@@ -1537,7 +1540,6 @@ pub async fn start_video_download(
         output_path: output_path.clone(),
         children: Vec::new(),
         cancel_flag: cancel_flag.clone(),
-        temp_dirs: Vec::new(),
     }));
 
     {
@@ -1621,7 +1623,7 @@ pub async fn cancel_video_download(app: AppHandle, job_id: String) -> Result<(),
             .ok_or_else(|| format!("下载任务不存在: {job_id}"))?
     };
 
-    let (mut children, output_path, temp_dirs, job_id_for_hls) = {
+    let (mut children, output_path, job_id_for_hls) = {
         let mut guard = job.lock().await;
         CancellationToken::new(guard.cancel_flag.clone()).cancel();
         guard.snapshot.status = DownloadStatus::Cancelled;
@@ -1629,7 +1631,6 @@ pub async fn cancel_video_download(app: AppHandle, job_id: String) -> Result<(),
         (
             std::mem::take(&mut guard.children),
             guard.output_path.clone(),
-            guard.temp_dirs.clone(),
             guard.snapshot.id.clone(),
         )
     };
@@ -1641,9 +1642,6 @@ pub async fn cancel_video_download(app: AppHandle, job_id: String) -> Result<(),
     if let Ok((video_tmp, audio_tmp)) = temp_download_paths(&output_path) {
         let _ = fs::remove_file(video_tmp);
         let _ = fs::remove_file(audio_tmp);
-    }
-    for temp_dir in temp_dirs {
-        let _ = fs::remove_dir_all(temp_dir);
     }
     if let Some(parent) = output_path.parent() {
         remove_hls_temp_dir(parent, &job_id_for_hls);

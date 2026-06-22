@@ -1,9 +1,7 @@
-# Optional dependencies for NVIDIA Parakeet ASR.
-# Install these in addition to requirements.txt when using engine="parakeet".
-#
-# Recommended flow:
-#   pip install -r requirements.txt
-#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
+# NeMo / Parakeet 引擎依赖（不含 PyTorch）。
+# 须先安装 requirements.txt（faster-whisper），再执行：
+#   ./scripts/setup-asr.sh parakeet-cuda   # 或 parakeet-cpu / parakeet
+# 也可在自行安装匹配的 torch/torchaudio 后：
 #   pip install -r requirements-parakeet.txt
 
 nemo_toolkit[asr]==2.7.3

@@ -66,12 +66,21 @@ pub struct HlsDownloadOutput {
     pub duration_ms: i64,
 }
 
-pub fn hls_temp_root(base_dir: &Path, job_id: &str) -> PathBuf {
-    base_dir.join(".hikaru-download").join(job_id)
+pub fn hls_download_root(base_dir: &Path) -> PathBuf {
+    base_dir.join(".hikaru-download")
 }
 
+pub fn hls_temp_root(base_dir: &Path, job_id: &str) -> PathBuf {
+    hls_download_root(base_dir).join(job_id)
+}
+
+/// 删除任务临时目录；若 `.hikaru-download` 已空则一并移除。
 pub fn remove_hls_temp_dir(base_dir: &Path, job_id: &str) {
     let _ = std::fs::remove_dir_all(hls_temp_root(base_dir, job_id));
+    let root = hls_download_root(base_dir);
+    if root.is_dir() {
+        let _ = std::fs::remove_dir(&root);
+    }
 }
 
 pub fn temp_media_path(base_dir: &Path, job_id: &str, kind: MediaKind) -> PathBuf {
@@ -518,6 +527,39 @@ mod tests {
         assemble_media_file(&plan, base, job_id, &output).await.unwrap();
 
         assert_eq!(std::fs::read(&output).unwrap(), b"init;a;b;");
+    }
+
+    #[test]
+    fn remove_hls_temp_dir_removes_job_dir_and_empty_parent() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        let job_id = "job-cleanup";
+        let job_dir = hls_temp_root(base, job_id);
+        let root = hls_download_root(base);
+        std::fs::create_dir_all(job_dir.join("video")).unwrap();
+        std::fs::write(job_dir.join("video.bin"), b"data").unwrap();
+
+        remove_hls_temp_dir(base, job_id);
+
+        assert!(!job_dir.exists());
+        assert!(!root.exists());
+    }
+
+    #[test]
+    fn remove_hls_temp_dir_keeps_parent_when_other_jobs_remain() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        let root = hls_download_root(base);
+        let job_a = hls_temp_root(base, "job-a");
+        let job_b = hls_temp_root(base, "job-b");
+        std::fs::create_dir_all(&job_a).unwrap();
+        std::fs::create_dir_all(&job_b).unwrap();
+
+        remove_hls_temp_dir(base, "job-a");
+
+        assert!(!job_a.exists());
+        assert!(job_b.exists());
+        assert!(root.exists());
     }
 
     #[test]
