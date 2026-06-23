@@ -1,10 +1,13 @@
 import { useEffect, useRef } from "react";
+import { getCueDisplay } from "@hikaru/ass-core";
+import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import type { SubtitleCue } from "../../types";
 
 export function SubtitleList() {
   const cues = useProjectStore((s) => s.cues);
+  const mergeMode = useSubtitleMergeMode();
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
@@ -42,33 +45,40 @@ export function SubtitleList() {
   return (
     <div ref={listRef} className="h-full overflow-auto">
       <div className="space-y-1 p-2">
-        {cues.map((cue) => (
-          <div
-            key={cue.id}
-            ref={cue.id === selectedCueId ? selectedRef : null}
-            onClick={() => handleCueClick(cue)}
-            className={`cursor-pointer rounded border px-3 py-2 transition-colors ${
-              cue.id === selectedCueId
-                ? "border-primary bg-primary/10"
-                : "border-border hover:bg-surface-hover"
-            }`}
-          >
-            <div className="mb-1 flex items-center justify-between text-xs text-text-muted">
-              <span>#{cues.indexOf(cue) + 1}</span>
-              <span>
-                {formatTime(cue.startMs)} → {formatTime(cue.endMs)}
-              </span>
+        {cues.map((cue) => {
+          const display = getCueDisplay(cue, mergeMode);
+          return (
+            <div
+              key={cue.id}
+              ref={cue.id === selectedCueId ? selectedRef : null}
+              onClick={() => handleCueClick(cue)}
+              className={`cursor-pointer rounded border px-3 py-2 transition-colors ${
+                cue.id === selectedCueId
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:bg-surface-hover"
+              }`}
+            >
+              <div className="mb-1 flex items-center justify-between text-xs text-text-muted">
+                <span>#{cues.indexOf(cue) + 1}</span>
+                <span>
+                  {formatTime(cue.startMs)} → {formatTime(cue.endMs)}
+                </span>
+              </div>
+              <div className="space-y-1 text-sm">
+                {display.mode === "single" ? (
+                  <div className="text-text">{display.text}</div>
+                ) : (
+                  <>
+                    <div className="font-medium text-primary">
+                      {display.secondaryText}
+                    </div>
+                    <div className="text-text">{display.primaryText}</div>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="space-y-1 text-sm">
-              {cue.secondaryText && (
-                <div className="font-medium text-primary">
-                  {cue.secondaryText}
-                </div>
-              )}
-              <div className="text-text">{cue.primaryText}</div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

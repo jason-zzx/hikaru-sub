@@ -6,15 +6,18 @@ import { PlaybackControls } from "../player/PlaybackControls";
 import { SubtitleList } from "./SubtitleList";
 import { SubtitleEditor } from "./SubtitleEditor";
 import { Timeline } from "./Timeline";
-import { saveAssText } from "../../services/tauri";
+import { getSettings, saveAssText } from "../../services/tauri";
 import { serializeAss } from "@hikaru/ass-core";
-import { getSettings } from "../../services/tauri";
+import { resolveAssDocumentForSave } from "../../utils/assDocument";
 import type { AppSettings } from "../../types";
 
 export function EditorView() {
   const project = useProjectStore((s) => s.project);
   const projectDir = useProjectStore((s) => s.projectDir);
   const cues = useProjectStore((s) => s.cues);
+  const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
+  const assStyles = useProjectStore((s) => s.assStyles);
+  const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
   const isDirty = useProjectStore((s) => s.isDirty);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
@@ -49,28 +52,19 @@ export function EditorView() {
 
     try {
       const settings: AppSettings = await getSettings();
-      const doc = {
-        scriptInfo: {
-          title: "Subtitle",
-          scriptType: "v4.00+",
-          playResX: 1920,
-          playResY: 1080,
-          wrapStyle: 0,
-          scaledBorderAndShadow: true,
-          extra: {},
-        },
-        styles: [],
-        cues: cues,
-      };
+      const doc = resolveAssDocumentForSave(cues, assScriptInfo, assStyles);
+      setAssMetadata(doc.scriptInfo, doc.styles);
 
-      // 保存到 .translated.ass（如果有译文）或 subtitles.ass
       const hasTranslation = cues.some((c) => c.secondaryText);
-      const fileName = hasTranslation ? "subtitles.translated.ass" : "subtitles.ass";
-      const assPath = `${projectDir}\\.hikaru\\${fileName}`;
+      const baseAssPath =
+        project.assPath ?? `${projectDir}/.hikaru/subtitles.ass`;
+      const assPath = hasTranslation
+        ? baseAssPath.replace(/\.ass$/i, ".translated.ass")
+        : baseAssPath;
 
       await saveAssText(
         assPath,
-        serializeAss(doc, { mergeMode: settings.subtitleMergeMode })
+        serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
       );
       markSaved();
       alert("保存成功！");

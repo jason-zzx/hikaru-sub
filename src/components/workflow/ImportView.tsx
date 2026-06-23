@@ -79,23 +79,21 @@ export function ImportView() {
         try {
           const { loadAssText, pathExists } = await import("../../services/tauri");
           const { parseAss } = await import("@hikaru/ass-core");
-          const { setCues } = useProjectStore.getState();
+          const { loadAssDocument } = useProjectStore.getState();
 
           // 尝试加载 .translated.ass
-          const translatedPath = meta.assPath.replace(/\.ass$/, ".translated.ass");
+          const translatedPath = meta.assPath.replace(/\.ass$/i, ".translated.ass");
           const translatedExists = await pathExists(translatedPath);
 
           if (translatedExists) {
             const assText = await loadAssText(translatedPath);
-            const doc = parseAss(assText);
-            setCues(doc.cues);
+            loadAssDocument(parseAss(assText));
           } else {
             // 回退到原始字幕
             const exists = await pathExists(meta.assPath);
             if (exists) {
               const assText = await loadAssText(meta.assPath);
-              const doc = parseAss(assText);
-              setCues(doc.cues);
+              loadAssDocument(parseAss(assText));
             }
           }
         } catch (loadErr) {

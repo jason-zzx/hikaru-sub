@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+import {
+  formatInlineCueText,
+  getCueDisplay,
+  splitInlineCueText,
+} from "@hikaru/ass-core";
+import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 
@@ -30,29 +36,57 @@ export function SubtitleEditor() {
   const updateCue = useProjectStore((s) => s.updateCue);
   const addCue = useProjectStore((s) => s.addCue);
   const deleteCue = useProjectStore((s) => s.deleteCue);
+  const mergeMode = useSubtitleMergeMode();
 
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
 
   const selectedCue = cues.find((c) => c.id === selectedCueId);
 
+  const [inlineText, setInlineText] = useState("");
   const [primaryText, setPrimaryText] = useState("");
   const [secondaryText, setSecondaryText] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
+  const useInlineEditor =
+    mergeMode === "inline" &&
+    !!selectedCue &&
+    !!formatInlineCueText(selectedCue);
+
   // 同步选中字幕到编辑框
   useEffect(() => {
-    if (selectedCue) {
+    if (!selectedCue) return;
+
+    setStartTime(formatTimeInput(selectedCue.startMs));
+    setEndTime(formatTimeInput(selectedCue.endMs));
+
+    const display = getCueDisplay(selectedCue, mergeMode);
+    if (display.mode === "single") {
+      setInlineText(display.text);
       setPrimaryText(selectedCue.primaryText);
       setSecondaryText(selectedCue.secondaryText || "");
-      setStartTime(formatTimeInput(selectedCue.startMs));
-      setEndTime(formatTimeInput(selectedCue.endMs));
+    } else {
+      setInlineText("");
+      setPrimaryText(display.primaryText);
+      setSecondaryText(display.secondaryText);
     }
-  }, [selectedCue]);
+  }, [selectedCue, mergeMode]);
 
   const handleSave = () => {
     if (!selectedCue) return;
+
+    if (useInlineEditor) {
+      const split = splitInlineCueText(inlineText);
+      updateCue(selectedCue.id, {
+        primaryText: split?.primaryText ?? inlineText,
+        secondaryText: split?.secondaryText,
+        startMs: parseTimeInput(startTime),
+        endMs: parseTimeInput(endTime),
+      });
+      return;
+    }
+
     updateCue(selectedCue.id, {
       primaryText,
       secondaryText: secondaryText || undefined,
@@ -142,9 +176,19 @@ export function SubtitleEditor() {
       </div>
 
       {/* 字幕编辑 */}
-      {secondaryText ? (
+      {useInlineEditor ? (
+        <div>
+          <label className="mb-1 block text-xs text-text-muted">字幕</label>
+          <textarea
+            value={inlineText}
+            onChange={(e) => setInlineText(e.target.value)}
+            onBlur={handleSave}
+            className="w-full rounded border border-border bg-surface px-2 py-1 text-sm"
+            rows={5}
+          />
+        </div>
+      ) : secondaryText ? (
         <>
-          {/* 译文编辑 */}
           <div>
             <label className="mb-1 block text-xs text-text-muted">译文</label>
             <textarea
@@ -155,8 +199,6 @@ export function SubtitleEditor() {
               rows={2}
             />
           </div>
-
-          {/* 原文编辑 */}
           <div>
             <label className="mb-1 block text-xs text-text-muted">原文</label>
             <textarea

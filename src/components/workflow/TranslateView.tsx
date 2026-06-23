@@ -24,6 +24,7 @@ export function TranslateView() {
   const project = useProjectStore((s) => s.project);
   const cues = useProjectStore((s) => s.cues);
   const setCues = useProjectStore((s) => s.setCues);
+  const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
@@ -133,19 +134,30 @@ export function TranslateView() {
           const { loadAssText, saveAssText } = await import("../../services/tauri");
           const { parseAss, serializeAss } = await import("@hikaru/ass-core");
 
-          // 读取原始 ASS（获取样式和元数据）
-          const originalAssText = await loadAssText(project.assPath);
-          const doc = parseAss(originalAssText);
-
-          // 更新 cues
-          doc.cues = result.cues;
+          const { assScriptInfo, assStyles } = useProjectStore.getState();
+          let doc;
+          if (assScriptInfo && assStyles.length > 0) {
+            // 沿用转录阶段写入的 PlayRes 与样式
+            doc = {
+              scriptInfo: assScriptInfo,
+              styles: assStyles,
+              cues: result.cues,
+            };
+          } else {
+            const originalAssText = await loadAssText(project.assPath);
+            doc = parseAss(originalAssText);
+            doc.cues = result.cues;
+            setAssMetadata(doc.scriptInfo, doc.styles);
+          }
 
           // 生成译文文件路径：原文件名 + .translated.ass
-          const translatedPath = project.assPath.replace(/\.ass$/i, '.translated.ass');
+          const translatedPath = project.assPath.replace(/\.ass$/i, ".translated.ass");
           await saveAssText(
             translatedPath,
-            serializeAss(doc, { mergeMode: settings.subtitleMergeMode })
+            serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
           );
+
+          setAssMetadata(doc.scriptInfo, doc.styles);
 
           console.log(`翻译后的字幕已保存到: ${translatedPath}`);
         } catch (saveErr) {
