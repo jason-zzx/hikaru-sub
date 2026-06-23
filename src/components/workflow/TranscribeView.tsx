@@ -74,6 +74,7 @@ export function TranscribeView() {
   const setStep = useUiStore((s) => s.setStep);
   const project = useProjectStore((s) => s.project);
   const setCues = useProjectStore((s) => s.setCues);
+  const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
@@ -271,23 +272,30 @@ export function TranscribeView() {
               const { serializeAss, createDefaultDocument } = await import("@hikaru/ass-core");
               const { getVideoInfo } = await import("../../services/tauri");
 
-              // 获取视频分辨率
+              // 获取视频分辨率（写入 ASS PlayRes，后续翻译/编辑沿用）
               let resX: number | undefined;
               let resY: number | undefined;
+              let playResWarning: string | null = null;
               try {
                 const videoInfo = await getVideoInfo(project.videoPath);
                 resX = videoInfo.width;
                 resY = videoInfo.height;
-              } catch {
-                // 获取失败时使用默认值（1920x1080）
+              } catch (err) {
+                console.warn("无法读取视频分辨率，ASS PlayRes 将使用默认 1920×1080:", err);
+                playResWarning =
+                  "无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080";
               }
 
               const doc = createDefaultDocument("Hikaru-Sub", resX, resY);
               doc.cues = cues;
+              setAssMetadata(doc.scriptInfo, doc.styles);
               const assText = serializeAss(doc);
               const { saveAssText } = await import("../../services/tauri");
               await saveAssText(project.assPath, assText);
               setSavedAssPath(project.assPath);
+              if (playResWarning) {
+                setAsrError(playResWarning);
+              }
             } catch (saveErr) {
               console.warn("保存 ASS 文件失败:", saveErr);
               setAsrError(`转录完成，但保存 ASS 失败：${String(saveErr)}`);

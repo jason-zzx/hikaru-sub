@@ -32,12 +32,17 @@ export {
 } from "./defaults";
 
 export {
+  INLINE_CUE_SEPARATOR,
   toAssText,
   fromAssText,
+  formatInlineCueText,
+  splitInlineCueText,
+  getCueDisplay,
   cueToEvents,
   cuesToEvents,
   eventsToCues,
 } from "./bilingual";
+export type { CueDisplay } from "./bilingual";
 
 export { parseAss } from "./parse";
 export { serializeAss } from "./serialize";

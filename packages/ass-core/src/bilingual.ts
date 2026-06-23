@@ -1,6 +1,53 @@
 import { DEFAULT_BILINGUAL_OPTIONS, createId } from "./defaults";
 import type { AssEvent, BilingualOptions, SubtitleCue } from "./types";
 
+/** 行内合并模式的分隔符，与 `cueToEvents` 序列化一致。 */
+export const INLINE_CUE_SEPARATOR = " / ";
+
+export type CueDisplay =
+  | { mode: "single"; text: string }
+  | { mode: "dual"; secondaryText: string; primaryText: string };
+
+/** 将 cue 格式化为行内合并文本「译文 / 原文」；无译文时返回 null。 */
+export function formatInlineCueText(
+  cue: Pick<SubtitleCue, "primaryText" | "secondaryText">,
+): string | null {
+  const secondary = cue.secondaryText?.trim();
+  if (!secondary) return null;
+  return `${secondary}${INLINE_CUE_SEPARATOR}${cue.primaryText}`;
+}
+
+/** 解析行内合并文本，分隔符与 `formatInlineCueText` 一致。 */
+export function splitInlineCueText(
+  text: string,
+): { secondaryText: string; primaryText: string } | null {
+  const idx = text.indexOf(INLINE_CUE_SEPARATOR);
+  if (idx < 0) return null;
+  return {
+    secondaryText: text.slice(0, idx),
+    primaryText: text.slice(idx + INLINE_CUE_SEPARATOR.length),
+  };
+}
+
+/** 按合并模式决定 UI 展示为单行或双行。 */
+export function getCueDisplay(
+  cue: SubtitleCue,
+  mergeMode: "inline" | "separate",
+): CueDisplay {
+  const inline = formatInlineCueText(cue);
+  if (mergeMode === "inline" && inline) {
+    return { mode: "single", text: inline };
+  }
+  if (cue.secondaryText?.trim()) {
+    return {
+      mode: "dual",
+      secondaryText: cue.secondaryText,
+      primaryText: cue.primaryText,
+    };
+  }
+  return { mode: "single", text: cue.primaryText };
+}
+
 /** 编辑器文本（真实换行）转 ASS 文本（`\N` 硬换行）。 */
 export function toAssText(text: string): string {
   return text.replace(/\r\n|\r|\n/g, "\\N");
@@ -46,8 +93,9 @@ export function cueToEvents(
   const primaryStyle = cue.style || opts.primaryStyle;
 
   // 行内拼接模式：译文 / 原文
-  if (mergeMode === "inline" && cue.secondaryText && cue.secondaryText.trim() !== "") {
-    const mergedText = `${cue.secondaryText} / ${cue.primaryText}`;
+  const mergedText =
+    mergeMode === "inline" ? formatInlineCueText(cue) : null;
+  if (mergedText) {
     events.push(makeEvent(cue, primaryStyle, mergedText));
     return events;
   }

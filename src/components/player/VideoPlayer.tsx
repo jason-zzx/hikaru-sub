@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCueDisplay } from "@hikaru/ass-core";
+import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { SubtitleCue, VideoPlaybackProbe } from "../../types";
@@ -28,6 +30,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
 
   const cues = useProjectStore((s) => s.cues);
+  const mergeMode = useSubtitleMergeMode();
 
   const loadHttpVideo = useCallback(async (path: string) => {
     const url = await invoke<string>("register_media_playback", { path });
@@ -297,7 +300,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
           {/* 字幕叠加层 */}
           {activeCue && (
             <div className="pointer-events-none absolute inset-x-0 bottom-12 flex flex-col items-center gap-1 px-8">
-              <SubtitleOverlay cue={activeCue} />
+              <SubtitleOverlay cue={activeCue} mergeMode={mergeMode} />
             </div>
           )}
         </>
@@ -306,23 +309,40 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   );
 }
 
-function SubtitleOverlay({ cue }: { cue: SubtitleCue }) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      {cue.secondaryText && (
-        <div
-          className="rounded bg-black/80 px-3 py-1 text-center font-medium text-white shadow-lg"
-          style={{ fontSize: "1.5rem", lineHeight: "1.4" }}
-        >
-          {cue.secondaryText}
-        </div>
-      )}
+function SubtitleOverlay({
+  cue,
+  mergeMode,
+}: {
+  cue: SubtitleCue;
+  mergeMode: "inline" | "separate";
+}) {
+  const display = getCueDisplay(cue, mergeMode);
+
+  if (display.mode === "single") {
+    return (
       <div
         className="rounded bg-black/80 px-3 py-1 text-center text-white shadow-lg"
         style={{ fontSize: "1.25rem", lineHeight: "1.4" }}
       >
-        {cue.primaryText}
+        {display.text}
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className="rounded bg-black/80 px-3 py-1 text-center font-medium text-white shadow-lg"
+        style={{ fontSize: "1.5rem", lineHeight: "1.4" }}
+      >
+        {display.secondaryText}
+      </div>
+      <div
+        className="rounded bg-black/80 px-3 py-1 text-center text-white shadow-lg"
+        style={{ fontSize: "1.25rem", lineHeight: "1.4" }}
+      >
+        {display.primaryText}
+      </div>
+    </>
   );
 }

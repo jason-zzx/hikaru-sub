@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { produce } from "immer";
+import type { AssDocument, AssScriptInfo, AssStyle } from "@hikaru/ass-core";
 import type { ProjectMeta, SubtitleCue } from "../types";
 
 interface HistoryState {
@@ -12,10 +13,14 @@ interface ProjectState {
   projectDir: string | null;
   videoPath: string | null;
   cues: SubtitleCue[];
+  assScriptInfo: AssScriptInfo | null;
+  assStyles: AssStyle[];
   isDirty: boolean;
   history: HistoryState;
   setProject: (project: ProjectMeta, projectDir: string) => void;
   clearProject: () => void;
+  loadAssDocument: (doc: AssDocument) => void;
+  setAssMetadata: (scriptInfo: AssScriptInfo, styles: AssStyle[]) => void;
   setCues: (cues: SubtitleCue[]) => void;
   updateCue: (id: string, updates: Partial<SubtitleCue>) => void;
   addCue: (cue: SubtitleCue) => void;
@@ -30,11 +35,17 @@ interface ProjectState {
 
 const MAX_HISTORY = 50;
 
+const emptyAssState = {
+  assScriptInfo: null as AssScriptInfo | null,
+  assStyles: [] as AssStyle[],
+};
+
 export const useProjectStore = create<ProjectState>((set, get) => ({
   project: null,
   projectDir: null,
   videoPath: null,
   cues: [],
+  ...emptyAssState,
   isDirty: false,
   history: { past: [], future: [] },
 
@@ -44,6 +55,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectDir,
       videoPath: project.videoPath,
       cues: [],
+      ...emptyAssState,
       isDirty: false,
       history: { past: [], future: [] },
     }),
@@ -54,8 +66,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectDir: null,
       videoPath: null,
       cues: [],
+      ...emptyAssState,
       isDirty: false,
       history: { past: [], future: [] },
+    }),
+
+  loadAssDocument: (doc) =>
+    set({
+      cues: doc.cues,
+      assScriptInfo: doc.scriptInfo,
+      assStyles: doc.styles,
+      isDirty: false,
+      history: { past: [], future: [] },
+    }),
+
+  setAssMetadata: (scriptInfo, styles) =>
+    set({
+      assScriptInfo: scriptInfo,
+      assStyles: styles,
     }),
 
   setCues: (cues) =>

@@ -13,8 +13,9 @@
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
 - 翻译工作流（配置界面 + 进度显示 → 生成 `.translated.ass`）
 - 设置页（FFmpeg/Python 路径、ASR 引擎、翻译 API、高级配置）
-- ASS 文件持久化（自动保存/加载字幕文件）
-- 字幕编辑器（视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做）
+- ASS 文件持久化（自动保存/加载；保留 `[V4+ Styles]` 与 PlayRes；转录时按视频分辨率写入）
+- 字幕编辑器（视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做；inline 模式 UI 单行展示 `译文 / 原文`）
+- 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
 - VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet 独立 VAD 切分语音段，失败自动降级）
 
@@ -97,6 +98,7 @@ src-tauri/                    # Tauri Rust 后端
     asr.rs                    # ASR sidecar 进程管理 + HTTP 代理
     ass.rs                    # ASS 文件读写
     asset_scope.rs            # Tauri asset protocol 动态授权
+    media_server.rs           # 本地 HTTP 媒体服务（编辑页视频播放）
     transcode.rs              # 不兼容视频编码的代理转码与缓存
     download.rs               # m3u8 下载 command、任务状态与策略编排
     hls_playlist.rs           # m3u8 解析与分片计划
@@ -166,12 +168,13 @@ scripts/
 - 批量失败自动降级为单条重试
 
 ### 编辑器
-- 视频预览与字幕叠加
+- 视频预览与字幕叠加（经 `register_media_playback` 本地 HTTP 流；`subtitleMergeMode=inline` 时单行显示 `译文 / 原文`）
 - 左侧字幕列表与右侧文本/时间编辑面板
 - `Ctrl+S` 保存、`Ctrl+Z` 撤销、`Ctrl+Y`/`Ctrl+Shift+Z` 重做
 - 局部时间轴视图：滚轮左右平移，`Ctrl+滚轮` 缩放，点击定位播放时间
 - 独立音频波形提取与渲染，便于参考 Aegisub 式精细对轴
-- WebView2 不支持的视频编码自动生成 480p H.264 全关键帧代理视频，并复用转码缓存
+- 不兼容编码自动生成 480p H.264 全关键帧代理视频，并复用转码缓存
+- 保存 ASS 时沿用转录/翻译阶段的 Script Info 与 Styles（含 PlayRes），不重新探测视频覆盖分辨率
 
 ### 文件管理
 - **项目元数据**：`.hikaru/project.json`（与视频同目录）
@@ -200,9 +203,10 @@ interface SubtitleCue {
 
 - **Style `Primary`**：原文样式（偏下方显示）
 - **Style `Secondary`**：译文样式（偏上方显示）
-- 默认 `inline` 模式：译文和原文保存为一条 Dialogue，文本格式为 `译文 / 原文`
+- 默认 `inline` 模式：译文和原文保存为一条 Dialogue，文本格式为 `译文 / 原文`；编辑页列表/预览/编辑框同步按单行展示
 - 可选 `separate` 模式：原文和译文保存为同时间戳的两条 Dialogue
-- 打开项目时优先加载 `subtitles.translated.ass`，不存在时回退到 `subtitles.ass`
+- **PlayRes**：转录保存 ASS 时从 `get_video_info` 写入视频分辨率；翻译与编辑保存沿用，不在编辑阶段重算
+- 打开项目时优先加载 `subtitles.translated.ass`，不存在时回退到 `subtitles.ass`；`parseAss` 后 `loadAssDocument` 保留 styles 与 scriptInfo
 
 ## 已实现的 Tauri Commands
 
@@ -214,6 +218,8 @@ interface SubtitleCue {
 | `extract_audio` | 提取 16kHz WAV 音轨 + 进度事件 |
 | `extract_waveform` | 提取归一化音频峰值数据用于时间轴波形 |
 | `get_video_info` | 获取视频分辨率、时长 |
+| `register_media_playback` | 注册本地视频到媒体 HTTP 服务，返回可播放 URL |
+| `probe_video_playback` | 探测是否需代理转码（容器/音视频编码） |
 | `path_exists` | 判断文件或目录是否存在 |
 | `list_asr_engines` | 列出 ASR sidecar 可用引擎 |
 | `start_asr` | 启动转录任务 |

@@ -51,6 +51,8 @@ src/                          # React 前端
     editor/                   # 字幕编辑器
     player/                   # 视频预览 + ASS 叠加
   stores/                     # ui、project、playback、task
+  hooks/                      # useSubtitleMergeMode 等
+  utils/                      # ASS 文档组装等
   services/                   # Tauri invoke 封装
   types/                      # 共享 TS 类型
 src-tauri/                    # Rust 后端
@@ -58,7 +60,8 @@ src-tauri/                    # Rust 后端
     ffmpeg.rs                 # FFmpeg 检测、音轨提取、视频信息、波形提取
     asr.rs                    # ASR sidecar 进程管理 + HTTP 代理
     ass.rs                    # ASS 文件读写
-    asset_scope.rs            # Tauri asset protocol 动态授权
+    asset_scope.rs            # Tauri asset protocol 动态授权（非视频播放主路径）
+    media_server.rs           # 本地 HTTP 媒体服务（编辑页视频 Range 播放）
     project.rs                # .hikaru/project.json
     settings.rs               # 全局设置持久化
     transcode.rs              # 不兼容视频编码的代理视频转码与缓存
@@ -83,7 +86,9 @@ scripts/
 - **Tauri Rust**：文件 I/O、FFmpeg、音频波形、视频代理转码、启动 ASR sidecar、项目元数据
 - **React**：全部 UI、ASS 文本编辑、翻译 API 调用
 - **Python sidecar**：ASR 推理，通过 HTTP localhost 通信，不阻塞 UI
-- **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`，保存时按配置输出行内合并或分离双行
+- **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`；`projectStore` 另缓存 `assScriptInfo` 与 `assStyles`（`[V4+ Styles]` 与 PlayRes 等），保存时完整写回 ASS
+
+**PlayRes 与样式**：转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。编辑页预览为简化 HTML 叠加（非 libass 真渲染），与压制成品样式仍可能有差异。
 
 ```mermaid
 flowchart LR
@@ -110,7 +115,7 @@ interface SubtitleCue {
 }
 ```
 
-双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary`（原文）+ `Secondary`（译文），同时间轴两行 Dialogue。
+双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary`（原文）+ `Secondary`（译文），同时间轴两行 Dialogue。编辑页列表、预览与编辑框通过 `getCueDisplay` 按 `subtitleMergeMode` 展示单行或双行，与序列化规则一致。
 
 **源语言**：产品面向日语转录与翻译，新建项目固定 `sourceLang: "ja"`；转录与翻译 UI 不再暴露源语言选择。旧项目中的其他 `sourceLang` 仍可打开。
 
@@ -132,7 +137,7 @@ interface SubtitleCue {
 
 ### 视频编辑兼容策略
 
-编辑页优先通过 Tauri asset protocol 直接加载原视频。WebView2 不支持的编码（如 HEVC/H.265、VP9、AV1）会通过 FFmpeg 生成 480p H.264 全关键帧代理视频：
+编辑页通过应用内 **本地 HTTP 媒体服务**（`register_media_playback` → `http://127.0.0.1:PORT/media/{token}`）播放视频，支持 Range 请求与 seek；Linux WebKit 无法经 Tauri `asset://` 正常播放音视频，故全平台统一走 HTTP。`probe_video_playback` 判断容器/编解码是否需代理转码；WebView 不直接支持的编码（如 HEVC/H.265、VP9、AV1）会通过 FFmpeg 生成 480p H.264 全关键帧代理视频：
 
 ```text
 -vf scale=-2:480 -c:v libx264 -preset ultrafast -g 1 -crf 22 -c:a aac -b:a 128k -movflags +faststart
@@ -181,7 +186,9 @@ interface SubtitleCue {
 | `get_model_download_progress` | 获取 ASR 模型下载进度 |
 | `save_ass_text` / `load_ass_text` | ASS 文件读写 |
 | `get_video_info` | 获取视频分辨率、时长等元信息 |
-| `allow_asset_path` | 将本地视频/代理视频路径加入 asset scope |
+| `register_media_playback` | 注册本地视频到媒体 HTTP 服务，返回可播放 URL |
+| `probe_video_playback` | 探测 WebView 是否需代理转码（容器/音视频编码） |
+| `allow_asset_path` | 将路径加入 Tauri asset scope（保留，非视频主路径） |
 | `detect_video_codec` | 检测视频编码格式 |
 | `start_transcode` | 启动代理视频转码 |
 | `check_transcode_progress` | 查询代理视频转码状态 |
@@ -217,9 +224,10 @@ interface SubtitleCue {
 - [x] 转录工作流 UI（TranscribeView：音轨提取 + 转录进度 + 生成单语 ASS；使用视频实际分辨率，不强制换行）
 - [x] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView：批量翻译 + 进度显示 + 术语表/自定义 prompt 支持）
 - [x] ASS 文件持久化（转录后自动保存，打开项目时自动加载）
-- [x] 字幕合并模式配置（默认行内 `译文 / 原文`，可切换分离双行）
+- [x] ASS 元数据持久化（`[V4+ Styles]` + PlayRes；转录写入、翻译/编辑沿用；打开项目 `loadAssDocument`）
+- [x] 字幕合并模式配置（默认行内 `译文 / 原文`；编辑 UI 与 ASS 序列化一致）
 - [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做）
-- [x] 视频播放兼容处理（asset protocol 加载；不兼容编码生成 480p H.264 全关键帧代理视频并缓存）
+- [x] 视频播放兼容处理（本地 HTTP 媒体服务 + Range；不兼容编码生成 480p H.264 全关键帧代理视频并缓存）
 - [x] VAD 预处理（统一配置 UI；faster-whisper 透传内置 VAD，Parakeet 独立 Silero VAD 预切分；失败自动降级）
 - [x] 日语专用化（源语言固定 ja；移除转录/设置页源语言选择）
 - [x] m3u8 视频下载（DownloadView；Rust 分片并发 + AES-128 + 自动并发/HTTP/2；FFmpeg fallback）
