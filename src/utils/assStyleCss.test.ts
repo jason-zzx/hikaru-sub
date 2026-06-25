@@ -9,6 +9,7 @@ import {
   resolveAssRenderItems,
   scaleAssLength,
 } from "./assStyleCss";
+import { assInlineToCss } from "./assRunCss";
 
 const viewport = { width: 960, height: 540 };
 const scriptInfo = createDefaultScriptInfo("Test", 1920, 1080);
@@ -107,6 +108,34 @@ describe("assStyleCss", () => {
         style: createDefaultStyles()[0],
       },
     ]);
+  });
+
+  it("falls back to the first ASS document style when a referenced style is missing", () => {
+    const first = style({ name: "DocumentFirst", fontName: "Document Font" });
+    const resolved = findAssStyle([first], "MissingStyle");
+    expect(resolved).toBe(first);
+  });
+
+  it("does not add Noto Sans SC as a hidden style-level font fallback", () => {
+    const css = assStyleToCss(
+      style({ name: "Primary", fontName: "Document Font" }),
+      scriptInfo,
+      viewport,
+    );
+    expect(css.fontFamily).toBe('"Document Font", sans-serif');
+    expect(String(css.fontFamily)).not.toContain("Noto Sans SC");
+  });
+
+  it("does not add Noto Sans SC as a hidden inline font fallback", () => {
+    const base = style({ name: "Primary", fontName: "Document Font" });
+    const css = assInlineToCss(
+      base,
+      { fontName: "Inline Font" },
+      scriptInfo,
+      viewport,
+    );
+    expect(css.fontFamily).toBe('"Inline Font", sans-serif');
+    expect(String(css.fontFamily)).not.toContain("Noto Sans SC");
   });
 
   it("resolves two render items for separate mode", () => {

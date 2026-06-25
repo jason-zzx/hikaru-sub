@@ -1,6 +1,7 @@
 mod asr;
 mod ass;
 mod asset_scope;
+mod burn;
 mod download;
 mod hls_download;
 mod hls_fetch;
@@ -53,10 +54,14 @@ pub fn run() {
             download::start_video_download,
             download::get_video_download_progress,
             download::cancel_video_download,
+            burn::start_burn_subtitles,
+            burn::get_burn_progress,
+            burn::cancel_burn,
         ])
         .setup(|app| {
             transcode::init_transcode_state(app);
             download::init_download_state(app);
+            burn::init_burn_state(app);
             let server = tauri::async_runtime::block_on(media_server::MediaServer::start())
                 .expect("failed to start media server");
             app.manage(server);
@@ -73,6 +78,9 @@ pub fn run() {
                             sidecar.kill();
                         }
                     }
+                }
+                if let Some(state) = app_handle.try_state::<burn::BurnState>() {
+                    state.shutdown();
                 }
             }
         });
