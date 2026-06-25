@@ -1,0 +1,10 @@
+# Qwen3-ASR 引擎上层依赖（不含 PyTorch）。
+# 须先安装 requirements.txt（faster-whisper + sidecar 运行依赖），再执行：
+#   ./scripts/setup-asr.sh qwen3-cuda   # 或 qwen3-cpu / qwen3
+# 也可在自行安装匹配的 torch 后：
+#   pip install -r requirements-qwen3.txt
+#
+# qwen-asr 会自动拉取 transformers==4.57.6、accelerate、nagisa、soynlp、
+# librosa、soundfile 等传递依赖，此处不重复列出以避免版本冲突。
+qwen-asr==0.0.6
+huggingface_hub>=0.23.0

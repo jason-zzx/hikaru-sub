@@ -4,6 +4,7 @@ import tempfile
 import threading
 import time
 import unittest
+import wave
 from pathlib import Path
 from unittest.mock import patch
 
@@ -103,6 +104,39 @@ class _OutOfOrderProgressEngine:
             yield AsrSegment(start_ms=0, end_ms=3000, text="early-backfill")
 
         return Transcription(duration_ms=10_000, language="ja", segments=_iter())
+
+
+class _BlockingProgressEngine:
+    """模拟 qwen3 一次性阻塞转录：transcribe 返回前（阻塞期间）调 progress_callback。
+
+    用于验证 jobs.py 预探测 duration 使阻塞型引擎的进度在 transcribe 返回前即可上报。
+    """
+
+    def __init__(self, audio_duration_ms: int) -> None:
+        self._audio_duration_ms = audio_duration_ms
+        self.progress_seen: list[int] = []
+        self.duration_when_progress: list[int] = []
+        self.reported = threading.Event()
+
+    def transcribe(
+        self,
+        audio_path,
+        *,
+        language=None,
+        cancel_check=None,
+        progress_callback=None,
+    ):
+        # 阻塞期间上报进度（此时 Transcription 尚未返回，jobs.py 旧逻辑会因 duration_ms=0 丢弃）
+        if progress_callback:
+            # 上报一半进度
+            half = self._audio_duration_ms // 2
+            progress_callback(half)
+        self.reported.set()
+        # 等主线程读取快照后放行
+        time.sleep(0.3)
+        return Transcription(
+            duration_ms=self._audio_duration_ms, language="ja", segments=iter([])
+        )
 
 
 def _wait_for_completion(job):
@@ -226,6 +260,41 @@ class JobPersistenceTests(unittest.TestCase):
             self.assertEqual(after_first["progress"], 0.9)
             self.assertEqual(snapshot["status"], "completed")
             self.assertEqual(snapshot["processedMs"], 10_000)
+
+    def test_pre_probed_duration_enables_progress_for_blocking_engine(self):
+        """阻塞型引擎（如 qwen3 一次性转录）在 transcribe 返回前上报进度时，
+        jobs.py 预探测的 duration 使进度不被丢弃（修复进度卡 0% 的核心）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / ".hikaru"
+            project_dir.mkdir()
+            audio = project_dir / "audio.wav"
+            # 写真实 2s wav，使 _duration_ms 预探测成功
+            rate = 16000
+            with wave.open(str(audio), "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(rate)
+                w.writeframes(b"\0\0" * (rate * 2))
+
+            engine = _BlockingProgressEngine(audio_duration_ms=2000)
+            manager = JobManager()
+            with patch("jobs.create_engine", return_value=engine):
+                job = manager.create(
+                    audio_path=str(audio),
+                    engine="qwen3-asr",
+                    model="Qwen/Qwen3-ASR-1.7B",
+                    device="cpu",
+                    language="ja",
+                )
+                self.assertTrue(engine.reported.wait(timeout=2))
+                running = job.snapshot(with_segments=True)
+                _wait_for_completion(job)
+
+            # 预探测已把 duration_ms 设为 2000，阻塞期间上报 1000 → progress 0.5
+            self.assertEqual(running["status"], "running")
+            self.assertEqual(running["durationMs"], 2000)
+            self.assertEqual(running["processedMs"], 1000)
+            self.assertAlmostEqual(running["progress"], 0.5, places=2)
 
 
 if __name__ == "__main__":

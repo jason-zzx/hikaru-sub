@@ -1,6 +1,7 @@
 export const ASR_ENGINE_OPTIONS = [
   { value: "faster-whisper", label: "faster-whisper" },
   { value: "parakeet", label: "parakeet" },
+  { value: "qwen3-asr", label: "qwen3" },
 ];
 
 export const ASR_ENGINE_MODELS: Record<string, Array<{ value: string; label: string }>> = {
@@ -12,6 +13,12 @@ export const ASR_ENGINE_MODELS: Record<string, Array<{ value: string; label: str
     {
       value: "nvidia/parakeet-tdt_ctc-0.6b-ja",
       label: "parakeet-tdt_ctc-0.6b-ja",
+    },
+  ],
+  "qwen3-asr": [
+    {
+      value: "Qwen/Qwen3-ASR-1.7B",
+      label: "Qwen3-ASR-1.7B",
     },
   ],
 };

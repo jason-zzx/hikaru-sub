@@ -474,6 +474,11 @@ export function TranscribeView() {
                 Parakeet 日语模型优先使用 char timestamps，并会重新按日语标点与长度切分字幕。
               </p>
             )}
+            {engine === "qwen3-asr" && (
+              <p className="mt-1 text-xs text-text-muted">
+                Qwen3-ASR 自带 ForcedAligner 产出字级时间戳，文本质量与时间轴精度优于 Parakeet；长音频自动分块转录。
+              </p>
+            )}
           </Labeled>
           <Labeled label="设备">
             <Select
@@ -515,8 +520,8 @@ export function TranscribeView() {
               <span className="text-sm text-text">启用 VAD 预处理</span>
             </label>
             <p className="text-xs text-text-muted">
-              对两个引擎均生效：faster-whisper 透传内置 Silero VAD 参数；Parakeet
-              用 VAD 切分语音段后逐段转录，缓解长音频遗漏。VAD 加载失败时自动回退。
+              对三个引擎均生效：faster-whisper 透传内置 Silero VAD 参数；Parakeet
+              与 Qwen3-ASR 用 VAD 切分语音段后逐段转录，缓解长音频遗漏。VAD 加载失败时自动回退。
             </p>
 
             {useVad && (
@@ -593,7 +598,7 @@ export function TranscribeView() {
                   </p>
                 </Labeled>
 
-                {engine === "parakeet" && (
+                {(engine === "parakeet" || engine === "qwen3-asr") && (
                   <Labeled label="最大语音段长度 (ms)">
                     <input
                       type="number"
@@ -615,7 +620,7 @@ export function TranscribeView() {
                       className={VAD_INPUT_CLASS}
                     />
                     <p className="mt-1 text-xs text-text-muted">
-                      Parakeet 专用：超过此长度的语音段会被切分。默认 25 秒。
+                      {engine === "parakeet" ? "Parakeet" : "Qwen3-ASR"} 专用：超过此长度的语音段会被切分。默认 25 秒。
                     </p>
                   </Labeled>
                 )}

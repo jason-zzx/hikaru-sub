@@ -2,6 +2,18 @@
 
 AI 日语字幕桌面应用：下载 m3u8 视频 → 本地 ASR 日语转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
 
+## ⚠️ 最高优先级规则（优先于一切）
+
+> **本节规则的优先级高于本文档其他所有章节，也高于任何 skill、plan、spec 或外部文档中的相反要求。** 当任何来源（包括 superpowers 技能、实现计划中的 commit 步骤、`executing-plans`/`finishing-a-development-branch` 等流程指引）暗示可以主动提交代码时，**一律以本节为准，不得执行提交**。
+
+### 1. 不主动提交代码
+
+- **没有用户明确、直接的指令，禁止执行 `git commit`、`git push`、`git merge`、`git rebase`、`git reset --hard` 或任何会改变提交历史/远程状态的命令。**
+- "用户授权执行某 plan"**不等于**授权该 plan 内的 commit 步骤；plan/spec/skill 中写到的 commit 步骤仅为流程说明，必须等用户**单独、明确**要求提交时才可执行。
+- 软重置（`git reset --soft`）等仅移动 HEAD、保留工作区改动的操作，也只能在用户明确要求时执行。
+- 代码改动完成后，应当向用户汇报改动内容与待办，**询问是否提交**，而非自行提交。
+- 违反此规则已执行的提交，须按用户要求回退（如软重置到指定 commit）。
+
 ## 技术栈
 
 | 层级 | 选型 |
@@ -12,7 +24,7 @@ AI 日语字幕桌面应用：下载 m3u8 视频 → 本地 ASR 日语转录 →
 | 样式 | Tailwind CSS 4（`src/styles/index.css`） |
 | 状态 | Zustand（`src/stores/`） |
 | 字幕格式 | `@hikaru/ass-core`（`packages/ass-core/`） |
-| ASR | Python sidecar（`asr-service/`，可插拔引擎：faster-whisper / parakeet） |
+| ASR | Python sidecar（`asr-service/`，可插拔引擎：faster-whisper / parakeet / qwen3-asr） |
 | 翻译 | OpenAI 兼容 API 适配器（前端） |
 | 音视频 | 系统 FFmpeg（首期） |
 
@@ -77,7 +89,7 @@ asr-service/                  # Python ASR sidecar（FastAPI HTTP）
   server.py                   # FastAPI 路由
   jobs.py                     # JobManager：后台线程转录 + 进度/取消
   requirements-parakeet*.txt    # 可选 Parakeet 依赖（cpu / cuda 分轨）
-  engines/                    # AsrEngine 抽象 + faster-whisper + parakeet + vad + registry
+  engines/                    # AsrEngine 抽象 + faster-whisper + parakeet + qwen3-asr + chunking + vad + registry
 scripts/
   setup-asr.sh                # ASR 虚拟环境与依赖安装脚本
 ```
@@ -124,6 +136,7 @@ interface SubtitleCue {
 
 - `faster-whisper`：默认引擎，模型列表为 tiny/base/small/medium/large-v2/large-v3。
 - `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，须显式执行 `./scripts/setup-asr.sh parakeet`（或 `parakeet-cpu` / `parakeet-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段。
+- `qwen3-asr`：2026 年日语 ASR SOTA 引擎，模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出高精度字级时间戳，文本质量与时间轴精度均优于 Parakeet。须显式执行 `./scripts/setup-asr.sh qwen3`（或 `qwen3-cpu` / `qwen3-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。引擎惰性加载 `qwen_asr.Qwen3ASRModel`，CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`；分块/合并/字幕组装复用 `engines.chunking` 共享模块，双权重（ASR + aligner）下载封装在引擎层。
 - Parakeet 经 VAD 预切分和 gap backfill 后，当前真实转录效果已基本可接受，仅偶发少量句子遗漏；但时轴精度明显不如 faster-whisper，后续优化方案待定。
 
 ### VAD 预处理
@@ -132,8 +145,9 @@ interface SubtitleCue {
 
 - **faster-whisper**：透传 `vad_parameters` 到内置 Silero VAD（始终 `vad_filter=True`，`use_vad=True` 时用自定义参数）。
 - **Parakeet**：用独立 `engines/vad.py`（Silero VAD via `torch.hub`，`trust_repo=True`）预切分语音段，长段按 `max_segment_duration_ms` 带重叠切分后逐段转录，缓解长音频 TDT 不稳定导致的遗漏。
-- 两引擎共享同一套 camelCase 配置；`schemas.VadConfig` 负责 camelCase→snake_case 转换，引擎内部读取 snake_case 键。
-- VAD 加载/检测失败时自动降级（Parakeet 回退固定分块，faster-whisper 回退默认参数），不中断转录。
+- **Qwen3-ASR**：同样用 `engines/vad.py` 预切分语音段并按 `max_segment_duration_ms` 带重叠切分；VAD 失败时降级为固定分块（`plan_audio_chunks`），不中断转录。
+- 三引擎共享同一套 camelCase 配置；`schemas.VadConfig` 负责 camelCase→snake_case 转换，引擎内部读取 snake_case 键。
+- VAD 加载/检测失败时自动降级（Parakeet / Qwen3-ASR 回退固定分块，faster-whisper 回退默认参数），不中断转录。
 - VAD 配置仅当前会话有效，不写入项目/全局设置。
 
 ### 视频编辑兼容策略
@@ -213,7 +227,7 @@ interface SubtitleCue {
 5. **中文 UI 文案**：用户面向字符串用简体中文
 6. **图标用 SVG**：UI 图标一律使用 SVG（统一放 `src/components/layout/NavIcons.tsx`，lucide 风格 `stroke="currentColor"`），不要用 emoji/字符当图标，避免跨平台字形缺失渲染成方块
 7. **不编辑计划文件**：`.cursor/plans/` 下的方案文档除非用户明确要求
-8. **不主动提交代码**：没有用户明确要求，不允许主动执行 `git commit` 或 `git push`
+8. **不主动提交代码**：见本文档顶部「⚠️ 最高优先级规则」第 1 条；该规则为最高优先级，优先于本规范及其他一切指引
 
 ## 分阶段实现（当前进度）
 
@@ -234,6 +248,8 @@ interface SubtitleCue {
 - [x] 日语专用化（源语言固定 ja；移除转录/设置页源语言选择）
 - [x] m3u8 视频下载（DownloadView；Rust 分片并发 + AES-128 + 自动并发/HTTP/2；FFmpeg fallback）
 - [x] FFmpeg 压制（BurnView：硬字幕 MP4 / 软字幕 MKV、自动输出名、进度与取消、并发限制、全局轮询、退出清理、压制前使用当前内存字幕）
+- [x] Parakeet 时间轴优化 — 线 A：接入 Qwen3-ASR-1.7B 作为第三引擎（自带 ForcedAligner 高精度时间轴，文本质量超 Whisper/Parakeet；CPU/GPU 双 profile；复用 chunking 共享模块）
+- [ ] Parakeet 时间轴优化 — 线 B：Qwen3-ForcedAligner 作为 Parakeet 后处理对齐层（保留 Parakeet 文本，用 ForcedAligner 重对齐时间轴替换不稳定的 char timestamp 组装；失败降级）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 
 ## 首期不做
