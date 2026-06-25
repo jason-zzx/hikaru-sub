@@ -216,3 +216,32 @@ export interface DownloadSnapshot {
   outputPath: string | null;
   error: string | null;
 }
+
+export type BurnMode = "hardSubMp4" | "softSubMkv";
+
+export type BurnStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface StartBurnArgs {
+  videoPath: string;
+  assPath: string;
+  outputPath: string;
+  mode: BurnMode;
+  crf?: number | null;
+  preset?: string | null;
+  fontDir?: string | null;
+}
+
+export interface BurnSnapshot {
+  id: string;
+  status: BurnStatus;
+  progress: number | null;
+  processedMs: number;
+  durationMs: number;
+  outputPath: string | null;
+  error: string | null;
+}

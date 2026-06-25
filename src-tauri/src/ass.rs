@@ -8,7 +8,14 @@ pub async fn save_ass_text(
     ass_path: String,
     ass_text: String,
 ) -> Result<(), String> {
-    std::fs::write(&ass_path, ass_text).map_err(|e| format!("写入 ASS 文件失败: {}", e))?;
+    let path = Path::new(&ass_path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("创建 ASS 目录失败: {}", e))?;
+        }
+    }
+    std::fs::write(path, ass_text).map_err(|e| format!("写入 ASS 文件失败: {}", e))?;
     Ok(())
 }
 

@@ -61,8 +61,12 @@ export function scaleAssLength(
 export function findAssStyle(styles: AssStyle[], styleName?: string): AssStyle {
   const defaults = createDefaultStyles();
   const allStyles = styles.length > 0 ? styles : defaults;
-  const fallbackPrimary = allStyles.find((style) => style.name === PRIMARY_STYLE);
-  const fallback = fallbackPrimary ?? allStyles[0] ?? defaults[0];
+  const fallback =
+    styles.length > 0
+      ? allStyles[0]
+      : (allStyles.find((style) => style.name === PRIMARY_STYLE) ??
+        allStyles[0] ??
+        defaults[0]);
 
   if (!styleName) return fallback;
   return allStyles.find((style) => style.name === styleName) ?? fallback;

@@ -1,4 +1,5 @@
 import { useUiStore } from "../../stores/uiStore";
+import { useBurnJobPoller } from "../../hooks/useBurnJobPoller";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { WelcomeView } from "../workflow/WelcomeView";
@@ -25,6 +26,8 @@ export function AppLayout() {
   const currentStep = useUiStore((s) => s.currentStep);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const View = stepViews[currentStep];
+
+  useBurnJobPoller();
 
   return (
     <div className="flex h-full flex-col">

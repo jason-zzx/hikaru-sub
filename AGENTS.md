@@ -50,8 +50,8 @@ src/                          # React 前端
     workflow/                 # 导入、转录、翻译、压制、设置
     editor/                   # 字幕编辑器
     player/                   # 视频预览 + ASS 叠加
-  stores/                     # ui、project、playback、task
-  hooks/                      # useSubtitleMergeMode 等
+  stores/                     # ui、project、playback、task、burn
+  hooks/                      # useSubtitleMergeMode、useBurnJobPoller 等
   utils/                      # ASS 文档组装等
   services/                   # Tauri invoke 封装
   types/                      # 共享 TS 类型
@@ -66,6 +66,7 @@ src-tauri/                    # Rust 后端
     settings.rs               # 全局设置持久化
     transcode.rs              # 不兼容视频编码的代理视频转码与缓存
     download.rs               # 下载 command、任务状态、FFmpeg fallback 与策略编排
+    burn.rs                   # 字幕压制/封装任务、FFmpeg 参数构建、进度与取消、并发限制、退出清理
     hls_types.rs              # 分片计划类型、自动并发配置、取消令牌
     hls_playlist.rs           # m3u8 解析、URL 解析、AES-128 规划、分片计划构建
     hls_fetch.rs              # HTTP headers、Range 请求、流式分片下载与重试
@@ -197,8 +198,9 @@ interface SubtitleCue {
 | `start_video_download` | 启动 m3u8 下载，返回 jobId |
 | `get_video_download_progress` | 轮询下载进度 |
 | `cancel_video_download` | 取消下载并清理部分输出 |
-
-计划中 command：`burn_subtitles`（FFmpeg 压制输出向导）。
+| `start_burn_subtitles` | 启动字幕压制/封装任务，返回 jobId |
+| `get_burn_progress` | 轮询压制进度 |
+| `cancel_burn` | 取消压制并清理部分输出 |
 
 新增 command 时：在 `src-tauri/src/` 实现 → `lib.rs` 注册 → `src/services/tauri.ts` 封装 → 更新 capabilities 权限。
 
@@ -231,7 +233,7 @@ interface SubtitleCue {
 - [x] VAD 预处理（统一配置 UI；faster-whisper 透传内置 VAD，Parakeet 独立 Silero VAD 预切分；失败自动降级）
 - [x] 日语专用化（源语言固定 ja；移除转录/设置页源语言选择）
 - [x] m3u8 视频下载（DownloadView；Rust 分片并发 + AES-128 + 自动并发/HTTP/2；FFmpeg fallback）
-- [ ] FFmpeg 压制（BurnView 输出向导）
+- [x] FFmpeg 压制（BurnView：硬字幕 MP4 / 软字幕 MKV、自动输出名、进度与取消、并发限制、全局轮询、退出清理、压制前使用当前内存字幕）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 
 ## 首期不做

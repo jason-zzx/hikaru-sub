@@ -7,12 +7,14 @@ import type {
   AsrJobSnapshot,
   AsrModelStatus,
   AudioExtractProgress,
+  BurnSnapshot,
   DownloadSnapshot,
   FfmpegStatus,
   ModelDownloadSnapshot,
   ProbeDownloadMediaArgs,
   ProjectMeta,
   StartAsrArgs,
+  StartBurnArgs,
   StartVideoDownloadArgs,
   DownloadMediaProbe,
 } from "../types";
@@ -193,4 +195,21 @@ export async function registerMediaPlayback(path: string): Promise<string> {
 /** 取消视频下载。 */
 export async function cancelVideoDownload(jobId: string): Promise<void> {
   await invoke("cancel_video_download", { jobId });
+}
+
+/** 启动字幕压制/封装任务，返回 jobId。 */
+export async function startBurnSubtitles(
+  args: StartBurnArgs,
+): Promise<string> {
+  return invoke<string>("start_burn_subtitles", { args });
+}
+
+/** 查询字幕压制进度。 */
+export async function getBurnProgress(jobId: string): Promise<BurnSnapshot> {
+  return invoke<BurnSnapshot>("get_burn_progress", { jobId });
+}
+
+/** 取消字幕压制任务。 */
+export async function cancelBurn(jobId: string): Promise<void> {
+  await invoke("cancel_burn", { jobId });
 }
