@@ -14,7 +14,7 @@
 - 翻译工作流（配置界面 + 进度显示 → 生成 `.translated.ass`）
 - 设置页（FFmpeg/Python 路径、ASR 引擎、翻译 API、高级配置）
 - ASS 文件持久化（自动保存/加载；保留 `[V4+ Styles]` 与 PlayRes；转录时按视频分辨率写入）
-- 字幕编辑器（视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做；inline 模式 UI 单行展示 `译文 / 原文`）
+- 字幕编辑器（视频播放 + ASS CSS 样式预览 + 行内 override 标签渲染 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做；inline 模式 UI 单行展示 `译文 / 原文`）
 - 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
 - VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet 独立 VAD 切分语音段，失败自动降级）
@@ -26,9 +26,7 @@
 4. 翻译页支持单独配置每批翻译条数、上下文条数、自定义 prompt 和术语表、字幕合并模式（当前使用全局设置）
 5. 编辑页功能完善：
    - 快捷键操作（上下切换字幕、时间轴左右移动）
-   - 字幕随时间轴选定位置实时渲染预览
-   - 字幕样式编辑（字体、颜色、位置）
-   - 多行字幕渲染支持
+   - 字幕样式可视化编辑（字体、颜色、位置等 GUI，当前需在编辑框手写 ASS 标签）
 
 📋 **计划中**：
 - FFmpeg 压制（硬/软字幕输出向导）
@@ -89,7 +87,15 @@ src/                          # React 前端
       Timeline.tsx            # 时间轴可视化
     player/                   # 视频播放器
       VideoPlayer.tsx         # 视频播放 + 字幕叠加
+      AssSubtitleOverlay.tsx  # ASS 字幕叠加容器
+      AssStyledText.tsx       # 行内 override 标签 span 渲染
       PlaybackControls.tsx    # 播放控制栏
+  utils/
+    assStyleCss.ts            # ASS Style → CSS 映射
+    assRunCss.ts              # 行内 override → span CSS
+    videoDisplayRect.ts       # object-fit 画面区域计算
+  hooks/
+    useVideoDisplayRect.ts    # 视频真实渲染区域跟踪
   stores/                     # Zustand 状态管理
   services/                   # Tauri 命令封装 + 翻译服务
 src-tauri/                    # Tauri Rust 后端
@@ -108,6 +114,7 @@ src-tauri/                    # Tauri Rust 后端
     project.rs                # 项目元数据管理
     settings.rs               # 全局设置持久化
 packages/ass-core/            # ASS 解析/序列化库（workspace）
+  src/assTags.ts              # ASS 行内 override 标签解析
 asr-service/                  # Python ASR sidecar
   main.py                     # FastAPI HTTP 服务
   server.py                   # 路由定义
@@ -175,6 +182,74 @@ scripts/
 - 独立音频波形提取与渲染，便于参考 Aegisub 式精细对轴
 - 不兼容编码自动生成 480p H.264 全关键帧代理视频，并复用转码缓存
 - 保存 ASS 时沿用转录/翻译阶段的 Script Info 与 Styles（含 PlayRes），不重新探测视频覆盖分辨率
+
+#### 编辑页字幕渲染（CSS 近似预览）
+
+编辑页与压制页预览**不是 libass 真渲染**，而是将 ASS 样式与行内标签映射到 CSS，在视频画面上叠加显示，用于交互校对。最终硬字幕仍以 FFmpeg/libass 输出为准。
+
+**实现架构**
+
+```
+SubtitleCue + assStyles + assScriptInfo
+        ↓
+resolveAssRenderItems（inline / separate 双行逻辑）
+        ↓
+AssSubtitleOverlay（ResizeObserver 测量视口）
+        ├─ assStyleToCss：Style 级定位、描边、阴影、PlayRes 缩放
+        └─ AssStyledText
+              ├─ parseAssTextLines（ass-core）：解析 {…} 行内标签
+              └─ assInlineToCss：逐 span 应用覆盖样式
+```
+
+**画面区域**
+
+- 视频使用 `object-fit: contain`，容器比例与视频不一致时会出现黑边
+- `useVideoDisplayRect` 按视频 intrinsic 尺寸（元数据未就绪时用 PlayRes 估算）计算真实画面矩形
+- 字幕叠加层仅覆盖该矩形，不会画在黑边上
+
+**Style 级支持（`[V4+ Styles]` 字段）**
+
+| 字段 | 预览行为 |
+|------|----------|
+| `fontName` / `fontSize` | 字体族、按 `PlayResY` 缩放字号 |
+| `primaryColor` | 文字颜色 |
+| `bold` / `italic` / `underline` / `strikeOut` | 字重、斜体、装饰线 |
+| `outline` / `outlineColor` / `shadow` / `backColor` | 多向 `text-shadow` 近似描边与阴影 |
+| `alignment` / `marginL` / `marginR` / `marginV` | 九宫格对齐与边距（水平居中用 `left+right` 避免误换行） |
+| `scaleX` / `scaleY` / `spacing` | `transform: scale`、字距 |
+| `borderStyle=3` | 半透明底框（近似） |
+
+**行内 override 标签（Tier 1，预览解析；编辑区保留原文）**
+
+编辑框与列表显示**完整 ASS 文本**（含 `{…}` 标签），不做 strip；预览层解析并渲染支持的标签：
+
+| 标签 | 效果 |
+|------|------|
+| `\b` `\i` `\u` `\s` | 粗体 / 斜体 / 下划线 / 删除线 |
+| `\c` `\1c` | 主色 |
+| `\1a` `\alpha` | 主色透明度 |
+| `\fs` `\fn` `\fscx` `\fscy` `\fsp` | 字号 / 字体 / 缩放 / 字距 |
+| `\r` `\rStyleName` | 重置为 Dialogue Style 或切换到指定 Style |
+| `\N` `\n` `\h` | 硬换行 / 软换行 / 硬空格 |
+
+不支持的标签（如 `\pos`、`\move`、`\fad`、`\k`、`\an`）在预览中静默忽略，**编辑区仍保留标签字符串**。
+
+**已知限制**
+
+- 预览为 CSS 近似，与 libass 在描边形状、字体度量、抗锯齿等方面可能有可见差异
+- 不支持 ASS override 定位/动画/卡拉 OK（`\pos`、`\move`、`\fad`、`\k`、`\t` 等）
+- 不支持 `\2c`–`\4c` 行内改色（描边色/阴影色 override）、`angle` 旋转、`wrapStyle` 精细换行规则
+- 未读取 `ScaledBorderAndShadow`；描边/阴影始终按 PlayRes 缩放
+- `SubtitleCue` 未建模 Dialogue 级 `marginL/R/V`，仅用 Style 级边距
+- 描边/阴影挂在 Dialogue 容器上，行内改色不会单独改变描边颜色
+- 分离双行模式下两行均为绝对定位，极长文本可能重叠
+- 压制页预览框宽高比跟随 `PlayRes`，无真实视频时仅为样式示意
+
+**触发时机**
+
+- 播放中：显示当前时间轴内的字幕
+- 暂停时：显示列表选中的字幕
+- 压制页：显示选中 / 当前时间 / 首条字幕的样式预览
 
 ### 文件管理
 - **项目元数据**：`.hikaru/project.json`（与视频同目录）

@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCueDisplay } from "@hikaru/ass-core";
 import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
+import { useVideoDisplayRect } from "../../hooks/useVideoDisplayRect";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
-import type { SubtitleCue, VideoPlaybackProbe } from "../../types";
+import type { VideoPlaybackProbe } from "../../types";
+import { AssSubtitleOverlay } from "./AssSubtitleOverlay";
 
 interface VideoPlayerProps {
   videoPath: string;
 }
 
 export function VideoPlayer({ videoPath }: VideoPlayerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const transcodeFallbackRef = useRef(false);
   const recoverAttemptRef = useRef(0);
@@ -30,7 +32,20 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
 
   const cues = useProjectStore((s) => s.cues);
+  const assStyles = useProjectStore((s) => s.assStyles);
+  const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
   const mergeMode = useSubtitleMergeMode();
+
+  const videoDisplayRect = useVideoDisplayRect(
+    containerRef,
+    videoRef,
+    Boolean(videoSrc && !error && !transcoding),
+    {
+      fallbackAspectWidth: assScriptInfo?.playResX,
+      fallbackAspectHeight: assScriptInfo?.playResY,
+    },
+    videoSrc,
+  );
 
   const loadHttpVideo = useCallback(async (path: string) => {
     const url = await invoke<string>("register_media_playback", { path });
@@ -264,7 +279,10 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     : cues.find((c) => c.id === selectedCueId);
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center bg-black">
+    <div
+      ref={containerRef}
+      className="relative flex h-full w-full items-center justify-center bg-black"
+    >
       {error ? (
         <div className="text-center text-red-400">
           <p className="text-sm">视频加载失败</p>
@@ -291,58 +309,29 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
           <video
             ref={videoRef}
             src={videoSrc}
-            className="h-full w-full"
+            className="h-full w-full object-contain"
             onError={() => {
               void handleVideoError();
             }}
           />
 
-          {/* 字幕叠加层 */}
-          {activeCue && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-12 flex flex-col items-center gap-1 px-8">
-              <SubtitleOverlay cue={activeCue} mergeMode={mergeMode} />
-            </div>
+          {/* 字幕叠加层：限制在 object-contain 的实际视频画面内 */}
+          {activeCue && videoDisplayRect.width > 0 && videoDisplayRect.height > 0 && (
+            <AssSubtitleOverlay
+              cue={activeCue}
+              styles={assStyles}
+              scriptInfo={assScriptInfo}
+              mergeMode={mergeMode}
+              style={{
+                left: videoDisplayRect.left,
+                top: videoDisplayRect.top,
+                width: videoDisplayRect.width,
+                height: videoDisplayRect.height,
+              }}
+            />
           )}
         </>
       )}
     </div>
-  );
-}
-
-function SubtitleOverlay({
-  cue,
-  mergeMode,
-}: {
-  cue: SubtitleCue;
-  mergeMode: "inline" | "separate";
-}) {
-  const display = getCueDisplay(cue, mergeMode);
-
-  if (display.mode === "single") {
-    return (
-      <div
-        className="rounded bg-black/80 px-3 py-1 text-center text-white shadow-lg"
-        style={{ fontSize: "1.25rem", lineHeight: "1.4" }}
-      >
-        {display.text}
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div
-        className="rounded bg-black/80 px-3 py-1 text-center font-medium text-white shadow-lg"
-        style={{ fontSize: "1.5rem", lineHeight: "1.4" }}
-      >
-        {display.secondaryText}
-      </div>
-      <div
-        className="rounded bg-black/80 px-3 py-1 text-center text-white shadow-lg"
-        style={{ fontSize: "1.25rem", lineHeight: "1.4" }}
-      >
-        {display.primaryText}
-      </div>
-    </>
   );
 }

@@ -88,7 +88,7 @@ scripts/
 - **Python sidecar**：ASR 推理，通过 HTTP localhost 通信，不阻塞 UI
 - **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`；`projectStore` 另缓存 `assScriptInfo` 与 `assStyles`（`[V4+ Styles]` 与 PlayRes 等），保存时完整写回 ASS
 
-**PlayRes 与样式**：转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。编辑页预览为简化 HTML 叠加（非 libass 真渲染），与压制成品样式仍可能有差异。
+**PlayRes 与样式**：转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。编辑页与压制页预览通过 `AssSubtitleOverlay` + `assStyleToCss` 将常用 ASS Style 字段映射到 CSS；该预览用于交互校对，非 libass 真渲染。最终压制仍以 FFmpeg/libass 输出为准。
 
 ```mermaid
 flowchart LR
