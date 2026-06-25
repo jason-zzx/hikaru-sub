@@ -55,3 +55,11 @@ export {
   mergeShortCues,
   splitLongCues,
 } from "./postprocess";
+
+export {
+  type AssInlineOverrides,
+  type AssTextRun,
+  type AssTextLine,
+  type ParseAssTextOptions,
+  parseAssTextLines,
+} from "./assTags";
