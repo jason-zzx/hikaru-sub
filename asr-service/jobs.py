@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 from ass_writer import write_ass_file
 from diagnostics import debug_exception, debug_log
 from engines.base import AsrError, AsrSegment
+from engines.chunking import _duration_ms
 from engines.registry import create_engine
 
 
@@ -189,6 +190,19 @@ class JobManager:
             )
             debug_log("job_create_engine_done", jobId=job.id, engine=job.engine)
             debug_log("job_transcribe_start", jobId=job.id)
+
+            # 预探测音频时长，使阻塞型引擎（如 qwen3 一次性整段转录）的
+            # progress_callback 在 transcribe 返回前就能正常上报进度。
+            # 引擎内部仍可自行探测，开销仅为读取 wav 头，可忽略。
+            try:
+                pre_duration = _duration_ms(job.audio_path)
+                if pre_duration > 0:
+                    with job._lock:
+                        if job.duration_ms <= 0:
+                            job.duration_ms = pre_duration
+                    debug_log("job_duration_pre_probed", jobId=job.id, durationMs=pre_duration)
+            except Exception as exc:  # noqa: BLE001 预探测失败不阻断转录
+                debug_exception("job_duration_pre_probe_error", exc, jobId=job.id)
 
             def report_progress(processed_ms: int) -> None:
                 with job._lock:

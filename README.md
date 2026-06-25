@@ -8,7 +8,7 @@
 - m3u8 视频下载（Rust 分片并发优先、FFmpeg 兼容回退；单 URL / 分离音视频；AES-128 加密 VOD；自定义请求头；自动并发与 HTTP/2；进度与取消；完成后可导入项目）
 - 项目管理（创建/打开项目，`.hikaru` 元数据）
 - FFmpeg 集成（音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
-- Python ASR sidecar（faster-whisper + NVIDIA Parakeet 日语适配器 + VAD 预处理 + HTTP 进度 API）
+- Python ASR sidecar（faster-whisper + NVIDIA Parakeet + Qwen3-ASR 日语适配器 + VAD 预处理 + HTTP 进度 API）
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
 - 翻译工作流（配置界面 + 进度显示 → 生成 `.translated.ass`）
@@ -18,11 +18,14 @@
 - FFmpeg 压制（硬字幕 MP4 / 软字幕 MKV；进度与取消；压制前使用当前内存字幕生成临时 ASS）
 - 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
-- VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet 独立 VAD 切分语音段，失败自动降级）
+- VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
 
 🚧 **待优化**：
 1. 首页增加显示最近项目列表
-2. Parakeet 转录时轴精度仍明显弱于 faster-whisper，优化方案待定
+2. Parakeet 转录时轴精度优化（分两条线）：
+   - ✅ 线 A（已完成）：接入 Qwen3-ASR-1.7B 作为第三引擎（2026 年日语 ASR SOTA，自带 Qwen3-ForcedAligner 高精度时间轴，文本质量超 Whisper/Parakeet；CPU 与 GPU 双 profile；复用 chunking 共享模块）
+   - 线 B（待办）：Qwen3-ForcedAligner 作为 Parakeet 后处理对齐层（保留 Parakeet 文本，用 ForcedAligner 重对齐时间轴，替换不稳定的 char timestamp 组装；失败降级）
+   - 设计文档见 `docs/superpowers/specs/`，实现计划见 `docs/superpowers/plans/`
 3. 翻译页进度条显示优化
 4. 翻译页支持单独配置每批翻译条数、上下文条数、自定义 prompt 和术语表、字幕合并模式（当前使用全局设置）
 5. 编辑页功能完善：
@@ -36,7 +39,7 @@
 - **样式**: Tailwind CSS 4
 - **状态**: Zustand
 - **包管理**: pnpm workspace
-- **ASR**: Python sidecar（faster-whisper / Parakeet + VAD）
+- **ASR**: Python sidecar（faster-whisper / Parakeet / Qwen3-ASR + VAD）
 - **翻译**: OpenAI 兼容 API 适配器
 
 ## 环境要求
@@ -46,7 +49,7 @@
 - Rust（[安装指南](https://www.rust-lang.org/learn/get-started)）
 - FFmpeg（PATH 或可配置路径）
 - Python 3.10+（ASR sidecar）
-- 可选：CUDA（faster-whisper GPU 加速；Parakeet 需单独安装 CUDA 版依赖）
+- 可选：CUDA（faster-whisper GPU 加速；Parakeet / Qwen3-ASR 需单独安装 CUDA 版依赖）
 
 ## 开发
 
@@ -61,15 +64,17 @@ pnpm tauri build  # 打包应用
 
 ### ASR sidecar 依赖
 
-`./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎（`requirements.txt`）。Parakeet（NeMo + PyTorch）体积大，**须显式传参**才会安装：
+`./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎（`requirements.txt`）。Parakeet（NeMo + PyTorch）与 Qwen3-ASR（qwen-asr + PyTorch）体积较大，**须显式传参**才会安装：
 
 | 场景 | 命令 |
 |------|------|
-| 日常开发 | `./scripts/setup-asr.sh` |
+| 日常开发（默认） | `./scripts/setup-asr.sh` 或 `pnpm asr:setup` |
 | 有 NVIDIA GPU、试 Parakeet | `./scripts/setup-asr.sh parakeet-cuda` |
 | 无 GPU 但想试 Parakeet | `./scripts/setup-asr.sh parakeet-cpu` |
+| 有 NVIDIA GPU、试 Qwen3-ASR | `./scripts/setup-asr.sh qwen3-cuda` |
+| 无 GPU 但想试 Qwen3-ASR | `./scripts/setup-asr.sh qwen3-cpu` |
 
-亦可用 `pnpm asr:setup`。已误装 Parakeet 时：`./scripts/setup-asr.sh --recreate`。详情见 `asr-service/README.md`。
+亦可用 `pnpm asr:setup -- qwen3-cuda`。已误装引擎时：`./scripts/setup-asr.sh --recreate`。详情见 `asr-service/README.md`。
 
 ## 项目结构
 
@@ -118,7 +123,8 @@ asr-service/                  # Python ASR sidecar
   server.py                   # 路由定义
   jobs.py                     # 后台转录任务管理
   requirements-parakeet*.txt    # 可选 Parakeet（cpu / cuda）
-  engines/                    # ASR 引擎抽象与实现
+  requirements-qwen3*.txt       # 可选 Qwen3-ASR（cpu / cuda）
+  engines/                    # ASR 引擎抽象与实现（faster-whisper / parakeet / qwen3-asr / chunking / vad）
 scripts/
   setup-asr.sh                # ASR 依赖安装（推荐）
 ```
@@ -161,18 +167,20 @@ scripts/
 - 源语言固定为日语（`ja`），转录页不提供语言选择
 - 引擎选择：faster-whisper（支持 CPU/CUDA/auto）
 - 可选引擎：parakeet（NVIDIA NeMo `nvidia/parakeet-tdt_ctc-0.6b-ja`，日语专用）
-- 模型选择：tiny/base/small/medium/large-v2/large-v3
+- 可选引擎：qwen3-asr（`Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`，2026 年日语 ASR SOTA，自带字级时间戳，文本质量与时轴精度优于 Parakeet；CPU float32 / CUDA bfloat16）
+- 模型选择：faster-whisper 为 tiny/base/small/medium/large-v2/large-v3
 - 自动模型下载与 CUDA 回退
 - 实时进度显示与任务取消
 - Parakeet 优先使用 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段
 - Parakeet + VAD 当前转录完整性已基本可接受，但仍可能有少量句子遗漏；时轴精度暂不如 faster-whisper
-- **VAD 高级配置**（可选，对两个引擎均生效）：
-  - 启用 VAD 预处理：faster-whisper 透传内置 Silero VAD 参数；Parakeet 用 VAD 切分语音段后逐段转录，缓解长音频遗漏
+- Qwen3-ASR 自带 ForcedAligner 产出字级时间戳，长音频自动分块转录并复用 chunking 共享模块合并去重
+- **VAD 高级配置**（可选，对三个引擎均生效）：
+  - 启用 VAD 预处理：faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 用 VAD 切分语音段后逐段转录，缓解长音频遗漏
   - 语音阈值（threshold）：0.0-1.0，默认 0.5
   - 最小语音段长度：过滤短噪声，默认 500ms
   - 最小静音间隔：语音段分割灵敏度，默认 300ms
-  - 最大语音段长度（Parakeet 专用）：长段切分阈值，默认 25s
-  - VAD 加载失败时自动降级（Parakeet 回退固定分块，faster-whisper 回退默认参数）
+  - 最大语音段长度（Parakeet / Qwen3-ASR 专用）：长段切分阈值，默认 25s
+  - VAD 加载失败时自动降级（Parakeet / Qwen3-ASR 回退固定分块，faster-whisper 回退默认参数）
 
 ### 翻译配置
 - OpenAI 兼容 API（支持 OpenAI、DeepSeek、Ollama 等）
