@@ -7,7 +7,20 @@ from engines.chunking import (
     merge_chunk_segments,
     build_segments_from_char_timestamps,
     build_segments_from_text,
+    _japanese_soft_boundary_score,
 )
+
+
+def _chars_from_text(text: str, *, char_sec: float = 0.1, gap_after: dict[int, float] | None = None):
+    """按字符生成 timestamps；gap_after[i] 表示第 i 个字符结束后额外停顿秒数。"""
+    gap_after = gap_after or {}
+    chars = []
+    cursor = 0.0
+    for i, ch in enumerate(text):
+        chars.append({"char": ch, "start": cursor, "end": cursor + char_sec})
+        cursor += char_sec
+        cursor += gap_after.get(i, 0.0)
+    return chars
 
 
 class PlanAudioChunksTests(unittest.TestCase):
@@ -102,6 +115,95 @@ class BuildSegmentsTests(unittest.TestCase):
         segments = build_segments_from_char_timestamps(timestamps, fallback_text="")
         self.assertEqual(len(segments), 1)
         self.assertEqual(segments[0].text, "あ")
+
+
+class JapaneseSoftBoundaryTests(unittest.TestCase):
+    def test_does_not_split_tottemo_on_tte(self):
+        text = "これはとっても楽しいです"
+        chars = _chars_from_text(text, char_sec=0.08)
+        segments = build_segments_from_char_timestamps(chars, text, max_chars=12)
+        for seg in segments:
+            self.assertNotEqual(seg.text, "これはとって")
+            self.assertNotIn("とって\n", seg.text)
+        self.assertEqual("".join(s.text for s in segments), text)
+
+    def test_does_not_split_shite_shimau(self):
+        text = "うっかりしてしまいました"
+        chars = _chars_from_text(text, char_sec=0.08)
+        segments = build_segments_from_char_timestamps(chars, text, max_chars=10)
+        for seg in segments:
+            self.assertNotEqual(seg.text, "うっかりして")
+        self.assertEqual("".join(s.text for s in segments), text)
+
+    def test_does_not_split_quotative_tte_iu(self):
+        text = "危ない今光って言いそうになった"
+        chars = []
+        cursor = 5.04
+        for ch in "危ない今":
+            chars.append({"char": ch, "start": cursor, "end": cursor + 0.14})
+            cursor += 0.14
+        cursor += 0.16
+        chars.append({"char": "光", "start": cursor, "end": cursor + 0.08})
+        cursor += 0.40
+        for ch in "って言いそうになった":
+            chars.append({"char": ch, "start": cursor, "end": cursor + 0.08})
+            cursor += 0.08
+        segments = build_segments_from_char_timestamps(chars, text)
+        self.assertEqual(len(segments), 1)
+        self.assertEqual(segments[0].text, text)
+
+    def test_still_splits_shite_before_ikimasu(self):
+        text = "今日は新しい企画なのでこちらで紹介していきます"
+        chars = _chars_from_text(text, char_sec=0.25)
+        segments = build_segments_from_char_timestamps(chars, text)
+        self.assertGreater(len(segments), 1)
+        self.assertEqual(segments[0].text, "今日は新しい企画なのでこちらで紹介して")
+
+    def test_does_not_split_dewa_nai(self):
+        text = "これではないと思います"
+        chars = _chars_from_text(text, char_sec=0.08)
+        segments = build_segments_from_char_timestamps(chars, text, max_chars=10)
+        for seg in segments:
+            self.assertNotEqual(seg.text, "これでは")
+        self.assertEqual("".join(s.text for s in segments), text)
+
+    def test_does_not_split_kedo_mo(self):
+        text = "忙しいけども頑張ります"
+        chars = _chars_from_text(text, char_sec=0.08)
+        segments = build_segments_from_char_timestamps(chars, text, max_chars=10)
+        for seg in segments:
+            self.assertNotEqual(seg.text, "忙しいけど")
+        self.assertEqual("".join(s.text for s in segments), text)
+
+    def test_does_not_split_particle_de_in_demo(self):
+        text = "誰でも参加できます"
+        chars = _chars_from_text(text, char_sec=0.08)
+        segments = build_segments_from_char_timestamps(chars, text, max_chars=8)
+        for seg in segments:
+            self.assertNotEqual(seg.text, "誰で")
+        self.assertEqual("".join(s.text for s in segments), text)
+
+    def test_does_not_split_shite_iru(self):
+        text = "今まさに準備しているところです"
+        chars = _chars_from_text(text, char_sec=0.07)
+        segments = build_segments_from_char_timestamps(chars, text, max_chars=12)
+        for seg in segments:
+            self.assertNotEqual(seg.text, "今まさに準備して")
+        self.assertEqual("".join(s.text for s in segments), text)
+
+    def test_contextual_tte_score_blocks_mo(self):
+        self.assertEqual(
+            _japanese_soft_boundary_score("とって", "て", following="も"),
+            0,
+        )
+
+    def test_does_not_split_nde_shimau(self):
+        text = "ついつい飲んでしまいました"
+        chars = _chars_from_text(text, char_sec=0.08)
+        segments = build_segments_from_char_timestamps(chars, text, max_chars=10)
+        for seg in segments:
+            self.assertNotEqual(seg.text, "ついつい飲んで")
+        self.assertEqual("".join(s.text for s in segments), text)
 
 
 if __name__ == "__main__":
