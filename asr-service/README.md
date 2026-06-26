@@ -129,7 +129,7 @@ python main.py --host 127.0.0.1 --port 0
 - `language`：`auto` 或 `null` 表示自动检测
 - `computeType`：留空时按设备推导（cpu→int8，cuda→float16）
 - `useVad` / `vadConfig`：可选 VAD 高级配置。faster-whisper 透传到内置 Silero VAD；Parakeet / Qwen3-ASR 用 `engines/vad.py` 先切分语音段，再逐段转录。
-- `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段。VAD + gap backfill 后转录完整性基本可接受，但仍可能有少量遗漏，且时轴精度弱于 faster-whisper。
+- `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段（`engines/chunking.py`）。VAD + gap backfill 后转录完整性基本可接受，但仍可能有少量遗漏，且时轴精度弱于 faster-whisper。
 - `qwen3-asr` 引擎模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出字级时间戳，语言固定按 `ja` 返回；文本质量与时轴精度优于 Parakeet。长音频自动分块转录，复用 `engines/chunking.py` 合并去重；CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`。模型下载为双权重（ASR + aligner），由引擎层封装为单一逻辑模型。
 
 响应：

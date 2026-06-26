@@ -135,9 +135,9 @@ interface SubtitleCue {
 ### ASR 引擎
 
 - `faster-whisper`：默认引擎，模型列表为 tiny/base/small/medium/large-v2/large-v3。
-- `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，须显式执行 `./scripts/setup-asr.sh parakeet`（或 `parakeet-cpu` / `parakeet-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段。
+- `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，须显式执行 `./scripts/setup-asr.sh parakeet`（或 `parakeet-cpu` / `parakeet-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段（`engines.chunking`）。
 - `qwen3-asr`：2026 年日语 ASR SOTA 引擎，模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出高精度字级时间戳，文本质量与时间轴精度均优于 Parakeet。须显式执行 `./scripts/setup-asr.sh qwen3`（或 `qwen3-cpu` / `qwen3-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。引擎惰性加载 `qwen_asr.Qwen3ASRModel`，CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`；分块/合并/字幕组装复用 `engines.chunking` 共享模块，双权重（ASR + aligner）下载封装在引擎层。
-- Parakeet 经 VAD 预切分和 gap backfill 后，当前真实转录效果已基本可接受，仅偶发少量句子遗漏；但时轴精度明显不如 faster-whisper，后续优化方案待定。
+- Parakeet 经 VAD 预切分和 gap backfill 后，当前真实转录效果已基本可接受，仅偶发少量句子遗漏；时轴精度明显不如 faster-whisper。
 
 ### VAD 预处理
 
@@ -248,8 +248,8 @@ interface SubtitleCue {
 - [x] 日语专用化（源语言固定 ja；移除转录/设置页源语言选择）
 - [x] m3u8 视频下载（DownloadView；Rust 分片并发 + AES-128 + 自动并发/HTTP/2；FFmpeg fallback）
 - [x] FFmpeg 压制（BurnView：硬字幕 MP4 / 软字幕 MKV、自动输出名、进度与取消、并发限制、全局轮询、退出清理、压制前使用当前内存字幕）
-- [x] Parakeet 时间轴优化 — 线 A：接入 Qwen3-ASR-1.7B 作为第三引擎（自带 ForcedAligner 高精度时间轴，文本质量超 Whisper/Parakeet；CPU/GPU 双 profile；复用 chunking 共享模块）
-- [ ] Parakeet 时间轴优化 — 线 B：Qwen3-ForcedAligner 作为 Parakeet 后处理对齐层（保留 Parakeet 文本，用 ForcedAligner 重对齐时间轴替换不稳定的 char timestamp 组装；失败降级）
+- [x] 接入 Qwen3-ASR-1.7B 作为第三引擎（CPU/GPU 双 profile；复用 chunking 共享模块）
+- [ ] Parakeet 时轴精度优化（chunking 软边界 / char timestamp 组装 / VAD 切分）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 
 ## 首期不做
