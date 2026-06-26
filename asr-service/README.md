@@ -129,7 +129,15 @@ python main.py --host 127.0.0.1 --port 0
 - `language`：`auto` 或 `null` 表示自动检测
 - `computeType`：留空时按设备推导（cpu→int8，cuda→float16）
 - `useVad` / `vadConfig`：可选 VAD 高级配置。faster-whisper 透传到内置 Silero VAD；Parakeet / Qwen3-ASR 用 `engines/vad.py` 先切分语音段，再逐段转录。
-- `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段（`engines/chunking.py`）。VAD + gap backfill 后转录完整性基本可接受，但仍可能有少量遗漏，且时轴精度弱于 faster-whisper。
+- `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段（`engines/chunking.py`）。长音频分块合并时会合并重叠文本而非简单取长弃短。
+
+  **Gap backfill**（缓解漏句与重叠碎片）：
+  - 主路径：相邻字幕间隙 ≥2.5s 时补转；另按 Silero 语音活动覆盖率扫描未覆盖区间。
+  - 逐窗口 `apply_gap_backfill`：在 gap 内 supersede 主路径残留（`それ` / `こちら` 等 spurious 碎片）；context 补转对「碎片 + 误对齐长句」做条件组装（如打招呼区）。
+  - 第二轮 context backfill 带 padding，窗口结果裁切到 gap 后再合并。
+  - 收尾 `dedupe_transcript_segments` 去同文重叠与尾缀子串重复；`TranscriptSegmentRefresh` 用最终列表替换任务预览片段。
+
+  VAD + backfill 后漏句已基本缓解；时轴精度仍弱于 faster-whisper / qwen3-asr，打招呼时长与后续句首偶有问题。
 - `qwen3-asr` 引擎模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出字级时间戳，语言固定按 `ja` 返回；文本质量与时轴精度优于 Parakeet。长音频自动分块转录，复用 `engines/chunking.py` 合并去重；CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`。模型下载为双权重（ASR + aligner），由引擎层封装为单一逻辑模型。
 
 响应：
@@ -157,6 +165,30 @@ python main.py --host 127.0.0.1 --port 0
 ```
 
 `status` 取值：`pending` / `running` / `completed` / `failed` / `cancelled`。
+
+## 调试日志
+
+诊断实现见 `diagnostics.py`（JSONL 事件、`HIKARU_ASR_TRACE_MS_RANGE` 时间窗过滤、`*_in_trace` 片段 diff）。
+
+桌面端启动 sidecar 时会写入 `asr-debug.log`（见 Tauri `asr.rs`），并默认开启详细片段日志（`HIKARU_ASR_DEBUG_DETAIL=1`）。
+
+手动调试时可设置：
+
+```bash
+export HIKARU_ASR_DEBUG_LOG=/tmp/asr-debug.jsonl
+export HIKARU_ASR_DEBUG_DETAIL=1   # 设为 0 可关闭逐段 dump
+export HIKARU_ASR_TRACE_MS_RANGE=8000-14000  # 可选：诊断关注的时间窗（毫秒）
+python main.py
+```
+
+Parakeet 相关事件包括：
+
+- `parakeet_chunk_segments_raw` / `parakeet_chunk_segments_merged`：每块原始与合并后字幕
+- `parakeet_merge_duplicate`：重叠去重时的文本合并（含 `inTraceRange`）
+- `parakeet_supplemental_append`：backfill 新增片段（未判为重复时）
+- `parakeet_*_in_trace`：在 `HIKARU_ASR_TRACE_MS_RANGE` 窗口内的片段快照与前后 diff
+- `parakeet_backfill_windows` / `parakeet_backfill_*_segments`：gap + 覆盖率补转窗口与结果
+- `job_segment_refresh_in_trace`：写入 ASS 前最终 refresh 列表在关注窗口内的片段
 
 ## 扩展新引擎
 
