@@ -22,10 +22,7 @@
 
 🚧 **待优化**：
 1. 首页增加显示最近项目列表
-2. Parakeet 转录时轴精度优化（分两条线）：
-   - ✅ 线 A（已完成）：接入 Qwen3-ASR-1.7B 作为第三引擎（2026 年日语 ASR SOTA，自带 Qwen3-ForcedAligner 高精度时间轴，文本质量超 Whisper/Parakeet；CPU 与 GPU 双 profile；复用 chunking 共享模块）
-   - 线 B（待办）：Qwen3-ForcedAligner 作为 Parakeet 后处理对齐层（保留 Parakeet 文本，用 ForcedAligner 重对齐时间轴，替换不稳定的 char timestamp 组装；失败降级）
-   - 设计文档见 `docs/superpowers/specs/`，实现计划见 `docs/superpowers/plans/`
+2. Parakeet 时轴精度优化（`chunking.py` 日语软边界切分、char timestamp 组装、VAD 切分等）
 3. 翻译页进度条显示优化
 4. 翻译页支持单独配置每批翻译条数、上下文条数、自定义 prompt 和术语表、字幕合并模式（当前使用全局设置）
 5. 编辑页功能完善：
