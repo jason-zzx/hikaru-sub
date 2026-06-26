@@ -24,6 +24,7 @@ DEFAULT_CHUNK_MS = 45_000
 DEFAULT_CHUNK_OVERLAP_MS = 2_000
 CHUNKING_MIN_DURATION_MS = 60_000
 DEFAULT_CLEAR_PAUSE_THRESHOLD_SEC = 0.45
+# 无条件强边界：不依赖后续字符（按长度降序匹配）
 JAPANESE_SOFT_BREAK_SUFFIXES = (
     "ですけど",
     "ましたが",
@@ -32,18 +33,53 @@ JAPANESE_SOFT_BREAK_SUFFIXES = (
     "なので",
     "ので",
     "から",
-    "けど",
-    "では",
-    "して",
-    "って",
+    "ですね",
+    "ました",
     "です",
     "ます",
-    "ました",
-    "ですね",
     "よね",
     "かな",
 )
+# 需结合后续文本判定的强边界（易与复合词/接续形混淆）
+JAPANESE_CONTEXTUAL_SOFT_BREAK_SUFFIXES: tuple[tuple[str, str], ...] = (
+    ("けど", "contextual_kedo"),
+    ("では", "contextual_dewa"),
+    ("して", "contextual_shite"),
+    ("って", "contextual_tte"),
+)
 JAPANESE_PARTICLE_BREAK_CHARS = set("はがをにでとへもやねよか")
+# 助词弱边界：当前字符为助词且后续字符构成固定搭配时不切分
+JAPANESE_PARTICLE_CONTINUATIONS: dict[str, tuple[str, ...]] = {
+    "で": (
+        "も",
+        "す",
+        "き",
+        "きま",
+        "は",
+        "しょ",
+        "しょう",
+        # て形「〜んで」接续（飲んでしまう、食べないでいた 等）
+        "し",
+        "い",
+        "あ",
+        "お",
+        "み",
+        "く",
+        "も",
+        "ほ",
+        "か",
+        "な",
+    ),
+    "と": ("い", "こ", "き", "は", "も", "う", "か", "っ"),
+    "に": ("は", "も", "ち", "く", "な", "し", "て", "ゃ", "ょ", "っ"),
+    "は": ("い", "あ", "ず", "め", "ん"),
+    "が": ("ら", "っ", "く", "き"),
+    "か": ("な", "ら", "も", "わ", "り"),
+    "も": ("う", "ち", "の", "っ"),
+    "や": ("っ", "つ", "す", "は"),
+    "ね": ("え",),
+    "よ": ("う", "り", "っ"),
+}
 DEDUP_PUNCTUATION = PUNCTUATION | SOFT_BREAK_PUNCTUATION | set(" \t\r\n　")
 
 
@@ -327,12 +363,110 @@ def _buffer_duration_ms(buffer: list[tuple[str, float, float]]) -> int:
     return int(round((buffer[-1][2] - buffer[0][1]) * 1000))
 
 
-def _japanese_soft_boundary_score(text: str, char: str) -> int:
+def _following_buffer_text(
+    buffer: list[tuple[str, float, float]],
+    index: int,
+) -> str:
+    return "".join(ch for ch, _, _ in buffer[index + 1 :]).strip()
+
+
+def _valid_break_after_tte(following: str) -> bool:
+    """「って」：引用助词或促音便て形，后续多为いう/も/は等，不宜单独成界。"""
+    if not following:
+        return False
+    if following[0] in "もはい言思感こなあやみっ":
+        return False
+    blocked = ("いう", "いる", "いえ", "いや", "いっ", "こと", "など", "って")
+    return not any(following.startswith(prefix) for prefix in blocked)
+
+
+def _valid_break_after_shite(following: str) -> bool:
+    """「して」：て形接续，需排除している/してしまう等复合，保留紹介して|いきます。"""
+    if not following:
+        return True
+    blocked = (
+        "しま",
+        "しち",
+        "しょ",
+        "しゃ",
+        "いる",
+        "いて",
+        "いた",
+        "いろ",
+        "いれ",
+        "いま",
+        "ある",
+        "あり",
+        "あっ",
+        "おく",
+        "おき",
+        "みる",
+        "みて",
+        "みた",
+        "くる",
+        "くれ",
+        "くれま",
+        "もら",
+        "もっ",
+        "はいけ",
+        "はい",
+        "はね",
+        "はま",
+        "しい",
+        "から",
+        "かわ",
+    )
+    return not any(following.startswith(prefix) for prefix in blocked)
+
+
+def _valid_break_after_kedo(following: str) -> bool:
+    return not following.startswith("も")
+
+
+def _valid_break_after_dewa(following: str) -> bool:
+    return not following.startswith(("な", "り"))
+
+
+_CONTEXTUAL_BREAK_VALIDATORS = {
+    "contextual_tte": _valid_break_after_tte,
+    "contextual_shite": _valid_break_after_shite,
+    "contextual_kedo": _valid_break_after_kedo,
+    "contextual_dewa": _valid_break_after_dewa,
+}
+
+
+def _matches_contextual_soft_break(text: str, following: str) -> bool:
+    for suffix, validator_key in JAPANESE_CONTEXTUAL_SOFT_BREAK_SUFFIXES:
+        if text.endswith(suffix):
+            return _CONTEXTUAL_BREAK_VALIDATORS[validator_key](following)
+    return False
+
+
+def _is_valid_particle_weak_break(char: str, following: str) -> bool:
+    if char not in JAPANESE_PARTICLE_BREAK_CHARS:
+        return False
+    if not following:
+        return True
+    blocked = JAPANESE_PARTICLE_CONTINUATIONS.get(char)
+    if not blocked:
+        return True
+    return not any(following.startswith(prefix) for prefix in blocked)
+
+
+def _japanese_soft_boundary_score(
+    text: str,
+    char: str,
+    *,
+    following: str = "",
+    allow_contextual: bool = True,
+) -> int:
     if char in SOFT_BREAK_PUNCTUATION:
         return 2
     if any(text.endswith(suffix) for suffix in JAPANESE_SOFT_BREAK_SUFFIXES):
         return 2
-    if char in JAPANESE_PARTICLE_BREAK_CHARS:
+    if allow_contextual and _matches_contextual_soft_break(text, following):
+        return 2
+    if _is_valid_particle_weak_break(char, following):
         return 1
     return 0
 
@@ -349,7 +483,12 @@ def _find_japanese_soft_break(
         text = f"{text}{char}"
         if len(text.strip()) < min_chars:
             continue
-        score = _japanese_soft_boundary_score(text.strip(), char)
+        following = _following_buffer_text(buffer, index)
+        score = _japanese_soft_boundary_score(
+            text.strip(),
+            char,
+            following=following,
+        )
         if score >= 2:
             best_strong = index
         elif score == 1:
@@ -370,7 +509,13 @@ def _should_split_on_pause(
     text = _buffer_text(buffer)
     if not text:
         return False
-    return _japanese_soft_boundary_score(text, text[-1]) >= 2
+    # 短停顿时尚未读入后续字符，仅信任无条件强边界，避免「とって|」类误判
+    return _japanese_soft_boundary_score(
+        text,
+        text[-1],
+        following="",
+        allow_contextual=False,
+    ) >= 2
 
 
 def build_segments_from_char_timestamps(
