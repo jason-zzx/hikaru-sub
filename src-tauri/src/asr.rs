@@ -148,6 +148,7 @@ fn spawn_sidecar(python: &str, dir: &Path) -> Result<Sidecar, String> {
         .args(["main.py", "--host", "127.0.0.1", "--port", "0"])
         .current_dir(dir)
         .env("HIKARU_ASR_DEBUG_LOG", &debug_log_path)
+        .env("HIKARU_ASR_DEBUG_DETAIL", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())

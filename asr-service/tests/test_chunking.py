@@ -5,9 +5,12 @@ from engines.base import AsrSegment
 from engines.chunking import (
     plan_audio_chunks,
     merge_chunk_segments,
+    dedupe_transcript_segments,
+    apply_gap_backfill,
     build_segments_from_char_timestamps,
     build_segments_from_text,
     _japanese_soft_boundary_score,
+    _merge_overlapping_text,
 )
 
 
@@ -77,6 +80,85 @@ class MergeChunkSegmentsTests(unittest.TestCase):
         ]
         merged = merge_chunk_segments(chunk_segments, overlap_ms=2000)
         self.assertEqual(len(merged), 2)
+
+
+class DedupeTranscriptSegmentsTests(unittest.TestCase):
+    def test_merges_exact_duplicate_with_overlapping_times(self):
+        segments = [
+            AsrSegment(64328, 65504, "5時ですよ。"),
+            AsrSegment(64540, 65500, "5時ですよ。"),
+        ]
+        deduped = dedupe_transcript_segments(segments)
+        self.assertEqual(len(deduped), 1)
+        self.assertEqual(deduped[0].text, "5時ですよ。")
+        self.assertEqual(deduped[0].start_ms, 64328)
+        self.assertEqual(deduped[0].end_ms, 65504)
+
+    def test_drops_suffix_substring_duplicate(self):
+        segments = [
+            AsrSegment(
+                107456,
+                112576,
+                "出演されている嫌な顔をされながらおパンツ見せてもらいたいリターンズを見ました",
+            ),
+            AsrSegment(112576, 112776, "リターンズを見ました。"),
+        ]
+        deduped = dedupe_transcript_segments(segments)
+        self.assertEqual(len(deduped), 1)
+        self.assertIn("リターンズを見ました", deduped[0].text)
+
+    def test_preserves_distinct_overlapping_segments(self):
+        segments = [
+            AsrSegment(9952, 11792, "こんばんは飯田ひかるです。"),
+            AsrSegment(11728, 12752, "皆さん、"),
+            AsrSegment(12432, 12912, "こんばんは。"),
+        ]
+        deduped = dedupe_transcript_segments(segments)
+        self.assertEqual(len(deduped), 3)
+
+
+class ApplyGapBackfillTests(unittest.TestCase):
+    def test_context_gap_supersedes_stale_fragments_and_assembles_greeting(self):
+        segments = [
+            AsrSegment(11792, 12112, "それ"),
+            AsrSegment(12112, 12432, "こちら"),
+        ]
+        window_segments = [
+            AsrSegment(11728 - 5008, 11792 - 5008, "皆さん、"),
+            AsrSegment(9952 - 5008, 11792 - 5008, "こんばんは飯田ひかるです。"),
+        ]
+        merged = apply_gap_backfill(
+            segments,
+            gap_start_ms=7536,
+            gap_end_ms=11792,
+            chunk_start_ms=5008,
+            window_segments=window_segments,
+            overlap_ms=2000,
+            assemble=True,
+        )
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].start_ms, 11728)
+        self.assertEqual(merged[0].text, "皆さん、こんばんは飯田ひかるです。")
+
+    def test_skips_redundant_second_gap_fill(self):
+        segments = [
+            AsrSegment(11728, 12912, "皆さん、こんばんは飯田ひかるです。"),
+        ]
+        window_segments = [
+            AsrSegment(12432 - 11072, 12752 - 11072, "皆さん、"),
+            AsrSegment(12432 - 11072, 12912 - 11072, "こんばんは。"),
+        ]
+        merged = apply_gap_backfill(
+            segments,
+            gap_start_ms=12432,
+            gap_end_ms=14352,
+            chunk_start_ms=11072,
+            window_segments=window_segments,
+            overlap_ms=2000,
+            assemble=True,
+        )
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].text, "皆さん、こんばんは飯田ひかるです。")
 
 
 class BuildSegmentsTests(unittest.TestCase):
@@ -204,6 +286,22 @@ class JapaneseSoftBoundaryTests(unittest.TestCase):
         for seg in segments:
             self.assertNotEqual(seg.text, "ついつい飲んで")
         self.assertEqual("".join(s.text for s in segments), text)
+
+
+class MergeOverlappingTextTests(unittest.TestCase):
+    def test_preserves_prefix_when_later_chunk_drops_it(self):
+        merged = _merge_overlapping_text(
+            "すごい爽やかな気持ちになりました。",
+            "爽やかな気持ちになりました何かさ最近暑くてさ",
+        )
+        self.assertTrue(merged.startswith("すごい"))
+        self.assertIn("何かさ最近暑くてさ", merged)
+
+    def test_keeps_longer_when_one_contains_the_other(self):
+        self.assertEqual(
+            _merge_overlapping_text("短い", "短い文です"),
+            "短い文です",
+        )
 
 
 if __name__ == "__main__":

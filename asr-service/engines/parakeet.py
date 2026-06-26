@@ -18,10 +18,27 @@ import tempfile
 import importlib.util
 from pathlib import Path
 import sys
-from typing import Callable, Iterable, Iterator, Optional
+from typing import Any, Callable, Iterable, Iterator, Optional
 
-from diagnostics import debug_exception, debug_log
-from .base import AsrEngine, AsrError, AsrSegment, Transcription, yield_unseen_segments
+from diagnostics import (
+    debug_detail_enabled,
+    debug_exception,
+    debug_log,
+    debug_segment_range_diff,
+    debug_segments,
+    debug_segments_in_range,
+    segment_overlaps_range,
+    segment_snapshots,
+    trace_ms_range,
+)
+from .base import (
+    AsrEngine,
+    AsrError,
+    AsrSegment,
+    TranscriptSegmentRefresh,
+    Transcription,
+    yield_unseen_segments,
+)
 from .chunking import (
     CHUNKING_MIN_DURATION_MS,
     DEFAULT_CHUNK_MS,
@@ -46,16 +63,18 @@ from .chunking import (
     _is_chunk_overlap_duplicate,
     _japanese_soft_boundary_score,
     _longest_common_text_len,
-    _merge_supplemental_segments,
+    _merge_duplicate_segments,
+    _merge_overlapping_text,
     _normalize_char_item,
     _overlap_ms,
-    _prefer_shifted_duplicate,
     _shift_valid_segments,
     _should_split_on_pause,
     _token_to_text,
     _write_wav_chunk,
     build_segments_from_char_timestamps,
     build_segments_from_text,
+    apply_gap_backfill,
+    dedupe_transcript_segments,
     cuda_unavailable_reason,
     merge_chunk_segments,
     plan_audio_chunks,
@@ -66,10 +85,14 @@ _cuda_unavailable_reason = cuda_unavailable_reason
 
 MODEL_ID = "nvidia/parakeet-tdt_ctc-0.6b-ja"
 MODEL_FILE = "parakeet-tdt_ctc-0.6b-ja.nemo"
-DEFAULT_BACKFILL_MIN_GAP_MS = 6_000
+DEFAULT_BACKFILL_MIN_GAP_MS = 2_500
+DEFAULT_BACKFILL_MIN_UNCOVERED_MS = 1_500
 DEFAULT_BACKFILL_PADDING_MS = 0
 DEFAULT_BACKFILL_CONTEXT_PADDING_MS = 5_000
+DEFAULT_BACKFILL_CONTEXT_PADDING_MAX_MS = 5_000
+DEFAULT_BACKFILL_CONTEXT_PADDING_MIN_MS = 400
 DEFAULT_BACKFILL_MAX_WINDOW_MS = 30_000
+DEFAULT_BACKFILL_ACTIVITY_MAX_COVERAGE_RATIO = 0.85
 DEFAULT_BACKFILL_ACTIVITY_FRAME_MS = 100
 DEFAULT_BACKFILL_RMS_THRESHOLD = 0.002
 DEFAULT_BACKFILL_MIN_ACTIVE_MS = 250
@@ -148,6 +171,253 @@ def _has_audio_activity(
     return False
 
 
+def _scan_audio_activity_regions(
+    audio_path: str,
+    duration_ms: int,
+    *,
+    frame_ms: int = DEFAULT_BACKFILL_ACTIVITY_FRAME_MS,
+    rms_threshold: float = DEFAULT_BACKFILL_RMS_THRESHOLD,
+    min_region_ms: int = DEFAULT_BACKFILL_MIN_ACTIVE_MS,
+    bridge_gap_ms: int = 300,
+) -> list[tuple[int, int]]:
+    """扫描整段音频，返回连续有语音能量的时间区间。"""
+    if duration_ms <= 0:
+        return []
+    regions: list[tuple[int, int]] = []
+    active_start: Optional[int] = None
+    last_active_end = 0
+    try:
+        with wave.open(audio_path, "rb") as wav:
+            rate = wav.getframerate()
+            if rate <= 0:
+                return []
+            sampwidth = wav.getsampwidth()
+            frames_per_block = max(1, int(round(rate * frame_ms / 1000)))
+            total_frames = wav.getnframes()
+            frame_index = 0
+            while frame_index < total_frames:
+                frame_count = min(frames_per_block, total_frames - frame_index)
+                data = wav.readframes(frame_count)
+                if not data:
+                    break
+                time_ms = int(round(frame_index * 1000 / rate))
+                frame_end_ms = int(round((frame_index + frame_count) * 1000 / rate))
+                frame_index += frame_count
+                if _pcm_rms(data, sampwidth) >= rms_threshold:
+                    if active_start is None:
+                        active_start = time_ms
+                    last_active_end = frame_end_ms
+                elif active_start is not None and time_ms - last_active_end >= bridge_gap_ms:
+                    if last_active_end - active_start >= min_region_ms:
+                        regions.append((active_start, last_active_end))
+                    active_start = None
+            if active_start is not None and last_active_end - active_start >= min_region_ms:
+                regions.append((active_start, min(duration_ms, last_active_end)))
+    except Exception as exc:  # noqa: BLE001
+        debug_exception(
+            "parakeet_activity_scan_error",
+            exc,
+            audioPath=audio_path,
+            durationMs=duration_ms,
+        )
+    return regions
+
+
+def _subtract_segment_coverage(
+    start_ms: int,
+    end_ms: int,
+    segments: Iterable[AsrSegment],
+    *,
+    min_remainder_ms: int,
+) -> list[tuple[int, int]]:
+    """从时间区间内减去已有字幕覆盖部分，返回仍空缺的时间段。"""
+    intervals = [(start_ms, end_ms)]
+    for seg in sorted(segments, key=lambda item: (item.start_ms, item.end_ms)):
+        if seg.end_ms <= seg.start_ms:
+            continue
+        next_intervals: list[tuple[int, int]] = []
+        for interval_start, interval_end in intervals:
+            if seg.end_ms <= interval_start or seg.start_ms >= interval_end:
+                next_intervals.append((interval_start, interval_end))
+                continue
+            if interval_start < seg.start_ms:
+                next_intervals.append((interval_start, seg.start_ms))
+            if seg.end_ms < interval_end:
+                next_intervals.append((seg.end_ms, interval_end))
+        intervals = next_intervals
+    return [
+        (interval_start, interval_end)
+        for interval_start, interval_end in intervals
+        if interval_end - interval_start >= min_remainder_ms
+    ]
+
+
+def _context_padding_ms_for_gap(gap_start_ms: int, gap_end_ms: int) -> int:
+    """窄 gap 用紧窗口补转，避免大 padding 把邻句吸进模型注意力。"""
+    gap_ms = max(0, gap_end_ms - gap_start_ms)
+    if gap_ms <= 0:
+        return 0
+    adaptive = max(
+        DEFAULT_BACKFILL_CONTEXT_PADDING_MIN_MS,
+        min(gap_ms // 2 + DEFAULT_BACKFILL_CONTEXT_PADDING_MIN_MS, gap_ms),
+    )
+    return min(DEFAULT_BACKFILL_CONTEXT_PADDING_MAX_MS, adaptive)
+
+
+def _filter_backfill_activity_regions(
+    regions: Iterable[tuple[int, int]],
+    duration_ms: int,
+    *,
+    max_coverage_ratio: float = DEFAULT_BACKFILL_ACTIVITY_MAX_COVERAGE_RATIO,
+) -> list[tuple[int, int]]:
+    """过滤几乎覆盖整段的 RMS 活动区（播客底噪会让覆盖率补转失效）。"""
+    if duration_ms <= 0:
+        return []
+    filtered: list[tuple[int, int]] = []
+    for start_ms, end_ms in regions:
+        if end_ms <= start_ms:
+            continue
+        if (end_ms - start_ms) / duration_ms >= max_coverage_ratio:
+            continue
+        filtered.append((start_ms, end_ms))
+    return filtered
+
+
+def _merge_time_intervals(
+    intervals: Iterable[tuple[int, int]],
+    *,
+    bridge_ms: int = 500,
+) -> list[tuple[int, int]]:
+    ordered = sorted((start, end) for start, end in intervals if end > start)
+    if not ordered:
+        return []
+    merged: list[tuple[int, int]] = [ordered[0]]
+    for start, end in ordered[1:]:
+        prev_start, prev_end = merged[-1]
+        if start <= prev_end + bridge_ms:
+            merged[-1] = (prev_start, max(prev_end, end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def _collect_backfill_targets(
+    audio_path: str,
+    segments: list[AsrSegment],
+    duration_ms: int,
+    *,
+    min_gap_ms: int = DEFAULT_BACKFILL_MIN_GAP_MS,
+    min_uncovered_ms: int = DEFAULT_BACKFILL_MIN_UNCOVERED_MS,
+) -> list[tuple[int, int]]:
+    targets = list(
+        _iter_backfill_gaps(
+            segments,
+            duration_ms,
+            min_gap_ms=min_gap_ms,
+        )
+    )
+    for region_start, region_end in _filter_backfill_activity_regions(
+        _scan_audio_activity_regions(audio_path, duration_ms),
+        duration_ms,
+    ):
+        targets.extend(
+            _subtract_segment_coverage(
+                region_start,
+                region_end,
+                segments,
+                min_remainder_ms=min_uncovered_ms,
+            )
+        )
+    # 不桥接相邻空隙：合并后的大窗口会让 Parakeet 在长段里跳过中间短句。
+    return _merge_time_intervals(targets, bridge_ms=0)
+
+
+def _parakeet_merge_observer(
+    reason: str,
+    existing: AsrSegment,
+    shifted: AsrSegment,
+    combined: AsrSegment,
+) -> None:
+    trace_start_ms, trace_end_ms = trace_ms_range()
+    debug_log(
+        "parakeet_merge_duplicate",
+        reason=reason,
+        existingStartMs=existing.start_ms,
+        existingEndMs=existing.end_ms,
+        existingText=existing.text,
+        shiftedStartMs=shifted.start_ms,
+        shiftedEndMs=shifted.end_ms,
+        shiftedText=shifted.text,
+        mergedStartMs=combined.start_ms,
+        mergedEndMs=combined.end_ms,
+        mergedText=combined.text,
+        inTraceRange=any(
+            segment_overlaps_range(seg, trace_start_ms, trace_end_ms)
+            for seg in (existing, shifted, combined)
+        ),
+    )
+
+
+def _parakeet_supplemental_append_observer(segment: AsrSegment) -> None:
+    trace_start_ms, trace_end_ms = trace_ms_range()
+    debug_log(
+        "parakeet_supplemental_append",
+        startMs=segment.start_ms,
+        endMs=segment.end_ms,
+        text=segment.text,
+        inTraceRange=segment_overlaps_range(segment, trace_start_ms, trace_end_ms),
+    )
+
+
+def _log_trace_intervals(event: str, intervals: Iterable[tuple[int, int]], **fields: Any) -> None:
+    if not debug_detail_enabled():
+        return
+    trace_start_ms, trace_end_ms = trace_ms_range()
+    overlapping = [
+        {"startMs": start_ms, "endMs": end_ms}
+        for start_ms, end_ms in intervals
+        if end_ms > trace_start_ms and start_ms < trace_end_ms
+    ]
+    if not overlapping:
+        return
+    debug_log(
+        event,
+        traceStartMs=trace_start_ms,
+        traceEndMs=trace_end_ms,
+        intervals=overlapping,
+        **fields,
+    )
+
+
+def _log_trace_backfill_windows(
+    event: str,
+    windows: Iterable[tuple[int, int, int, int]],
+    **fields: Any,
+) -> None:
+    if not debug_detail_enabled():
+        return
+    trace_start_ms, trace_end_ms = trace_ms_range()
+    overlapping = [
+        {
+            "windowStartMs": start_ms,
+            "windowEndMs": end_ms,
+            "gapStartMs": gap_start_ms,
+            "gapEndMs": gap_end_ms,
+        }
+        for start_ms, end_ms, gap_start_ms, gap_end_ms in windows
+        if end_ms > trace_start_ms and start_ms < trace_end_ms
+    ]
+    if not overlapping:
+        return
+    debug_log(
+        event,
+        traceStartMs=trace_start_ms,
+        traceEndMs=trace_end_ms,
+        windows=overlapping,
+        **fields,
+    )
+
+
 def _iter_backfill_gaps(
     segments: Iterable[AsrSegment],
     duration_ms: int,
@@ -175,6 +445,7 @@ def _plan_backfill_windows(
     segments: list[AsrSegment],
     duration_ms: int,
     *,
+    targets: Optional[list[tuple[int, int]]] = None,
     min_gap_ms: int = DEFAULT_BACKFILL_MIN_GAP_MS,
     padding_ms: int = DEFAULT_BACKFILL_PADDING_MS,
     max_window_ms: int = DEFAULT_BACKFILL_MAX_WINDOW_MS,
@@ -184,11 +455,18 @@ def _plan_backfill_windows(
         return []
     inner_window_ms = max(1000, max_window_ms - padding_ms * 2)
     windows: list[tuple[int, int, int, int]] = []
-    for gap_start_ms, gap_end_ms in _iter_backfill_gaps(
-        segments,
-        duration_ms,
-        min_gap_ms=min_gap_ms,
-    ):
+    gap_targets = (
+        targets
+        if targets is not None
+        else list(
+            _iter_backfill_gaps(
+                segments,
+                duration_ms,
+                min_gap_ms=min_gap_ms,
+            )
+        )
+    )
+    for gap_start_ms, gap_end_ms in gap_targets:
         cursor = gap_start_ms
         while cursor < gap_end_ms:
             inner_end_ms = min(gap_end_ms, cursor + inner_window_ms)
@@ -205,12 +483,53 @@ def _plan_backfill_windows(
     return windows
 
 
+def _plan_context_backfill_windows(
+    audio_path: str,
+    segments: list[AsrSegment],
+    duration_ms: int,
+    *,
+    targets: Optional[list[tuple[int, int]]] = None,
+    min_gap_ms: int = DEFAULT_BACKFILL_MIN_UNCOVERED_MS,
+    max_window_ms: int = DEFAULT_BACKFILL_MAX_WINDOW_MS,
+    activity_checker: Callable[[str, int, int], bool] = _has_audio_activity,
+) -> list[tuple[int, int, int, int]]:
+    """第二轮补转：按 gap 自适应 padding，避免宽窗口吸走邻句。"""
+    gap_targets = (
+        targets
+        if targets is not None
+        else list(
+            _iter_backfill_gaps(
+                segments,
+                duration_ms,
+                min_gap_ms=min_gap_ms,
+            )
+        )
+    )
+    windows: list[tuple[int, int, int, int]] = []
+    for gap_start_ms, gap_end_ms in gap_targets:
+        padding_ms = _context_padding_ms_for_gap(gap_start_ms, gap_end_ms)
+        windows.extend(
+            _plan_backfill_windows(
+                audio_path,
+                segments,
+                duration_ms,
+                targets=[(gap_start_ms, gap_end_ms)],
+                min_gap_ms=0,
+                padding_ms=padding_ms,
+                max_window_ms=max_window_ms,
+                activity_checker=activity_checker,
+            )
+        )
+    return windows
+
+
 def _clip_backfill_segments_to_gap(
     segments: list[AsrSegment],
     *,
     window_start_ms: int,
     gap_start_ms: int,
     gap_end_ms: int,
+    neighbor_ms: int = DEFAULT_BACKFILL_PADDING_MS,
 ) -> list[AsrSegment]:
     local_gap_start_ms = max(0, gap_start_ms - window_start_ms)
     local_gap_end_ms = max(local_gap_start_ms, gap_end_ms - window_start_ms)
@@ -221,13 +540,17 @@ def _clip_backfill_segments_to_gap(
         start_ms = seg.start_ms
         end_ms = seg.end_ms
         if end_ms <= local_gap_start_ms:
-            if local_gap_start_ms - end_ms > DEFAULT_BACKFILL_PADDING_MS:
+            if local_gap_start_ms - end_ms > neighbor_ms:
                 continue
             duration_ms = max(100, end_ms - start_ms)
             start_ms = local_gap_start_ms
             end_ms = min(local_gap_end_ms, start_ms + duration_ms)
         elif start_ms >= local_gap_end_ms:
-            continue
+            if start_ms - local_gap_end_ms > neighbor_ms:
+                continue
+            duration_ms = max(100, end_ms - start_ms)
+            end_ms = local_gap_end_ms
+            start_ms = max(local_gap_start_ms, end_ms - duration_ms)
         else:
             start_ms = max(start_ms, local_gap_start_ms)
             end_ms = min(end_ms, local_gap_end_ms)
@@ -531,6 +854,7 @@ class ParakeetEngine(AsrEngine):
         chunks = self._plan_transcribe_chunks(audio_path, duration_ms)
         chunk_results: list[tuple[int, list[AsrSegment]]] = []
         yielded: set[tuple[int, int, str]] = set()
+        merge_observer = _parakeet_merge_observer if debug_detail_enabled() else None
 
         with tempfile.TemporaryDirectory(prefix="hikaru_parakeet_") as tmp:
             tmp_dir = Path(tmp)
@@ -573,8 +897,51 @@ class ParakeetEngine(AsrEngine):
                     endMs=end_ms,
                     segmentCount=len(segments),
                 )
+                debug_segments(
+                    "parakeet_chunk_segments_raw",
+                    segments,
+                    chunkIndex=index,
+                    startMs=start_ms,
+                    endMs=end_ms,
+                )
+                if debug_detail_enabled():
+                    trace_start_ms, trace_end_ms = trace_ms_range()
+                    if end_ms > trace_start_ms and start_ms < trace_end_ms:
+                        absolute_segments = [
+                            AsrSegment(
+                                start_ms=seg.start_ms + start_ms,
+                                end_ms=seg.end_ms + start_ms,
+                                text=seg.text,
+                            )
+                            for seg in segments
+                            if seg.end_ms > seg.start_ms and seg.text.strip()
+                        ]
+                        debug_log(
+                            "parakeet_chunk_raw_in_trace",
+                            chunkIndex=index,
+                            chunkStartMs=start_ms,
+                            chunkEndMs=end_ms,
+                            traceStartMs=trace_start_ms,
+                            traceEndMs=trace_end_ms,
+                            segments=segment_snapshots(absolute_segments),
+                        )
                 chunk_results.append((start_ms, segments))
-                merged = merge_chunk_segments(chunk_results)
+                merged = merge_chunk_segments(
+                    chunk_results,
+                    merge_observer=merge_observer,
+                )
+                debug_segments(
+                    "parakeet_chunk_segments_merged",
+                    merged,
+                    chunkIndex=index,
+                    chunkCount=len(chunks),
+                )
+                debug_segments_in_range(
+                    "parakeet_chunk_merged_in_trace",
+                    merged,
+                    chunkIndex=index,
+                    chunkCount=len(chunks),
+                )
                 yield from yield_unseen_segments(yielded, merged)
                 if progress_callback:
                     progress_callback(end_ms)
@@ -587,19 +954,41 @@ class ParakeetEngine(AsrEngine):
             )
             return
 
-        merged = merge_chunk_segments(chunk_results)
-        final = self._backfill_missing_segments(
+        merged = merge_chunk_segments(
+            chunk_results,
+            merge_observer=merge_observer,
+        )
+        debug_segments("parakeet_chunk_segments_final", merged, chunkCount=len(chunks))
+        debug_segments_in_range(
+            "parakeet_chunk_final_in_trace",
+            merged,
+            chunkCount=len(chunks),
+        )
+        backfilled = self._backfill_missing_segments(
             audio_path,
             duration_ms,
             merged,
             cancel_check=cancel_check,
+        )
+        final = dedupe_transcript_segments(backfilled)
+        debug_segment_range_diff(
+            "parakeet_dedupe_in_trace",
+            backfilled,
+            final,
+            chunkCount=len(chunks),
         )
         debug_log(
             "parakeet_chunking_done",
             chunkCount=len(chunks),
             segmentCount=len(final),
         )
-        yield from yield_unseen_segments(yielded, final)
+        debug_segments("parakeet_chunk_segments_after_backfill", final, chunkCount=len(chunks))
+        debug_segments_in_range(
+            "parakeet_refresh_payload_in_trace",
+            final,
+            chunkCount=len(chunks),
+        )
+        yield TranscriptSegmentRefresh(tuple(final))
 
     def _plan_transcribe_chunks(
         self,
@@ -716,8 +1105,35 @@ class ParakeetEngine(AsrEngine):
                     window_start_ms=start_ms,
                     gap_start_ms=gap_start_ms,
                     gap_end_ms=gap_end_ms,
+                    neighbor_ms=max(
+                        0,
+                        gap_start_ms - start_ms,
+                        end_ms - gap_end_ms,
+                    ),
                 )
                 if backfilled:
+                    if debug_detail_enabled():
+                        trace_start_ms, trace_end_ms = trace_ms_range()
+                        if end_ms > trace_start_ms and start_ms < trace_end_ms:
+                            absolute_segments = [
+                                AsrSegment(
+                                    start_ms=seg.start_ms + start_ms,
+                                    end_ms=seg.end_ms + start_ms,
+                                    text=seg.text,
+                                )
+                                for seg in backfilled
+                            ]
+                            debug_log(
+                                f"{log_prefix}_clipped_in_trace",
+                                windowIndex=index,
+                                windowStartMs=start_ms,
+                                windowEndMs=end_ms,
+                                gapStartMs=gap_start_ms,
+                                gapEndMs=gap_end_ms,
+                                traceStartMs=trace_start_ms,
+                                traceEndMs=trace_end_ms,
+                                segments=segment_snapshots(absolute_segments),
+                            )
                     backfill_results.append((start_ms, backfilled))
         return backfill_results
 
@@ -729,13 +1145,24 @@ class ParakeetEngine(AsrEngine):
         *,
         cancel_check: Optional[Callable[[], bool]] = None,
     ) -> list[AsrSegment]:
-        windows = _plan_backfill_windows(audio_path, segments, duration_ms)
+        merge_observer = _parakeet_merge_observer if debug_detail_enabled() else None
+        backfill_targets = _collect_backfill_targets(audio_path, segments, duration_ms)
+        gap_windows = _plan_backfill_windows(
+            audio_path,
+            segments,
+            duration_ms,
+            targets=backfill_targets,
+        )
+        activity_regions = _scan_audio_activity_regions(audio_path, duration_ms)
+        windows = gap_windows
         if not windows:
             debug_log(
                 "parakeet_backfill_skip",
                 audioPath=audio_path,
                 durationMs=duration_ms,
                 segmentCount=len(segments),
+                gapWindowCount=len(gap_windows),
+                coverageTargetCount=len(backfill_targets),
             )
             return segments
 
@@ -744,6 +1171,36 @@ class ParakeetEngine(AsrEngine):
             audioPath=audio_path,
             durationMs=duration_ms,
             windowCount=len(windows),
+            coverageTargetCount=len(backfill_targets),
+            activityRegionCount=len(activity_regions),
+        )
+        debug_log(
+            "parakeet_backfill_windows",
+            windows=[
+                {
+                    "startMs": start_ms,
+                    "endMs": end_ms,
+                    "gapStartMs": gap_start_ms,
+                    "gapEndMs": gap_end_ms,
+                }
+                for start_ms, end_ms, gap_start_ms, gap_end_ms in windows
+            ],
+        )
+        debug_segments("parakeet_backfill_input_segments", segments, durationMs=duration_ms)
+        debug_segments_in_range(
+            "parakeet_backfill_input_in_trace",
+            segments,
+            durationMs=duration_ms,
+        )
+        _log_trace_intervals(
+            "parakeet_backfill_targets_in_trace",
+            backfill_targets,
+            durationMs=duration_ms,
+        )
+        _log_trace_backfill_windows(
+            "parakeet_backfill_windows_in_trace",
+            windows,
+            stage="primary",
         )
         backfill_results = self._transcribe_backfill_windows(
             audio_path,
@@ -753,16 +1210,51 @@ class ParakeetEngine(AsrEngine):
             cancel_check=cancel_check,
         )
 
-        merged = _merge_supplemental_segments(
-            segments,
-            backfill_results,
-            overlap_ms=max(DEFAULT_CHUNK_OVERLAP_MS, DEFAULT_BACKFILL_PADDING_MS),
+        append_observer = (
+            _parakeet_supplemental_append_observer if debug_detail_enabled() else None
         )
-        context_windows = _plan_backfill_windows(
+        debug_segments_in_range(
+            "parakeet_backfill_before_primary_merge_in_trace",
+            segments,
+            stage="primary",
+        )
+        merged = list(segments)
+        for (_window_start_ms, _window_end_ms, gap_start_ms, gap_end_ms), (
+            chunk_start_ms,
+            window_segments,
+        ) in zip(windows, backfill_results):
+            before_merge = list(merged)
+            merged = apply_gap_backfill(
+                merged,
+                gap_start_ms,
+                gap_end_ms,
+                chunk_start_ms,
+                window_segments,
+                overlap_ms=max(DEFAULT_CHUNK_OVERLAP_MS, DEFAULT_BACKFILL_PADDING_MS),
+                assemble=False,
+                merge_observer=merge_observer,
+                append_observer=append_observer,
+            )
+            if debug_detail_enabled():
+                debug_segment_range_diff(
+                    "parakeet_primary_gap_merge_in_trace",
+                    before_merge,
+                    merged,
+                    stage="primary",
+                    gapStartMs=gap_start_ms,
+                    gapEndMs=gap_end_ms,
+                )
+        debug_segment_range_diff(
+            "parakeet_backfill_primary_merge_in_trace",
+            segments,
+            merged,
+            stage="primary",
+        )
+        debug_segments("parakeet_backfill_after_primary", merged, durationMs=duration_ms)
+        context_windows = _plan_context_backfill_windows(
             audio_path,
             merged,
             duration_ms,
-            padding_ms=DEFAULT_BACKFILL_CONTEXT_PADDING_MS,
         )
         if context_windows:
             debug_log(
@@ -779,10 +1271,63 @@ class ParakeetEngine(AsrEngine):
                 log_prefix="parakeet_backfill_context",
                 cancel_check=cancel_check,
             )
-            merged = _merge_supplemental_segments(
+            _log_trace_backfill_windows(
+                "parakeet_backfill_windows_in_trace",
+                context_windows,
+                stage="context",
+            )
+            for (window_start_ms, window_end_ms, gap_start_ms, gap_end_ms), (
+                chunk_start_ms,
+                window_segments,
+            ) in zip(context_windows, context_results):
+                if debug_detail_enabled():
+                    debug_segments_in_range(
+                        "parakeet_context_before_merge_in_trace",
+                        merged,
+                        stage="context",
+                        windowStartMs=window_start_ms,
+                        windowEndMs=window_end_ms,
+                        gapStartMs=gap_start_ms,
+                        gapEndMs=gap_end_ms,
+                    )
+                before_merge = list(merged)
+                merged = apply_gap_backfill(
+                    merged,
+                    gap_start_ms,
+                    gap_end_ms,
+                    chunk_start_ms,
+                    window_segments,
+                    overlap_ms=DEFAULT_CHUNK_OVERLAP_MS,
+                    assemble=True,
+                    merge_observer=merge_observer,
+                    append_observer=append_observer,
+                )
+                if debug_detail_enabled():
+                    debug_segment_range_diff(
+                        "parakeet_context_merge_in_trace",
+                        before_merge,
+                        merged,
+                        stage="context",
+                        windowStartMs=window_start_ms,
+                        windowEndMs=window_end_ms,
+                        gapStartMs=gap_start_ms,
+                        gapEndMs=gap_end_ms,
+                        incomingSegments=segment_snapshots(
+                            [
+                                AsrSegment(
+                                    start_ms=seg.start_ms + chunk_start_ms,
+                                    end_ms=seg.end_ms + chunk_start_ms,
+                                    text=seg.text,
+                                )
+                                for seg in window_segments
+                            ]
+                        ),
+                    )
+            debug_segments("parakeet_backfill_after_context", merged, durationMs=duration_ms)
+            debug_segments_in_range(
+                "parakeet_backfill_after_context_in_trace",
                 merged,
-                context_results,
-                overlap_ms=DEFAULT_CHUNK_OVERLAP_MS,
+                durationMs=duration_ms,
             )
         debug_log(
             "parakeet_backfill_done",
@@ -790,4 +1335,5 @@ class ParakeetEngine(AsrEngine):
             beforeSegmentCount=len(segments),
             afterSegmentCount=len(merged),
         )
+        debug_segments("parakeet_backfill_output_segments", merged, durationMs=duration_ms)
         return merged

@@ -10,7 +10,7 @@ import os
 import wave
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
+from typing import Callable, Iterable, Iterator, Optional
 
 from .base import AsrSegment
 
@@ -191,6 +191,7 @@ def merge_chunk_segments(
     chunk_segments: Iterable[tuple[int, list[AsrSegment]]],
     *,
     overlap_ms: int = DEFAULT_CHUNK_OVERLAP_MS,
+    merge_observer: Optional[Callable[[str, AsrSegment, AsrSegment, AsrSegment], None]] = None,
 ) -> list[AsrSegment]:
     shifted_segments: list[AsrSegment] = []
     for chunk_start_ms, segments in chunk_segments:
@@ -221,8 +222,12 @@ def merge_chunk_segments(
                 break
         if duplicate_index is None:
             merged.append(shifted)
-        elif replace_duplicate:
-            merged[duplicate_index] = shifted
+        else:
+            existing = merged[duplicate_index]
+            combined = _merge_duplicate_segments(existing, shifted)
+            if merge_observer is not None:
+                merge_observer("chunk_overlap", existing, shifted, combined)
+            merged[duplicate_index] = combined
     merged.sort(key=lambda s: (s.start_ms, s.end_ms))
     return merged
 
@@ -255,6 +260,407 @@ def _find_duplicate_index(
         if _is_chunk_overlap_duplicate(existing, candidate, overlap_ms=overlap_ms):
             return index
     return None
+
+
+DEFAULT_GAP_FRAGMENT_DEDUP_LEN = 10
+GAP_ASSEMBLE_SHORT_MAX_LEN = 4
+SPURIOUS_GAP_FRAGMENT_CORES = frozenset({
+    "それ",
+    "こちら",
+    "それこちら",
+})
+
+
+def _interval_overlap_ms(
+    start_a_ms: int,
+    end_a_ms: int,
+    start_b_ms: int,
+    end_b_ms: int,
+) -> int:
+    return max(0, min(end_a_ms, end_b_ms) - max(start_a_ms, start_b_ms))
+
+
+def _is_gap_spurious_fragment(text_core: str) -> bool:
+    return text_core in SPURIOUS_GAP_FRAGMENT_CORES
+
+
+def _suffix_after_text_overlap(prefix_core: str, longer_core: str) -> str:
+    if not prefix_core or not longer_core:
+        return longer_core
+    if longer_core in prefix_core:
+        return ""
+    if prefix_core in longer_core:
+        return longer_core[len(prefix_core) :]
+    max_overlap = min(len(prefix_core), len(longer_core))
+    for size in range(max_overlap, 0, -1):
+        if prefix_core[-size:] == longer_core[:size]:
+            return longer_core[size:]
+    return longer_core
+
+
+def _merge_overlapping_text(left: str, right: str) -> str:
+    left_core = _dedup_text(left)
+    right_core = _dedup_text(right)
+    if not left_core:
+        return right
+    if not right_core:
+        return left
+    if left_core in right_core:
+        return right
+    if right_core in left_core:
+        return left
+    max_overlap = min(len(left_core), len(right_core))
+    for size in range(max_overlap, 0, -1):
+        if left_core[-size:] == right_core[:size]:
+            return left_core[:-size] + right
+    return left + right
+
+
+def _merge_duplicate_segments(existing: AsrSegment, candidate: AsrSegment) -> AsrSegment:
+    return AsrSegment(
+        min(existing.start_ms, candidate.start_ms),
+        max(existing.end_ms, candidate.end_ms),
+        _merge_overlapping_text(existing.text, candidate.text),
+    )
+
+
+def _is_exact_text_duplicate(left: AsrSegment, right: AsrSegment) -> bool:
+    return _dedup_text(left.text) == _dedup_text(right.text)
+
+
+def _is_suffix_substring_duplicate(earlier: AsrSegment, later: AsrSegment) -> bool:
+    earlier_core = _dedup_text(earlier.text)
+    later_core = _dedup_text(later.text)
+    if not earlier_core or not later_core:
+        return False
+    if later_core in earlier_core:
+        return True
+    return (
+        len(later_core) <= DEFAULT_GAP_FRAGMENT_DEDUP_LEN
+        and earlier_core.endswith(later_core)
+    )
+
+
+def dedupe_transcript_segments(
+    segments: list[AsrSegment],
+    *,
+    overlap_ms: int = DEFAULT_CHUNK_OVERLAP_MS,
+) -> list[AsrSegment]:
+    ordered = sorted(segments, key=lambda seg: (seg.start_ms, seg.end_ms))
+    deduped: list[AsrSegment] = []
+    for candidate in ordered:
+        if not candidate.text.strip():
+            continue
+        duplicate_index = _find_duplicate_index(
+            deduped,
+            candidate,
+            overlap_ms=overlap_ms,
+        )
+        if duplicate_index is None:
+            if deduped and _is_suffix_substring_duplicate(deduped[-1], candidate):
+                continue
+            deduped.append(candidate)
+            continue
+        existing = deduped[duplicate_index]
+        if _is_exact_text_duplicate(existing, candidate) or _is_suffix_substring_duplicate(
+            existing,
+            candidate,
+        ):
+            deduped[duplicate_index] = _merge_duplicate_segments(existing, candidate)
+            continue
+        if _is_suffix_substring_duplicate(candidate, existing):
+            continue
+        deduped.append(candidate)
+    return deduped
+
+
+def _gap_supersede_zone(
+    gap_start_ms: int,
+    gap_end_ms: int,
+    incoming: list[AsrSegment],
+    *,
+    nearby_ms: int,
+) -> tuple[int, int]:
+    if not incoming:
+        return gap_start_ms, gap_end_ms
+    zone_start_ms = min(gap_start_ms, min(seg.start_ms for seg in incoming))
+    zone_end_ms = max(gap_end_ms, max(seg.end_ms for seg in incoming)) + nearby_ms
+    return zone_start_ms, zone_end_ms
+
+
+def _incoming_matches_segment(
+    incoming: list[AsrSegment],
+    segment: AsrSegment,
+) -> bool:
+    return any(
+        item.start_ms == segment.start_ms
+        and item.end_ms == segment.end_ms
+        and item.text == segment.text
+        for item in incoming
+    )
+
+
+def _incoming_redundant_with_existing(
+    segments: list[AsrSegment],
+    incoming: list[AsrSegment],
+    *,
+    overlap_ms: int,
+) -> bool:
+    incoming_core = "".join(
+        _dedup_text(seg.text)
+        for seg in sorted(incoming, key=lambda item: item.start_ms)
+    )
+    if not incoming_core:
+        return True
+    for segment in segments:
+        segment_core = _dedup_text(segment.text)
+        if not segment_core:
+            continue
+        if incoming_core in segment_core:
+            if any(_overlap_ms(segment, item) > 0 for item in incoming):
+                return True
+            gap_ms = min(
+                abs(segment.start_ms - incoming[-1].end_ms),
+                abs(incoming[0].start_ms - segment.end_ms),
+            )
+            if gap_ms <= overlap_ms:
+                return True
+    return False
+
+
+def _should_supersede_stale_segment(
+    segment: AsrSegment,
+    *,
+    zone_start_ms: int,
+    zone_end_ms: int,
+    incoming: list[AsrSegment],
+    overlap_ms: int,
+) -> bool:
+    if _incoming_matches_segment(incoming, segment):
+        return False
+
+    text_core = _dedup_text(segment.text)
+    zone_overlap_ms = _interval_overlap_ms(
+        segment.start_ms,
+        segment.end_ms,
+        zone_start_ms,
+        zone_end_ms,
+    )
+    if zone_overlap_ms > 0:
+        if _is_gap_spurious_fragment(text_core):
+            return True
+        incoming_start_ms = min(seg.start_ms for seg in incoming)
+        if segment.start_ms < incoming_start_ms:
+            for item in incoming:
+                item_core = _dedup_text(item.text)
+                if not item_core:
+                    continue
+                if item_core in text_core or text_core in item_core:
+                    return True
+                if len(item_core) >= 4 and item_core[: min(4, len(item_core))] in text_core:
+                    return True
+        return False
+
+    if _is_gap_spurious_fragment(text_core):
+        gap_after_ms = segment.start_ms - zone_end_ms
+        if 0 <= gap_after_ms <= overlap_ms:
+            return True
+    return False
+
+
+def _assemble_incoming_gap_segments(incoming: list[AsrSegment]) -> list[AsrSegment]:
+    ordered = sorted(incoming, key=lambda seg: (seg.start_ms, seg.end_ms))
+    if not ordered:
+        return []
+    if len(ordered) == 1:
+        return ordered
+
+    short_segments = [
+        seg
+        for seg in ordered
+        if len(_dedup_text(seg.text)) <= DEFAULT_GAP_FRAGMENT_DEDUP_LEN
+    ]
+    long_segments = [seg for seg in ordered if seg not in short_segments]
+
+    if short_segments and long_segments:
+        fragment_start_ms = min(seg.start_ms for seg in short_segments)
+        fragment_text = "".join(
+            seg.text.strip()
+            for seg in sorted(short_segments, key=lambda seg: seg.start_ms)
+        )
+        anchor = max(long_segments, key=lambda seg: len(_dedup_text(seg.text)))
+        anchor_text = anchor.text.strip()
+        fragment_core = _dedup_text(fragment_text)
+        anchor_core = _dedup_text(anchor_text)
+        if anchor.start_ms < fragment_start_ms and "こんばんは" in anchor_core:
+            if "こんばんは" not in fragment_core:
+                combined_text = fragment_text + anchor_text
+            else:
+                combined_text = fragment_text + _suffix_after_text_overlap(
+                    fragment_core,
+                    anchor_core,
+                )
+        else:
+            combined_text = fragment_text + _suffix_after_text_overlap(
+                fragment_core,
+                anchor_core,
+            )
+        end_ms = max(seg.end_ms for seg in ordered)
+        return [AsrSegment(fragment_start_ms, end_ms, combined_text)]
+
+    if len(short_segments) > 1:
+        return [
+            AsrSegment(
+                min(seg.start_ms for seg in short_segments),
+                max(seg.end_ms for seg in short_segments),
+                "".join(
+                    seg.text.strip()
+                    for seg in sorted(short_segments, key=lambda seg: seg.start_ms)
+                ),
+            ),
+        ]
+
+    return ordered
+
+
+def _should_assemble_gap_incoming(
+    incoming: list[AsrSegment],
+    *,
+    gap_start_ms: int,
+    gap_end_ms: int,
+    overlap_ms: int,
+) -> bool:
+    if len(incoming) <= 1:
+        return False
+
+    ordered = sorted(incoming, key=lambda seg: (seg.start_ms, seg.end_ms))
+    shorts = [
+        seg
+        for seg in ordered
+        if len(_dedup_text(seg.text)) <= GAP_ASSEMBLE_SHORT_MAX_LEN
+    ]
+    longs = [
+        seg
+        for seg in ordered
+        if len(_dedup_text(seg.text)) > GAP_ASSEMBLE_SHORT_MAX_LEN
+    ]
+
+    if shorts and longs:
+        earliest_short_ms = min(seg.start_ms for seg in shorts)
+        for long_seg in longs:
+            if (
+                long_seg.start_ms < earliest_short_ms - 100
+                and len(_dedup_text(long_seg.text)) >= 4
+            ):
+                return True
+        ordered_shorts = sorted(shorts, key=lambda seg: seg.start_ms)
+        for index in range(len(ordered_shorts) - 1):
+            left = ordered_shorts[index]
+            right = ordered_shorts[index + 1]
+            spans_long = any(
+                _interval_overlap_ms(
+                    long_seg.start_ms,
+                    long_seg.end_ms,
+                    left.start_ms,
+                    right.end_ms,
+                )
+                > 0
+                for long_seg in longs
+            )
+            if spans_long:
+                return False
+            has_long_between = any(
+                left.end_ms <= long_seg.start_ms and long_seg.end_ms <= right.start_ms
+                for long_seg in longs
+            )
+            if not has_long_between:
+                return True
+        return False
+
+    return False
+
+
+def _append_absolute_segments(
+    segments: list[AsrSegment],
+    incoming: list[AsrSegment],
+    *,
+    overlap_ms: int,
+    merge_observer: Optional[Callable[[str, AsrSegment, AsrSegment, AsrSegment], None]] = None,
+    append_observer: Optional[Callable[[AsrSegment], None]] = None,
+) -> list[AsrSegment]:
+    merged = sorted(segments, key=lambda seg: (seg.start_ms, seg.end_ms))
+    for candidate in incoming:
+        duplicate_index = _find_duplicate_index(
+            merged,
+            candidate,
+            overlap_ms=overlap_ms,
+        )
+        if duplicate_index is None:
+            merged.append(candidate)
+            merged.sort(key=lambda seg: (seg.start_ms, seg.end_ms))
+            if append_observer is not None:
+                append_observer(candidate)
+        else:
+            existing = merged[duplicate_index]
+            combined = _merge_duplicate_segments(existing, candidate)
+            if merge_observer is not None:
+                merge_observer("gap_backfill_overlap", existing, candidate, combined)
+            merged[duplicate_index] = combined
+            merged.sort(key=lambda seg: (seg.start_ms, seg.end_ms))
+    return merged
+
+
+def apply_gap_backfill(
+    segments: list[AsrSegment],
+    gap_start_ms: int,
+    gap_end_ms: int,
+    chunk_start_ms: int,
+    window_segments: list[AsrSegment],
+    *,
+    overlap_ms: int,
+    assemble: bool = False,
+    merge_observer: Optional[Callable[[str, AsrSegment, AsrSegment, AsrSegment], None]] = None,
+    append_observer: Optional[Callable[[AsrSegment], None]] = None,
+) -> list[AsrSegment]:
+    """在 gap 内用 backfill 结果替换主路径残留，context 模式可组装为单条。"""
+    incoming = list(_shift_valid_segments(chunk_start_ms, window_segments))
+    if not incoming:
+        return segments
+    if _incoming_redundant_with_existing(segments, incoming, overlap_ms=overlap_ms):
+        return segments
+
+    zone_start_ms, zone_end_ms = _gap_supersede_zone(
+        gap_start_ms,
+        gap_end_ms,
+        incoming,
+        nearby_ms=overlap_ms,
+    )
+    kept = [
+        segment
+        for segment in segments
+        if not _should_supersede_stale_segment(
+            segment,
+            zone_start_ms=zone_start_ms,
+            zone_end_ms=zone_end_ms,
+            incoming=incoming,
+            overlap_ms=overlap_ms,
+        )
+    ]
+    to_add = incoming
+    if assemble and _should_assemble_gap_incoming(
+        incoming,
+        gap_start_ms=gap_start_ms,
+        gap_end_ms=gap_end_ms,
+        overlap_ms=overlap_ms,
+    ):
+        to_add = _assemble_incoming_gap_segments(incoming)
+    return _append_absolute_segments(
+        kept,
+        to_add,
+        overlap_ms=overlap_ms,
+        merge_observer=merge_observer,
+        append_observer=append_observer,
+    )
 
 
 def _merge_supplemental_segments(

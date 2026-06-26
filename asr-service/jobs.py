@@ -14,7 +14,8 @@ from typing import Dict, List, Optional
 
 from ass_writer import write_ass_file
 from diagnostics import debug_exception, debug_log
-from engines.base import AsrError, AsrSegment
+from diagnostics import debug_log, debug_segments_in_range
+from engines.base import AsrError, AsrSegment, TranscriptSegmentRefresh
 from engines.chunking import _duration_ms
 from engines.registry import create_engine
 
@@ -231,12 +232,35 @@ class JobManager:
                 job.duration_ms = transcription.duration_ms
                 job.detected_language = transcription.language
 
-            for seg in transcription.segments:
+            for item in transcription.segments:
                 if job._cancel.is_set():
                     with job._lock:
                         job.status = JobStatus.CANCELLED
                     self._persist_terminal_outputs(job)
                     return
+                if isinstance(item, TranscriptSegmentRefresh):
+                    with job._lock:
+                        job.segments = list(item.segments)
+                        if job.segments:
+                            last_end_ms = job.segments[-1].end_ms
+                            if job.duration_ms > 0:
+                                job.processed_ms = max(job.processed_ms, min(last_end_ms, job.duration_ms))
+                                job.progress = min(job.processed_ms / job.duration_ms, 1.0)
+                            else:
+                                job.processed_ms = max(job.processed_ms, last_end_ms)
+                        count = len(job.segments)
+                    debug_log(
+                        "job_segment_refresh",
+                        jobId=job.id,
+                        segmentCount=count,
+                    )
+                    debug_segments_in_range(
+                        "job_segment_refresh_in_trace",
+                        item.segments,
+                        jobId=job.id,
+                    )
+                    continue
+                seg = item
                 with job._lock:
                     job.segments.append(seg)
                     if job.duration_ms > 0:

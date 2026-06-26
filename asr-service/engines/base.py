@@ -20,6 +20,13 @@ class AsrSegment:
     text: str
 
 
+@dataclass(frozen=True)
+class TranscriptSegmentRefresh:
+    """转录收尾时下发最终片段列表，替换任务中已累积的预览片段。"""
+
+    segments: tuple[AsrSegment, ...]
+
+
 def segment_key(seg: AsrSegment) -> tuple[int, int, str]:
     return (seg.start_ms, seg.end_ms, seg.text)
 
