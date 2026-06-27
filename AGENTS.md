@@ -135,9 +135,8 @@ interface SubtitleCue {
 ### ASR 引擎
 
 - `faster-whisper`：默认引擎，模型列表为 tiny/base/small/medium/large-v2/large-v3。
-- `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，须显式执行 `./scripts/setup-asr.sh parakeet`（或 `parakeet-cpu` / `parakeet-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段（`engines.chunking`）。长音频分块合并时合并重叠文本；gap backfill（≥2.5s 静音间隙 + 语音活动覆盖率补转）逐窗口调用 `apply_gap_backfill`：在 gap 内 supersede 主路径残留碎片（如误对齐的「それ」「こちら」），context 模式对误对齐的打招呼碎片做条件组装；收尾 `dedupe_transcript_segments` 去同文重叠与尾缀重复，并经 `TranscriptSegmentRefresh` 替换预览片段列表。
-- `qwen3-asr`：2026 年日语 ASR SOTA 引擎，模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出高精度字级时间戳，文本质量与时间轴精度均优于 Parakeet。须显式执行 `./scripts/setup-asr.sh qwen3`（或 `qwen3-cpu` / `qwen3-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。引擎惰性加载 `qwen_asr.Qwen3ASRModel`，CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`；分块/合并/字幕组装复用 `engines.chunking` 共享模块，双权重（ASR + aligner）下载封装在引擎层。
-- Parakeet 经 VAD 预切分与 gap backfill 后漏句已基本缓解；11s 区重叠碎片可通过 context backfill 组装为单条打招呼，但显示时长仍可能偏短，且误对齐 char timestamp 仍可能导致后续句首缺失。时轴精度整体仍弱于 faster-whisper / qwen3-asr。排查时可设 `HIKARU_ASR_TRACE_MS_RANGE`（见 `asr-service/diagnostics.py`）。
+- `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，须显式执行 `./scripts/setup-asr.sh parakeet`（或 `parakeet-cpu` / `parakeet-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段（`engines.chunking`）。长音频分块合并时合并重叠文本；gap backfill（≥2.5s 静音间隙 + 语音活动覆盖率补转）逐窗口调用 `apply_gap_backfill` 补全主路径间隙并清理残留碎片；收尾 `dedupe_transcript_segments` 去同文重叠与尾缀重复，并经 `TranscriptSegmentRefresh` 替换预览片段列表。
+- `qwen3-asr`：2026 年日语 ASR SOTA 引擎，模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出高精度字级时间戳。须显式执行 `./scripts/setup-asr.sh qwen3`（或 `qwen3-cpu` / `qwen3-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。引擎惰性加载 `qwen_asr.Qwen3ASRModel`，CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`；分块/合并/字幕组装复用 `engines.chunking` 共享模块，双权重（ASR + aligner）下载封装在引擎层。
 
 ### VAD 预处理
 
@@ -250,7 +249,6 @@ interface SubtitleCue {
 - [x] FFmpeg 压制（BurnView：硬字幕 MP4 / 软字幕 MKV、自动输出名、进度与取消、并发限制、全局轮询、退出清理、压制前使用当前内存字幕）
 - [x] 接入 Qwen3-ASR-1.7B 作为第三引擎（CPU/GPU 双 profile；复用 chunking 共享模块）
 - [x] Parakeet gap backfill 增强（覆盖率补转、`apply_gap_backfill` supersede/组装、收尾 dedupe + `TranscriptSegmentRefresh`、ASR 诊断日志）
-- [ ] Parakeet 时轴精度优化（打招呼显示时长、误对齐碎片与后续句首；或 Qwen3-ForcedAligner 后处理）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 
 ## 首期不做

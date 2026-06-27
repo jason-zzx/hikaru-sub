@@ -47,6 +47,23 @@ fn project_json_path(dir: &Path) -> PathBuf {
     dir.join("project.json")
 }
 
+fn resolve_project_dir(dir: &Path) -> Result<PathBuf, String> {
+    if project_json_path(dir).is_file() {
+        return Ok(dir.to_path_buf());
+    }
+
+    let nested = dir.join(".hikaru");
+    if project_json_path(&nested).is_file() {
+        return Ok(nested);
+    }
+
+    Err(format!(
+        "项目文件不存在: {} 或 {}",
+        project_json_path(dir).display(),
+        project_json_path(&nested).display(),
+    ))
+}
+
 fn default_project(video_path: &str, settings: &crate::settings::AppSettings) -> ProjectMeta {
     ProjectMeta {
         version: 1,
@@ -99,11 +116,54 @@ pub fn path_exists(path: String) -> bool {
 
 #[tauri::command]
 pub fn open_project(project_dir: String) -> Result<ProjectMeta, String> {
-    let dir = PathBuf::from(&project_dir);
+    let dir = resolve_project_dir(&PathBuf::from(&project_dir))?;
     let json_path = project_json_path(&dir);
-    if !json_path.is_file() {
-        return Err(format!("项目文件不存在: {}", json_path.display()));
-    }
     let content = fs::read_to_string(json_path).map_err(|e| e.to_string())?;
     serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_project(video_path: &str) -> ProjectMeta {
+        ProjectMeta {
+            version: 1,
+            video_path: video_path.to_string(),
+            audio_path: Some("audio.wav".into()),
+            ass_path: Some("subtitles.ass".into()),
+            source_lang: "ja".into(),
+            target_lang: "zh-CN".into(),
+            asr: AsrConfig {
+                engine: "faster-whisper".into(),
+                model: "large-v3".into(),
+                device: "auto".into(),
+            },
+            translation: TranslationConfig {
+                provider: "openai-compatible".into(),
+                base_url: "https://api.openai.com/v1".into(),
+                model: "gpt-4o-mini".into(),
+                temperature: Some(0.3),
+            },
+        }
+    }
+
+    #[test]
+    fn open_project_accepts_parent_directory_containing_hikaru_dir() {
+        let temp = tempfile::tempdir().unwrap();
+        let project_dir = temp.path().join(".hikaru");
+        fs::create_dir_all(&project_dir).unwrap();
+
+        let video_path = temp.path().join("episode.mp4");
+        let project = sample_project(&video_path.to_string_lossy());
+        fs::write(
+            project_json_path(&project_dir),
+            serde_json::to_string_pretty(&project).unwrap(),
+        )
+        .unwrap();
+
+        let opened = open_project(temp.path().to_string_lossy().into_owned()).unwrap();
+
+        assert_eq!(opened.video_path, project.video_path);
+    }
 }

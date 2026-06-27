@@ -6,7 +6,7 @@
 
 ✅ **已实现**：
 - m3u8 视频下载（Rust 分片并发优先、FFmpeg 兼容回退；单 URL / 分离音视频；AES-128 加密 VOD；自定义请求头；自动并发与 HTTP/2；进度与取消；完成后可导入项目）
-- 项目管理（创建/打开项目，`.hikaru` 元数据）
+- 项目管理（创建/打开项目，`.hikaru` 元数据；打开时支持选择视频目录或 `.hikaru` 目录）
 - FFmpeg 集成（音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
 - Python ASR sidecar（faster-whisper + NVIDIA Parakeet + Qwen3-ASR 日语适配器 + VAD 预处理 + HTTP 进度 API）
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
@@ -22,10 +22,9 @@
 
 🚧 **待优化**：
 1. 首页增加显示最近项目列表
-2. Parakeet 时轴精度优化（`chunking.py` 日语软边界切分、char timestamp 组装、VAD 切分等）
-3. 翻译页进度条显示优化
-4. 翻译页支持单独配置每批翻译条数、上下文条数、自定义 prompt 和术语表、字幕合并模式（当前使用全局设置）
-5. 编辑页功能完善：
+2. 翻译页进度条显示优化
+3. 翻译页支持单独配置每批翻译条数、上下文条数、自定义 prompt 和术语表、字幕合并模式（当前使用全局设置）
+4. 编辑页功能完善：
    - 快捷键操作（上下切换字幕、时间轴左右移动）
    - 字幕样式可视化编辑（字体、颜色、位置等 GUI，当前需在编辑框手写 ASS 标签）
 
@@ -164,12 +163,12 @@ scripts/
 - 源语言固定为日语（`ja`），转录页不提供语言选择
 - 引擎选择：faster-whisper（支持 CPU/CUDA/auto）
 - 可选引擎：parakeet（NVIDIA NeMo `nvidia/parakeet-tdt_ctc-0.6b-ja`，日语专用）
-- 可选引擎：qwen3-asr（`Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`，2026 年日语 ASR SOTA，自带字级时间戳，文本质量与时轴精度优于 Parakeet；CPU float32 / CUDA bfloat16）
+- 可选引擎：qwen3-asr（`Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`，2026 年日语 ASR SOTA，自带字级时间戳；CPU float32 / CUDA bfloat16）
 - 模型选择：faster-whisper 为 tiny/base/small/medium/large-v2/large-v3
 - 自动模型下载与 CUDA 回退
 - 实时进度显示与任务取消
 - Parakeet 优先使用 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段
-- Parakeet + VAD 当前转录完整性已基本可接受，但仍可能有少量句子遗漏；时轴精度暂不如 faster-whisper
+- Parakeet + VAD/gap backfill 已完成长音频完整性增强，并复用 chunking 共享模块合并去重
 - Qwen3-ASR 自带 ForcedAligner 产出字级时间戳，长音频自动分块转录并复用 chunking 共享模块合并去重
 - **VAD 高级配置**（可选，对三个引擎均生效）：
   - 启用 VAD 预处理：faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 用 VAD 切分语音段后逐段转录，缓解长音频遗漏
