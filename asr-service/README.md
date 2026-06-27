@@ -133,12 +133,12 @@ python main.py --host 127.0.0.1 --port 0
 
   **Gap backfill**（缓解漏句与重叠碎片）：
   - 主路径：相邻字幕间隙 ≥2.5s 时补转；另按 Silero 语音活动覆盖率扫描未覆盖区间。
-  - 逐窗口 `apply_gap_backfill`：在 gap 内 supersede 主路径残留（`それ` / `こちら` 等 spurious 碎片）；context 补转对「碎片 + 误对齐长句」做条件组装（如打招呼区）。
+  - 逐窗口 `apply_gap_backfill`：在 gap 内 supersede 主路径残留碎片，并用 context 补转补全间隙内容。
   - 第二轮 context backfill 带 padding，窗口结果裁切到 gap 后再合并。
   - 收尾 `dedupe_transcript_segments` 去同文重叠与尾缀子串重复；`TranscriptSegmentRefresh` 用最终列表替换任务预览片段。
 
-  VAD + backfill 后漏句已基本缓解；时轴精度仍弱于 faster-whisper / qwen3-asr，打招呼时长与后续句首偶有问题。
-- `qwen3-asr` 引擎模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出字级时间戳，语言固定按 `ja` 返回；文本质量与时轴精度优于 Parakeet。长音频自动分块转录，复用 `engines/chunking.py` 合并去重；CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`。模型下载为双权重（ASR + aligner），由引擎层封装为单一逻辑模型。
+  VAD + backfill 已完成长音频完整性增强，最终片段列表会在写入前统一去重与刷新。
+- `qwen3-asr` 引擎模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出字级时间戳，语言固定按 `ja` 返回。长音频自动分块转录，复用 `engines/chunking.py` 合并去重；CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`。模型下载为双权重（ASR + aligner），由引擎层封装为单一逻辑模型。
 
 响应：
 

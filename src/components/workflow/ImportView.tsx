@@ -72,7 +72,7 @@ export function ImportView() {
     setBusy(true);
     try {
       const meta = await openProject(dir);
-      setProject(meta, dir);
+      setProject(meta, projectDirFromMeta(meta) || dir);
 
       // 优先加载翻译后的字幕文件，回退到原始字幕
       if (meta.assPath) {
@@ -188,7 +188,7 @@ export function ImportView() {
           <IconFolderOpen className="h-7 w-7 text-accent" />
           <span className="font-medium text-text">打开已有项目</span>
           <span className="text-xs text-text-muted">
-            选择含 project.json 的 .hikaru 目录
+            选择视频目录或其中的 .hikaru 目录
           </span>
         </button>
       </div>

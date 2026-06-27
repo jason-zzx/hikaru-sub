@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
-import { IconCheck } from "../layout/NavIcons";
+import { IconAlertTriangle, IconCheck } from "../layout/NavIcons";
 import { Select } from "../ui/Select";
 import { getSettings, pathExists } from "../../services/tauri";
 import {
@@ -207,7 +207,10 @@ export function TranslateView() {
       {/* 前置条件检查 */}
       {!checkingAss && !hasAss && (
         <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-200">
-          <p className="font-medium">⚠️ 未检测到字幕文件</p>
+          <p className="flex items-center gap-2 font-medium">
+            <IconAlertTriangle className="h-4 w-4" />
+            <span>未检测到字幕文件</span>
+          </p>
           <p className="mt-1 text-yellow-300/80">
             请先完成「转录」步骤生成单语字幕
           </p>
@@ -216,7 +219,10 @@ export function TranslateView() {
 
       {cues.length === 0 && (
         <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-200">
-          <p className="font-medium">⚠️ 字幕为空</p>
+          <p className="flex items-center gap-2 font-medium">
+            <IconAlertTriangle className="h-4 w-4" />
+            <span>字幕为空</span>
+          </p>
           <p className="mt-1 text-yellow-300/80">
             当前项目没有字幕条目，请先完成转录
           </p>
@@ -249,8 +255,9 @@ export function TranslateView() {
 
           {/* API 配置提示 */}
           {settings && !settings.translationBaseUrl && (
-            <div className="rounded-md border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
-              ⚠️ 未配置翻译 API，请前往「设置」页面配置
+            <div className="flex items-center gap-2 rounded-md border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
+              <IconAlertTriangle className="h-4 w-4" />
+              <span>未配置翻译 API，请前往「设置」页面配置</span>
             </div>
           )}
 
