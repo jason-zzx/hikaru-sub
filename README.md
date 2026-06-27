@@ -15,7 +15,7 @@
 - 设置页（FFmpeg/Python 路径、ASR 引擎、翻译 API、高级配置）
 - ASS 文件持久化（自动保存/加载；保留 `[V4+ Styles]` 与 PlayRes；转录时按视频分辨率写入）
 - 字幕编辑器（视频播放 + ASS CSS 样式预览 + 行内 override 标签渲染 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做；inline 模式 UI 单行展示 `译文 / 原文`）
-- FFmpeg 压制（硬字幕 MP4 / 软字幕 MKV；进度与取消；压制前使用当前内存字幕生成临时 ASS）
+- FFmpeg 压制（硬字幕 MP4 / 软字幕 MKV；导出策略、原片码率探测、硬件 H.264 编码器自动选择；进度与取消；压制前使用当前内存字幕生成临时 ASS）
 - 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
 - VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
@@ -149,10 +149,12 @@ scripts/
 - 下载完成后可打开保存目录或直接进入导入流程
 
 ### 字幕压制
-- 硬字幕 MP4（libx264 + libass 渲染）与软字幕 MKV（ASS 字幕轨封装）
+- 硬字幕 MP4（libass 渲染字幕 + H.264 重新编码）与软字幕 MKV（ASS 字幕轨封装）
 - 压制前将当前内存字幕序列化为 `.hikaru/burn.input.ass`，包含未保存编辑
 - 输出文件名自动生成（`{视频名}.burned.mp4` / `{视频名}.subbed.mkv`），按模式固定扩展名，不可自定义
-- 硬字幕支持 CRF、preset、可选字体目录；软字幕仅 MKV
+- 硬字幕支持“高质量 / 接近原片 / 自定义码率”导出策略；策略会同步视频码率、编码器、CRF 与 preset
+- 硬字幕会探测原视频码率与 FFmpeg 可用编码器，自动优先选择平台合适的硬件 H.264 编码器（Windows：NVENC / QSV / AMF；macOS：VideoToolbox；Linux：NVENC / QSV），不可用时回退 libx264
+- 可手动选择编码器、视频码率、CRF、preset 与字体目录；软字幕仅 MKV
 - 同一时刻仅允许一个压制任务；终态后自动清理任务记录
 - 全局任务轮询（`useBurnJobPoller`）：切换页面后仍更新底部状态栏进度
 - 进度轮询、取消（仅清理运行中的输出）、完成后打开输出位置
@@ -328,6 +330,7 @@ interface SubtitleCue {
 | `start_video_download` | 启动 m3u8 下载任务 |
 | `get_video_download_progress` | 查询下载进度 |
 | `cancel_video_download` | 取消下载并清理部分文件 |
+| `probe_burn_video` | 探测压制推荐参数（原视频码率、可用编码器） |
 | `start_burn_subtitles` | 启动字幕压制/封装任务 |
 | `get_burn_progress` | 查询压制进度 |
 | `cancel_burn` | 取消压制并清理部分输出 |

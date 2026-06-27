@@ -3,11 +3,11 @@ mod ass;
 mod asset_scope;
 mod burn;
 mod download;
+mod ffmpeg;
 mod hls_download;
 mod hls_fetch;
 mod hls_playlist;
 mod hls_types;
-mod ffmpeg;
 mod media_server;
 mod project;
 mod settings;
@@ -54,6 +54,7 @@ pub fn run() {
             download::start_video_download,
             download::get_video_download_progress,
             download::cancel_video_download,
+            burn::probe_burn_video,
             burn::start_burn_subtitles,
             burn::get_burn_progress,
             burn::cancel_burn,
