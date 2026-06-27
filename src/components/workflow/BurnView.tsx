@@ -12,11 +12,17 @@ import {
   checkFfmpeg,
   getSettings,
   pickDirectory,
+  probeBurnVideo,
   saveAssText,
   startBurnSubtitles,
 } from "../../services/tauri";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
-import type { BurnMode, FfmpegStatus } from "../../types";
+import type {
+  BurnMode,
+  BurnVideoEncoder,
+  BurnVideoProbe,
+  FfmpegStatus,
+} from "../../types";
 import { AssSubtitleOverlay } from "../player/AssSubtitleOverlay";
 import { Select } from "../ui/Select";
 
@@ -34,6 +40,60 @@ const HARD_SUB_PRESETS = [
   "slower",
   "veryslow",
 ];
+
+type BurnExportStrategy = "highQuality" | "nearSource" | "customBitrate";
+
+const DEFAULT_VIDEO_BITRATE_KBPS = 12_000;
+
+const EXPORT_STRATEGY_OPTIONS: Array<{
+  value: BurnExportStrategy;
+  label: string;
+}> = [
+  { value: "highQuality", label: "高质量" },
+  { value: "nearSource", label: "接近原片" },
+  { value: "customBitrate", label: "自定义码率" },
+];
+
+const ENCODER_LABELS: Record<BurnVideoEncoder, string> = {
+  auto: "自动",
+  libX264: "CPU / libx264",
+  h264Nvenc: "NVIDIA NVENC",
+  h264Qsv: "Intel Quick Sync",
+  h264Amf: "AMD AMF",
+  h264Videotoolbox: "Apple VideoToolbox",
+};
+
+const ENCODER_OPTIONS: BurnVideoEncoder[] = [
+  "auto",
+  "libX264",
+  "h264Nvenc",
+  "h264Qsv",
+  "h264Amf",
+  "h264Videotoolbox",
+];
+
+function clampVideoBitrate(kbps: number): number {
+  return Math.min(Math.max(Math.round(kbps), 100), 200_000);
+}
+
+function nearSourceBitrate(probe: BurnVideoProbe | null): number {
+  return clampVideoBitrate(probe?.videoBitrateKbps ?? DEFAULT_VIDEO_BITRATE_KBPS);
+}
+
+function highQualityBitrate(probe: BurnVideoProbe | null): number {
+  const source = probe?.videoBitrateKbps ?? DEFAULT_VIDEO_BITRATE_KBPS;
+  return clampVideoBitrate(Math.max(DEFAULT_VIDEO_BITRATE_KBPS, source * 1.35));
+}
+
+function formatBitrate(kbps: number | null | undefined): string {
+  return kbps && kbps > 0 ? `${kbps.toLocaleString()} kbps` : "未知";
+}
+
+function parseBitrateInput(value: string): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 100) return null;
+  return clampVideoBitrate(parsed);
+}
 
 function formatMs(ms: number): string {
   if (!ms || ms < 0) return "0:00";
@@ -90,8 +150,16 @@ export function BurnView() {
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const [mode, setMode] = useState<BurnMode>("hardSubMp4");
   const [outputDir, setOutputDir] = useState("");
-  const [crf, setCrf] = useState(20);
-  const [preset, setPreset] = useState("veryfast");
+  const [exportStrategy, setExportStrategy] =
+    useState<BurnExportStrategy>("highQuality");
+  const [burnProbe, setBurnProbe] = useState<BurnVideoProbe | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
+  const [crf, setCrf] = useState(16);
+  const [preset, setPreset] = useState("medium");
+  const [videoEncoder, setVideoEncoder] = useState<BurnVideoEncoder>("auto");
+  const [videoBitrateKbps, setVideoBitrateKbps] = useState(
+    String(DEFAULT_VIDEO_BITRATE_KBPS),
+  );
   const [fontDir, setFontDir] = useState("");
 
   const previewCue = useMemo(() => {
@@ -115,6 +183,57 @@ export function BurnView() {
     return defaultOutputFileName(project.videoPath, mode);
   }, [project, mode]);
 
+  const effectiveVideoBitrateKbps = useMemo(
+    () => parseBitrateInput(videoBitrateKbps),
+    [videoBitrateKbps],
+  );
+
+  const encoderOptions = useMemo(() => {
+    const available = new Set(burnProbe?.availableEncoders ?? []);
+    return ENCODER_OPTIONS.filter((value) => {
+      return (
+        value === "auto" ||
+        !burnProbe ||
+        available.has(value) ||
+        value === videoEncoder
+      );
+    }).map((value) => ({
+      value,
+      label:
+        value === "auto" && burnProbe
+          ? `自动（${ENCODER_LABELS[burnProbe.preferredEncoder]}）`
+          : ENCODER_LABELS[value],
+    }));
+  }, [burnProbe, videoEncoder]);
+
+  const applyStrategyPreset = (
+    strategy: BurnExportStrategy,
+    probeForPreset = burnProbe,
+  ) => {
+    if (strategy === "customBitrate") return;
+    setVideoEncoder("auto");
+    setPreset("medium");
+    if (strategy === "highQuality") {
+      setCrf(16);
+      setVideoBitrateKbps(String(highQualityBitrate(probeForPreset)));
+      return;
+    }
+    setCrf(18);
+    setVideoBitrateKbps(String(nearSourceBitrate(probeForPreset)));
+  };
+
+  const markCustomStrategy = () => {
+    setExportStrategy((current) =>
+      current === "customBitrate" ? current : "customBitrate",
+    );
+  };
+
+  const handleStrategyChange = (value: string) => {
+    const strategy = value as BurnExportStrategy;
+    setExportStrategy(strategy);
+    applyStrategyPreset(strategy);
+  };
+
   useEffect(() => {
     checkFfmpeg()
       .then(setFfmpeg)
@@ -125,6 +244,39 @@ export function BurnView() {
     if (!project) return;
     setOutputDir((current) => current || pathDir(project.videoPath));
   }, [project]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBurnProbe(null);
+    setProbeError(null);
+    if (!project?.videoPath) return;
+
+    probeBurnVideo(project.videoPath)
+      .then((probe) => {
+        if (cancelled) return;
+        setBurnProbe(probe);
+        setProbeError(null);
+        setVideoEncoder((current) =>
+          current === "auto" || probe.availableEncoders.includes(current)
+            ? current
+            : "auto",
+        );
+        if (exportStrategy === "highQuality") {
+          setVideoBitrateKbps(String(highQualityBitrate(probe)));
+        } else if (exportStrategy === "nearSource") {
+          setVideoBitrateKbps(String(nearSourceBitrate(probe)));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProbeError("无法探测原片码率，将使用默认推荐值。");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.videoPath]);
 
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
   const outputPath =
@@ -185,6 +337,9 @@ export function BurnView() {
         mode,
         crf: mode === "hardSubMp4" ? crf : null,
         preset: mode === "hardSubMp4" ? preset : null,
+        videoEncoder: mode === "hardSubMp4" ? videoEncoder : null,
+        videoBitrateKbps:
+          mode === "hardSubMp4" ? effectiveVideoBitrateKbps : null,
         fontDir:
           mode === "hardSubMp4" && fontDir.trim() ? fontDir.trim() : null,
       });
@@ -324,13 +479,54 @@ export function BurnView() {
 
               {mode === "hardSubMp4" && (
                 <>
-                  <Field label="CRF">
+                  <Field label="导出策略">
+                    <Select
+                      value={exportStrategy}
+                      onChange={handleStrategyChange}
+                      disabled={busy}
+                      options={EXPORT_STRATEGY_OPTIONS}
+                    />
+                  </Field>
+
+                  <Field label="视频编码">
+                    <Select
+                      value={videoEncoder}
+                      onChange={(value) => {
+                        setVideoEncoder(value as BurnVideoEncoder);
+                        markCustomStrategy();
+                      }}
+                      disabled={busy}
+                      options={encoderOptions}
+                    />
+                  </Field>
+
+                  <Field label="视频码率（kbps）">
+                    <input
+                      type="number"
+                      min={100}
+                      max={200000}
+                      step={500}
+                      value={videoBitrateKbps}
+                      onChange={(e) => {
+                        setVideoBitrateKbps(e.target.value);
+                        markCustomStrategy();
+                      }}
+                      disabled={busy}
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+
+                  <Field label="CRF（无视频码率时）">
                     <input
                       type="number"
                       min={0}
                       max={51}
                       value={crf}
-                      onChange={(e) => setCrf(Number(e.target.value))}
+                      onChange={(e) => {
+                        setCrf(Number(e.target.value));
+                        markCustomStrategy();
+                      }}
+                      disabled={busy}
                       className={INPUT_CLASS}
                     />
                   </Field>
@@ -338,7 +534,10 @@ export function BurnView() {
                   <Field label="编码预设">
                     <Select
                       value={preset}
-                      onChange={setPreset}
+                      onChange={(value) => {
+                        setPreset(value);
+                        markCustomStrategy();
+                      }}
                       disabled={busy}
                       options={HARD_SUB_PRESETS.map((value) => ({
                         value,
@@ -346,6 +545,17 @@ export function BurnView() {
                       }))}
                     />
                   </Field>
+
+                  <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
+                    原片码率：{formatBitrate(burnProbe?.videoBitrateKbps)}；自动编码：
+                    {burnProbe ? ENCODER_LABELS[burnProbe.preferredEncoder] : "检测中"}。
+                  </p>
+
+                  {probeError && (
+                    <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+                      {probeError}
+                    </p>
+                  )}
 
                   <Field label="字体目录（可选）">
                     <div className="flex gap-2">

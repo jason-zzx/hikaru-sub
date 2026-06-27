@@ -219,6 +219,14 @@ export interface DownloadSnapshot {
 
 export type BurnMode = "hardSubMp4" | "softSubMkv";
 
+export type BurnVideoEncoder =
+  | "auto"
+  | "libX264"
+  | "h264Nvenc"
+  | "h264Qsv"
+  | "h264Amf"
+  | "h264Videotoolbox";
+
 export type BurnStatus =
   | "pending"
   | "running"
@@ -233,7 +241,15 @@ export interface StartBurnArgs {
   mode: BurnMode;
   crf?: number | null;
   preset?: string | null;
+  videoEncoder?: BurnVideoEncoder | null;
+  videoBitrateKbps?: number | null;
   fontDir?: string | null;
+}
+
+export interface BurnVideoProbe {
+  videoBitrateKbps: number | null;
+  availableEncoders: BurnVideoEncoder[];
+  preferredEncoder: BurnVideoEncoder;
 }
 
 export interface BurnSnapshot {

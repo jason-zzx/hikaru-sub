@@ -1,4 +1,4 @@
-use crate::ffmpeg::resolve_ffmpeg;
+use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
 use crate::settings::load_settings;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -20,6 +20,17 @@ pub enum BurnMode {
     SoftSubMkv,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub enum BurnVideoEncoder {
+    Auto,
+    LibX264,
+    H264Nvenc,
+    H264Qsv,
+    H264Amf,
+    H264Videotoolbox,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum BurnStatus {
@@ -39,7 +50,17 @@ pub struct StartBurnArgs {
     pub mode: BurnMode,
     pub crf: Option<u8>,
     pub preset: Option<String>,
+    pub video_encoder: Option<BurnVideoEncoder>,
+    pub video_bitrate_kbps: Option<u32>,
     pub font_dir: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BurnVideoProbe {
+    pub video_bitrate_kbps: Option<u32>,
+    pub available_encoders: Vec<BurnVideoEncoder>,
+    pub preferred_encoder: BurnVideoEncoder,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -166,6 +187,230 @@ fn normalize_crf(crf: Option<u8>) -> String {
     crf.unwrap_or(20).min(51).to_string()
 }
 
+const DEFAULT_HARDWARE_VIDEO_BITRATE_KBPS: u32 = 12_000;
+const BURN_ENCODER_ORDER: &[BurnVideoEncoder] = &[
+    BurnVideoEncoder::LibX264,
+    BurnVideoEncoder::H264Nvenc,
+    BurnVideoEncoder::H264Qsv,
+    BurnVideoEncoder::H264Amf,
+    BurnVideoEncoder::H264Videotoolbox,
+];
+
+impl BurnVideoEncoder {
+    fn ffmpeg_name(self) -> Option<&'static str> {
+        match self {
+            BurnVideoEncoder::Auto => None,
+            BurnVideoEncoder::LibX264 => Some("libx264"),
+            BurnVideoEncoder::H264Nvenc => Some("h264_nvenc"),
+            BurnVideoEncoder::H264Qsv => Some("h264_qsv"),
+            BurnVideoEncoder::H264Amf => Some("h264_amf"),
+            BurnVideoEncoder::H264Videotoolbox => Some("h264_videotoolbox"),
+        }
+    }
+
+    fn from_ffmpeg_name(name: &str) -> Option<Self> {
+        match name {
+            "libx264" => Some(BurnVideoEncoder::LibX264),
+            "h264_nvenc" => Some(BurnVideoEncoder::H264Nvenc),
+            "h264_qsv" => Some(BurnVideoEncoder::H264Qsv),
+            "h264_amf" => Some(BurnVideoEncoder::H264Amf),
+            "h264_videotoolbox" => Some(BurnVideoEncoder::H264Videotoolbox),
+            _ => None,
+        }
+    }
+
+    fn is_hardware(self) -> bool {
+        matches!(
+            self,
+            BurnVideoEncoder::H264Nvenc
+                | BurnVideoEncoder::H264Qsv
+                | BurnVideoEncoder::H264Amf
+                | BurnVideoEncoder::H264Videotoolbox
+        )
+    }
+}
+
+fn current_os() -> &'static str {
+    std::env::consts::OS
+}
+
+fn normalize_video_bitrate_kbps(value: Option<u32>) -> Option<u32> {
+    value
+        .filter(|kbps| *kbps >= 100)
+        .map(|kbps| kbps.min(200_000))
+}
+
+fn parse_available_encoders(output: &str) -> Vec<BurnVideoEncoder> {
+    let mut found = Vec::new();
+    for line in output.lines() {
+        for token in line.split_whitespace().skip(1) {
+            if let Some(encoder) = BurnVideoEncoder::from_ffmpeg_name(token) {
+                if !found.contains(&encoder) {
+                    found.push(encoder);
+                }
+                break;
+            }
+        }
+    }
+
+    BURN_ENCODER_ORDER
+        .iter()
+        .copied()
+        .filter(|encoder| found.contains(encoder))
+        .collect()
+}
+
+fn probe_available_burn_encoders(ffmpeg: &str) -> Result<Vec<BurnVideoEncoder>, String> {
+    let output = Command::new(ffmpeg)
+        .args(["-hide_banner", "-encoders"])
+        .output()
+        .map_err(|e| format!("无法探测 FFmpeg 编码器：{e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "FFmpeg 编码器探测失败：{}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut encoders: Vec<BurnVideoEncoder> = parse_available_encoders(&stdout)
+        .into_iter()
+        .filter(|encoder| {
+            !encoder.is_hardware() || hardware_encoder_runtime_available(ffmpeg, *encoder)
+        })
+        .collect();
+    if encoders.is_empty() {
+        encoders.push(BurnVideoEncoder::LibX264);
+    }
+    Ok(encoders)
+}
+
+fn hardware_encoder_runtime_available(ffmpeg: &str, encoder: BurnVideoEncoder) -> bool {
+    let Some(name) = encoder.ffmpeg_name() else {
+        return false;
+    };
+    let output = Command::new(ffmpeg)
+        .args(hardware_encoder_probe_args(name))
+        .output();
+    matches!(output, Ok(out) if out.status.success())
+}
+
+fn hardware_encoder_probe_args(encoder_name: &str) -> Vec<String> {
+    [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=black:s=256x256:r=1:d=0.1",
+        "-frames:v",
+        "1",
+        "-an",
+        "-c:v",
+        encoder_name,
+        "-f",
+        "null",
+        "-",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect()
+}
+
+fn select_auto_encoder(
+    available: &[BurnVideoEncoder],
+    os: &str,
+    allow_hardware: bool,
+) -> BurnVideoEncoder {
+    let priority: &[BurnVideoEncoder] = if !allow_hardware {
+        &[BurnVideoEncoder::LibX264]
+    } else {
+        match os {
+            "windows" => &[
+                BurnVideoEncoder::H264Nvenc,
+                BurnVideoEncoder::H264Qsv,
+                BurnVideoEncoder::H264Amf,
+                BurnVideoEncoder::LibX264,
+            ],
+            "macos" => &[
+                BurnVideoEncoder::H264Videotoolbox,
+                BurnVideoEncoder::LibX264,
+            ],
+            "linux" => &[
+                BurnVideoEncoder::H264Nvenc,
+                BurnVideoEncoder::H264Qsv,
+                BurnVideoEncoder::LibX264,
+            ],
+            _ => &[BurnVideoEncoder::LibX264],
+        }
+    };
+
+    priority
+        .iter()
+        .copied()
+        .find(|encoder| available.contains(encoder))
+        .or_else(|| {
+            available
+                .iter()
+                .copied()
+                .find(|encoder| *encoder != BurnVideoEncoder::Auto)
+        })
+        .unwrap_or(BurnVideoEncoder::LibX264)
+}
+
+fn select_burn_encoder(
+    requested: BurnVideoEncoder,
+    available: &[BurnVideoEncoder],
+) -> BurnVideoEncoder {
+    match requested {
+        BurnVideoEncoder::Auto => select_auto_encoder(available, current_os(), true),
+        encoder if available.contains(&encoder) => encoder,
+        _ => BurnVideoEncoder::LibX264,
+    }
+}
+
+fn parse_video_bitrate_kbps(output: &str) -> Option<u32> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("N/A") {
+                return None;
+            }
+            trimmed.parse::<u64>().ok()
+        })
+        .find(|bits| *bits > 0)
+        .and_then(|bits| u32::try_from(bits / 1000).ok())
+        .filter(|kbps| *kbps > 0)
+}
+
+fn probe_video_bitrate_kbps(ffprobe: &str, video_path: &str) -> Result<Option<u32>, String> {
+    let output = Command::new(ffprobe)
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=bit_rate:format=bit_rate",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            video_path,
+        ])
+        .output()
+        .map_err(|e| format!("执行 ffprobe 失败：{e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "ffprobe 失败：{}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(parse_video_bitrate_kbps(&String::from_utf8_lossy(
+        &output.stdout,
+    )))
+}
+
 fn escape_ass_filter_value(value: &str) -> String {
     value
         .replace('\\', "\\\\")
@@ -176,7 +421,10 @@ fn escape_ass_filter_value(value: &str) -> String {
 fn build_ass_filter(ass_path: &str, font_dir: Option<&str>) -> String {
     let mut filter = format!("ass=filename='{}'", escape_ass_filter_value(ass_path));
     if let Some(font_dir) = font_dir.map(str::trim).filter(|v| !v.is_empty()) {
-        filter.push_str(&format!(":fontsdir='{}'", escape_ass_filter_value(font_dir)));
+        filter.push_str(&format!(
+            ":fontsdir='{}'",
+            escape_ass_filter_value(font_dir)
+        ));
     }
     filter
 }
@@ -187,9 +435,16 @@ fn build_hard_sub_args(
     output_path: &Path,
     crf: Option<u8>,
     preset: Option<&str>,
+    video_encoder: BurnVideoEncoder,
+    video_bitrate_kbps: Option<u32>,
     font_dir: Option<&str>,
 ) -> Vec<String> {
-    vec![
+    let encoder = if video_encoder == BurnVideoEncoder::Auto {
+        BurnVideoEncoder::LibX264
+    } else {
+        video_encoder
+    };
+    let mut args = vec![
         "-hide_banner".into(),
         "-y".into(),
         "-i".into(),
@@ -202,11 +457,25 @@ fn build_hard_sub_args(
         "-vf".into(),
         build_ass_filter(ass_path, font_dir),
         "-c:v".into(),
-        "libx264".into(),
-        "-preset".into(),
-        normalize_preset(preset),
-        "-crf".into(),
-        normalize_crf(crf),
+        encoder.ffmpeg_name().unwrap_or("libx264").into(),
+    ];
+
+    if encoder == BurnVideoEncoder::LibX264 {
+        args.extend(["-preset".into(), normalize_preset(preset)]);
+    }
+
+    if let Some(kbps) = normalize_video_bitrate_kbps(video_bitrate_kbps) {
+        args.extend(["-b:v".into(), format!("{kbps}k")]);
+    } else if encoder == BurnVideoEncoder::LibX264 {
+        args.extend(["-crf".into(), normalize_crf(crf)]);
+    } else if encoder.is_hardware() {
+        args.extend([
+            "-b:v".into(),
+            format!("{DEFAULT_HARDWARE_VIDEO_BITRATE_KBPS}k"),
+        ]);
+    }
+
+    args.extend([
         "-c:a".into(),
         "aac".into(),
         "-b:a".into(),
@@ -216,7 +485,8 @@ fn build_hard_sub_args(
         "-progress".into(),
         "pipe:2".into(),
         output_path.to_string_lossy().into_owned(),
-    ]
+    ]);
+    args
 }
 
 fn build_soft_sub_args(video_path: &str, ass_path: &str, output_path: &Path) -> Vec<String> {
@@ -280,13 +550,14 @@ fn validate_output_path(
 }
 
 fn job_is_active(snapshot: &BurnSnapshot) -> bool {
-    matches!(
-        snapshot.status,
-        BurnStatus::Pending | BurnStatus::Running
-    )
+    matches!(snapshot.status, BurnStatus::Pending | BurnStatus::Running)
 }
 
-fn build_burn_args(args: &StartBurnArgs, output_path: &Path) -> Vec<String> {
+fn build_burn_args(
+    args: &StartBurnArgs,
+    output_path: &Path,
+    effective_encoder: BurnVideoEncoder,
+) -> Vec<String> {
     match args.mode {
         BurnMode::HardSubMp4 => build_hard_sub_args(
             &args.video_path,
@@ -294,6 +565,8 @@ fn build_burn_args(args: &StartBurnArgs, output_path: &Path) -> Vec<String> {
             output_path,
             args.crf,
             args.preset.as_deref(),
+            effective_encoder,
+            args.video_bitrate_kbps,
             args.font_dir.as_deref(),
         ),
         BurnMode::SoftSubMkv => build_soft_sub_args(&args.video_path, &args.ass_path, output_path),
@@ -325,8 +598,8 @@ fn handle_progress_line(
 
     let processed_ms = parse_progress_out_time_ms(text).or_else(|| parse_time_token(text));
     if let Some(processed) = processed_ms {
-        let progress = (*duration_ms > 0)
-            .then(|| (processed as f64 / *duration_ms as f64).clamp(0.0, 1.0));
+        let progress =
+            (*duration_ms > 0).then(|| (processed as f64 / *duration_ms as f64).clamp(0.0, 1.0));
         update_snapshot(job, |snap| {
             snap.processed_ms = processed;
             if *duration_ms > 0 {
@@ -359,7 +632,17 @@ fn run_burn_job(
             guard.cancel_flag.clone()
         };
 
-        let ffmpeg_args = build_burn_args(&args, &output_path);
+        let effective_encoder = if args.mode == BurnMode::HardSubMp4 {
+            let available = probe_available_burn_encoders(&ffmpeg)
+                .unwrap_or_else(|_| vec![BurnVideoEncoder::LibX264]);
+            select_burn_encoder(
+                args.video_encoder.unwrap_or(BurnVideoEncoder::Auto),
+                &available,
+            )
+        } else {
+            BurnVideoEncoder::LibX264
+        };
+        let ffmpeg_args = build_burn_args(&args, &output_path, effective_encoder);
         let mut child = Command::new(&ffmpeg)
             .args(&ffmpeg_args)
             .stdin(Stdio::null())
@@ -459,6 +742,36 @@ fn run_burn_job(
             }
         });
     }
+}
+
+#[tauri::command]
+pub async fn probe_burn_video(
+    app: AppHandle,
+    video_path: String,
+) -> Result<BurnVideoProbe, String> {
+    let video = PathBuf::from(&video_path);
+    if !video.is_file() {
+        return Err(format!("视频文件不存在: {video_path}"));
+    }
+
+    let settings = load_settings(&app).unwrap_or_default();
+    let (ffmpeg, _) = resolve_ffmpeg(&app, &settings);
+    let ffprobe = resolve_ffprobe(&app, &settings);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let available_encoders = probe_available_burn_encoders(&ffmpeg)
+            .unwrap_or_else(|_| vec![BurnVideoEncoder::LibX264]);
+        let video_bitrate_kbps = probe_video_bitrate_kbps(&ffprobe, &video_path).unwrap_or(None);
+        let preferred_encoder = select_auto_encoder(&available_encoders, current_os(), true);
+
+        Ok(BurnVideoProbe {
+            video_bitrate_kbps,
+            available_encoders,
+            preferred_encoder,
+        })
+    })
+    .await
+    .map_err(|e| format!("探测视频导出能力失败: {e}"))?
 }
 
 #[tauri::command]
@@ -586,7 +899,10 @@ mod tests {
 
     #[test]
     fn parses_progress_out_time_microseconds_as_milliseconds() {
-        assert_eq!(parse_progress_out_time_ms("out_time_ms=12345000"), Some(12345));
+        assert_eq!(
+            parse_progress_out_time_ms("out_time_ms=12345000"),
+            Some(12345)
+        );
     }
 
     #[test]
@@ -606,17 +922,84 @@ mod tests {
             &output,
             Some(23),
             Some("fast"),
+            BurnVideoEncoder::LibX264,
+            None,
             Some("/tmp/fonts"),
         );
-        assert!(args.windows(2).any(|w| {
-            w == [
-                "-vf",
-                "ass=filename='/tmp/subs.ass':fontsdir='/tmp/fonts'"
-            ]
-        }));
+        assert!(args
+            .windows(2)
+            .any(|w| { w == ["-vf", "ass=filename='/tmp/subs.ass':fontsdir='/tmp/fonts'"] }));
         assert!(args.windows(2).any(|w| w == ["-crf", "23"]));
         assert!(args.windows(2).any(|w| w == ["-preset", "fast"]));
         assert!(args.windows(2).any(|w| w == ["-progress", "pipe:2"]));
+    }
+
+    #[test]
+    fn builds_hard_sub_args_with_hardware_encoder_and_video_bitrate() {
+        let output = PathBuf::from("/tmp/out.mp4");
+        let args = build_hard_sub_args(
+            "/tmp/in.mp4",
+            "/tmp/subs.ass",
+            &output,
+            Some(18),
+            Some("medium"),
+            BurnVideoEncoder::H264Nvenc,
+            Some(12_000),
+            None,
+        );
+
+        assert!(args.windows(2).any(|w| w == ["-c:v", "h264_nvenc"]));
+        assert!(args.windows(2).any(|w| w == ["-b:v", "12000k"]));
+        assert!(!args.iter().any(|arg| arg == "-crf"));
+    }
+
+    #[test]
+    fn auto_encoder_prefers_available_hardware_for_platform() {
+        let available = vec![
+            BurnVideoEncoder::LibX264,
+            BurnVideoEncoder::H264Qsv,
+            BurnVideoEncoder::H264Nvenc,
+        ];
+
+        assert_eq!(
+            select_auto_encoder(&available, "windows", true),
+            BurnVideoEncoder::H264Nvenc
+        );
+    }
+
+    #[test]
+    fn parses_video_bitrate_kbps_from_ffprobe_output() {
+        assert_eq!(parse_video_bitrate_kbps("8000000\n"), Some(8000));
+        assert_eq!(parse_video_bitrate_kbps("N/A\n12000000\n"), Some(12000));
+        assert_eq!(parse_video_bitrate_kbps("\nN/A\n"), None);
+    }
+
+    #[test]
+    fn parses_available_encoders_from_ffmpeg_output() {
+        let output = r#"
+ V....D libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+ V....D h264_nvenc           NVIDIA NVENC H.264 encoder
+ V..... h264_qsv             H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+"#;
+
+        assert_eq!(
+            parse_available_encoders(output),
+            vec![
+                BurnVideoEncoder::LibX264,
+                BurnVideoEncoder::H264Nvenc,
+                BurnVideoEncoder::H264Qsv
+            ]
+        );
+    }
+
+    #[test]
+    fn hardware_encoder_probe_uses_supported_frame_size() {
+        let args = hardware_encoder_probe_args("h264_nvenc");
+
+        assert!(args
+            .windows(2)
+            .any(|w| w == ["-i", "color=c=black:s=256x256:r=1:d=0.1"]));
+        assert!(!args.iter().any(|arg| arg.contains("64x64")));
     }
 
     #[test]
@@ -624,7 +1007,9 @@ mod tests {
         let output = PathBuf::from("/tmp/out.mkv");
         let args = build_soft_sub_args("/tmp/in.mp4", "/tmp/subs.ass", &output);
         assert!(args.windows(2).any(|w| w == ["-c:s", "ass"]));
-        assert!(args.windows(2).any(|w| w == ["-metadata:s:s:0", "language=jpn"]));
+        assert!(args
+            .windows(2)
+            .any(|w| w == ["-metadata:s:s:0", "language=jpn"]));
         assert!(args.windows(2).any(|w| w == ["-progress", "pipe:2"]));
     }
 

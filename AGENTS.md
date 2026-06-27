@@ -78,7 +78,7 @@ src-tauri/                    # Rust 后端
     settings.rs               # 全局设置持久化
     transcode.rs              # 不兼容视频编码的代理视频转码与缓存
     download.rs               # 下载 command、任务状态、FFmpeg fallback 与策略编排
-    burn.rs                   # 字幕压制/封装任务、FFmpeg 参数构建、进度与取消、并发限制、退出清理
+    burn.rs                   # 字幕压制/封装任务、码率/编码器探测、FFmpeg 参数构建、进度与取消、并发限制、退出清理
     hls_types.rs              # 分片计划类型、自动并发配置、取消令牌
     hls_playlist.rs           # m3u8 解析、URL 解析、AES-128 规划、分片计划构建
     hls_fetch.rs              # HTTP headers、Range 请求、流式分片下载与重试
@@ -211,6 +211,7 @@ interface SubtitleCue {
 | `start_video_download` | 启动 m3u8 下载，返回 jobId |
 | `get_video_download_progress` | 轮询下载进度 |
 | `cancel_video_download` | 取消下载并清理部分输出 |
+| `probe_burn_video` | 探测压制推荐参数（原视频码率、可用 H.264 编码器、自动编码器选择） |
 | `start_burn_subtitles` | 启动字幕压制/封装任务，返回 jobId |
 | `get_burn_progress` | 轮询压制进度 |
 | `cancel_burn` | 取消压制并清理部分输出 |
@@ -246,7 +247,7 @@ interface SubtitleCue {
 - [x] VAD 预处理（统一配置 UI；faster-whisper 透传内置 VAD，Parakeet 独立 Silero VAD 预切分；失败自动降级）
 - [x] 日语专用化（源语言固定 ja；移除转录/设置页源语言选择）
 - [x] m3u8 视频下载（DownloadView；Rust 分片并发 + AES-128 + 自动并发/HTTP/2；FFmpeg fallback）
-- [x] FFmpeg 压制（BurnView：硬字幕 MP4 / 软字幕 MKV、自动输出名、进度与取消、并发限制、全局轮询、退出清理、压制前使用当前内存字幕）
+- [x] FFmpeg 压制（BurnView：硬字幕 MP4 / 软字幕 MKV、导出策略、原片码率探测、硬件 H.264 编码器自动选择、自动输出名、进度与取消、并发限制、全局轮询、退出清理、压制前使用当前内存字幕）
 - [x] 接入 Qwen3-ASR-1.7B 作为第三引擎（CPU/GPU 双 profile；复用 chunking 共享模块）
 - [x] Parakeet gap backfill 增强（覆盖率补转、`apply_gap_backfill` supersede/组装、收尾 dedupe + `TranscriptSegmentRefresh`、ASR 诊断日志）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨

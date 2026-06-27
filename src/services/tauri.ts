@@ -8,6 +8,7 @@ import type {
   AsrModelStatus,
   AudioExtractProgress,
   BurnSnapshot,
+  BurnVideoProbe,
   DownloadSnapshot,
   FfmpegStatus,
   ModelDownloadSnapshot,
@@ -202,6 +203,11 @@ export async function startBurnSubtitles(
   args: StartBurnArgs,
 ): Promise<string> {
   return invoke<string>("start_burn_subtitles", { args });
+}
+
+/** 探测硬字幕导出推荐设置（原视频码率、可用编码器）。 */
+export async function probeBurnVideo(videoPath: string): Promise<BurnVideoProbe> {
+  return invoke<BurnVideoProbe>("probe_burn_video", { videoPath });
 }
 
 /** 查询字幕压制进度。 */
