@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "@fontsource/noto-sans-sc/100.css";
 import "@fontsource/noto-sans-sc/chinese-simplified-400.css";
 import "@fontsource/noto-sans-sc/chinese-simplified-500.css";
 import "@fontsource/noto-sans-sc/chinese-simplified-600.css";

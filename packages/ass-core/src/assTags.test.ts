@@ -64,6 +64,20 @@ describe("parseAssTextLines", () => {
     });
   });
 
+  it("applies outline and shadow overrides", () => {
+    const lines = parseAssTextLines(
+      "{\\bord4.5\\shad2\\3c&H000000&\\4c&H80000000&}描边",
+      primary,
+    );
+
+    expect(lines[0].runs[0].inline).toMatchObject({
+      outline: 4.5,
+      shadow: 2,
+      outlineColor: "&H00000000",
+      backColor: "&H80000000",
+    });
+  });
+
   it("resolves \\rStyleName via resolveStyle", () => {
     const secondary = createDefaultStyles()[1];
     const lines = parseAssTextLines("{\\rSecondary}译文样式", primary, {
