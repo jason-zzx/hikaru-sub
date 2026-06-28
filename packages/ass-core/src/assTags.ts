@@ -14,6 +14,10 @@ export interface AssInlineOverrides {
   scaleX?: number;
   scaleY?: number;
   spacing?: number;
+  outline?: number;
+  shadow?: number;
+  outlineColor?: string;
+  backColor?: string;
 }
 
 export interface AssTextRun {
@@ -143,6 +147,18 @@ function applyTag(
     return;
   }
 
+  m = raw.match(/^bord(-?\d+(?:\.\d+)?)/i);
+  if (m) {
+    state.inline.outline = Number(m[1]);
+    return;
+  }
+
+  m = raw.match(/^shad(-?\d+(?:\.\d+)?)/i);
+  if (m) {
+    state.inline.shadow = Number(m[1]);
+    return;
+  }
+
   m = raw.match(/^fs(\d+)/i);
   if (m) {
     state.inline.fontSize = Number(m[1]);
@@ -164,6 +180,18 @@ function applyTag(
   m = raw.match(/^c(&H[0-9A-Fa-f]+&?)/i);
   if (m) {
     state.inline.primaryColor = normalizeAssColor(m[1]);
+    return;
+  }
+
+  m = raw.match(/^3c(&H[0-9A-Fa-f]+&?)/i);
+  if (m) {
+    state.inline.outlineColor = normalizeAssColor(m[1]);
+    return;
+  }
+
+  m = raw.match(/^4c(&H[0-9A-Fa-f]+&?)/i);
+  if (m) {
+    state.inline.backColor = normalizeAssColor(m[1]);
     return;
   }
 

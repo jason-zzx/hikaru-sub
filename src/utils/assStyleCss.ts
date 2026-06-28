@@ -44,6 +44,10 @@ function roundPx(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+const ASS_FONT_POINT_TO_CSS_PX = 0.74;
+const ASS_PREVIEW_NEUTRAL_SCALE_X = 0.95;
+const ASS_OUTLINE_PREVIEW_COMPENSATION = 1.25;
+
 export function scaleAssLength(
   value: number,
   axis: "x" | "y",
@@ -56,6 +60,35 @@ export function scaleAssLength(
   const size = axis === "x" ? view.width : view.height;
   if (base <= 0) return value;
   return roundPx(value * (size / base));
+}
+
+export function scaleAssFontSize(
+  value: number,
+  scriptInfo: AssScriptInfo | null,
+  viewport: AssViewport,
+): number {
+  return roundPx(
+    scaleAssLength(value, "y", scriptInfo, viewport) *
+      ASS_FONT_POINT_TO_CSS_PX,
+  );
+}
+
+export function assFontFamily(fontName: string, _bold: boolean | number): string {
+  return `"${fontName}", sans-serif`;
+}
+
+export function assFontWeight(
+  fontName: string,
+  bold: boolean | number,
+): CSSProperties["fontWeight"] {
+  if (typeof bold === "number") return bold;
+  if (bold) return 700;
+  return fontName.trim().toLowerCase() === "noto sans sc" ? 100 : 400;
+}
+
+export function previewScaleX(scaleX: number): number {
+  if (scaleX === 100) return ASS_PREVIEW_NEUTRAL_SCALE_X;
+  return roundPx(scaleX / 100);
 }
 
 export function findAssStyle(styles: AssStyle[], styleName?: string): AssStyle {
@@ -116,26 +149,39 @@ export function buildTextShadow(
   const shadows: string[] = [];
 
   if (style.borderStyle !== 3 && outline > 0) {
-    const px = Math.max(1, Math.round(outline));
-    const offsets = [
-      [-px, 0],
-      [px, 0],
-      [0, -px],
-      [0, px],
-      [-px, -px],
-      [px, -px],
-      [-px, px],
-      [px, px],
-    ];
-    shadows.push(...offsets.map(([x, y]) => `${x}px ${y}px 0 ${outlineColor}`));
+    const offsets = buildOutlineShadowOffsets(outline);
+    shadows.push(
+      ...offsets.map(([x, y]) => `${x}px ${y}px 0 ${outlineColor}`),
+    );
   }
 
   if (shadow > 0) {
     const px = Math.max(1, Math.round(shadow));
-    shadows.push(`${px}px ${px}px ${px}px ${shadowColor}`);
+    shadows.push(`${px}px ${px}px 0 ${shadowColor}`);
   }
 
   return shadows.length > 0 ? shadows.join(", ") : undefined;
+}
+
+export function buildOutlineShadowOffsets(outline: number): Array<[number, number]> {
+  const radius = Math.max(1, roundPx(outline * ASS_OUTLINE_PREVIEW_COMPENSATION));
+  const step = radius <= 2.5 ? 0.5 : 1;
+  const limit = Math.ceil(radius / step);
+  const offsets: Array<[number, number]> = [];
+
+  for (let xi = -limit; xi <= limit; xi += 1) {
+    for (let yi = -limit; yi <= limit; yi += 1) {
+      const x = roundPx(xi * step);
+      const y = roundPx(yi * step);
+      if (x === 0 && y === 0) continue;
+      const distance = Math.sqrt(x * x + y * y);
+      if (distance <= radius + 0.01) {
+        offsets.push([x, y]);
+      }
+    }
+  }
+
+  return offsets;
 }
 
 export function placementToCss(
@@ -204,21 +250,23 @@ export function assStyleToCss(
   viewport: AssViewport,
 ): CSSProperties {
   const placementCss = placementToCss(style, scriptInfo, viewport);
-  const fontSize = scaleAssLength(style.fontSize, "y", scriptInfo, viewport);
+  const fontSize = scaleAssFontSize(style.fontSize, scriptInfo, viewport);
   const spacing = scaleAssLength(style.spacing, "x", scriptInfo, viewport);
   const decorations = textDecoration(style);
   const transforms: string[] = [];
   if (placementCss.transform) transforms.push(String(placementCss.transform));
-  if (style.scaleX !== 100 || style.scaleY !== 100) {
-    transforms.push(`scale(${style.scaleX / 100}, ${style.scaleY / 100})`);
+  const scaleX = previewScaleX(style.scaleX);
+  const scaleY = roundPx(style.scaleY / 100);
+  if (scaleX !== 1 || scaleY !== 1) {
+    transforms.push(`scale(${scaleX}, ${scaleY})`);
   }
 
   return {
     ...placementCss,
     color: assColorToCss(style.primaryColor),
-    fontFamily: `"${style.fontName}", sans-serif`,
+    fontFamily: assFontFamily(style.fontName, style.bold),
     fontSize,
-    fontWeight: style.bold ? 700 : 400,
+    fontWeight: assFontWeight(style.fontName, style.bold),
     fontStyle: style.italic ? "italic" : "normal",
     textDecorationLine: decorations,
     letterSpacing: spacing,

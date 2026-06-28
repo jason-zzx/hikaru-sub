@@ -27,6 +27,7 @@
 4. 编辑页功能完善：
    - 快捷键操作（上下切换字幕、时间轴左右移动）
    - 字幕样式可视化编辑（字体、颜色、位置等 GUI，当前需在编辑框手写 ASS 标签）
+5. 引入 libass 预览，使编辑页 / 压制页字幕预览与最终 FFmpeg/libass 硬字幕输出达到渲染级一致
 
 ## 技术栈
 
@@ -244,6 +245,7 @@ AssSubtitleOverlay（ResizeObserver 测量视口）
 | `\c` `\1c` | 主色 |
 | `\1a` `\alpha` | 主色透明度 |
 | `\fs` `\fn` `\fscx` `\fscy` `\fsp` | 字号 / 字体 / 缩放 / 字距 |
+| `\bord` `\shad` `\3c` `\4c` | 描边宽度 / 阴影偏移 / 描边色 / 阴影色 |
 | `\r` `\rStyleName` | 重置为 Dialogue Style 或切换到指定 Style |
 | `\N` `\n` `\h` | 硬换行 / 软换行 / 硬空格 |
 
@@ -251,12 +253,11 @@ AssSubtitleOverlay（ResizeObserver 测量视口）
 
 **已知限制**
 
-- 预览为 CSS 近似，与 libass 在描边形状、字体度量、抗锯齿等方面可能有可见差异
+- 当前预览为 CSS 近似，与 libass 在描边形状、字体度量、抗锯齿等方面可能有可见差异；后续目标是引入 libass 预览路径，使编辑页 / 压制页预览与最终 FFmpeg/libass 硬字幕输出达到渲染级一致
 - 不支持 ASS override 定位/动画/卡拉 OK（`\pos`、`\move`、`\fad`、`\k`、`\t` 等）
-- 不支持 `\2c`–`\4c` 行内改色（描边色/阴影色 override）、`angle` 旋转、`wrapStyle` 精细换行规则
+- 不支持 `\2c`、描边/阴影透明度（`\3a` / `\4a`）、轴向描边/阴影（`\xbord` / `\ybord` / `\xshad` / `\yshad`）、`angle` 旋转、`wrapStyle` 精细换行规则
 - 未读取 `ScaledBorderAndShadow`；描边/阴影始终按 PlayRes 缩放
 - `SubtitleCue` 未建模 Dialogue 级 `marginL/R/V`，仅用 Style 级边距
-- 描边/阴影挂在 Dialogue 容器上，行内改色不会单独改变描边颜色
 - 分离双行模式下两行均为绝对定位，极长文本可能重叠
 - 压制页预览框宽高比跟随 `PlayRes`，无真实视频时仅为样式示意
 

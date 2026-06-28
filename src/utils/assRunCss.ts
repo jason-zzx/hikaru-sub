@@ -6,7 +6,14 @@ import {
   type AssStyle,
   type AssScriptInfo,
 } from "@hikaru/ass-core";
-import { scaleAssLength, type AssViewport } from "./assStyleCss";
+import {
+  assFontFamily,
+  assFontWeight,
+  buildTextShadow,
+  scaleAssFontSize,
+  scaleAssLength,
+  type AssViewport,
+} from "./assStyleCss";
 
 function effectiveColor(
   base: AssStyle,
@@ -33,6 +40,16 @@ function textDecoration(
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
+function shadowStyle(base: AssStyle, inline: AssInlineOverrides): AssStyle {
+  return {
+    ...base,
+    outline: inline.outline ?? base.outline,
+    shadow: inline.shadow ?? base.shadow,
+    outlineColor: inline.outlineColor ?? base.outlineColor,
+    backColor: inline.backColor ?? base.backColor,
+  };
+}
+
 /** 将 base Style + 行内 override 映射为 span 级 CSS。 */
 export function assInlineToCss(
   base: AssStyle,
@@ -41,11 +58,8 @@ export function assInlineToCss(
   viewport: AssViewport,
 ): CSSProperties {
   const bold = inline.bold ?? base.bold;
-  const fontWeight =
-    typeof bold === "number" ? bold : bold ? 700 : 400;
-  const fontSize = scaleAssLength(
+  const fontSize = scaleAssFontSize(
     inline.fontSize ?? base.fontSize,
-    "y",
     scriptInfo,
     viewport,
   );
@@ -58,16 +72,20 @@ export function assInlineToCss(
   const scaleX = (inline.scaleX ?? base.scaleX) / 100;
   const scaleY = (inline.scaleY ?? base.scaleY) / 100;
   const fontName = inline.fontName ?? base.fontName;
+  const fontWeight = assFontWeight(fontName, bold);
 
   const css: CSSProperties = {
     display: "inline",
     color: effectiveColor(base, inline),
-    fontFamily: `"${fontName}", sans-serif`,
+    fontFamily: assFontFamily(fontName, bold),
     fontSize,
     fontWeight,
     fontStyle: (inline.italic ?? base.italic) ? "italic" : "normal",
     textDecorationLine: textDecoration(base, inline),
     letterSpacing: spacing,
+    textShadow:
+      buildTextShadow(shadowStyle(base, inline), scriptInfo, viewport) ??
+      "none",
   };
 
   if (scaleX !== 1 || scaleY !== 1) {

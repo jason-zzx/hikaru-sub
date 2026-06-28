@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { createDefaultScriptInfo, createDefaultStyles } from "@hikaru/ass-core";
 import type { AssStyle, SubtitleCue } from "@hikaru/ass-core";
 import {
+  assFontWeight,
   assAlignmentToPlacement,
   assStyleToCss,
   buildTextShadow,
   findAssStyle,
+  previewScaleX,
   resolveAssRenderItems,
+  scaleAssFontSize,
   scaleAssLength,
 } from "./assStyleCss";
 import { assInlineToCss } from "./assRunCss";
@@ -29,6 +32,15 @@ describe("assStyleCss", () => {
   it("scales ASS lengths by axis using PlayRes", () => {
     expect(scaleAssLength(54, "y", scriptInfo, viewport)).toBe(27);
     expect(scaleAssLength(20, "x", scriptInfo, viewport)).toBe(10);
+  });
+
+  it("maps ASS font size to CSS pixels using renderer point scaling", () => {
+    expect(scaleAssFontSize(54, scriptInfo, viewport)).toBe(19.98);
+  });
+
+  it("slightly narrows browser subtitle text when ASS ScaleX is neutral", () => {
+    expect(previewScaleX(100)).toBe(0.95);
+    expect(previewScaleX(110)).toBe(1.1);
   });
 
   it("maps ASS numpad alignment to placement", () => {
@@ -65,7 +77,7 @@ describe("assStyleCss", () => {
     );
 
     expect(css.fontFamily).toContain("Noto Sans SC");
-    expect(css.fontSize).toBe(27);
+    expect(css.fontSize).toBe(19.98);
     expect(css.color).toBe("#F5F500");
     expect(css.fontWeight).toBe(700);
     expect(css.fontStyle).toBe("italic");
@@ -74,7 +86,37 @@ describe("assStyleCss", () => {
     expect(css.transform).toContain("scale(1.1, 0.9)");
   });
 
-  it("builds text shadow from outline and shadow", () => {
+  it("applies the default horizontal width compensation to neutral ScaleX", () => {
+    const css = assStyleToCss(
+      style({
+        scaleX: 100,
+        scaleY: 100,
+      }),
+      scriptInfo,
+      viewport,
+    );
+
+    expect(css.transform).toBe("scale(0.95, 1)");
+  });
+
+  it("keeps ASS outline in text shadow so the white fill is not swallowed", () => {
+    const css = assStyleToCss(
+      style({
+        outline: 2,
+        shadow: 1,
+        outlineColor: "&H00000000",
+        backColor: "&H80000000",
+      }),
+      scriptInfo,
+      viewport,
+    );
+
+    expect(css.WebkitTextStroke).toBeUndefined();
+    expect(css.textShadow).toContain("-1px 0px 0 #000000");
+    expect(css.textShadow).toContain("1px 1px 0 rgba(0, 0, 0, 0.498)");
+  });
+
+  it("builds text shadow from ASS outline and shadow", () => {
     const shadow = buildTextShadow(
       style({
         outline: 2,
@@ -86,8 +128,8 @@ describe("assStyleCss", () => {
       viewport,
     );
 
-    expect(shadow).toContain("#000000");
-    expect(shadow).toContain("1px 1px");
+    expect(shadow).toContain("-1px 0px 0 #000000");
+    expect(shadow).toContain("1px 1px 0 rgba(0, 0, 0, 0.498)");
   });
 
   it("resolves one render item for inline mode", () => {
@@ -124,6 +166,54 @@ describe("assStyleCss", () => {
     );
     expect(css.fontFamily).toBe('"Document Font", sans-serif');
     expect(String(css.fontFamily)).not.toContain("Noto Sans SC");
+  });
+
+  it("prefers the libass-selected Noto Sans SC thin face for non-bold subtitles", () => {
+    const css = assStyleToCss(
+      style({ name: "Primary", fontName: "Noto Sans SC", bold: false }),
+      scriptInfo,
+      viewport,
+    );
+
+    expect(css.fontFamily).toBe(
+      '"Noto Sans SC", sans-serif',
+    );
+    expect(css.fontWeight).toBe(100);
+    expect(assFontWeight("Noto Sans SC", false)).toBe(100);
+  });
+
+  it("does not force thin weight for other font families", () => {
+    const css = assStyleToCss(
+      style({ name: "Primary", fontName: "Arial", bold: false }),
+      scriptInfo,
+      viewport,
+    );
+
+    expect(css.fontFamily).toBe('"Arial", sans-serif');
+    expect(css.fontWeight).toBe(400);
+    expect(assFontWeight("Arial", false)).toBe(400);
+  });
+
+  it("maps changed style metrics dynamically", () => {
+    const css = assStyleToCss(
+      style({
+        fontName: "Arial",
+        fontSize: 80,
+        scaleX: 90,
+        scaleY: 110,
+        spacing: 3,
+        outline: 4,
+        shadow: 3,
+      }),
+      scriptInfo,
+      viewport,
+    );
+
+    expect(css.fontSize).toBe(29.6);
+    expect(css.transform).toContain("scale(0.9, 1.1)");
+    expect(css.letterSpacing).toBe(1.5);
+    expect(css.textShadow).toContain("-2px 0px 0 #000000");
+    expect(css.textShadow).toContain("2px 2px 0 rgba(0, 0, 0, 0.498)");
   });
 
   it("does not add Noto Sans SC as a hidden inline font fallback", () => {
