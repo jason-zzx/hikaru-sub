@@ -73,7 +73,9 @@ src-tauri/                    # Rust 后端
     asr.rs                    # ASR sidecar 进程管理 + HTTP 代理
     ass.rs                    # ASS 文件读写
     asset_scope.rs            # Tauri asset protocol 动态授权（非视频播放主路径）
+    fonts.rs                  # 系统字体发现与 libass 预览字体注册
     media_server.rs           # 本地 HTTP 媒体服务（编辑页视频 Range 播放）
+    preview.rs                # FFmpeg/libass 单帧字幕渲染（诊断/校准）
     project.rs                # .hikaru/project.json
     settings.rs               # 全局设置持久化
     transcode.rs              # 不兼容视频编码的代理视频转码与缓存
@@ -101,7 +103,7 @@ scripts/
 - **Python sidecar**：ASR 推理，通过 HTTP localhost 通信，不阻塞 UI
 - **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`；`projectStore` 另缓存 `assScriptInfo` 与 `assStyles`（`[V4+ Styles]` 与 PlayRes 等），保存时完整写回 ASS
 
-**PlayRes 与样式**：转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。编辑页与压制页预览通过 `AssSubtitleOverlay` + `assStyleToCss` 将常用 ASS Style 字段映射到 CSS；该预览用于交互校对，非 libass 真渲染。最终压制仍以 FFmpeg/libass 输出为准。项目后续目标是引入 libass 预览路径，使编辑页 / 压制页字幕预览与最终硬字幕输出达到渲染级一致。
+**PlayRes 与样式**：转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。编辑页预览优先走 jASSUB/libass WASM，播放时按 `<video>` 视频帧时间同步，并按 ASS Style、同族权重和行内 `\fn` 选择预览字体；不可用时回退 `AssSubtitleOverlay` + `assStyleToCss` CSS 近似预览并在预览区提示，ASS/字体变化后会重新尝试 libass。压制页不展示字幕预览，只提供导出设置；最终压制仍以 FFmpeg/libass 输出为准。
 
 ```mermaid
 flowchart LR
@@ -200,6 +202,8 @@ interface SubtitleCue {
 | `get_model_download_progress` | 获取 ASR 模型下载进度 |
 | `save_ass_text` / `load_ass_text` | ASS 文件读写 |
 | `get_video_info` | 获取视频分辨率、时长等元信息 |
+| `discover_preview_fonts` | 枚举系统/补充字体并注册为预览可访问 URL |
+| `render_subtitle_preview_frame` | 使用 FFmpeg/libass 渲染硬字幕单帧图，用于诊断与校准 |
 | `register_media_playback` | 注册本地视频到媒体 HTTP 服务，返回可播放 URL |
 | `probe_video_playback` | 探测 WebView 是否需代理转码（容器/音视频编码） |
 | `allow_asset_path` | 将路径加入 Tauri asset scope（保留，非视频主路径） |
@@ -250,7 +254,7 @@ interface SubtitleCue {
 - [x] FFmpeg 压制（BurnView：硬字幕 MP4 / 软字幕 MKV、导出策略、原片码率探测、硬件 H.264 编码器自动选择、自动输出名、进度与取消、并发限制、全局轮询、退出清理、压制前使用当前内存字幕）
 - [x] 接入 Qwen3-ASR-1.7B 作为第三引擎（CPU/GPU 双 profile；复用 chunking 共享模块）
 - [x] Parakeet gap backfill 增强（覆盖率补转、`apply_gap_backfill` supersede/组装、收尾 dedupe + `TranscriptSegmentRefresh`、ASR 诊断日志）
-- [ ] libass 预览（编辑页 / 压制页预览与最终 FFmpeg/libass 硬字幕输出渲染级一致）
+- [x] libass 预览（编辑页 jASSUB/libass WASM；视频帧同步；系统字体发现与行内字体/同族权重预加载；CSS 明示兜底并可恢复重试；FFmpeg 单帧用于诊断/校准）
 - [ ] 错误处理、任务队列、安装脚本等整体打磨
 
 ## 首期不做

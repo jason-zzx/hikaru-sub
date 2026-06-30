@@ -4,11 +4,13 @@ mod asset_scope;
 mod burn;
 mod download;
 mod ffmpeg;
+mod fonts;
 mod hls_download;
 mod hls_fetch;
 mod hls_playlist;
 mod hls_types;
 mod media_server;
+mod preview;
 mod project;
 mod settings;
 mod transcode;
@@ -31,6 +33,7 @@ pub fn run() {
             ffmpeg::extract_audio,
             ffmpeg::get_video_info,
             ffmpeg::extract_waveform,
+            fonts::discover_preview_fonts,
             project::create_project,
             project::open_project,
             project::path_exists,
@@ -45,6 +48,7 @@ pub fn run() {
             ass::load_ass_text,
             asset_scope::allow_asset_path,
             media_server::register_media_playback,
+            preview::render_subtitle_preview_frame,
             transcode::detect_video_codec,
             transcode::probe_video_playback,
             transcode::start_transcode,

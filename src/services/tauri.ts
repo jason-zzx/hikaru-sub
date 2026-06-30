@@ -13,7 +13,10 @@ import type {
   FfmpegStatus,
   ModelDownloadSnapshot,
   ProbeDownloadMediaArgs,
+  PreviewFontFile,
   ProjectMeta,
+  RenderSubtitlePreviewFrameArgs,
+  RenderSubtitlePreviewFrameResult,
   StartAsrArgs,
   StartBurnArgs,
   StartVideoDownloadArgs,
@@ -165,6 +168,23 @@ export async function loadAssText(assPath: string): Promise<string> {
 /** 获取视频信息（分辨率、时长）。 */
 export async function getVideoInfo(videoPath: string): Promise<import("../types").VideoInfo> {
   return invoke<import("../types").VideoInfo>("get_video_info", { videoPath });
+}
+
+/** 枚举系统字体与额外字体目录，并返回本地 HTTP 可读 URL。 */
+export async function discoverPreviewFonts(
+  extraDirs: string[] = [],
+): Promise<PreviewFontFile[]> {
+  return invoke<PreviewFontFile[]>("discover_preview_fonts", { extraDirs });
+}
+
+/** 通过 FFmpeg/libass 渲染一帧硬字幕预览图。 */
+export async function renderSubtitlePreviewFrame(
+  args: RenderSubtitlePreviewFrameArgs,
+): Promise<RenderSubtitlePreviewFrameResult> {
+  return invoke<RenderSubtitlePreviewFrameResult>(
+    "render_subtitle_preview_frame",
+    { args },
+  );
 }
 
 /** 探测 m3u8 媒体流信息。 */
