@@ -1,9 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { serializeAss } from "@hikaru/ass-core";
-import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { useBurnStore } from "../../stores/burnStore";
-import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -23,7 +21,6 @@ import type {
   BurnVideoProbe,
   FfmpegStatus,
 } from "../../types";
-import { AssSubtitleOverlay } from "../player/AssSubtitleOverlay";
 import { Select } from "../ui/Select";
 
 const INPUT_CLASS =
@@ -130,9 +127,6 @@ export function BurnView() {
   const assStyles = useProjectStore((s) => s.assStyles);
   const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
   const isDirty = useProjectStore((s) => s.isDirty);
-  const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
-  const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
-  const mergeMode = useSubtitleMergeMode();
   const setStep = useUiStore((s) => s.setStep);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -161,22 +155,6 @@ export function BurnView() {
     String(DEFAULT_VIDEO_BITRATE_KBPS),
   );
   const [fontDir, setFontDir] = useState("");
-
-  const previewCue = useMemo(() => {
-    return (
-      cues.find((cue) => cue.id === selectedCueId) ??
-      cues.find(
-        (cue) => currentTimeMs >= cue.startMs && currentTimeMs <= cue.endMs,
-      ) ??
-      cues[0] ??
-      null
-    );
-  }, [cues, currentTimeMs, selectedCueId]);
-
-  const previewAspectRatio =
-    assScriptInfo && assScriptInfo.playResX > 0 && assScriptInfo.playResY > 0
-      ? `${assScriptInfo.playResX} / ${assScriptInfo.playResY}`
-      : "16 / 9";
 
   const outputFileName = useMemo(() => {
     if (!project) return "";
@@ -398,39 +376,8 @@ export function BurnView() {
           <p className="text-text-muted">请先导入或打开项目</p>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="rounded-xl border border-border bg-surface-raised p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-medium">字幕样式预览</h3>
-              <span className="text-xs text-text-muted">
-                {mergeMode === "inline" ? "行内拼接" : "分离双行"}
-              </span>
-            </div>
-
-            <div
-              className="relative w-full overflow-hidden rounded-lg bg-black"
-              style={{ aspectRatio: previewAspectRatio }}
-            >
-              {previewCue ? (
-                <AssSubtitleOverlay
-                  cue={previewCue}
-                  styles={assStyles}
-                  scriptInfo={assScriptInfo}
-                  mergeMode={mergeMode}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-text-muted">
-                  暂无字幕可预览
-                </div>
-              )}
-            </div>
-
-            <p className="mt-3 text-xs text-text-muted">
-              预览为 CSS 近似效果；最终硬字幕由 FFmpeg/libass 渲染，细节可能略有差异。
-            </p>
-          </section>
-
-          <aside className="rounded-xl border border-border bg-surface-raised p-4">
+        <div className="min-h-0 flex-1">
+          <section className="w-full rounded-xl border border-border bg-surface-raised p-4">
             <h3 className="text-sm font-medium">导出设置</h3>
 
             <div className="mt-4 space-y-4">
@@ -578,10 +525,11 @@ export function BurnView() {
                 </>
               )}
 
-              <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
-                预览与压制都会优先使用 ASS 指定字体；字体缺失时浏览器和 libass
-                会各自回退，结果可能不完全一致。
-              </p>
+              {mode === "hardSubMp4" && (
+                <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
+                  硬字幕压制会使用系统字体；如 ASS 指定字体未被 FFmpeg 找到，可在字体目录中补充。
+                </p>
+              )}
 
               {busy && (
                 <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
@@ -648,7 +596,7 @@ export function BurnView() {
                 )}
               </div>
             </div>
-          </aside>
+          </section>
         </div>
       )}
     </div>

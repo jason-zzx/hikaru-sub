@@ -14,8 +14,9 @@
 - 翻译工作流（配置界面 + 进度显示 → 生成 `.translated.ass`）
 - 设置页（FFmpeg/Python 路径、ASR 引擎、翻译 API、高级配置）
 - ASS 文件持久化（自动保存/加载；保留 `[V4+ Styles]` 与 PlayRes；转录时按视频分辨率写入）
-- 字幕编辑器（视频播放 + ASS CSS 样式预览 + 行内 override 标签渲染 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做；inline 模式 UI 单行展示 `译文 / 原文`）
+- 字幕编辑器（视频播放 + libass 优先字幕预览 + CSS 明示兜底 + 行内 override 标签渲染 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做；播放时按视频帧时间同步预览；inline 模式 UI 单行展示 `译文 / 原文`）
 - FFmpeg 压制（硬字幕 MP4 / 软字幕 MKV；导出策略、原片码率探测、硬件 H.264 编码器自动选择；进度与取消；压制前使用当前内存字幕生成临时 ASS）
+- libass 预览（编辑页使用 jASSUB/libass WASM 渲染当前内存 ASS；按视频帧时间同步；自动发现系统字体并预加载 ASS 样式、同族权重与行内 `\fn` 字体；不可用时回退 CSS 并在预览区提示；FFmpeg/libass 单帧路径保留作诊断与视觉回归）
 - 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
 - VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
@@ -27,7 +28,7 @@
 4. 编辑页功能完善：
    - 快捷键操作（上下切换字幕、时间轴左右移动）
    - 字幕样式可视化编辑（字体、颜色、位置等 GUI，当前需在编辑框手写 ASS 标签）
-5. 引入 libass 预览，使编辑页 / 压制页字幕预览与最终 FFmpeg/libass 硬字幕输出达到渲染级一致
+5. libass 预览继续增加自动化视觉回归样本与跨平台校准
 
 ## 技术栈
 
@@ -87,11 +88,14 @@ src/                          # React 前端
       Timeline.tsx            # 时间轴可视化
     player/                   # 视频播放器
       VideoPlayer.tsx         # 视频播放 + 字幕叠加
-      AssSubtitleOverlay.tsx  # ASS 字幕叠加容器
+      SubtitlePreview.tsx     # libass 优先 / CSS 兜底的字幕预览入口
+      LibassSubtitleOverlay.tsx # jASSUB/libass WASM 预览
+      AssSubtitleOverlay.tsx  # CSS 兜底字幕叠加容器
       AssStyledText.tsx       # 行内 override 标签 span 渲染
       PlaybackControls.tsx    # 播放控制栏
   utils/
-    assStyleCss.ts            # ASS Style → CSS 映射
+    assPreviewDocument.ts     # 当前内存字幕 → 预览 ASS 文本
+    assStyleCss.ts            # ASS Style → CSS 兜底映射
     assRunCss.ts              # 行内 override → span CSS
     videoDisplayRect.ts       # object-fit 画面区域计算
   hooks/
@@ -105,6 +109,8 @@ src-tauri/                    # Tauri Rust 后端
     ass.rs                    # ASS 文件读写
     asset_scope.rs            # Tauri asset protocol 动态授权
     media_server.rs           # 本地 HTTP 媒体服务（编辑页视频播放）
+    fonts.rs                  # 系统字体发现与预览字体 URL 注册
+    preview.rs                # FFmpeg/libass 单帧字幕渲染（诊断/校准）
     transcode.rs              # 不兼容视频编码的代理转码与缓存
     download.rs               # m3u8 下载 command、任务状态与策略编排
     hls_playlist.rs           # m3u8 解析与分片计划
@@ -160,7 +166,7 @@ scripts/
 - 全局任务轮询（`useBurnJobPoller`）：切换页面后仍更新底部状态栏进度
 - 进度轮询、取消（仅清理运行中的输出）、完成后打开输出位置
 - 应用退出时终止运行中的 FFmpeg 子进程，避免孤儿进程
-- 预览与压制均优先使用 ASS 指定字体，缺失时由运行环境各自 fallback
+- 压制页仅展示导出设置；字体目录用于最终硬字幕压制时帮助 FFmpeg/libass 找到 ASS 指定字体
 
 ### 转录配置（日语源语言）
 - 源语言固定为日语（`ja`），转录页不提供语言选择
@@ -199,73 +205,46 @@ scripts/
 - 不兼容编码自动生成 480p H.264 全关键帧代理视频，并复用转码缓存
 - 保存 ASS 时沿用转录/翻译阶段的 Script Info 与 Styles（含 PlayRes），不重新探测视频覆盖分辨率
 
-#### 编辑页字幕渲染（CSS 近似预览）
+#### 字幕预览渲染（libass 优先，CSS 兜底）
 
-编辑页与压制页预览**不是 libass 真渲染**，而是将 ASS 样式与行内标签映射到 CSS，在视频画面上叠加显示，用于交互校对。最终硬字幕仍以 FFmpeg/libass 输出为准。
+编辑页优先通过 jASSUB/libass WASM 渲染当前内存 ASS。播放时预览跟随 `<video>` 的视频帧时间，优先使用 `requestVideoFrameCallback`，不支持时回退到 `requestAnimationFrame`。若 libass WASM 或字体注册不可用，编辑页会回退到 CSS 近似预览，并在预览区显示提示；ASS 文本、字体集合或渲染模式变化后会清除回退状态并重新尝试 libass。压制页不展示字幕预览，只保留导出设置；最终硬字幕输出仍以 FFmpeg/libass 为准。
 
 **实现架构**
 
 ```
 SubtitleCue + assStyles + assScriptInfo
         ↓
-resolveAssRenderItems（inline / separate 双行逻辑）
+resolveAssDocumentForSave + serializeAss
         ↓
-AssSubtitleOverlay（ResizeObserver 测量视口）
-        ├─ assStyleToCss：Style 级定位、描边、阴影、PlayRes 缩放
-        └─ AssStyledText
-              ├─ parseAssTextLines（ass-core）：解析 {…} 行内标签
-              └─ assInlineToCss：逐 span 应用覆盖样式
+SubtitlePreview
+        ├─ 编辑页：LibassSubtitleOverlay（jASSUB/libass WASM）
+        └─ CSS 兜底：AssSubtitleOverlay + AssStyledText
+
+诊断 / 视觉回归：render_subtitle_preview_frame（FFmpeg ass filter）
 ```
+
+**字体发现**
+
+- `discover_preview_fonts` 会枚举系统字体目录，并通过本地 HTTP 媒体服务把 `.ttf` / `.otf` / `.ttc` / `.otc` 注册给浏览器端 libass。
+- 编辑页会按 ASS Style 字体名、当前字幕行内 `\fn` 覆盖，以及匹配字体家族的多个权重文件选择预加载字体，减少预览与最终压制在字重选择上的差异。
+- 压制页填写的字体目录会作为最终硬字幕压制的补充字体源。
+- 字体缺失时 libass 会按运行环境回退；预览区会保留提示，便于定位字体差异。
 
 **画面区域**
 
-- 视频使用 `object-fit: contain`，容器比例与视频不一致时会出现黑边
-- `useVideoDisplayRect` 按视频 intrinsic 尺寸（元数据未就绪时用 PlayRes 估算）计算真实画面矩形
-- 字幕叠加层仅覆盖该矩形，不会画在黑边上
+- 视频使用 `object-fit: contain`，容器比例与视频不一致时会出现黑边。
+- 编辑页通过 `useVideoDisplayRect` 按视频 intrinsic 尺寸计算真实画面矩形，字幕预览只覆盖该矩形。
+- 压制页不再展示字幕预览，避免与最终导出设置混在同一工作区。
 
-**Style 级支持（`[V4+ Styles]` 字段）**
+**CSS 兜底覆盖范围**
 
-| 字段 | 预览行为 |
-|------|----------|
-| `fontName` / `fontSize` | 字体族、按 `PlayResY` 缩放字号 |
-| `primaryColor` | 文字颜色 |
-| `bold` / `italic` / `underline` / `strikeOut` | 字重、斜体、装饰线 |
-| `outline` / `outlineColor` / `shadow` / `backColor` | 多向 `text-shadow` 近似描边与阴影 |
-| `alignment` / `marginL` / `marginR` / `marginV` | 九宫格对齐与边距（水平居中用 `left+right` 避免误换行） |
-| `scaleX` / `scaleY` / `spacing` | `transform: scale`、字距 |
-| `borderStyle=3` | 半透明底框（近似） |
-
-**行内 override 标签（Tier 1，预览解析；编辑区保留原文）**
-
-编辑框与列表显示**完整 ASS 文本**（含 `{…}` 标签），不做 strip；预览层解析并渲染支持的标签：
-
-| 标签 | 效果 |
-|------|------|
-| `\b` `\i` `\u` `\s` | 粗体 / 斜体 / 下划线 / 删除线 |
-| `\c` `\1c` | 主色 |
-| `\1a` `\alpha` | 主色透明度 |
-| `\fs` `\fn` `\fscx` `\fscy` `\fsp` | 字号 / 字体 / 缩放 / 字距 |
-| `\bord` `\shad` `\3c` `\4c` | 描边宽度 / 阴影偏移 / 描边色 / 阴影色 |
-| `\r` `\rStyleName` | 重置为 Dialogue Style 或切换到指定 Style |
-| `\N` `\n` `\h` | 硬换行 / 软换行 / 硬空格 |
-
-不支持的标签（如 `\pos`、`\move`、`\fad`、`\k`、`\an`）在预览中静默忽略，**编辑区仍保留标签字符串**。
-
-**已知限制**
-
-- 当前预览为 CSS 近似，与 libass 在描边形状、字体度量、抗锯齿等方面可能有可见差异；后续目标是引入 libass 预览路径，使编辑页 / 压制页预览与最终 FFmpeg/libass 硬字幕输出达到渲染级一致
-- 不支持 ASS override 定位/动画/卡拉 OK（`\pos`、`\move`、`\fad`、`\k`、`\t` 等）
-- 不支持 `\2c`、描边/阴影透明度（`\3a` / `\4a`）、轴向描边/阴影（`\xbord` / `\ybord` / `\xshad` / `\yshad`）、`angle` 旋转、`wrapStyle` 精细换行规则
-- 未读取 `ScaledBorderAndShadow`；描边/阴影始终按 PlayRes 缩放
-- `SubtitleCue` 未建模 Dialogue 级 `marginL/R/V`，仅用 Style 级边距
-- 分离双行模式下两行均为绝对定位，极长文本可能重叠
-- 压制页预览框宽高比跟随 `PlayRes`，无真实视频时仅为样式示意
+CSS 兜底仍解析常用 Style 与行内 override 标签，用于 libass 不可用时维持可编辑体验。它支持字体、字号、颜色、粗斜体、描边、阴影、九宫格对齐、边距、缩放、字距、`\N` 换行、`\r` 重置/切换 Style 等常用字段；不支持定位动画、卡拉 OK、精细换行、旋转、轴向描边/阴影等 libass 高级行为。
 
 **触发时机**
 
-- 播放中：显示当前时间轴内的字幕
-- 暂停时：显示列表选中的字幕
-- 压制页：显示选中 / 当前时间 / 首条字幕的样式预览
+- 编辑页播放中：按 `<video>` 视频帧时间显示字幕。
+- 编辑页暂停时：优先显示列表选中的字幕，便于校对样式。
+- 压制页：不显示字幕预览，只展示输出模式、导出策略、编码、码率、字体目录和任务进度。
 
 ### 文件管理
 - **项目元数据**：`.hikaru/project.json`（与视频同目录）
@@ -309,6 +288,8 @@ interface SubtitleCue {
 | `extract_audio` | 提取 16kHz WAV 音轨 + 进度事件 |
 | `extract_waveform` | 提取归一化音频峰值数据用于时间轴波形 |
 | `get_video_info` | 获取视频分辨率、时长 |
+| `discover_preview_fonts` | 枚举系统/补充字体并注册为预览可访问 URL |
+| `render_subtitle_preview_frame` | 使用 FFmpeg/libass 渲染硬字幕单帧图，用于诊断与视觉回归 |
 | `register_media_playback` | 注册本地视频到媒体 HTTP 服务，返回可播放 URL |
 | `probe_video_playback` | 探测是否需代理转码（容器/音视频编码） |
 | `path_exists` | 判断文件或目录是否存在 |

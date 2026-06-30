@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
+import { selectLibassPreviewFonts } from "../../services/libassFontSelection";
 import { useVideoDisplayRect } from "../../hooks/useVideoDisplayRect";
+import { discoverPreviewFonts } from "../../services/tauri";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
-import type { VideoPlaybackProbe } from "../../types";
-import { AssSubtitleOverlay } from "./AssSubtitleOverlay";
+import type { PreviewFontFile, VideoPlaybackProbe } from "../../types";
+import { SubtitlePreview } from "./SubtitlePreview";
 
 interface VideoPlayerProps {
   videoPath: string;
@@ -20,8 +22,11 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const isSeekingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string>("");
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const [transcoding, setTranscoding] = useState(false);
   const [transcodePercent, setTranscodePercent] = useState(0);
+  const [previewFonts, setPreviewFonts] = useState<PreviewFontFile[]>([]);
+  const [previewFontError, setPreviewFontError] = useState<string | null>(null);
 
   const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
@@ -35,6 +40,14 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const assStyles = useProjectStore((s) => s.assStyles);
   const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
   const mergeMode = useSubtitleMergeMode();
+  const previewFontSelection = useMemo(
+    () =>
+      selectLibassPreviewFonts(previewFonts, assStyles, {
+        cues,
+        mergeMode,
+      }),
+    [assStyles, cues, mergeMode, previewFonts],
+  );
 
   const videoDisplayRect = useVideoDisplayRect(
     containerRef,
@@ -51,6 +64,29 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     const url = await invoke<string>("register_media_playback", { path });
     console.log("Media HTTP URL:", url);
     setVideoSrc(url);
+  }, []);
+
+  const setVideoNode = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    setVideoElement(node);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    discoverPreviewFonts()
+      .then((fonts) => {
+        if (!cancelled) {
+          setPreviewFonts(fonts);
+          setPreviewFontError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setPreviewFontError(String(err));
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const waitForTranscodedVideo = useCallback(
@@ -273,11 +309,6 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     return () => video.removeEventListener("seeked", onSeeked);
   }, [currentTimeMs, videoSrc]);
 
-  // 获取当前显示的字幕（只显示当前选中的或当前播放位置的）
-  const activeCue = isPlaying
-    ? cues.find((c) => currentTimeMs >= c.startMs && currentTimeMs <= c.endMs)
-    : cues.find((c) => c.id === selectedCueId);
-
   return (
     <div
       ref={containerRef}
@@ -307,7 +338,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       ) : (
         <>
           <video
-            ref={videoRef}
+            ref={setVideoNode}
             src={videoSrc}
             className="h-full w-full object-contain"
             onError={() => {
@@ -316,19 +347,30 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
           />
 
           {/* 字幕叠加层：限制在 object-contain 的实际视频画面内 */}
-          {activeCue && videoDisplayRect.width > 0 && videoDisplayRect.height > 0 && (
-            <AssSubtitleOverlay
-              cue={activeCue}
+          {videoDisplayRect.width > 0 && videoDisplayRect.height > 0 && (
+            <SubtitlePreview
+              cues={cues}
+              activeCueId={isPlaying ? null : selectedCueId}
               styles={assStyles}
               scriptInfo={assScriptInfo}
               mergeMode={mergeMode}
-              style={{
+              currentTimeMs={currentTimeMs}
+              videoElement={videoElement}
+              followVideoFrames={isPlaying}
+              fontUrls={previewFontSelection.fontUrls}
+              defaultFont={previewFontSelection.defaultFont}
+              displayRect={{
                 left: videoDisplayRect.left,
                 top: videoDisplayRect.top,
                 width: videoDisplayRect.width,
                 height: videoDisplayRect.height,
               }}
             />
+          )}
+          {previewFontError && (
+            <div className="absolute bottom-2 left-2 rounded-md border border-warning/40 bg-black/70 px-2 py-1 text-xs text-warning">
+              字体自动发现失败：{previewFontError}
+            </div>
           )}
         </>
       )}

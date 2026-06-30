@@ -12,6 +12,12 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 const STREAM_CHUNK: usize = 64 * 1024;
+const CORS_HEADERS: &str = concat!(
+    "Access-Control-Allow-Origin: *\r\n",
+    "Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n",
+    "Access-Control-Allow-Headers: Range, Content-Type\r\n",
+    "Access-Control-Expose-Headers: Accept-Ranges, Content-Length, Content-Range\r\n",
+);
 
 pub struct MediaServer {
     base_url: String,
@@ -55,7 +61,7 @@ impl MediaServer {
         Ok(Self { base_url, files })
     }
 
-    fn register_path(&self, path: PathBuf) -> Result<String, String> {
+    pub fn register_path(&self, path: PathBuf) -> Result<String, String> {
         if !path.is_file() {
             return Err(format!("文件不存在: {}", path.display()));
         }
@@ -139,6 +145,10 @@ async fn send_media_response(
     request: &HttpRequest,
     files: Arc<Mutex<HashMap<String, PathBuf>>>,
 ) -> Result<(), io::Error> {
+    if request.method == "OPTIONS" {
+        return write_simple_response(stream, StatusCode::NO_CONTENT, "text/plain", b"").await;
+    }
+
     if request.method != "GET" && request.method != "HEAD" {
         return write_simple_response(
             stream,
@@ -282,12 +292,14 @@ async fn write_simple_response(
     mime: &str,
     body: &[u8],
 ) -> Result<(), io::Error> {
-    let headers = format!(
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+    let mut headers = format!(
+        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n",
         status,
         mime,
         body.len()
     );
+    append_cors_headers(&mut headers);
+    headers.push_str("\r\n");
     write_all_or_disconnect(stream, headers.as_bytes()).await?;
     write_all_or_disconnect(stream, body).await?;
     stream.flush().await.map(|_| ())
@@ -305,6 +317,7 @@ async fn write_headers_only(
         "HTTP/1.1 {}\r\nContent-Type: {}\r\nAccept-Ranges: bytes\r\nContent-Length: {}\r\nConnection: close\r\n",
         status, mime, body_len
     );
+    append_cors_headers(&mut headers);
     if let Some(range) = byte_range {
         headers.push_str(&format!(
             "Content-Range: bytes {}-{}/{}\r\n",
@@ -313,6 +326,10 @@ async fn write_headers_only(
     }
     headers.push_str("\r\n");
     write_all_or_disconnect(stream, headers.as_bytes()).await
+}
+
+fn append_cors_headers(headers: &mut String) {
+    headers.push_str(CORS_HEADERS);
 }
 
 async fn write_all_or_disconnect(
@@ -330,6 +347,7 @@ fn is_client_disconnect(err: &io::Error) -> bool {
     matches!(
         err.kind(),
         io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
             | io::ErrorKind::BrokenPipe
             | io::ErrorKind::UnexpectedEof
     )
@@ -347,13 +365,17 @@ fn guess_mime(path: &Path) -> &'static str {
         Some("mp4") | Some("m4v") | Some("mov") => "video/mp4",
         Some("wav") => "audio/wav",
         Some("mp3") => "audio/mpeg",
+        Some("ttf") => "font/ttf",
+        Some("otf") => "font/otf",
+        Some("ttc") | Some("otc") => "font/collection",
         _ => "application/octet-stream",
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_byte_range, ByteRange};
+    use super::{append_cors_headers, is_client_disconnect, resolve_byte_range, ByteRange};
+    use std::io;
 
     #[test]
     fn open_ended_range_covers_tail() {
@@ -371,5 +393,20 @@ mod tests {
     fn explicit_range_is_honored() {
         let range = resolve_byte_range("bytes=0-1023", 5000).unwrap();
         assert_eq!(range, ByteRange { start: 0, end: 1023 });
+    }
+
+    #[test]
+    fn connection_aborted_is_treated_as_client_disconnect() {
+        let err = io::Error::new(io::ErrorKind::ConnectionAborted, "client closed");
+        assert!(is_client_disconnect(&err));
+    }
+
+    #[test]
+    fn cors_headers_allow_worker_font_fetches() {
+        let mut headers = String::new();
+        append_cors_headers(&mut headers);
+
+        assert!(headers.contains("Access-Control-Allow-Origin: *\r\n"));
+        assert!(headers.contains("Access-Control-Allow-Headers: Range, Content-Type\r\n"));
     }
 }
