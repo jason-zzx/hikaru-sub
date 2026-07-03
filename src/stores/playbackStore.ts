@@ -5,10 +5,16 @@ interface PlaybackState {
   durationMs: number;
   isPlaying: boolean;
   selectedCueId: string | null;
+  /** 视频帧率；未探测到时为 null（帧步进按 30fps 回退） */
+  fps: number | null;
+  /** 「播放当前句」的自动停止点；null 表示非片段播放 */
+  playUntilMs: number | null;
   setCurrentTime: (ms: number) => void;
   setDuration: (ms: number) => void;
   setPlaying: (playing: boolean) => void;
   setSelectedCueId: (id: string | null) => void;
+  setFps: (fps: number | null) => void;
+  setPlayUntil: (ms: number | null) => void;
 }
 
 export const usePlaybackStore = create<PlaybackState>((set) => ({
@@ -16,8 +22,14 @@ export const usePlaybackStore = create<PlaybackState>((set) => ({
   durationMs: 0,
   isPlaying: false,
   selectedCueId: null,
+  fps: null,
+  playUntilMs: null,
   setCurrentTime: (ms) => set({ currentTimeMs: ms }),
   setDuration: (ms) => set({ durationMs: ms }),
-  setPlaying: (playing) => set({ isPlaying: playing }),
+  // 暂停即视为片段播放结束：统一清除 playUntilMs，覆盖空格/按钮/播放结束等所有暂停路径
+  setPlaying: (playing) =>
+    set(playing ? { isPlaying: true } : { isPlaying: false, playUntilMs: null }),
   setSelectedCueId: (id) => set({ selectedCueId: id }),
+  setFps: (fps) => set({ fps }),
+  setPlayUntil: (ms) => set({ playUntilMs: ms }),
 }));

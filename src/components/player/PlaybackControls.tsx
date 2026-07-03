@@ -1,4 +1,5 @@
 import { usePlaybackStore } from "../../stores/playbackStore";
+import { formatPlaybackTime } from "../../utils/formatTime";
 
 interface PlaybackControlsProps {
   onSave?: () => void;
@@ -46,7 +47,7 @@ export function PlaybackControls({
       <button
         onClick={() => setPlaying(!isPlaying)}
         className="rounded p-1 hover:bg-surface-hover"
-        title={isPlaying ? "暂停" : "播放"}
+        title={isPlaying ? "暂停（空格）" : "播放（空格）"}
       >
         {isPlaying ? (
           <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
@@ -69,9 +70,9 @@ export function PlaybackControls({
         </svg>
       </button>
 
-      {/* 时间显示 */}
-      <span className="text-xs text-text-muted">
-        {formatTime(currentTimeMs)} / {formatTime(durationMs)}
+      {/* 时间显示：当前时间精确到毫秒便于精细对轴，总时长仅秒级 */}
+      <span className="font-mono text-xs text-text-muted">
+        {formatPlaybackTime(currentTimeMs, true)} / {formatPlaybackTime(durationMs, false)}
       </span>
 
       {/* 进度条 */}
@@ -90,7 +91,7 @@ export function PlaybackControls({
           onClick={onUndo}
           disabled={!canUndo}
           className="rounded p-1 hover:bg-surface-hover disabled:opacity-30"
-          title="撤销 (Ctrl+Z)"
+          title="撤销（Ctrl+Z）"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -101,7 +102,7 @@ export function PlaybackControls({
           onClick={onRedo}
           disabled={!canRedo}
           className="rounded p-1 hover:bg-surface-hover disabled:opacity-30"
-          title="重做 (Ctrl+Y)"
+          title="重做（Ctrl+Y / Ctrl+Shift+Z）"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
@@ -118,16 +119,4 @@ export function PlaybackControls({
       </div>
     </div>
   );
-}
-
-function formatTime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-  }
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }

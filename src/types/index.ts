@@ -162,6 +162,8 @@ export interface VideoInfo {
   width: number;
   height: number;
   durationMs: number;
+  /** 视频帧率；后端无法探测时为 null */
+  fps: number | null;
 }
 
 export interface VideoPlaybackProbe {

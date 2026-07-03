@@ -1,0 +1,133 @@
+import { describe, expect, it } from "vitest";
+import {
+  appendCueAfter,
+  createCueAtPlayhead,
+  findSubtitleBoundary,
+  frameStepTarget,
+  nextAfterCommit,
+  selectCueByOffset,
+} from "./editorActions";
+import type { SubtitleCue } from "../types";
+
+function cue(id: string, startMs: number, endMs: number): SubtitleCue {
+  return { id, startMs, endMs, primaryText: id, style: "Primary", layer: 0 };
+}
+
+const CUES = [cue("a", 0, 1000), cue("b", 2000, 3000), cue("c", 5000, 6000)];
+
+describe("selectCueByOffset", () => {
+  it("选中下一条/上一条", () => {
+    expect(selectCueByOffset(CUES, "a", 1)?.id).toBe("b");
+    expect(selectCueByOffset(CUES, "b", -1)?.id).toBe("a");
+  });
+
+  it("越界收在首/末条", () => {
+    expect(selectCueByOffset(CUES, "a", -1)?.id).toBe("a");
+    expect(selectCueByOffset(CUES, "c", 1)?.id).toBe("c");
+    expect(selectCueByOffset(CUES, "a", Infinity)?.id).toBe("c");
+    expect(selectCueByOffset(CUES, "c", -Infinity)?.id).toBe("a");
+  });
+
+  it("未选中时从第一条开始；空列表返回 null", () => {
+    expect(selectCueByOffset(CUES, null, 1)?.id).toBe("a");
+    expect(selectCueByOffset([], null, 1)).toBeNull();
+  });
+});
+
+describe("findSubtitleBoundary", () => {
+  it("找到后方最近边界（跳过 1ms 容差内的当前位置）", () => {
+    expect(findSubtitleBoundary(CUES, 500, 1)).toBe(1000);
+    expect(findSubtitleBoundary(CUES, 1000, 1)).toBe(2000);
+    expect(findSubtitleBoundary(CUES, 1000.4, 1)).toBe(2000);
+  });
+
+  it("找到前方最近边界", () => {
+    expect(findSubtitleBoundary(CUES, 2500, -1)).toBe(2000);
+    expect(findSubtitleBoundary(CUES, 2000, -1)).toBe(1000);
+  });
+
+  it("越过首/末边界或空列表返回 null", () => {
+    expect(findSubtitleBoundary(CUES, 0, -1)).toBeNull();
+    expect(findSubtitleBoundary(CUES, 6000, 1)).toBeNull();
+    expect(findSubtitleBoundary([], 100, 1)).toBeNull();
+  });
+});
+
+describe("frameStepTarget", () => {
+  it("按 fps 帧中心步进", () => {
+    // 25fps：一帧 40ms；当前 0ms（第 0 帧）→ 下一帧中心 = 1.5 × 40 = 60ms
+    expect(frameStepTarget(0, 25, 1, 60000)).toBeCloseTo(60);
+    // 回退一帧被 clamp 到 0
+    expect(frameStepTarget(0, 25, -1, 60000)).toBe(0);
+  });
+
+  it("从帧中心前进/后退恰好一帧（不跳帧、不卡死）", () => {
+    // 25fps 帧中心：20, 60, 100, ... 当前位于帧 1 中心（60ms）
+    expect(frameStepTarget(60, 25, 1, 60000)).toBe(100); // → 帧 2 中心
+    expect(frameStepTarget(60, 25, -1, 60000)).toBe(20); // → 帧 0 中心
+  });
+
+  it("fps 为 null 或非正时按 30fps 回退", () => {
+    // 30fps：一帧 ≈33.33ms；0ms → 下一帧中心 = 1.5 × 33.33 ≈ 50ms
+    expect(frameStepTarget(0, null, 1, 60000)).toBeCloseTo(50, 0);
+    expect(frameStepTarget(0, 0, 1, 60000)).toBeCloseTo(50, 0);
+  });
+
+  it("clamp 到时长", () => {
+    expect(frameStepTarget(59990, 25, 10, 60000)).toBe(60000);
+  });
+});
+
+describe("appendCueAfter", () => {
+  it("起点接当前行结束、时长 2s、文本空、继承样式与 layer", () => {
+    const base: SubtitleCue = {
+      id: "x",
+      startMs: 1000,
+      endMs: 3000,
+      primaryText: "text",
+      secondaryText: "译",
+      style: "Secondary",
+      layer: 2,
+    };
+    const appended = appendCueAfter(base);
+    expect(appended.id).toBeTruthy();
+    expect(appended.id).not.toBe("x");
+    expect(appended.startMs).toBe(3000);
+    expect(appended.endMs).toBe(5000);
+    expect(appended.primaryText).toBe("");
+    expect(appended.secondaryText).toBeUndefined();
+    expect(appended.style).toBe("Secondary");
+    expect(appended.layer).toBe(2);
+  });
+});
+
+describe("createCueAtPlayhead", () => {
+  it("沿用现有新建参数：2s、占位文本、Primary、layer 0", () => {
+    const created = createCueAtPlayhead(1234);
+    expect(created.startMs).toBe(1234);
+    expect(created.endMs).toBe(3234);
+    expect(created.primaryText).toBe("新建字幕");
+    expect(created.style).toBe("Primary");
+    expect(created.layer).toBe(0);
+  });
+});
+
+describe("nextAfterCommit", () => {
+  it("中间行提交后选中下一条", () => {
+    const result = nextAfterCommit(CUES, "a");
+    expect(result).toEqual({ kind: "select", cue: CUES[1] });
+  });
+
+  it("最后一条提交后追加", () => {
+    const result = nextAfterCommit(CUES, "c");
+    expect(result.kind).toBe("append");
+    if (result.kind === "append") {
+      expect(result.base.id).toBe("c");
+    }
+  });
+
+  it("找不到 id 时返回 none", () => {
+    expect(nextAfterCommit(CUES, "missing")).toEqual({ kind: "none" });
+    expect(nextAfterCommit([], "a")).toEqual({ kind: "none" });
+  });
+});

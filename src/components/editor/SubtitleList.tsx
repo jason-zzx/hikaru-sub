@@ -11,6 +11,7 @@ export function SubtitleList() {
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
+  const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
 
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -32,6 +33,7 @@ export function SubtitleList() {
   const handleCueClick = (cue: SubtitleCue) => {
     setSelectedCueId(cue.id);
     setCurrentTime(cue.startMs);
+    setPlayUntil(null);
   };
 
   if (cues.length === 0) {
