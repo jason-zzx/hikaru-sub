@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { selectLibassPreviewFonts } from "../../services/libassFontSelection";
 import { useVideoDisplayRect } from "../../hooks/useVideoDisplayRect";
-import { discoverPreviewFonts } from "../../services/tauri";
+import { discoverPreviewFonts, getVideoInfo } from "../../services/tauri";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { PreviewFontFile, VideoPlaybackProbe } from "../../types";
@@ -20,6 +20,8 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const transcodeFallbackRef = useRef(false);
   const recoverAttemptRef = useRef(0);
   const isSeekingRef = useRef(false);
+  /** 「播放当前句」到点时记录终点，供 rAF cleanup 使用该精确值而非 frame-snap 后的视频时间 */
+  const segmentEndRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string>("");
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
@@ -130,6 +132,16 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  // 探测原片帧率供逐帧步进使用（代理转码不改帧率，始终按原路径探测）
+  useEffect(() => {
+    if (!videoPath) return;
+    const { setFps } = usePlaybackStore.getState();
+    setFps(null);
+    getVideoInfo(videoPath)
+      .then((info) => setFps(info.fps ?? null))
+      .catch(() => setFps(null));
+  }, [videoPath]);
 
   // 通过本地 HTTP 服务加载视频（Linux WebKit 无法经 asset 协议播放音视频）
   useEffect(() => {
@@ -244,8 +256,14 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       const ms = Math.floor(video.currentTime * 1000);
       setCurrentTime(ms);
 
-      // 仅在播放时自动选中当前时间轴的字幕
-      if (isPlaying) {
+      // 「播放当前句」到点自动暂停；pause 事件链会经 setPlaying(false) 清除 playUntilMs
+      const { playUntilMs } = usePlaybackStore.getState();
+      if (playUntilMs !== null && ms >= playUntilMs) {
+        video.pause();
+      }
+
+      // 仅在普通播放时自动选中当前时间轴的字幕；「播放当前句」期间保持选中不变
+      if (isPlaying && playUntilMs === null) {
         const activeCue = cues.find(
           (c) => ms >= c.startMs && ms <= c.endMs,
         );
@@ -281,11 +299,53 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     };
   }, [videoSrc, cues, isPlaying, setCurrentTime, setDuration, setPlaying, setSelectedCueId]);
 
+  // 播放时高频同步播放时间并在片段终点及时停止。
+  // timeupdate 仅 ~4Hz，会导致时间轴指针跳动（bug 4）与 R 段落播放越界（bug 3）。
+  useEffect(() => {
+    if (!isPlaying || !videoSrc) return;
+    const video = videoRef.current;
+    if (!video) return;
+    let rafId = 0;
+    const tick = () => {
+      const { playUntilMs } = usePlaybackStore.getState();
+      // 「播放当前句」到点：暂停并把播放头精确 snap 到片段终点（cue.endMs），
+      // 避免越界进入下一条字幕导致选中切换；pause 事件链会经 setPlaying(false) 清除 playUntilMs
+      if (playUntilMs !== null && video.currentTime * 1000 >= playUntilMs) {
+        video.pause();
+        video.currentTime = playUntilMs / 1000;
+        setCurrentTime(playUntilMs);
+        segmentEndRef.current = playUntilMs;
+        return;
+      }
+      if (!isSeekingRef.current) {
+        setCurrentTime(Math.floor(video.currentTime * 1000));
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (!video) return;
+      // 「播放当前句」终点用记录的精确值，避免 cleanup 读到 frame-snap 后的视频时间
+      // 把 store 回退到终点前一帧；普通暂停则同步真实视频位置修正 rAF 回写残差
+      const segmentEnd = segmentEndRef.current;
+      if (segmentEnd !== null) {
+        setCurrentTime(segmentEnd);
+        segmentEndRef.current = null;
+      } else if (!isSeekingRef.current) {
+        setCurrentTime(Math.floor(video.currentTime * 1000));
+      }
+    };
+  }, [isPlaying, videoSrc, setCurrentTime]);
+
   // 外部跳转到指定时间（拖动进度条 / 时间轴）
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
-    if (Math.abs(video.currentTime * 1000 - currentTimeMs) < 100) return;
+    // 暂停时收小死区以放行逐帧步进（一帧约 16-42ms）；播放时保留较大死区压制
+    // rAF/timeupdate 回写残差（≤~16ms）避免播放中误 seek。播放中逐帧步进为既有限制。
+    const deadbandMs = isPlaying ? 100 : 5;
+    if (Math.abs(video.currentTime * 1000 - currentTimeMs) < deadbandMs) return;
 
     isSeekingRef.current = true;
     const targetSec = currentTimeMs / 1000;
@@ -307,7 +367,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
 
     video.currentTime = targetSec;
     return () => video.removeEventListener("seeked", onSeeked);
-  }, [currentTimeMs, videoSrc]);
+  }, [currentTimeMs, videoSrc, isPlaying]);
 
   return (
     <div

@@ -40,6 +40,8 @@ pub struct VideoInfo {
     pub width: u32,
     pub height: u32,
     pub duration_ms: i64,
+    /// 视频帧率（r_frame_rate 优先，回退 avg_frame_rate），无法解析时为 None
+    pub fps: Option<f64>,
 }
 
 const EXECUTABLE_NAME: &str = if cfg!(windows) {
@@ -262,7 +264,62 @@ fn run_extract(
     Ok(())
 }
 
-/// 使用 ffprobe 获取视频信息（分辨率、时长）
+/// 解析 ffprobe 的 "30000/1001" 形式帧率；无效（0/0、N/A、非正数）返回 None。
+fn parse_rational_fps(value: &str) -> Option<f64> {
+    let v = value.trim();
+    if v.is_empty() || v == "N/A" {
+        return None;
+    }
+    if let Some((num, den)) = v.split_once('/') {
+        let num: f64 = num.parse().ok()?;
+        let den: f64 = den.parse().ok()?;
+        if den == 0.0 || num <= 0.0 {
+            return None;
+        }
+        return Some(num / den);
+    }
+    v.parse::<f64>().ok().filter(|f| *f > 0.0)
+}
+
+/// 解析 ffprobe `-of default=noprint_wrappers=1` 的 key=value 输出。
+fn parse_video_info_output(stdout: &str) -> Result<VideoInfo, String> {
+    let mut width: Option<u32> = None;
+    let mut height: Option<u32> = None;
+    let mut duration_ms: i64 = 0;
+    let mut r_fps: Option<f64> = None;
+    let mut avg_fps: Option<f64> = None;
+
+    for line in stdout.lines() {
+        let Some((key, value)) = line.trim().split_once('=') else {
+            continue;
+        };
+        match key {
+            "width" => width = value.parse().ok(),
+            "height" => height = value.parse().ok(),
+            "duration" => {
+                duration_ms = value
+                    .parse::<f64>()
+                    .ok()
+                    .map(|d| (d * 1000.0) as i64)
+                    .unwrap_or(0)
+            }
+            "r_frame_rate" => r_fps = parse_rational_fps(value),
+            "avg_frame_rate" => avg_fps = parse_rational_fps(value),
+            _ => {}
+        }
+    }
+
+    let width = width.ok_or("无法解析宽度")?;
+    let height = height.ok_or("无法解析高度")?;
+    Ok(VideoInfo {
+        width,
+        height,
+        duration_ms,
+        fps: r_fps.or(avg_fps),
+    })
+}
+
+/// 使用 ffprobe 获取视频信息（分辨率、时长、帧率）
 #[tauri::command]
 pub async fn get_video_info(
     app: AppHandle,
@@ -287,8 +344,8 @@ pub async fn get_video_info(
         .args([
             "-v", "error",
             "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,duration",
-            "-of", "csv=p=0",
+            "-show_entries", "stream=width,height,duration,r_frame_rate,avg_frame_rate",
+            "-of", "default=noprint_wrappers=1",
             &video_path,
         ])
         .output()
@@ -301,28 +358,7 @@ pub async fn get_video_info(
         ));
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parts: Vec<&str> = stdout.trim().split(',').collect();
-
-    if parts.len() < 2 {
-        return Err("无法解析视频信息".to_string());
-    }
-
-    let width: u32 = parts[0].parse().map_err(|_| "无法解析宽度")?;
-    let height: u32 = parts[1].parse().map_err(|_| "无法解析高度")?;
-
-    // duration 可能为空或 N/A
-    let duration_ms = if parts.len() >= 3 {
-        parts[2].parse::<f64>().ok().map(|d| (d * 1000.0) as i64).unwrap_or(0)
-    } else {
-        0
-    };
-
-    Ok(VideoInfo {
-        width,
-        height,
-        duration_ms,
-    })
+    parse_video_info_output(&String::from_utf8_lossy(&output.stdout))
 }
 
 /// 提取音频波形数据（峰值数组），用于 Timeline 渲染
@@ -417,5 +453,41 @@ fn handle_stderr_line(app: &AppHandle, text: &str, duration_ms: &mut i64, tail: 
     let trimmed = text.trim();
     if !trimmed.is_empty() {
         *tail = trimmed.to_string();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_video_info_normal() {
+        let out = "width=1920\nheight=1080\nr_frame_rate=30000/1001\navg_frame_rate=30000/1001\nduration=1445.361000\n";
+        let info = parse_video_info_output(out).unwrap();
+        assert_eq!(info.width, 1920);
+        assert_eq!(info.height, 1080);
+        assert_eq!(info.duration_ms, 1445361);
+        let fps = info.fps.unwrap();
+        assert!((fps - 29.97).abs() < 0.01);
+    }
+
+    #[test]
+    fn parse_video_info_r_frame_rate_invalid_falls_back_to_avg() {
+        let out = "width=1280\nheight=720\nr_frame_rate=0/0\navg_frame_rate=25/1\nduration=10.0\n";
+        let info = parse_video_info_output(out).unwrap();
+        assert_eq!(info.fps, Some(25.0));
+    }
+
+    #[test]
+    fn parse_video_info_missing_fps_and_duration() {
+        let out = "width=640\nheight=480\nr_frame_rate=N/A\navg_frame_rate=0/0\n";
+        let info = parse_video_info_output(out).unwrap();
+        assert_eq!(info.fps, None);
+        assert_eq!(info.duration_ms, 0);
+    }
+
+    #[test]
+    fn parse_video_info_missing_dimensions_errors() {
+        assert!(parse_video_info_output("duration=1.0\n").is_err());
     }
 }

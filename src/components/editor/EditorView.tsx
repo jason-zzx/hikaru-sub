@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useState } from "react";
+import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { VideoPlayer } from "../player/VideoPlayer";
@@ -6,6 +7,7 @@ import { PlaybackControls } from "../player/PlaybackControls";
 import { SubtitleList } from "./SubtitleList";
 import { SubtitleEditor } from "./SubtitleEditor";
 import { Timeline } from "./Timeline";
+import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
 import { getSettings, saveAssText } from "../../services/tauri";
 import { serializeAss } from "@hikaru/ass-core";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
@@ -25,27 +27,6 @@ export function EditorView() {
   const canRedo = useProjectStore((s) => s.canRedo);
   const markSaved = useProjectStore((s) => s.markSaved);
   const setStep = useUiStore((s) => s.setStep);
-
-  // 快捷键支持
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === "z" && !e.shiftKey) {
-          e.preventDefault();
-          undo();
-        } else if (e.key === "y" || (e.key === "z" && e.shiftKey)) {
-          e.preventDefault();
-          redo();
-        } else if (e.key === "s") {
-          e.preventDefault();
-          handleSave();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo]);
 
   const handleSave = async () => {
     if (!project || !projectDir || cues.length === 0) return;
@@ -72,6 +53,14 @@ export function EditorView() {
       alert(`保存失败：${err}`);
     }
   };
+
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useEditorHotkeys({
+    onSave: handleSave,
+    onToggleHelp: () => setHelpOpen((v) => !v),
+    enabled: !helpOpen,
+  });
 
   if (!project || !projectDir) {
     return (
@@ -138,6 +127,9 @@ export function EditorView() {
           未保存
         </div>
       )}
+
+      {/* 键位速查浮层（? 呼出） */}
+      <HotkeyHelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
