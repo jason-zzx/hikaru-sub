@@ -23,8 +23,13 @@ interface ProjectState {
   setAssMetadata: (scriptInfo: AssScriptInfo, styles: AssStyle[]) => void;
   setCues: (cues: SubtitleCue[]) => void;
   updateCue: (id: string, updates: Partial<SubtitleCue>) => void;
+  updateCuePreview: (id: string, updates: Partial<SubtitleCue>) => void;
   addCue: (cue: SubtitleCue) => void;
   deleteCue: (id: string) => void;
+  addStyle: (style: AssStyle) => void;
+  updateStyle: (name: string, updates: Partial<AssStyle>) => void;
+  deleteStyle: (name: string) => void;
+  renameStyle: (oldName: string, newName: string, cascade: boolean) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -39,6 +44,16 @@ const emptyAssState = {
   assScriptInfo: null as AssScriptInfo | null,
   assStyles: [] as AssStyle[],
 };
+
+function hasCueChanges(
+  cue: SubtitleCue | undefined,
+  updates: Partial<SubtitleCue>,
+): boolean {
+  if (!cue) return false;
+  return (Object.keys(updates) as Array<keyof SubtitleCue>).some(
+    (key) => !Object.is(cue[key], updates[key]),
+  );
+}
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   project: null,
@@ -95,6 +110,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   updateCue: (id, updates) =>
     set((state) => {
+      const currentCue = state.cues.find((cue) => cue.id === id);
+      if (!hasCueChanges(currentCue, updates)) return state;
+
       const newCues = produce(state.cues, (draft) => {
         const cue = draft.find((c) => c.id === id);
         if (cue) {
@@ -106,6 +124,23 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         cues: newCues,
         isDirty: true,
         history: { past: newPast, future: [] },
+      };
+    }),
+
+  updateCuePreview: (id, updates) =>
+    set((state) => {
+      const currentCue = state.cues.find((cue) => cue.id === id);
+      if (!hasCueChanges(currentCue, updates)) return state;
+
+      const newCues = produce(state.cues, (draft) => {
+        const cue = draft.find((c) => c.id === id);
+        if (cue) {
+          Object.assign(cue, updates);
+        }
+      });
+      return {
+        cues: newCues,
+        isDirty: true,
       };
     }),
 
@@ -125,6 +160,53 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const newCues = state.cues.filter((c) => c.id !== id);
       const newPast = [...state.history.past, state.cues].slice(-MAX_HISTORY);
       return {
+        cues: newCues,
+        isDirty: true,
+        history: { past: newPast, future: [] },
+      };
+    }),
+
+  addStyle: (style) =>
+    set((state) => ({
+      assStyles: [...state.assStyles, style],
+      isDirty: true,
+    })),
+
+  updateStyle: (name, updates) =>
+    set((state) => ({
+      assStyles: state.assStyles.map((style) =>
+        style.name === name ? { ...style, ...updates } : style,
+      ),
+      isDirty: true,
+    })),
+
+  deleteStyle: (name) =>
+    set((state) => ({
+      assStyles: state.assStyles.filter((style) => style.name !== name),
+      isDirty: true,
+    })),
+
+  renameStyle: (oldName, newName, cascade) =>
+    set((state) => {
+      const target = state.assStyles.find((style) => style.name === oldName);
+      if (!target || oldName === newName) return state;
+
+      const assStyles = state.assStyles.map((style) =>
+        style.name === oldName ? { ...style, name: newName } : style,
+      );
+
+      if (!cascade) {
+        return { assStyles, isDirty: true };
+      }
+
+      const newCues = produce(state.cues, (draft) => {
+        for (const cue of draft) {
+          if (cue.style === oldName) cue.style = newName;
+        }
+      });
+      const newPast = [...state.history.past, state.cues].slice(-MAX_HISTORY);
+      return {
+        assStyles,
         cues: newCues,
         isDirty: true,
         history: { past: newPast, future: [] },

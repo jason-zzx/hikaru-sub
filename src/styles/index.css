@@ -51,3 +51,19 @@ body {
   background: var(--color-border);
   border-radius: 4px;
 }
+
+.hikaru-color-picker .react-colorful {
+  height: 176px;
+  width: 100%;
+}
+
+.hikaru-color-picker .react-colorful__hue,
+.hikaru-color-picker .react-colorful__alpha {
+  height: 10px;
+  border-radius: 999px;
+}
+
+.hikaru-color-picker .react-colorful__pointer {
+  height: 14px;
+  width: 14px;
+}

@@ -17,11 +17,14 @@ export function Select({
   onChange,
   options,
   disabled,
+  placeholder,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
   disabled?: boolean;
+  /** value 不在 options 中时显示的文本；缺省回退显示原始 value */
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -53,7 +56,9 @@ export function Select({
         onClick={() => setOpen((o) => !o)}
         className={triggerClass}
       >
-        <span className="truncate">{selected?.label ?? value}</span>
+        <span className="truncate">
+          {selected ? selected.label : (placeholder ?? value)}
+        </span>
         <IconChevronDown
           className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${
             open ? "rotate-180" : ""
