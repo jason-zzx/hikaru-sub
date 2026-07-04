@@ -8,6 +8,7 @@ import { SubtitleList } from "./SubtitleList";
 import { SubtitleEditor } from "./SubtitleEditor";
 import { Timeline } from "./Timeline";
 import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
+import { StyleManager } from "./StyleManager";
 import { getSettings, saveAssText } from "../../services/tauri";
 import { serializeAss } from "@hikaru/ass-core";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
@@ -27,6 +28,8 @@ export function EditorView() {
   const canRedo = useProjectStore((s) => s.canRedo);
   const markSaved = useProjectStore((s) => s.markSaved);
   const setStep = useUiStore((s) => s.setStep);
+  const styleManagerOpen = useUiStore((s) => s.styleManagerOpen);
+  const toggleStyleManager = useUiStore((s) => s.toggleStyleManager);
 
   const handleSave = async () => {
     if (!project || !projectDir || cues.length === 0) return;
@@ -102,8 +105,19 @@ export function EditorView() {
         </div>
 
         {/* 编辑面板 */}
-        <div className="col-start-3 row-span-2 bg-surface-raised">
-          <SubtitleEditor />
+        <div className="col-start-3 row-span-2 flex min-h-0 flex-col bg-surface-raised">
+          <div className="border-b border-border px-3 py-2">
+            <button
+              type="button"
+              onClick={toggleStyleManager}
+              className="w-full rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay"
+            >
+              {styleManagerOpen ? "关闭样式库" : "样式管理"}
+            </button>
+          </div>
+          <div className="min-h-0 flex-1">
+            <SubtitleEditor />
+          </div>
         </div>
 
         {/* 时间轴 */}
@@ -127,6 +141,8 @@ export function EditorView() {
           未保存
         </div>
       )}
+
+      <StyleManager />
 
       {/* 键位速查浮层（? 呼出） */}
       <HotkeyHelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
