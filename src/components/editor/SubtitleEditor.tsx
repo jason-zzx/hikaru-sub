@@ -10,11 +10,19 @@ import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useUiStore } from "../../stores/uiStore";
 import {
-  appendCueAfter,
-  createCueAtPlayhead,
+  appendCueAfterWithUniqueId,
+  createCueAtPlayheadWithUniqueId,
   nextAfterCommit,
+  selectCueAfterDelete,
 } from "../../services/editorActions";
 import { applyToggleOverrideTag } from "../../utils/assOverrideTags";
+import {
+  applyTimeInputKey,
+  formatTimeInput,
+  normalizeTimeInputValue,
+  normalizeTimeRange,
+  snapTimeInputCaret,
+} from "../../utils/timeInput";
 import { Select } from "../ui/Select";
 import { ColorPicker } from "./ColorPicker";
 import { FontComboBox } from "./FontComboBox";
@@ -36,30 +44,14 @@ type TextEditBaseline = {
   wasDirty: boolean;
 };
 
-function formatTimeInput(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const centiseconds = Math.floor((ms % 1000) / 10);
+type EditorNotify = (variant: "success" | "error" | "info", text: string) => void;
+type TimeField = "start" | "end";
 
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${centiseconds.toString().padStart(2, "0")}`;
+interface SubtitleEditorProps {
+  onNotify?: EditorNotify;
 }
 
-function parseTimeInput(timeStr: string): number {
-  const match = timeStr.match(/^(\d{1,2}):(\d{2}):(\d{2})\.(\d{2})$/);
-  if (!match) return 0;
-
-  const [, hours, minutes, seconds, centiseconds] = match;
-  return (
-    parseInt(hours) * 3600000 +
-    parseInt(minutes) * 60000 +
-    parseInt(seconds) * 1000 +
-    parseInt(centiseconds) * 10
-  );
-}
-
-export function SubtitleEditor() {
+export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   const cues = useProjectStore((s) => s.cues);
   const updateCue = useProjectStore((s) => s.updateCue);
   const updateCuePreview = useProjectStore((s) => s.updateCuePreview);
@@ -95,6 +87,8 @@ export function SubtitleEditor() {
   const inlineTextRef = useRef<HTMLTextAreaElement>(null);
   const primaryTextRef = useRef<HTMLTextAreaElement>(null);
   const secondaryTextRef = useRef<HTMLTextAreaElement>(null);
+  const startTimeRef = useRef<HTMLInputElement>(null);
+  const endTimeRef = useRef<HTMLInputElement>(null);
 
   const selectedCueStartsInline =
     mergeMode === "inline" &&
@@ -197,37 +191,84 @@ export function SubtitleEditor() {
     }
   }, [editorFocusNonce]);
 
-  const commitDraft = () => {
-    if (!selectedCue) return;
+  const setTimeValue = (field: TimeField, value: string) => {
+    if (field === "start") setStartTime(value);
+    else setEndTime(value);
+  };
 
+  const timeInputFor = (field: TimeField) =>
+    field === "start" ? startTimeRef.current : endTimeRef.current;
+
+  const scheduleTimeCaret = (field: TimeField, position: number) => {
+    window.requestAnimationFrame(() => {
+      const input = timeInputFor(field);
+      if (!input) return;
+      input.setSelectionRange(position, position);
+    });
+  };
+
+  const buildCurrentTextUpdates = () => {
     if (useInlineEditor) {
-      updateCue(selectedCue.id, {
-        ...textUpdatesFor("inline", inlineText),
-        startMs: parseTimeInput(startTime),
-        endMs: parseTimeInput(endTime),
-      });
-      textEditBaselineRef.current = null;
-      return;
+      return textUpdatesFor("inline", inlineText);
     }
-
-    updateCue(selectedCue.id, {
+    return {
       ...textUpdatesFor("primary", primaryText),
       ...textUpdatesFor("secondary", secondaryText),
-      startMs: parseTimeInput(startTime),
-      endMs: parseTimeInput(endTime),
+    };
+  };
+
+  const commitTextDraft = () => {
+    if (!selectedCue) return false;
+    updateCue(selectedCue.id, buildCurrentTextUpdates());
+    textEditBaselineRef.current = null;
+    return true;
+  };
+
+  const commitTimeDraft = (field: TimeField = "end") => {
+    if (!selectedCue) return false;
+    const result = normalizeTimeRange(startTime, endTime, field);
+    setStartTime(result.startText);
+    setEndTime(result.endText);
+    updateCue(selectedCue.id, {
+      startMs: result.startMs,
+      endMs: result.endMs,
+    });
+    return true;
+  };
+
+  const commitDraft = () => {
+    if (!selectedCue) return false;
+
+    const result = normalizeTimeRange(startTime, endTime, "end");
+    setStartTime(result.startText);
+    setEndTime(result.endText);
+    updateCue(selectedCue.id, {
+      ...buildCurrentTextUpdates(),
+      startMs: result.startMs,
+      endMs: result.endMs,
     });
     textEditBaselineRef.current = null;
+    return true;
   };
 
   const handleBlur = () => {
     if (escapingRef.current) return;
-    commitDraft();
+    commitTextDraft();
+  };
+
+  const handleTimeBlur = (field: TimeField) => {
+    if (escapingRef.current) return;
+    const normalized = normalizeTimeInputValue(
+      field === "start" ? startTime : endTime,
+    );
+    setTimeValue(field, normalized);
+    commitTimeDraft(field);
   };
 
   /** Enter：提交并跳下一条；最后一条时追加新行（继承样式，起点接结束时间）。 */
   const commitAndNext = () => {
     if (!selectedCue) return;
-    commitDraft();
+    if (!commitDraft()) return;
 
     const committedCues = useProjectStore.getState().cues;
     const followUp = nextAfterCommit(committedCues, selectedCue.id);
@@ -239,7 +280,14 @@ export function SubtitleEditor() {
       setCurrentTime(followUp.cue.startMs);
       return;
     }
-    const appended = appendCueAfter(followUp.base);
+    const appended = appendCueAfterWithUniqueId(
+      followUp.base,
+      useProjectStore.getState().cues,
+    );
+    if (!appended) {
+      onNotify?.("error", "新建字幕失败：无法生成唯一 ID");
+      return;
+    }
     addCue(appended);
     setSelectedCueId(appended.id);
     setCurrentTime(appended.startMs);
@@ -392,30 +440,59 @@ export function SubtitleEditor() {
     // Shift+Enter 走 textarea 默认换行
   };
 
-  const handleTimeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === "Escape") {
+  const handleTimeKeyDown =
+    (field: TimeField) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.nativeEvent.isComposing) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        discardAndBlur(e.currentTarget);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (commitTimeDraft(field)) e.currentTarget.blur();
+        return;
+      }
+
+      const result = applyTimeInputKey(
+        e.currentTarget.value,
+        e.currentTarget.selectionStart ?? 0,
+        e.currentTarget.selectionEnd ?? 0,
+        e.key,
+      );
+      if (!result.handled) return;
+
       e.preventDefault();
-      discardAndBlur(e.currentTarget);
-      return;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      e.currentTarget.blur(); // blur 提交
-    }
-  };
+      setTimeValue(field, result.value);
+      scheduleTimeCaret(field, result.selectionStart);
+    };
+
+  const handleTimeChange =
+    (field: TimeField) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const caret = snapTimeInputCaret(e.currentTarget.selectionStart ?? 0);
+      setTimeValue(field, normalizeTimeInputValue(e.currentTarget.value));
+      scheduleTimeCaret(field, caret);
+    };
 
   const handleDelete = () => {
     if (!selectedCue) return;
-    if (confirm("确定删除该字幕？")) {
-      deleteCue(selectedCue.id);
-    }
+    const before = useProjectStore.getState().cues;
+    const next = selectCueAfterDelete(before, selectedCue.id);
+    deleteCue(selectedCue.id);
+    setSelectedCueId(next ? next.id : null);
+    setPlayUntil(null);
+    onNotify?.("info", "已删除字幕，可按 Ctrl+Z 撤销");
   };
 
   const handleAdd = () => {
-    const newCue: SubtitleCue = createCueAtPlayhead(
+    const newCue: SubtitleCue | null = createCueAtPlayheadWithUniqueId(
       Math.round(usePlaybackStore.getState().currentTimeMs),
+      useProjectStore.getState().cues,
     );
+    if (!newCue) {
+      onNotify?.("error", "新建字幕失败：无法生成唯一 ID");
+      return;
+    }
     addCue(newCue);
     setSelectedCueId(newCue.id);
   };
@@ -466,24 +543,28 @@ export function SubtitleEditor() {
         <div>
           <label className="mb-1 block text-xs text-text-muted">开始时间</label>
           <input
+            ref={startTimeRef}
             type="text"
             value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleTimeKeyDown}
+            onChange={handleTimeChange("start")}
+            onBlur={() => handleTimeBlur("start")}
+            onKeyDown={handleTimeKeyDown("start")}
             placeholder="00:00:00.00"
+            inputMode="numeric"
             className="w-full rounded border border-border bg-surface px-2 py-1 text-sm font-mono"
           />
         </div>
         <div>
           <label className="mb-1 block text-xs text-text-muted">结束时间</label>
           <input
+            ref={endTimeRef}
             type="text"
             value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleTimeKeyDown}
+            onChange={handleTimeChange("end")}
+            onBlur={() => handleTimeBlur("end")}
+            onKeyDown={handleTimeKeyDown("end")}
             placeholder="00:00:00.00"
+            inputMode="numeric"
             className="w-full rounded border border-border bg-surface px-2 py-1 text-sm font-mono"
           />
         </div>

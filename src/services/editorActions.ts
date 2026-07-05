@@ -1,4 +1,4 @@
-import { createId } from "@hikaru/ass-core";
+import { createId as createAssId } from "@hikaru/ass-core";
 import type { SubtitleCue } from "../types";
 
 /**
@@ -53,10 +53,28 @@ export function frameStepTarget(
   return Math.max(0, Math.min(durationMs, targetMs));
 }
 
-/** Enter 在最后一条时的追加行：起点接当前行结束，时长 2s，文本空，继承样式与 layer。 */
-export function appendCueAfter(cue: SubtitleCue): SubtitleCue {
+export type CreateIdFn = () => string;
+
+/**
+ * 在现有 cue 列表中生成不撞车的 id；默认用 ass-core 的 createId，最多重试 3 次。
+ * 3 次仍撞车时返回 null，调用方应放弃新增并提示用户。
+ */
+export function createUniqueCueId(
+  existingCues: SubtitleCue[],
+  createIdFn: CreateIdFn = createAssId,
+  maxAttempts = 3,
+): string | null {
+  const existingIds = new Set(existingCues.map((cue) => cue.id));
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const id = createIdFn();
+    if (!existingIds.has(id)) return id;
+  }
+  return null;
+}
+
+function buildAppendedCue(cue: SubtitleCue, id: string): SubtitleCue {
   return {
-    id: createId(),
+    id,
     startMs: cue.endMs,
     endMs: cue.endMs + 2000,
     primaryText: "",
@@ -66,10 +84,9 @@ export function appendCueAfter(cue: SubtitleCue): SubtitleCue {
   };
 }
 
-/** Insert 新建：沿用现有新建参数（2s、占位文本、Primary、layer 0）。 */
-export function createCueAtPlayhead(currentTimeMs: number): SubtitleCue {
+function buildCueAtPlayhead(currentTimeMs: number, id: string): SubtitleCue {
   return {
-    id: createId(),
+    id,
     startMs: currentTimeMs,
     endMs: currentTimeMs + 2000,
     primaryText: "新建字幕",
@@ -77,6 +94,49 @@ export function createCueAtPlayhead(currentTimeMs: number): SubtitleCue {
     style: "Primary",
     layer: 0,
   };
+}
+
+/** Enter 在最后一条时的追加行：起点接当前行结束，时长 2s，文本空，继承样式与 layer。 */
+export function appendCueAfter(cue: SubtitleCue): SubtitleCue {
+  return buildAppendedCue(cue, createAssId());
+}
+
+export function appendCueAfterWithUniqueId(
+  cue: SubtitleCue,
+  existingCues: SubtitleCue[],
+  createIdFn?: CreateIdFn,
+): SubtitleCue | null {
+  const id = createUniqueCueId(existingCues, createIdFn);
+  return id ? buildAppendedCue(cue, id) : null;
+}
+
+/** Insert 新建：沿用现有新建参数（2s、占位文本、Primary、layer 0）。 */
+export function createCueAtPlayhead(currentTimeMs: number): SubtitleCue {
+  return buildCueAtPlayhead(currentTimeMs, createAssId());
+}
+
+export function createCueAtPlayheadWithUniqueId(
+  currentTimeMs: number,
+  existingCues: SubtitleCue[],
+  createIdFn?: CreateIdFn,
+): SubtitleCue | null {
+  const id = createUniqueCueId(existingCues, createIdFn);
+  return id ? buildCueAtPlayhead(currentTimeMs, id) : null;
+}
+
+/**
+ * 删除后的选中策略：删中间行选原位置的下一行；删末行选新的末行；
+ * 删唯一行或找不到 id 时返回 null。
+ */
+export function selectCueAfterDelete(
+  cuesBeforeDelete: SubtitleCue[],
+  deletedId: string,
+): SubtitleCue | null {
+  const idx = cuesBeforeDelete.findIndex((cue) => cue.id === deletedId);
+  if (idx < 0) return null;
+
+  const remaining = cuesBeforeDelete.filter((cue) => cue.id !== deletedId);
+  return remaining[Math.min(idx, remaining.length - 1)] ?? null;
 }
 
 export type CommitFollowUp =

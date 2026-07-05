@@ -4,9 +4,10 @@ import { usePlaybackStore } from "../stores/playbackStore";
 import { useUiStore } from "../stores/uiStore";
 import { findHotkey, type EditorActionId } from "../components/editor/hotkeys";
 import {
-  createCueAtPlayhead,
+  createCueAtPlayheadWithUniqueId,
   findSubtitleBoundary,
   frameStepTarget,
+  selectCueAfterDelete,
   selectCueByOffset,
 } from "../services/editorActions";
 import type { SubtitleCue } from "../types";
@@ -17,6 +18,7 @@ const PAGE_JUMP_CUES = 10;
 export interface EditorHotkeyOptions {
   onSave: () => void;
   onToggleHelp: () => void;
+  onNotify?: (variant: "success" | "error" | "info", text: string) => void;
   enabled?: boolean;
 }
 
@@ -81,7 +83,15 @@ export function buildEditorActions(
 
   const newCue = () => {
     const pb = usePlaybackStore.getState();
-    const created = createCueAtPlayhead(Math.round(pb.currentTimeMs));
+    const cues = useProjectStore.getState().cues;
+    const created = createCueAtPlayheadWithUniqueId(
+      Math.round(pb.currentTimeMs),
+      cues,
+    );
+    if (!created) {
+      options.onNotify?.("error", "新建字幕失败：无法生成唯一 ID");
+      return;
+    }
     useProjectStore.getState().addCue(created);
     pb.setSelectedCueId(created.id);
     pb.setPlayUntil(null);
@@ -92,12 +102,12 @@ export function buildEditorActions(
     const pb = usePlaybackStore.getState();
     if (!pb.selectedCueId) return;
     const before = useProjectStore.getState().cues;
-    const idx = before.findIndex((c) => c.id === pb.selectedCueId);
-    if (idx < 0) return;
+    const next = selectCueAfterDelete(before, pb.selectedCueId);
+    if (!before.some((cue) => cue.id === pb.selectedCueId)) return;
     useProjectStore.getState().deleteCue(pb.selectedCueId);
-    const remaining = useProjectStore.getState().cues;
-    const next = remaining[Math.min(idx, remaining.length - 1)] ?? null;
     pb.setSelectedCueId(next ? next.id : null);
+    pb.setPlayUntil(null);
+    options.onNotify?.("info", "已删除字幕，可按 Ctrl+Z 撤销");
   };
 
   return {
@@ -138,6 +148,7 @@ export function useEditorHotkeys(options: EditorHotkeyOptions) {
     const actions = buildEditorActions({
       onSave: () => optionsRef.current.onSave(),
       onToggleHelp: () => optionsRef.current.onToggleHelp(),
+      onNotify: (variant, text) => optionsRef.current.onNotify?.(variant, text),
     });
     const onKeyDown = (e: KeyboardEvent) => {
       if (optionsRef.current.enabled === false) return;

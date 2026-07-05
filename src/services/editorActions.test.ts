@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   appendCueAfter,
+  appendCueAfterWithUniqueId,
   createCueAtPlayhead,
+  createCueAtPlayheadWithUniqueId,
+  createUniqueCueId,
   findSubtitleBoundary,
   frameStepTarget,
   nextAfterCommit,
+  selectCueAfterDelete,
   selectCueByOffset,
 } from "./editorActions";
 import type { SubtitleCue } from "../types";
@@ -109,6 +113,71 @@ describe("createCueAtPlayhead", () => {
     expect(created.primaryText).toBe("新建字幕");
     expect(created.style).toBe("Primary");
     expect(created.layer).toBe(0);
+  });
+});
+
+describe("createUniqueCueId", () => {
+  it("returns the first generated id when unique", () => {
+    expect(createUniqueCueId(CUES, () => "new-id")).toBe("new-id");
+  });
+
+  it("retries collisions up to the first unique id", () => {
+    const ids = ["a", "b", "new-id"];
+    expect(createUniqueCueId(CUES, () => ids.shift()!)).toBe("new-id");
+  });
+
+  it("returns null after three collisions", () => {
+    const ids = ["a", "b", "c"];
+    expect(createUniqueCueId(CUES, () => ids.shift()!)).toBeNull();
+  });
+});
+
+describe("unique cue creation wrappers", () => {
+  it("createCueAtPlayheadWithUniqueId keeps existing new-cue defaults", () => {
+    const created = createCueAtPlayheadWithUniqueId(1234, CUES, () => "new-id");
+    expect(created).toEqual({
+      id: "new-id",
+      startMs: 1234,
+      endMs: 3234,
+      primaryText: "新建字幕",
+      secondaryText: undefined,
+      style: "Primary",
+      layer: 0,
+    });
+  });
+
+  it("appendCueAfterWithUniqueId keeps append defaults and inherits style/layer", () => {
+    const base = { ...CUES[1], style: "Secondary", layer: 2 };
+    const appended = appendCueAfterWithUniqueId(base, CUES, () => "new-id");
+    expect(appended).toEqual({
+      id: "new-id",
+      startMs: 3000,
+      endMs: 5000,
+      primaryText: "",
+      secondaryText: undefined,
+      style: "Secondary",
+      layer: 2,
+    });
+  });
+
+  it("returns null when no unique id can be generated", () => {
+    expect(createCueAtPlayheadWithUniqueId(1234, CUES, () => "a")).toBeNull();
+    expect(appendCueAfterWithUniqueId(CUES[0], CUES, () => "b")).toBeNull();
+  });
+});
+
+describe("selectCueAfterDelete", () => {
+  it("selects the next cue at the deleted cue's original index", () => {
+    expect(selectCueAfterDelete(CUES, "b")?.id).toBe("c");
+  });
+
+  it("selects the previous cue when deleting the last cue", () => {
+    expect(selectCueAfterDelete(CUES, "c")?.id).toBe("b");
+  });
+
+  it("returns null when deleting the only cue or when id is missing", () => {
+    expect(selectCueAfterDelete([CUES[0]], "a")).toBeNull();
+    expect(selectCueAfterDelete(CUES, "missing")).toBeNull();
   });
 });
 
