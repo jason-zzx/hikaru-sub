@@ -78,6 +78,18 @@ describe("parseAssTextLines", () => {
     });
   });
 
+  it("applies per-color alpha overrides via \\1a / \\3a / \\4a", () => {
+    const lines = parseAssTextLines(
+      "{\\1a&H80&\\3a&H40&\\4a&HFF&}半透明",
+      primary,
+    );
+    expect(lines[0].runs[0].inline).toMatchObject({
+      primaryAlpha: (255 - 0x80) / 255,
+      outlineAlpha: (255 - 0x40) / 255,
+      backAlpha: (255 - 0xff) / 255,
+    });
+  });
+
   it("resolves \\rStyleName via resolveStyle", () => {
     const secondary = createDefaultStyles()[1];
     const lines = parseAssTextLines("{\\rSecondary}译文样式", primary, {

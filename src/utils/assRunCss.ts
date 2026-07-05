@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import {
   assColorToCss,
   parseAssColor,
+  rgbaToAssColor,
   type AssInlineOverrides,
   type AssStyle,
   type AssScriptInfo,
@@ -40,13 +41,26 @@ function textDecoration(
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
+/** Rebuild an ASS color string with an inline alpha override baked into the alpha byte. */
+function colorWithAlpha(assColor: string, alpha: number | undefined): string {
+  if (alpha === undefined) return assColor;
+  const { r, g, b } = parseAssColor(assColor);
+  return rgbaToAssColor({ r, g, b, a: alpha });
+}
+
 function shadowStyle(base: AssStyle, inline: AssInlineOverrides): AssStyle {
   return {
     ...base,
     outline: inline.outline ?? base.outline,
     shadow: inline.shadow ?? base.shadow,
-    outlineColor: inline.outlineColor ?? base.outlineColor,
-    backColor: inline.backColor ?? base.backColor,
+    outlineColor: colorWithAlpha(
+      inline.outlineColor ?? base.outlineColor,
+      inline.outlineAlpha,
+    ),
+    backColor: colorWithAlpha(
+      inline.backColor ?? base.backColor,
+      inline.backAlpha,
+    ),
   };
 }
 

@@ -43,13 +43,15 @@ pnpm tauri build      # 打包桌面应用
 
 ### ASR sidecar 依赖
 
-Python 3.10+。`./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎；**Parakeet 仅在使用 `parakeet` / `parakeet-cpu` / `parakeet-cuda` 参数时安装**。
+Python 3.10+。`./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎；**Parakeet / Qwen3-ASR 仅在使用对应参数时安装**。
 
 | 场景 | 命令 |
 |------|------|
 | 日常开发（默认） | `./scripts/setup-asr.sh` 或 `pnpm asr:setup` |
 | 有 NVIDIA GPU、试 Parakeet | `./scripts/setup-asr.sh parakeet-cuda` |
 | 无 GPU 但想试 Parakeet | `./scripts/setup-asr.sh parakeet-cpu` |
+| 有 NVIDIA GPU、试 Qwen3-ASR | `./scripts/setup-asr.sh qwen3-cuda` |
+| 无 GPU 但想试 Qwen3-ASR | `./scripts/setup-asr.sh qwen3-cpu` |
 
 手动安装见 `asr-service/README.md`。
 
@@ -103,7 +105,7 @@ scripts/
 - **Python sidecar**：ASR 推理，通过 HTTP localhost 通信，不阻塞 UI
 - **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`；`projectStore` 另缓存 `assScriptInfo` 与 `assStyles`（`[V4+ Styles]` 与 PlayRes 等），保存时完整写回 ASS
 
-**PlayRes 与样式**：转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。编辑页预览优先走 jASSUB/libass WASM，播放时按 `<video>` 视频帧时间同步，并按 ASS Style、同族权重和行内 `\fn` 选择预览字体；不可用时回退 `AssSubtitleOverlay` + `assStyleToCss` CSS 近似预览并在预览区提示，ASS/字体变化后会重新尝试 libass。压制页不展示字幕预览，只提供导出设置；最终压制仍以 FFmpeg/libass 输出为准。
+**PlayRes 与样式**：转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。编辑页预览优先走 jASSUB/libass WASM，播放时按 `<video>` 视频帧时间同步，并按 ASS Style、同族权重和行内 `\fn` 选择预览字体；不可用时回退 `AssSubtitleOverlay` + `assStyleToCss` CSS 近似预览并在预览区提示，ASS/字体变化后会重新尝试 libass。编辑面板提供样式下拉、字体/字号/主色、B/I/U/S，以及「更多标签」面板（`\c`、`\3c`、`\4c`、`\bord`、`\shad`、`\an1-9`）；选区包裹属性标签时按当前活动文本框 Style 生成恢复标签，分离双语下译文使用 `Secondary` Style。压制页不展示字幕预览，只提供导出设置；最终压制仍以 FFmpeg/libass 输出为准。
 
 ```mermaid
 flowchart LR
@@ -246,7 +248,7 @@ interface SubtitleCue {
 - [x] ASS 文件持久化（转录后自动保存，打开项目时自动加载）
 - [x] ASS 元数据持久化（`[V4+ Styles]` + PlayRes；转录写入、翻译/编辑沿用；打开项目 `loadAssDocument`）
 - [x] 字幕合并模式配置（默认行内 `译文 / 原文`；编辑 UI 与 ASS 序列化一致）
-- [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做）
+- [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做 + Aegisub 式时间输入 + 常用 ASS 行内标签面板）
 - [x] 视频播放兼容处理（本地 HTTP 媒体服务 + Range；不兼容编码生成 480p H.264 全关键帧代理视频并缓存）
 - [x] VAD 预处理（统一配置 UI；faster-whisper 透传内置 VAD，Parakeet 独立 Silero VAD 预切分；失败自动降级）
 - [x] 日语专用化（源语言固定 ja；移除转录/设置页源语言选择）

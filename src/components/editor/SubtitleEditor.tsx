@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   formatInlineCueText,
   getCueDisplay,
+  SECONDARY_STYLE,
   splitInlineCueText,
 } from "@hikaru/ass-core";
 import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
@@ -15,7 +16,16 @@ import {
   nextAfterCommit,
   selectCueAfterDelete,
 } from "../../services/editorActions";
-import { applyToggleOverrideTag } from "../../utils/assOverrideTags";
+import {
+  applyAlignmentReplace,
+  applyAttributeOverrideTag,
+  applyToggleOverrideTag,
+  colorOverrideStartTag,
+  findEffectiveAlignment,
+  restoreTagForStyle,
+  type AttributeOverrideKind,
+  type ColorOverrideKind,
+} from "../../utils/assOverrideTags";
 import {
   applyTimeInputKey,
   formatTimeInput,
@@ -26,6 +36,7 @@ import {
 import { Select } from "../ui/Select";
 import { ColorPicker } from "./ColorPicker";
 import { FontComboBox } from "./FontComboBox";
+import { InlineOverridePanel } from "./InlineOverridePanel";
 import type { SubtitleCue } from "../../types";
 
 const QUICK_FONT_OPTIONS = [
@@ -76,6 +87,8 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   const [quickFontName, setQuickFontName] = useState("");
   const [quickFontSize, setQuickFontSize] = useState("48");
   const [quickColor, setQuickColor] = useState("&H00FFFFFF");
+  const [activeTextField, setActiveTextField] =
+    useState<EditableTextField>("primary");
   const [inlineEditorCueId, setInlineEditorCueId] = useState<string | null>(
     null,
   );
@@ -171,6 +184,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
 
   const handleTextFocus = (field: EditableTextField) => {
     activeTextFieldRef.current = field;
+    setActiveTextField(field);
     rememberTextEditBaseline();
   };
 
@@ -319,21 +333,47 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     );
   };
 
-  const insertOverrideTag = (tag: string) => {
+  const activeTarget = getActiveTextTarget();
+  const styleForTextField = (field: EditableTextField | undefined) => {
+    const styleName =
+      field === "secondary" ? SECONDARY_STYLE : selectedCue?.style;
+    return styleName
+      ? assStyles.find((style) => style.name === styleName)
+      : undefined;
+  };
+
+  const currentStyle = activeTarget
+    ? styleForTextField(activeTarget.field)
+    : styleForTextField(activeTextField);
+  const effectiveAlignment = activeTarget
+    ? findEffectiveAlignment(activeTarget.text, currentStyle?.alignment)
+    : currentStyle?.alignment;
+
+  const applyAttributeTag = (
+    kind: AttributeOverrideKind,
+    startTag: string,
+  ) => {
     const target = getActiveTextTarget();
-
     if (!target) return;
+    const targetStyle = styleForTextField(target.field);
 
-    const start = target.textarea.selectionStart;
-    const end = target.textarea.selectionEnd;
-    const nextText = target.text.slice(0, start) + tag + target.text.slice(end);
+    const result = applyAttributeOverrideTag(
+      target.text,
+      target.textarea.selectionStart,
+      target.textarea.selectionEnd,
+      {
+        startTag,
+        restoreTag: restoreTagForStyle(kind, targetStyle),
+      },
+    );
 
-    handleTextChange(target.field, nextText);
-
+    handleTextChange(target.field, result.text);
     window.setTimeout(() => {
       target.textarea.focus();
-      const position = start + tag.length;
-      target.textarea.setSelectionRange(position, position);
+      target.textarea.setSelectionRange(
+        result.selectionStart,
+        result.selectionEnd,
+      );
     }, 0);
   };
 
@@ -361,20 +401,50 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   const handleFontChange = (fontName: string) => {
     setQuickFontName(fontName);
     if (fontName) {
-      insertOverrideTag(`{\\fn${fontName}}`);
+      applyAttributeTag("fontName", `{\\fn${fontName}}`);
     }
   };
 
   const handleFontSizeCommit = () => {
     const parsed = Number(quickFontSize);
     if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 200) {
-      insertOverrideTag(`{\\fs${Math.round(parsed)}}`);
+      applyAttributeTag("fontSize", `{\\fs${Math.round(parsed)}}`);
     }
   };
 
   const handleColorChange = (color: string) => {
     setQuickColor(color);
-    insertOverrideTag(`{\\c${color}}`);
+    applyAttributeTag("primaryColor", colorOverrideStartTag("primaryColor", color));
+  };
+
+  const handleInlineColor = (kind: ColorOverrideKind, color: string) => {
+    applyAttributeTag(kind, colorOverrideStartTag(kind, color));
+  };
+
+  const handleInlineNumber = (kind: "outline" | "shadow", value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    const formatted = Number.isInteger(rounded)
+      ? String(rounded)
+      : rounded.toFixed(1);
+    const command = kind === "outline" ? "bord" : "shad";
+    applyAttributeTag(kind, `{\\${command}${formatted}}`);
+  };
+
+  const handleInlineAlignment = (alignment: number) => {
+    if (!Number.isInteger(alignment) || alignment < 1 || alignment > 9) return;
+    const target = getActiveTextTarget();
+    if (!target) return;
+    // Alignment is a paragraph-level property: replace any existing \an and
+    // force the new tag to the front instead of wrapping the selection.
+    const result = applyAlignmentReplace(target.text, alignment);
+    handleTextChange(target.field, result.text);
+    window.setTimeout(() => {
+      target.textarea.focus();
+      target.textarea.setSelectionRange(
+        result.selectionStart,
+        result.selectionEnd,
+      );
+    }, 0);
   };
 
   const resetTextDraftsFromCue = (cue: SubtitleCue) => {
@@ -600,7 +670,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  handleFontSizeCommit();
+                  event.currentTarget.blur();
                 }
               }}
               className="h-9 w-full rounded border border-border bg-surface px-2 text-sm text-text outline-none focus:border-accent/60"
@@ -612,7 +682,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
             deferChange
           />
         </div>
-        <div className="flex gap-2" aria-label="快速样式标签">
+        <div className="flex flex-wrap gap-2" aria-label="快速样式标签">
           <button
             type="button"
             onClick={() => applyToggleTag("{\\b1}", "{\\b0}")}
@@ -645,6 +715,13 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
           >
             S
           </button>
+          <InlineOverridePanel
+            currentStyle={currentStyle}
+            effectiveAlignment={effectiveAlignment}
+            onApplyColor={handleInlineColor}
+            onApplyNumber={handleInlineNumber}
+            onApplyAlignment={handleInlineAlignment}
+          />
         </div>
       </div>
 

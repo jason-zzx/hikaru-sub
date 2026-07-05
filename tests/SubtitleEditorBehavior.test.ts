@@ -48,4 +48,40 @@ describe("SubtitleEditor 快捷键行为约束", () => {
     expect(source).toContain("createCueAtPlayheadWithUniqueId");
     expect(source).toContain("appendCueAfterWithUniqueId");
   });
+
+  it("uses the Phase 3 attribute override helper and panel", () => {
+    expect(source).toContain("InlineOverridePanel");
+    expect(source).toContain("applyAttributeOverrideTag");
+    expect(source).toContain("restoreTagForStyle");
+    expect(source).toContain("applyAttributeTag");
+  });
+
+  it("routes font, size, and primary color through attribute override insertion", () => {
+    expect(source).toContain('applyAttributeTag("fontName"');
+    expect(source).toContain('applyAttributeTag("fontSize"');
+    expect(source).toContain('applyAttributeTag("primaryColor"');
+    expect(source).not.toContain("insertOverrideTag(`{\\\\fn");
+    expect(source).not.toContain("insertOverrideTag(`{\\\\fs");
+    expect(source).not.toContain("insertOverrideTag(`{\\\\c");
+  });
+
+  it("uses line-level replace for alignment and splits color alpha", () => {
+    expect(source).toContain("applyAlignmentReplace");
+    expect(source).toContain("colorOverrideStartTag");
+    expect(source).toContain("effectiveAlignment");
+    expect(source).toContain("findEffectiveAlignment");
+  });
+
+  it("resolves restore style from the active text field", () => {
+    expect(source).toContain("SECONDARY_STYLE");
+    expect(source).toContain("setActiveTextField");
+    expect(source).toContain("styleForTextField");
+    expect(source).toContain('field === "secondary" ? SECONDARY_STYLE');
+    expect(source).toContain("restoreTagForStyle(kind, targetStyle)");
+  });
+
+  it("commits quick font size through blur only on Enter", () => {
+    expect(source).toContain("event.currentTarget.blur()");
+    expect(source).not.toContain("handleFontSizeCommit();");
+  });
 });
