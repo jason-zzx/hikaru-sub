@@ -62,9 +62,7 @@ export function SubtitleList() {
             >
               <div className="mb-1 flex items-center justify-between text-xs text-text-muted">
                 <span>#{cues.indexOf(cue) + 1}</span>
-                <span>
-                  {formatTime(cue.startMs)} → {formatTime(cue.endMs)}
-                </span>
+                <span>{formatTime(cue.startMs)} → {formatTime(cue.endMs)}</span>
               </div>
               <div className="space-y-1 text-sm">
                 {display.mode === "single" ? (
@@ -90,6 +88,6 @@ function formatTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  const millis = Math.floor((ms % 1000) / 10);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}.${millis.toString().padStart(2, "0")}`;
+  const centiseconds = Math.floor((ms % 1000) / 10);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}.${centiseconds.toString().padStart(2, "0")}`;
 }

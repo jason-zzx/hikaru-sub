@@ -11,8 +11,12 @@ function cue(id: string, startMs: number, endMs: number): SubtitleCue {
 
 const CUES = [cue("a", 0, 1000), cue("b", 2000, 3000), cue("c", 5000, 6000)];
 
-function make_actions() {
-  return buildEditorActions({ onSave: vi.fn(), onToggleHelp: vi.fn() });
+function make_actions(onNotify = vi.fn()) {
+  return buildEditorActions({
+    onSave: vi.fn(),
+    onToggleHelp: vi.fn(),
+    onNotify,
+  });
 }
 
 beforeEach(() => {
@@ -127,6 +131,17 @@ describe("编辑动作", () => {
     expect(created.primaryText).toBe("新建字幕");
     expect(usePlaybackStore.getState().selectedCueId).toBe(created.id);
     expect(useUiStore.getState().editorFocusNonce).toBe(1);
+    expect(new Set(cues.map((c) => c.id)).size).toBe(cues.length);
+  });
+
+  it("delete-cue 删除选中后清除片段播放并通知可撤销", () => {
+    const onNotify = vi.fn();
+    usePlaybackStore.setState({ selectedCueId: "b", playUntilMs: 3000 });
+    make_actions(onNotify)["delete-cue"]!();
+    expect(useProjectStore.getState().cues.map((c) => c.id)).toEqual(["a", "c"]);
+    expect(usePlaybackStore.getState().selectedCueId).toBe("c");
+    expect(usePlaybackStore.getState().playUntilMs).toBeNull();
+    expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可按 Ctrl+Z 撤销");
   });
 
   it("delete-cue 删除选中并顺延选中下一条（按原索引）", () => {
@@ -163,5 +178,13 @@ describe("系统动作", () => {
     expect(useProjectStore.getState().cues.find((c) => c.id === "a")?.primaryText).toBe("a");
     actions["redo"]!();
     expect(useProjectStore.getState().cues.find((c) => c.id === "a")?.primaryText).toBe("changed");
+  });
+});
+
+describe("Phase 2B source guards", () => {
+  it("buildEditorActions exposes onNotify as an option", () => {
+    const onNotify = vi.fn();
+    buildEditorActions({ onSave: vi.fn(), onToggleHelp: vi.fn(), onNotify });
+    expect(onNotify).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -6,6 +6,7 @@ import { VideoPlayer } from "../player/VideoPlayer";
 import { PlaybackControls } from "../player/PlaybackControls";
 import { SubtitleList } from "./SubtitleList";
 import { SubtitleEditor } from "./SubtitleEditor";
+import { EditorToast, type EditorToastMessage, type EditorToastVariant } from "./EditorToast";
 import { Timeline } from "./Timeline";
 import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
 import { StyleManager } from "./StyleManager";
@@ -31,8 +32,30 @@ export function EditorView() {
   const styleManagerOpen = useUiStore((s) => s.styleManagerOpen);
   const toggleStyleManager = useUiStore((s) => s.toggleStyleManager);
 
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [toast, setToast] = useState<EditorToastMessage | null>(null);
+  const toastIdRef = useRef(0);
+
+  const notify = (variant: EditorToastVariant, text: string) => {
+    toastIdRef.current += 1;
+    setToast({ id: toastIdRef.current, variant, text });
+  };
+
+  const saveStatus = saving
+    ? { label: "保存中…", className: "border-border text-text-muted" }
+    : saveError
+      ? { label: "保存失败", className: "border-danger/50 text-danger" }
+      : isDirty
+        ? { label: "未保存", className: "border-warning/50 text-warning" }
+        : { label: "已保存", className: "border-success/50 text-success" };
+
   const handleSave = async () => {
-    if (!project || !projectDir || cues.length === 0) return;
+    if (saving || !project || !projectDir || cues.length === 0) return;
+
+    setSaving(true);
+    setSaveError(null);
 
     try {
       const settings: AppSettings = await getSettings();
@@ -51,17 +74,20 @@ export function EditorView() {
         serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
       );
       markSaved();
-      alert("保存成功！");
+      setSaveError(null);
     } catch (err) {
-      alert(`保存失败：${err}`);
+      const message = err instanceof Error ? err.message : String(err);
+      setSaveError(message);
+      notify("error", `保存失败：${message}`);
+    } finally {
+      setSaving(false);
     }
   };
-
-  const [helpOpen, setHelpOpen] = useState(false);
 
   useEditorHotkeys({
     onSave: handleSave,
     onToggleHelp: () => setHelpOpen((v) => !v),
+    onNotify: notify,
     enabled: !helpOpen,
   });
 
@@ -83,6 +109,29 @@ export function EditorView() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* 顶部保存状态与编辑页工具条 */}
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-medium text-text">字幕编辑</h2>
+          <span className="text-xs text-text-muted">{cues.length} 条字幕</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded border px-2 py-1 text-xs ${saveStatus.className}`}
+            title={saveError ? `保存失败：${saveError}` : undefined}
+          >
+            {saveStatus.label}
+          </span>
+          <button
+            type="button"
+            onClick={toggleStyleManager}
+            className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay"
+          >
+            {styleManagerOpen ? "关闭样式库" : "样式管理"}
+          </button>
+        </div>
+      </div>
+
       {/* 主编辑区 */}
       <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr_320px] grid-rows-[1fr_120px] gap-px bg-border">
         {/* 字幕列表 */}
@@ -106,17 +155,8 @@ export function EditorView() {
 
         {/* 编辑面板 */}
         <div className="col-start-3 row-span-2 flex min-h-0 flex-col bg-surface-raised">
-          <div className="border-b border-border px-3 py-2">
-            <button
-              type="button"
-              onClick={toggleStyleManager}
-              className="w-full rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay"
-            >
-              {styleManagerOpen ? "关闭样式库" : "样式管理"}
-            </button>
-          </div>
           <div className="min-h-0 flex-1">
-            <SubtitleEditor />
+            <SubtitleEditor onNotify={notify} />
           </div>
         </div>
 
@@ -135,12 +175,8 @@ export function EditorView() {
         onRedo={redo}
       />
 
-      {/* 未保存提示 */}
-      {isDirty && (
-        <div className="pointer-events-none fixed bottom-16 right-4 rounded bg-yellow-500/90 px-3 py-1 text-xs text-white shadow-lg">
-          未保存
-        </div>
-      )}
+      {/* 编辑页局部反馈 */}
+      <EditorToast message={toast} onClose={() => setToast(null)} />
 
       <StyleManager />
 

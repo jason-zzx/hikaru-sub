@@ -33,7 +33,19 @@ describe("SubtitleEditor 快捷键行为约束", () => {
     expect(source).toContain("editorFocusNonce");
   });
 
-  it("删除按钮仍保留确认（二期 F 统一替换 toast）", () => {
-    expect(source).toContain("confirm(");
+  it("删除按钮不再使用原生 confirm，删除可通过撤销恢复", () => {
+    expect(source).not.toContain("confirm(");
+    expect(source).toContain("selectCueAfterDelete");
+  });
+
+  it("时间输入使用 Aegisub 式固定掩码工具", () => {
+    expect(source).toContain("applyTimeInputKey");
+    expect(source).toContain("snapTimeInputCaret");
+    expect(source).toContain("normalizeTimeRange");
+  });
+
+  it("新建与追加字幕使用唯一 id 包装", () => {
+    expect(source).toContain("createCueAtPlayheadWithUniqueId");
+    expect(source).toContain("appendCueAfterWithUniqueId");
   });
 });
