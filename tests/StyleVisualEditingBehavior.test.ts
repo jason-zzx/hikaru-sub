@@ -13,7 +13,7 @@ describe("editor style visual editing integration", () => {
 
     expect(source).toContain("assStyles");
     expect(source).toContain("updateCue(selectedCue.id, { style:");
-    expect(source).toContain("insertOverrideTag");
+    expect(source).toContain("applyAttributeTag");
     expect(source).toContain("applyToggleOverrideTag");
     expect(source).toContain("FontComboBox");
     expect(source).toContain("updateCuePreview");

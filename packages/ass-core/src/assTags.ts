@@ -9,6 +9,10 @@ export interface AssInlineOverrides {
   primaryColor?: string;
   /** CSS alpha 0–1；由 \\alpha / \\1a 设置。 */
   primaryAlpha?: number;
+  /** CSS alpha 0–1；由 \\3a 设置。 */
+  outlineAlpha?: number;
+  /** CSS alpha 0–1；由 \\4a 设置。 */
+  backAlpha?: number;
   fontSize?: number;
   fontName?: string;
   scaleX?: number;
@@ -52,8 +56,12 @@ function assAlphaByteToCss(aa: number): number {
 function parseAlphaValue(raw: string): number | undefined {
   const m = raw.match(ASS_COLOR_RE);
   if (!m) return undefined;
-  const hex = m[1].padStart(8, "0");
-  const aa = parseInt(hex.slice(0, 2), 16);
+  const hex = m[1];
+  const val = parseInt(hex, 16);
+  if (!Number.isFinite(val)) return undefined;
+  // \alpha / \Xa carry the alpha byte as the value: a 1–2 digit value is the
+  // byte itself; a full &HAABBGGRR value uses the high byte (AA).
+  const aa = hex.length > 2 ? (val >>> 24) & 0xff : val & 0xff;
   return assAlphaByteToCss(aa);
 }
 
@@ -192,6 +200,20 @@ function applyTag(
   m = raw.match(/^4c(&H[0-9A-Fa-f]+&?)/i);
   if (m) {
     state.inline.backColor = normalizeAssColor(m[1]);
+    return;
+  }
+
+  m = raw.match(/^3a(&H[0-9A-Fa-f]+&?)/i);
+  if (m) {
+    const alpha = parseAlphaValue(m[1]);
+    if (alpha !== undefined) state.inline.outlineAlpha = alpha;
+    return;
+  }
+
+  m = raw.match(/^4a(&H[0-9A-Fa-f]+&?)/i);
+  if (m) {
+    const alpha = parseAlphaValue(m[1]);
+    if (alpha !== undefined) state.inline.backAlpha = alpha;
     return;
   }
 
