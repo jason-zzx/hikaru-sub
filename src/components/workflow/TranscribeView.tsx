@@ -160,6 +160,8 @@ export function TranscribeView() {
 
   const audioPath = project.audioPath ?? "";
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
+  const selectedEngineUnavailable =
+    engines?.find((item) => item.name === engine)?.available === false;
 
   const handleExtract = async () => {
     if (!audioPath) {
@@ -327,6 +329,10 @@ export function TranscribeView() {
   };
 
   const handleTranscribe = async () => {
+    if (selectedEngineUnavailable) {
+      setAsrError("当前引擎依赖未安装，请先在设置中配置引擎依赖。");
+      return;
+    }
     setAsrError(null);
     setResultCount(null);
     setSavedAssPath(null);
@@ -494,7 +500,7 @@ export function TranscribeView() {
           {engineMsg && (
             <span
               className={
-                engines?.find((e) => e.name === engine)?.available === false
+                selectedEngineUnavailable
                   ? "text-warning"
                   : "text-text-muted"
               }
@@ -503,6 +509,20 @@ export function TranscribeView() {
             </span>
           )}
         </div>
+        {selectedEngineUnavailable && !transcribing && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+            <span className="text-warning">
+              当前引擎依赖未安装。请先在设置中配置引擎依赖。
+            </span>
+            <button
+              type="button"
+              onClick={() => setStep("settings")}
+              className="rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
+            >
+              前往设置
+            </button>
+          </div>
+        )}
 
         <details className="rounded-lg border border-border bg-surface">
           <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-text">
@@ -692,7 +712,7 @@ export function TranscribeView() {
             <button
               type="button"
               onClick={handleTranscribe}
-              disabled={!audioReady}
+              disabled={!audioReady || selectedEngineUnavailable}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
               {resultCount !== null ? "重新转录" : "开始转录"}

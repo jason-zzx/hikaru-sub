@@ -1,4 +1,5 @@
 mod asr;
+mod asr_setup;
 mod ass;
 mod asset_scope;
 mod burn;
@@ -26,6 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_persisted_scope::init())
         .manage(asr::AsrState::default())
+        .manage(asr_setup::AsrSetupState::default())
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
             settings::set_settings,
@@ -44,6 +46,10 @@ pub fn run() {
             asr::check_asr_model,
             asr::download_asr_model,
             asr::get_model_download_progress,
+            asr_setup::probe_asr_setup_environment,
+            asr_setup::start_asr_setup,
+            asr_setup::get_asr_setup_progress,
+            asr_setup::cancel_asr_setup,
             ass::save_ass_text,
             ass::load_ass_text,
             asset_scope::allow_asset_path,
@@ -85,6 +91,9 @@ pub fn run() {
                     }
                 }
                 if let Some(state) = app_handle.try_state::<burn::BurnState>() {
+                    state.shutdown();
+                }
+                if let Some(state) = app_handle.try_state::<asr_setup::AsrSetupState>() {
                     state.shutdown();
                 }
             }
