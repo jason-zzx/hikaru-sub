@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
+import { parseAss, serializeAss } from "@hikaru/ass-core";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { IconAlertTriangle, IconCheck } from "../layout/NavIcons";
 import { Select } from "../ui/Select";
-import { getSettings, pathExists } from "../../services/tauri";
+import {
+  getSettings,
+  loadAssText,
+  pathExists,
+  saveAssText,
+} from "../../services/tauri";
 import {
   createTranslationProvider,
   type TranslationProgress,
@@ -131,9 +137,6 @@ export function TranslateView() {
       // 保存翻译后的 ASS 文件
       if (project.assPath) {
         try {
-          const { loadAssText, saveAssText } = await import("../../services/tauri");
-          const { parseAss, serializeAss } = await import("@hikaru/ass-core");
-
           const { assScriptInfo, assStyles } = useProjectStore.getState();
           let doc;
           if (assScriptInfo && assStyles.length > 0) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { parseAss } from "@hikaru/ass-core";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { IconFilePlus, IconFolderOpen } from "../layout/NavIcons";
@@ -6,7 +7,9 @@ import {
   checkFfmpeg,
   createProject,
   invalidateFfmpegStatus,
+  loadAssText,
   openProject,
+  pathExists,
   pickDirectory,
   pickVideoFile,
   projectDirFromMeta,
@@ -86,8 +89,6 @@ export function ImportView() {
       // 优先加载翻译后的字幕文件，回退到原始字幕
       if (meta.assPath) {
         try {
-          const { loadAssText, pathExists } = await import("../../services/tauri");
-          const { parseAss } = await import("@hikaru/ass-core");
           const { loadAssDocument } = useProjectStore.getState();
 
           // 尝试加载 .translated.ass

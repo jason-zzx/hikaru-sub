@@ -19,7 +19,6 @@
     "asr:setup": "bash scripts/setup-asr.sh"
   },
   "dependencies": {
-    "@fontsource/noto-sans-sc": "^5.2.9",
     "@hikaru/ass-core": "workspace:*",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",

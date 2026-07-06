@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  createDefaultDocument,
   PRIMARY_STYLE,
   mergeShortCues,
   segmentsToCues,
+  serializeAss,
 } from "@hikaru/ass-core";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -20,10 +22,12 @@ import {
   checkFfmpeg,
   extractAudio,
   getAsrProgress,
+  getVideoInfo,
   invalidateFfmpegStatus,
   listAsrEngines,
   onAudioExtractProgress,
   pathExists,
+  saveAssText,
   startAsr,
 } from "../../services/tauri";
 import type {
@@ -287,9 +291,6 @@ export function TranscribeView() {
           // 保存字幕到文件
           if (project?.assPath && cues.length > 0) {
             try {
-              const { serializeAss, createDefaultDocument } = await import("@hikaru/ass-core");
-              const { getVideoInfo } = await import("../../services/tauri");
-
               // 获取视频分辨率（写入 ASS PlayRes，后续翻译/编辑沿用）
               let resX: number | undefined;
               let resY: number | undefined;
@@ -308,7 +309,6 @@ export function TranscribeView() {
               doc.cues = cues;
               setAssMetadata(doc.scriptInfo, doc.styles);
               const assText = serializeAss(doc);
-              const { saveAssText } = await import("../../services/tauri");
               await saveAssText(project.assPath, assText);
               setSavedAssPath(project.assPath);
               if (playResWarning) {
