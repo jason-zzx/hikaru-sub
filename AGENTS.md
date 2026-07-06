@@ -14,6 +14,15 @@ AI 日语字幕桌面应用：下载 m3u8 视频 → 本地 ASR 日语转录 →
 - 代码改动完成后，应当向用户汇报改动内容与待办，**询问是否提交**，而非自行提交。
 - 违反此规则已执行的提交，须按用户要求回退（如软重置到指定 commit）。
 
+### 2. Commit message 格式
+
+- 所有新提交的 commit message 必须使用 `type(section): content` 格式；`(section)` 可省略，即 `type: content` 也允许。
+- `type` 使用小写英文，例如 `feat`、`fix`、`chore`、`docs`、`test`、`refactor`、`build`、`ci`。
+- `section` 使用简短小写英文或数字、连字符、下划线，表示影响范围，例如 `editor`、`release`、`asr`。
+- `content` 内容随意，保持简洁即可。
+- 示例：`feat(editor): Add inline override controls`、`fix: Support opening project parent directories`。
+- 只有在用户明确要求整理历史时，才可修正未推送提交的 message；已推送提交默认不改写。
+
 ## 技术栈
 
 | 层级 | 选型 |
