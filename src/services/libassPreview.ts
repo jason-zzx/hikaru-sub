@@ -33,6 +33,8 @@ type JassubInstance = {
 
 type JassubConstructor = new (options: Record<string, unknown>) => JassubInstance;
 
+const SYSTEM_DEFAULT_FONT = "sans-serif";
+
 interface CreateLibassControllerArgs {
   Renderer: JassubConstructor;
   canvas: HTMLCanvasElement;
@@ -72,7 +74,7 @@ export async function createLibassController({
     canvas,
     subContent: assText,
     fonts: fontUrls,
-    defaultFont,
+    defaultFont: defaultFont ?? SYSTEM_DEFAULT_FONT,
     workerUrl,
     wasmUrl,
     modernWasmUrl,
