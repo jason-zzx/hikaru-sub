@@ -158,6 +158,54 @@ export interface ModelDownloadSnapshot {
   error: string | null;
 }
 
+export type AsrSetupProfile =
+  | "default"
+  | "parakeet-cpu"
+  | "parakeet-cuda"
+  | "qwen3-cpu"
+  | "qwen3-cuda";
+
+export type AsrSetupStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface StartAsrSetupArgs {
+  profile: AsrSetupProfile;
+  recreate?: boolean;
+  pythonPath?: string | null;
+  asrServicePath?: string | null;
+}
+
+export interface ProbeAsrSetupEnvironmentArgs {
+  pythonPath?: string | null;
+  asrServicePath?: string | null;
+}
+
+export interface AsrSetupSnapshot {
+  id: string;
+  status: AsrSetupStatus;
+  profile: AsrSetupProfile;
+  stage: string;
+  progress: number | null;
+  logTail: string[];
+  exitCode?: number | null;
+  error: string | null;
+}
+
+export interface AsrSetupEnvironment {
+  serviceTemplatePath?: string | null;
+  managedServicePath: string;
+  pythonPath?: string | null;
+  pythonVersion?: string | null;
+  pythonOk: boolean;
+  venvPath: string;
+  venvExists: boolean;
+  hasNvidiaGpu: boolean;
+}
+
 export interface VideoInfo {
   width: number;
   height: number;

@@ -1,0 +1,9 @@
+# Parakeet 可选依赖：CUDA 12.6 版 PyTorch + NeMo。
+# 推荐：./scripts/setup-asr.sh parakeet-cuda
+# 手动安装前须先执行 requirements.txt。需要可用的 NVIDIA 驱动与 GPU。
+
+--extra-index-url https://download.pytorch.org/whl/cu126
+torch>=2.6.0
+torchaudio>=2.6.0
+
+-r requirements-parakeet.txt

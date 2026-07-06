@@ -252,6 +252,13 @@ async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, St
     Ok(base)
 }
 
+pub async fn stop_sidecar(state: &AsrState) {
+    let mut guard = state.sidecar.lock().await;
+    if let Some(mut sidecar) = guard.take() {
+        sidecar.kill();
+    }
+}
+
 async fn remember_job_base_url(state: &AsrState, job_id: &str, base_url: &str) {
     state
         .job_base_urls

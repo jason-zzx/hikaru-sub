@@ -7,6 +7,7 @@ import {
   setSettings,
 } from "../../services/tauri";
 import { Select } from "../ui/Select";
+import { AsrEngineSetupPanel } from "./AsrEngineSetupPanel";
 import { ModelManager } from "./ModelManager";
 import type { AppSettings, FfmpegStatus } from "../../types";
 import {
@@ -43,6 +44,8 @@ export function SettingsView() {
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [asrSetupRunning, setAsrSetupRunning] = useState(false);
+  const [asrSetupRefreshKey, setAsrSetupRefreshKey] = useState(0);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(
     null,
   );
@@ -82,6 +85,14 @@ export function SettingsView() {
     }
   };
 
+  const refreshSettingsAfterAsrSetup = async () => {
+    const next = await getSettings();
+    setLocal(next);
+    setDirty(false);
+    setAsrSetupRefreshKey((value) => value + 1);
+    setMessage({ kind: "ok", text: "ASR 引擎依赖配置完成，设置已更新" });
+  };
+
   const updateAsrEngine = (engine: string) => {
     update("asrEngine", engine);
     update("asrModel", defaultAsrModel(engine));
@@ -117,7 +128,7 @@ export function SettingsView() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || !dirty}
+            disabled={saving || !dirty || asrSetupRunning}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "保存中…" : "保存"}
@@ -183,7 +194,11 @@ export function SettingsView() {
                 </p>
               )}
               <div className="mt-1.5">
-                <ModelManager engine={settings.asrEngine} model={settings.asrModel} />
+                <ModelManager
+                  key={`${settings.asrEngine}:${settings.asrModel}:${asrSetupRefreshKey}`}
+                  engine={settings.asrEngine}
+                  model={settings.asrModel}
+                />
               </div>
             </Field>
             <Field label="设备">
@@ -193,6 +208,20 @@ export function SettingsView() {
                 options={ASR_DEVICES}
               />
             </Field>
+            <AsrEngineSetupPanel
+              engine={settings.asrEngine}
+              device={settings.asrDevice}
+              pythonPath={settings.pythonPath}
+              asrServicePath={settings.asrServicePath}
+              disabled={saving}
+              onBeforeStart={async () => {
+                await setSettings(settings);
+                setDirty(false);
+                setMessage({ kind: "ok", text: "设置已保存，开始配置 ASR 引擎依赖" });
+              }}
+              onRunningChange={setAsrSetupRunning}
+              onComplete={refreshSettingsAfterAsrSetup}
+            />
           </Section>
 
           <Section title="翻译（OpenAI 兼容）" desc="API Key 仅保存在本机配置文件中，不会写入项目或源码">

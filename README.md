@@ -57,7 +57,40 @@ pnpm build        # 构建前端
 pnpm tauri build  # 打包应用
 ```
 
+## 发布客户端
+
+首期发布目标是 Windows 与 macOS 安装包；Linux 客户端会在 Windows/macOS 发布链路稳定后再加入。
+
+### 本地打包
+
+```bash
+pnpm release:local
+```
+
+该命令用于 Windows/macOS 发布机，会先按当前平台下载 FFmpeg/FFprobe 到 `src-tauri/binaries/`，再执行 Tauri 打包。生成产物位于 `src-tauri/target/release/bundle/`。Linux 本地包不属于首期支持范围。
+
+### GitHub Release
+
+推送 `v*` 标签会触发 `.github/workflows/release.yml`：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+工作流会构建 Windows、macOS Intel 与 macOS Apple Silicon 产物，并上传到 GitHub Release 草稿。也可以从 GitHub Actions 手动运行 `Release Desktop Clients`，输入已存在的 tag/ref；工作流会检出该 ref，并创建或更新同名 Release 草稿。
+
+发布包会随平台包含 FFmpeg/FFprobe。ASR Python 依赖、Parakeet/Qwen3-ASR 可选依赖和模型权重不随安装包预装，安装后通过客户端内的 ASR 配置流程准备。
+
+当前发布限制：
+
+- Windows 包未做代码签名，可能出现 SmartScreen 提示。
+- macOS 包使用 ad-hoc signing，但未做 notarization，可能出现 Gatekeeper 提示。
+- Linux 包暂不发布。
+
 ### ASR sidecar 依赖
+
+打包后的 Windows/macOS 客户端可在「设置 → 日语转录（ASR）默认」中点击「配置当前引擎依赖」，自动复制随应用提供的 ASR 服务模板、创建/复用本机虚拟环境并安装所选引擎依赖。模型权重仍在同一区域的「模型状态」中单独检测与下载，不随依赖配置一起安装。
 
 `./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎（`requirements.txt`）。Parakeet（NeMo + PyTorch）与 Qwen3-ASR（qwen-asr + PyTorch）体积较大，**须显式传参**才会安装：
 

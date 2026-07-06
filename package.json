@@ -10,7 +10,11 @@
     "test": "vitest run",
     "preview": "vite preview",
     "tauri": "tauri",
+    "build:desktop": "tauri build",
+    "bundle": "tauri build",
+    "release:local": "pnpm ffmpeg:fetch && pnpm asr:prepare-resource && tauri build",
     "ffmpeg:fetch": "node scripts/fetch-ffmpeg.mjs",
+    "asr:prepare-resource": "node scripts/prepare-asr-resource.mjs",
     "asr:setup": "bash scripts/setup-asr.sh"
   },
   "dependencies": {

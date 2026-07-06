@@ -1,0 +1,9 @@
+# NeMo / Parakeet 引擎依赖（不含 PyTorch）。
+# 须先安装 requirements.txt（faster-whisper），再执行：
+#   ./scripts/setup-asr.sh parakeet-cuda   # 或 parakeet-cpu / parakeet
+# 也可在自行安装匹配的 torch/torchaudio 后：
+#   pip install -r requirements-parakeet.txt
+
+nemo_toolkit[asr]==2.7.3
+fsspec==2024.12.0
+huggingface_hub>=0.23.0

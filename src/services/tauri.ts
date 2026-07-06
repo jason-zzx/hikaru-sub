@@ -6,6 +6,8 @@ import type {
   AsrEngineInfo,
   AsrJobSnapshot,
   AsrModelStatus,
+  AsrSetupEnvironment,
+  AsrSetupSnapshot,
   AudioExtractProgress,
   BurnSnapshot,
   BurnVideoProbe,
@@ -13,11 +15,13 @@ import type {
   FfmpegStatus,
   ModelDownloadSnapshot,
   ProbeDownloadMediaArgs,
+  ProbeAsrSetupEnvironmentArgs,
   PreviewFontFile,
   ProjectMeta,
   RenderSubtitlePreviewFrameArgs,
   RenderSubtitlePreviewFrameResult,
   StartAsrArgs,
+  StartAsrSetupArgs,
   StartBurnArgs,
   StartVideoDownloadArgs,
   DownloadMediaProbe,
@@ -150,6 +154,30 @@ export async function getModelDownloadProgress(
   jobId: string,
 ): Promise<ModelDownloadSnapshot> {
   return invoke<ModelDownloadSnapshot>("get_model_download_progress", { jobId });
+}
+
+/** 探测 ASR 一键配置所需的模板、Python 与虚拟环境状态。 */
+export async function probeAsrSetupEnvironment(
+  args: ProbeAsrSetupEnvironmentArgs = {},
+): Promise<AsrSetupEnvironment> {
+  return invoke<AsrSetupEnvironment>("probe_asr_setup_environment", { args });
+}
+
+/** 启动 ASR 引擎依赖配置任务，返回 jobId。 */
+export async function startAsrSetup(args: StartAsrSetupArgs): Promise<string> {
+  return invoke<string>("start_asr_setup", { args });
+}
+
+/** 查询 ASR 引擎依赖配置任务进度。 */
+export async function getAsrSetupProgress(
+  jobId: string,
+): Promise<AsrSetupSnapshot> {
+  return invoke<AsrSetupSnapshot>("get_asr_setup_progress", { jobId });
+}
+
+/** 取消 ASR 引擎依赖配置任务。 */
+export async function cancelAsrSetup(jobId: string): Promise<void> {
+  await invoke("cancel_asr_setup", { jobId });
 }
 
 /** 保存 ASS 文本到文件。 */
