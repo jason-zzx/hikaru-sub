@@ -1,8 +1,9 @@
 use crate::settings::{load_settings, AppSettings};
+use crate::process::hidden_command;
 use serde::Serialize;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use tauri::{AppHandle, Emitter, Manager};
 
 /// FFmpeg 来源：用户设置 / 随应用捆绑 / 系统 PATH。
@@ -88,7 +89,7 @@ pub fn ffmpeg_status(app: &AppHandle) -> FfmpegStatus {
     let settings = load_settings(app).unwrap_or_default();
     let (path, source) = resolve_ffmpeg(app, &settings);
 
-    let output = Command::new(&path).arg("-version").output();
+    let output = hidden_command(&path).arg("-version").output();
     match output {
         Ok(out) if out.status.success() => {
             let stdout = String::from_utf8_lossy(&out.stdout);
@@ -193,7 +194,7 @@ fn run_extract(
     video_path: &str,
     audio_path: &str,
 ) -> Result<(), String> {
-    let mut child = Command::new(ffmpeg)
+    let mut child = hidden_command(ffmpeg)
         .args([
             "-hide_banner",
             "-y",
@@ -340,7 +341,7 @@ pub async fn get_video_info(
         "ffprobe".to_string()
     };
 
-    let output = Command::new(&ffprobe)
+    let output = hidden_command(&ffprobe)
         .args([
             "-v", "error",
             "-select_streams", "v:0",
@@ -380,7 +381,7 @@ pub async fn extract_waveform(
 
 fn run_extract_waveform(ffmpeg: &str, video_path: &str, samples: usize) -> Result<Vec<f32>, String> {
     // FFmpeg 提取 16bit PCM，单声道，16kHz
-    let mut child = Command::new(ffmpeg)
+    let mut child = hidden_command(ffmpeg)
         .args([
             "-i", video_path,
             "-vn",

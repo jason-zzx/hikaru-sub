@@ -17,4 +17,10 @@ describe("BurnView layout", () => {
     expect(source).not.toContain("SubtitlePreview");
     expect(source).not.toContain("max-w-3xl");
   });
+
+  it("waits for user action before probing source video encoding details", () => {
+    expect(source).not.toContain("probeBurnVideo(project.videoPath)");
+    expect(source).toContain("handleProbeBurnVideo");
+    expect(source).toContain("检测原片参数");
+  });
 });

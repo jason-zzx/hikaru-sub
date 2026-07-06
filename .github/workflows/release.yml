@@ -105,6 +105,7 @@ jobs:
             This release includes bundled FFmpeg/FFprobe for the packaged platform.
             ASR engine dependencies and model weights are configured after installation.
             This workflow currently uploads Windows bundles only.
+            Windows currently ships the NSIS setup package only; MSI is disabled until the installer UX is revisited.
             macOS packages are temporarily disabled pending bundle/resource validation.
             Linux packages are intentionally deferred until Windows/macOS releases are stable.
             Windows packages are not code-signed and may show SmartScreen warnings.

@@ -16,4 +16,10 @@ describe("TranscribeView ASR setup guidance", () => {
     expect(source).toContain('setStep("settings")');
     expect(source).toContain("!audioReady || selectedEngineUnavailable");
   });
+
+  it("does not launch the ASR sidecar just by entering the page", () => {
+    expect(source).not.toContain("void detectEngines();");
+    expect(source).toContain("检测引擎状态");
+    expect(source).toContain("onClick={detectEngines}");
+  });
 });

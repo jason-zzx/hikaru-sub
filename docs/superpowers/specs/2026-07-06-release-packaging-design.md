@@ -11,7 +11,8 @@ packages, without Tauri updater support or in-app auto update.
 In scope:
 
 - Add a GitHub Actions release workflow.
-- Build Windows and macOS desktop bundles through Tauri.
+- Build Windows desktop bundles through Tauri first; macOS matrix entries stay
+  commented until macOS bundle/resource layout is verified.
 - Upload generated bundle artifacts to a GitHub Release.
 - Fetch platform FFmpeg/FFprobe binaries during CI before bundling.
 - Add local package scripts that mirror the CI packaging path.
@@ -22,9 +23,9 @@ Out of scope:
 - Tauri updater artifacts, updater endpoints, signing keys, and in-app update UI.
 - Linux desktop packaging. Add it after Windows/macOS releases are stable.
 - macOS notarization and store distribution.
+- macOS package upload while macOS bundle/resource validation is still pending.
 - Windows code-signing certificates.
 - Bundling Python ASR dependencies or model weights in the installer.
-- Client-side ASR one-click setup. That is the next separate feature.
 
 ## Release Trigger
 
@@ -41,9 +42,12 @@ ad hoc releases becomes awkward.
 
 ## Build Matrix
 
-The first release workflow should build on:
+The initial release workflow currently builds on:
 
 - `windows-latest`
+
+The macOS matrix entries are retained as comments for later re-enable:
+
 - `macos-15-intel` for macOS Intel
 - `macos-15` for macOS Apple Silicon
 
@@ -79,14 +83,20 @@ The existing `src-tauri/tauri.conf.json` already enables bundling and includes
 of checking FFmpeg binaries into git.
 
 The first release can avoid paid certificate signing and notarization. For
-macOS, use Tauri's ad-hoc signing identity (`"-"`) so Apple Silicon builds have
-a code signature even without an Apple Developer certificate. This means:
+macOS, once the macOS matrix is re-enabled, use Tauri's ad-hoc signing identity
+(`"-"`) so Apple Silicon builds have a code signature even without an Apple
+Developer certificate. This means:
 
 - Windows may show SmartScreen warnings.
 - macOS may still show Gatekeeper warnings because the app is not notarized.
 
 These limitations should be documented in the release notes or README rather
 than hidden.
+
+Current Windows bundle target is NSIS-only (`bundle.targets = ["nsis"]`).
+MSI is disabled because the default Windows Installer directory-selection UI is
+too primitive for the current user experience target. Re-enable MSI only after
+the installer UX is intentionally revisited.
 
 ## Local Scripts
 
@@ -95,8 +105,8 @@ Add package scripts that make the release path easy to reproduce locally:
 - `build:desktop`: run the frontend build and Tauri build.
 - `bundle`: alias for Tauri bundle/build if the repository prefers shorter
   naming.
-- `release:local`: fetch FFmpeg and then build the desktop bundle for the
-  current platform.
+- `release:local`: fetch FFmpeg, prepare the packaged ASR service resource, and
+  then build the desktop bundle for the current platform.
 
 The scripts must use pnpm and existing Tauri commands. They should not publish,
 tag, push, or commit anything.
@@ -127,6 +137,7 @@ Add a short release section to README or a dedicated docs file covering:
 - How to cut a release tag.
 - Which packages GitHub Actions produces.
 - That FFmpeg is included in release bundles.
+- That Windows currently ships only the NSIS setup package.
 - That ASR engine dependencies are configured after installation, not bundled.
 - That Linux packages are intentionally deferred until Windows/macOS releases
   are stable.

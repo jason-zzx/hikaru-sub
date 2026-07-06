@@ -1,11 +1,12 @@
 use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
+use crate::process::hidden_command;
 use crate::settings::load_settings;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
@@ -261,7 +262,7 @@ fn parse_available_encoders(output: &str) -> Vec<BurnVideoEncoder> {
 }
 
 fn probe_available_burn_encoders(ffmpeg: &str) -> Result<Vec<BurnVideoEncoder>, String> {
-    let output = Command::new(ffmpeg)
+    let output = hidden_command(ffmpeg)
         .args(["-hide_banner", "-encoders"])
         .output()
         .map_err(|e| format!("无法探测 FFmpeg 编码器：{e}"))?;
@@ -289,7 +290,7 @@ fn hardware_encoder_runtime_available(ffmpeg: &str, encoder: BurnVideoEncoder) -
     let Some(name) = encoder.ffmpeg_name() else {
         return false;
     };
-    let output = Command::new(ffmpeg)
+    let output = hidden_command(ffmpeg)
         .args(hardware_encoder_probe_args(name))
         .output();
     matches!(output, Ok(out) if out.status.success())
@@ -386,7 +387,7 @@ fn parse_video_bitrate_kbps(output: &str) -> Option<u32> {
 }
 
 fn probe_video_bitrate_kbps(ffprobe: &str, video_path: &str) -> Result<Option<u32>, String> {
-    let output = Command::new(ffprobe)
+    let output = hidden_command(ffprobe)
         .args([
             "-v",
             "error",
@@ -643,7 +644,7 @@ fn run_burn_job(
             BurnVideoEncoder::LibX264
         };
         let ffmpeg_args = build_burn_args(&args, &output_path, effective_encoder);
-        let mut child = Command::new(&ffmpeg)
+        let mut child = hidden_command(&ffmpeg)
             .args(&ffmpeg_args)
             .stdin(Stdio::null())
             .stdout(Stdio::null())

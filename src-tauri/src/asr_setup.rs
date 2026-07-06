@@ -1,3 +1,4 @@
+use crate::process::hidden_command;
 use crate::settings::{load_settings, save_settings};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -5,7 +6,7 @@ use std::io::{BufRead, BufReader, Read};
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::path::BaseDirectory;
@@ -353,7 +354,7 @@ fn command_output(
     args: &[&str],
     cwd: Option<&Path>,
 ) -> Result<std::process::Output, String> {
-    let mut command = Command::new(program);
+    let mut command = hidden_command(program);
     command.args(base_args).args(args);
     if let Some(cwd) = cwd {
         command.current_dir(cwd);
@@ -398,7 +399,7 @@ fn find_python(explicit: Option<&str>) -> Option<(PythonCommand, String)> {
 }
 
 fn has_nvidia_gpu() -> bool {
-    Command::new("nvidia-smi")
+    hidden_command("nvidia-smi")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -468,20 +469,20 @@ fn setup_job_id() -> String {
 
 fn kill_process_tree(pid: u32) {
     if cfg!(windows) {
-        let _ = Command::new("taskkill")
+        let _ = hidden_command("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
     } else {
         let group = format!("-{pid}");
-        let group_status = Command::new("kill")
+        let group_status = hidden_command("kill")
             .args(["-TERM", &group])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
         if !group_status.map(|status| status.success()).unwrap_or(false) {
-            let _ = Command::new("kill")
+            let _ = hidden_command("kill")
                 .args(["-TERM", &pid.to_string()])
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
@@ -503,7 +504,7 @@ fn run_logged_command(
     }
     set_stage(job, stage, progress);
 
-    let mut command = Command::new(program);
+    let mut command = hidden_command(program);
     command
         .args(args)
         .current_dir(cwd)
@@ -621,7 +622,7 @@ fn run_venv_python_command(
 
 fn verify_engine_available(service_dir: &Path, profile: AsrSetupProfile) -> Result<(), String> {
     let python = venv_python_path(service_dir);
-    let output = Command::new(&python)
+    let output = hidden_command(&python)
         .arg("-c")
         .arg("from engines.registry import list_engines; import json; print('HIKARU_ENGINES_JSON=' + json.dumps(list_engines()))")
         .current_dir(service_dir)
