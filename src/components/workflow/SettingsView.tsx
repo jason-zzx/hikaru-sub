@@ -1,25 +1,39 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   checkFfmpeg,
   getSettings,
+  cleanupRuntimeDependency,
+  getRuntimeDependencyProgress,
   invalidateFfmpegStatus,
   pickDirectory,
   pickExecutableFile,
+  prepareRuntimeDependency,
+  probeDownloadSources,
+  probeRuntimeDependencies,
   setSettings,
 } from "../../services/tauri";
 import { Select } from "../ui/Select";
 import { AsrEngineSetupPanel } from "./AsrEngineSetupPanel";
 import { ModelManager } from "./ModelManager";
-import type { AppSettings, FfmpegStatus } from "../../types";
+import { RuntimeDependenciesPanel } from "./RuntimeDependenciesPanel";
+import type {
+  AppSettings,
+  FfmpegStatus,
+  RuntimeDependencyKind,
+  RuntimeDependencyProbe,
+  RuntimeDependencySnapshot,
+  RuntimeDependencySourceMode,
+} from "../../types";
 import {
   ASR_ENGINE_OPTIONS,
   asrModelOptions,
   defaultAsrModel,
 } from "../../constants/asr";
+import { RUNTIME_DEPENDENCY_LABEL } from "../../constants/runtimeDependencies";
 
 const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
   settings: "自定义路径",
-  bundled: "随应用捆绑",
+  managed: "受管下载",
   system: "系统 PATH",
 };
 
@@ -40,22 +54,46 @@ const ASR_DEVICES = [
 const inputClass =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent/60";
 
+const RUNTIME_PREPARATION_POLL_MS = 800;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type RuntimePreparationSnapshots = Partial<
+  Record<RuntimeDependencyKind, RuntimeDependencySnapshot>
+>;
+
+const shouldAutoProbeRuntimeSources = (probe: RuntimeDependencyProbe) =>
+  probe.sourceMode === "auto";
+
 export function SettingsView() {
+  const asrSectionRef = useRef<HTMLDivElement | null>(null);
+  const runtimePreparationJobsRef = useRef<Partial<Record<RuntimeDependencyKind, string>>>({});
+  const autoProbeRuntimeSourcesRef = useRef(false);
   const [settings, setLocal] = useState<AppSettings | null>(null);
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [asrSetupRunning, setAsrSetupRunning] = useState(false);
   const [asrSetupRefreshKey, setAsrSetupRefreshKey] = useState(0);
+  const [runtimeProbe, setRuntimeProbe] = useState<RuntimeDependencyProbe | null>(null);
+  const [runtimePreparationSnapshots, setRuntimePreparationSnapshots] =
+    useState<RuntimePreparationSnapshots>({});
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(
     null,
   );
 
   useEffect(() => {
-    getSettings()
-      .then(setLocal)
-      .catch((e) => setMessage({ kind: "error", text: `加载设置失败：${String(e)}` }));
+    const initialize = async () => {
+      try {
+        const next = await getSettings();
+        setLocal(next);
+      } catch (e) {
+        setMessage({ kind: "error", text: `加载设置失败：${String(e)}` });
+      }
+      await refreshRuntimeDependencies({ autoProbeSources: true });
+    };
     refreshFfmpeg();
+    void initialize();
   }, []);
 
   const refreshFfmpeg = (force = false) => {
@@ -63,6 +101,34 @@ export function SettingsView() {
     checkFfmpeg()
       .then(setFfmpeg)
       .catch(() => setFfmpeg(null));
+  };
+
+  const refreshRuntimeDependencies = async (
+    options: { autoProbeSources?: boolean } = {},
+  ) => {
+    try {
+      const probe = await probeRuntimeDependencies();
+      if (
+        options.autoProbeSources &&
+        !autoProbeRuntimeSourcesRef.current &&
+        shouldAutoProbeRuntimeSources(probe)
+      ) {
+        autoProbeRuntimeSourcesRef.current = true;
+        try {
+          const probed = await probeDownloadSources();
+          setRuntimeProbe(probed);
+          const next = await getSettings();
+          setLocal(next);
+          setDirty(false);
+          return;
+        } catch (e) {
+          console.warn("自动测速下载源失败", e);
+        }
+      }
+      setRuntimeProbe(probe);
+    } catch (e) {
+      setMessage({ kind: "error", text: `检测运行时依赖失败：${String(e)}` });
+    }
   };
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -78,7 +144,7 @@ export function SettingsView() {
     try {
       await setSettings(settings);
       setDirty(false);
-      setMessage({ kind: "ok", text: "设置已保存" });
+      setMessage(null);
       refreshFfmpeg(true);
     } catch (e) {
       setMessage({ kind: "error", text: `保存失败：${String(e)}` });
@@ -92,7 +158,120 @@ export function SettingsView() {
     setLocal(next);
     setDirty(false);
     setAsrSetupRefreshKey((value) => value + 1);
-    setMessage({ kind: "ok", text: "ASR 引擎依赖配置完成，设置已更新" });
+    void refreshRuntimeDependencies();
+    setMessage(null);
+  };
+
+  const handleRuntimeSourceModeChange = async (mode: RuntimeDependencySourceMode) => {
+    if (!settings) return;
+    const next = { ...settings, runtimeSourceMode: mode };
+    setLocal(next);
+    setSaving(true);
+    setMessage(null);
+    try {
+      await setSettings(next);
+      setDirty(false);
+      setMessage(null);
+      void refreshRuntimeDependencies();
+    } catch (e) {
+      setMessage({ kind: "error", text: `保存下载源失败：${String(e)}` });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleProbeSources = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const probe = await probeDownloadSources();
+      setRuntimeProbe(probe);
+      const next = await getSettings();
+      setLocal(next);
+      setDirty(false);
+      setMessage(null);
+    } catch (e) {
+      setMessage({ kind: "error", text: `下载源测速失败：${String(e)}` });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCleanupDependency = async (kind: RuntimeDependencyKind) => {
+    const item = runtimeProbe?.items.find((entry) => entry.kind === kind);
+    const label = item?.path
+      ? `${item.path}`
+      : kind;
+    if (!window.confirm(`确认清理 ${label}？`)) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      await cleanupRuntimeDependency(kind);
+      if (kind === "ffmpeg") refreshFfmpeg(true);
+      if (kind === "python311" || kind === "asrVenv") {
+        setAsrSetupRefreshKey((value) => value + 1);
+      }
+      void refreshRuntimeDependencies();
+      setMessage(null);
+    } catch (e) {
+      setMessage({ kind: "error", text: `清理失败：${String(e)}` });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setRuntimePreparationSnapshot = (
+    kind: RuntimeDependencyKind,
+    snapshot: RuntimeDependencySnapshot,
+  ) => {
+    setRuntimePreparationSnapshots((prev) => ({ ...prev, [kind]: snapshot }));
+  };
+
+  const handlePrepareRuntimeDependency = async (kind: RuntimeDependencyKind) => {
+    if (runtimePreparationJobsRef.current[kind]) return;
+    const label = RUNTIME_DEPENDENCY_LABEL[kind];
+    runtimePreparationJobsRef.current[kind] = "starting";
+    setRuntimePreparationSnapshot(kind, {
+      id: "",
+      kind,
+      status: "pending",
+      stage: "等待开始",
+      progress: null,
+      downloadedBytes: 0,
+      totalBytes: 0,
+      logTail: [],
+      error: null,
+    });
+    try {
+      const jobId = await prepareRuntimeDependency({ kind });
+      runtimePreparationJobsRef.current[kind] = jobId;
+      for (;;) {
+        const snapshot = await getRuntimeDependencyProgress(jobId);
+        setRuntimePreparationSnapshot(kind, snapshot);
+        if (snapshot.status === "completed") {
+          if (kind === "ffmpeg") refreshFfmpeg(true);
+          if (kind === "python311") {
+            setAsrSetupRefreshKey((value) => value + 1);
+          }
+          void refreshRuntimeDependencies();
+          setMessage(null);
+          return;
+        }
+        if (snapshot.status === "failed" || snapshot.status === "cancelled") {
+          throw new Error(snapshot.error ?? `${label} 下载失败`);
+        }
+        await sleep(RUNTIME_PREPARATION_POLL_MS);
+      }
+    } catch (e) {
+      setMessage({ kind: "error", text: `${label} 下载失败：${String(e)}` });
+    } finally {
+      delete runtimePreparationJobsRef.current[kind];
+    }
+  };
+
+  const handleConfigureAsrFromRuntimePanel = () => {
+    asrSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setMessage(null);
   };
 
   const updateAsrEngine = (engine: string) => {
@@ -118,15 +297,6 @@ export function SettingsView() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {message && (
-            <span
-              className={`text-sm ${
-                message.kind === "ok" ? "text-success" : "text-danger"
-              }`}
-            >
-              {message.text}
-            </span>
-          )}
           <button
             type="button"
             onClick={handleSave}
@@ -140,11 +310,23 @@ export function SettingsView() {
 
       <div className="flex-1 overflow-auto px-6 py-5">
         <div className="mx-auto flex max-w-2xl flex-col gap-8">
-          <Section title="可执行程序路径" desc="留空则使用捆绑或系统 PATH 中的程序">
+          {message ? (
+            <div
+              className={`rounded-md border px-3 py-2 text-sm break-words ${
+                message.kind === "ok"
+                  ? "border-success/30 bg-success/10 text-success"
+                  : "border-danger/30 bg-danger/10 text-danger"
+              }`}
+            >
+              {message.text}
+            </div>
+          ) : null}
+
+          <Section title="可执行程序路径" desc="留空则使用系统 PATH 或受管下载的程序">
             <Field label="FFmpeg 路径">
               <PathInput
                 value={settings.ffmpegPath ?? ""}
-                placeholder="留空使用捆绑 / 系统 ffmpeg"
+                placeholder="留空使用系统 / 受管 ffmpeg"
                 onChange={(v) => update("ffmpegPath", v || undefined)}
                 onBrowse={pickExecutableFile}
               />
@@ -161,7 +343,7 @@ export function SettingsView() {
             <Field label="Python 路径">
               <PathInput
                 value={settings.pythonPath ?? ""}
-                placeholder="留空使用系统 python"
+                placeholder="留空使用系统或受管 Python 3.11"
                 onChange={(v) => update("pythonPath", v || undefined)}
                 onBrowse={pickExecutableFile}
               />
@@ -176,55 +358,68 @@ export function SettingsView() {
             </Field>
           </Section>
 
-          <Section title="日语转录（ASR）默认" desc="新建项目时使用的默认转录配置（源语言固定为日语）">
-            <Field label="引擎">
-              <Select
-                value={settings.asrEngine}
-                onChange={updateAsrEngine}
-                options={ASR_ENGINE_OPTIONS}
-              />
-            </Field>
-            <Field label="模型">
-              <Select
-                value={settings.asrModel}
-                onChange={(v) => update("asrModel", v)}
-                options={asrModelOptions(settings.asrEngine)}
-              />
-              {settings.asrEngine === "parakeet" && (
-                <p className="mt-1 text-xs text-text-muted">
-                  Parakeet 使用 NVIDIA NeMo，可选依赖需单独安装；当前集成针对日语模型。
-                </p>
-              )}
-              <div className="mt-1.5">
-                <ModelManager
-                  key={`${settings.asrEngine}:${settings.asrModel}:${asrSetupRefreshKey}`}
-                  engine={settings.asrEngine}
-                  model={settings.asrModel}
+          <RuntimeDependenciesPanel
+            probe={runtimeProbe}
+            onChangeSourceMode={handleRuntimeSourceModeChange}
+            onProbeSources={handleProbeSources}
+            onCleanup={handleCleanupDependency}
+            onPrepareDependency={handlePrepareRuntimeDependency}
+            onConfigureAsr={handleConfigureAsrFromRuntimePanel}
+            preparations={runtimePreparationSnapshots}
+          />
+
+          <div ref={asrSectionRef}>
+            <Section title="日语转录（ASR）默认" desc="新建项目时使用的默认转录配置（源语言固定为日语）">
+              <Field label="引擎">
+                <Select
+                  value={settings.asrEngine}
+                  onChange={updateAsrEngine}
+                  options={ASR_ENGINE_OPTIONS}
                 />
-              </div>
-            </Field>
-            <Field label="设备">
-              <Select
-                value={settings.asrDevice}
-                onChange={(v) => update("asrDevice", v)}
-                options={ASR_DEVICES}
+              </Field>
+              <Field label="模型">
+                <Select
+                  value={settings.asrModel}
+                  onChange={(v) => update("asrModel", v)}
+                  options={asrModelOptions(settings.asrEngine)}
+                />
+                {settings.asrEngine === "parakeet" && (
+                  <p className="mt-1 text-xs text-text-muted">
+                    Parakeet 使用 NVIDIA NeMo，可选依赖需单独安装；当前集成针对日语模型。
+                  </p>
+                )}
+                <div className="mt-1.5">
+                  <ModelManager
+                    key={`${settings.asrEngine}:${settings.asrModel}:${asrSetupRefreshKey}`}
+                    engine={settings.asrEngine}
+                    model={settings.asrModel}
+                  />
+                </div>
+              </Field>
+              <Field label="设备">
+                <Select
+                  value={settings.asrDevice}
+                  onChange={(v) => update("asrDevice", v)}
+                  options={ASR_DEVICES}
+                />
+              </Field>
+              <AsrEngineSetupPanel
+                engine={settings.asrEngine}
+                device={settings.asrDevice}
+                pythonPath={settings.pythonPath}
+                asrServicePath={settings.asrServicePath}
+                refreshKey={asrSetupRefreshKey}
+                disabled={saving}
+                onBeforeStart={async () => {
+                  await setSettings(settings);
+                  setDirty(false);
+                setMessage(null);
+                }}
+                onRunningChange={setAsrSetupRunning}
+                onComplete={refreshSettingsAfterAsrSetup}
               />
-            </Field>
-            <AsrEngineSetupPanel
-              engine={settings.asrEngine}
-              device={settings.asrDevice}
-              pythonPath={settings.pythonPath}
-              asrServicePath={settings.asrServicePath}
-              disabled={saving}
-              onBeforeStart={async () => {
-                await setSettings(settings);
-                setDirty(false);
-                setMessage({ kind: "ok", text: "设置已保存，开始配置 ASR 引擎依赖" });
-              }}
-              onRunningChange={setAsrSetupRunning}
-              onComplete={refreshSettingsAfterAsrSetup}
-            />
-          </Section>
+            </Section>
+          </div>
 
           <Section title="翻译（OpenAI 兼容）" desc="API Key 仅保存在本机配置文件中，不会写入项目或源码">
             <Field label="Base URL">

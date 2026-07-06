@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-06T19:12:54.774Z",
+  "platforms": {
+    "windows-x64": {
+      "official": {
+        "id": "official",
+        "label": "官方源",
+        "ffmpeg": {
+          "url": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+          "archive": "zip",
+          "sha256": "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec",
+          "sizeBytes": 109728040
+        },
+        "python311": {
+          "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
+          "archive": "tar.gz",
+          "stripPrefix": "python",
+          "sha256": "368474c69f476e7de4adaf50b61d9fcf6ec8b4db88cc43c5f71c860b3cd29c69",
+          "sizeBytes": 41332032
+        },
+        "pipIndexUrl": "https://pypi.org/simple",
+        "pipExtraIndexUrls": [],
+        "pytorchCpuIndexUrl": "https://download.pytorch.org/whl/cpu",
+        "pytorchCudaIndexUrl": "https://download.pytorch.org/whl/cu126",
+        "pytorchCpuFindLinksUrl": null,
+        "pytorchCudaFindLinksUrl": null,
+        "huggingfaceEndpoint": null
+      },
+      "china": {
+        "id": "china",
+        "label": "中国大陆镜像",
+        "ffmpeg": {
+          "url": "https://ghfast.top/https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n7.1.5-1-g7d0e842004-win64-gpl-7.1.zip",
+          "archive": "zip",
+          "sha256": "405b190f746db40539eb453967f72c0e69d8bf260b10ceff36e0c2149a9ad22f",
+          "sizeBytes": 157680916
+        },
+        "python311": {
+          "url": "https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
+          "archive": "tar.gz",
+          "stripPrefix": "python",
+          "sha256": "368474c69f476e7de4adaf50b61d9fcf6ec8b4db88cc43c5f71c860b3cd29c69",
+          "sizeBytes": 41332032
+        },
+        "pipIndexUrl": "https://pypi.tuna.tsinghua.edu.cn/simple",
+        "pipExtraIndexUrls": [
+          "https://pypi.org/simple"
+        ],
+        "pytorchCpuIndexUrl": null,
+        "pytorchCudaIndexUrl": null,
+        "pytorchCpuFindLinksUrl": "https://mirrors.aliyun.com/pytorch-wheels/cpu/",
+        "pytorchCudaFindLinksUrl": "https://mirrors.aliyun.com/pytorch-wheels/cu126/",
+        "huggingfaceEndpoint": "https://hf-mirror.com"
+      }
+    }
+  }
+}

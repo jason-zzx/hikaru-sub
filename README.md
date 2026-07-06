@@ -1,4 +1,4 @@
-# Hikaru-Sub
+# Hikaru Sub
 
 日语 AI 字幕桌面应用：m3u8 视频下载 → 本地 ASR 日语转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
 
@@ -7,12 +7,12 @@
 ✅ **已实现**：
 - m3u8 视频下载（Rust 分片并发优先、FFmpeg 兼容回退；单 URL / 分离音视频；AES-128 加密 VOD；自定义请求头；自动并发与 HTTP/2；进度与取消；完成后可导入项目）
 - 项目管理（创建/打开项目，`.hikaru` 元数据；打开时支持选择视频目录或 `.hikaru` 目录）
-- FFmpeg 集成（音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
+- FFmpeg 集成（系统优先、缺失时按需下载受管 FFmpeg；音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
 - Python ASR sidecar（faster-whisper + NVIDIA Parakeet + Qwen3-ASR 日语适配器 + VAD 预处理 + HTTP 进度 API）
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
 - 翻译工作流（配置界面 + 进度显示 → 生成 `.translated.ass`）
-- 设置页（FFmpeg/Python 路径、ASR 引擎、翻译 API、高级配置）
+- 设置页（FFmpeg/Python 路径、运行时依赖下载源与存储清理、ASR 引擎、翻译 API、高级配置）
 - ASS 文件持久化（自动保存/加载；保留 `[V4+ Styles]` 与 PlayRes；转录时按视频分辨率写入）
 - 字幕编辑器（视频播放 + libass 优先字幕预览 + CSS 明示兜底 + 行内 override 标签渲染 + 样式下拉/快速参数工具栏/更多标签面板/样式库抽屉 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做 + Aegisub 式快捷键体系（字幕导航、逐帧/边界播放头控制、Ctrl+3/4 对轴打点、Enter 提交跳转、? 键位速查）；播放时按视频帧时间同步预览；inline 模式 UI 单行展示 `译文 / 原文`）
 - FFmpeg 压制（硬字幕 MP4 / 软字幕 MKV；导出策略、原片码率探测、硬件 H.264 编码器自动选择；进度与取消；压制前使用当前内存字幕生成临时 ASS）
@@ -42,8 +42,8 @@
 - Node.js 20+
 - pnpm 10+
 - Rust（[安装指南](https://www.rust-lang.org/learn/get-started)）
-- FFmpeg（PATH 或可配置路径）
-- Python 3.10+（ASR sidecar）
+- FFmpeg（PATH/自定义路径优先；缺失时客户端按需下载受管副本）
+- Python 3.11（系统/自定义路径优先；ASR 配置时缺失则按需下载受管 Python 3.11）
 - 可选：CUDA（faster-whisper GPU 加速；Parakeet / Qwen3-ASR 需单独安装 CUDA 版依赖）
 
 ## 开发
@@ -67,7 +67,7 @@ pnpm tauri build  # 打包应用
 pnpm release:local
 ```
 
-该命令用于发布机，会先按当前平台下载 FFmpeg/FFprobe 到 `src-tauri/binaries/`、准备 ASR 服务资源，再执行 Tauri 打包。当前 Windows 仅生成 NSIS 安装包，产物位于 `src-tauri/target/release/bundle/nsis/`。Linux 本地包不属于首期支持范围。
+该命令用于发布机，会准备 ASR 服务资源并执行 Tauri 打包，不会下载或捆绑 FFmpeg。当前 Windows 仅生成 NSIS 安装包，产物位于 `src-tauri/target/release/bundle/nsis/`。Linux 本地包不属于首期支持范围。
 
 ### GitHub Release
 
@@ -80,7 +80,7 @@ git push origin v0.1.0
 
 工作流当前只构建 Windows 产物，并上传到 GitHub Release 草稿。也可以从 GitHub Actions 手动运行 `Release Desktop Clients`，输入已存在的 tag/ref；工作流会检出该 ref，并创建或更新同名 Release 草稿。macOS Intel 与 macOS Apple Silicon matrix 已保留为注释，待 macOS 验证通过后重新启用。
 
-发布包会随平台包含 FFmpeg/FFprobe 与 ASR 服务模板。ASR Python 依赖、Parakeet/Qwen3-ASR 可选依赖和模型权重不随安装包预装，安装后通过客户端内的 ASR 配置流程准备。
+发布包会包含 ASR 服务模板，但不包含 FFmpeg、Python、ASR Python 依赖或模型权重。安装后，Hikaru Sub 会在首次使用相关功能时优先复用系统 FFmpeg/Python 3.11；如缺失，会弹出确认窗口后下载到安装目录下的 `deps/` 受管依赖目录，不使用 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 存放这些大型依赖。下载源支持自动测速推荐、官方源、中国大陆镜像和自定义源；设置页可查看受管依赖占用并清理 FFmpeg、Python 3.11、ASR venv、模型缓存和临时下载缓存。
 
 当前发布限制：
 
@@ -93,17 +93,31 @@ git push origin v0.1.0
 
 在 Windows 发布机执行 `pnpm release:local` 后，应确认：
 
-1. `src-tauri/target/release/bundle/nsis/Hikaru-Sub_0.1.0_x64-setup.exe` 存在，且干净 bundle 目录下没有新生成的 MSI。
-2. 运行 NSIS setup，可选择安装目录，安装完成后从开始菜单或安装目录启动应用。
-3. 首次启动与切换到「下载」「导入」「转录」「压制」页面时不应长时间卡住；这些页面会复用 FFmpeg 检测缓存。
+1. `src-tauri/target/release/bundle/nsis/` 下存在 Hikaru Sub NSIS setup，且干净 bundle 目录下没有新生成的 MSI。
+2. 运行 NSIS setup，可选择安装目录；如果用户未手动修改目录，安装开始时会将 Tauri 目录页的默认值重定向到 `%LOCALAPPDATA%\Programs\hikaru-sub`，安装完成后从开始菜单或安装目录启动应用。
+3. 首次启动与切换到「下载」「导入」「转录」「压制」页面时不应长时间卡住；这些页面会复用 FFmpeg 检测缓存，不会自动下载 FFmpeg。
 4. 进入「转录」页不会自动启动 ASR sidecar；点击「检测引擎状态」或开始转录时才会拉起 sidecar。
 5. 进入「压制」页不会自动探测原片码率/编码器；点击「检测原片参数」后才会运行 ffprobe/编码器探测。
 6. 检测 ASR、配置 ASR、FFmpeg/ffprobe 相关操作不应弹出转瞬即逝的终端窗口。
-7. 如果本机曾运行开发版，安装版设置页不应继续显示项目源码目录下的 `asr-service/.venv` Python 路径；一键配置完成后应指向应用数据目录下的 managed `asr-service/.venv`。
+7. 如果本机没有系统 FFmpeg，点击「下载」「转录」「压制」中的 FFmpeg 相关操作时，应出现依赖确认窗口，显示 FFmpeg、预计大小、安装目录 `deps/` 下的保存位置和当前下载源；取消时原操作不继续，确认后下载完成并继续原操作。
+8. 如果本机没有 Python 3.11，设置页点击「配置当前引擎依赖」时，应先出现 Python 3.11 依赖确认窗口；确认后下载并解压受管 Python 3.11 归档到安装目录 `deps/python311/current/`，再继续创建 ASR venv 和安装引擎依赖。
+9. 设置页「运行时依赖」区域可切换官方源/中国大陆镜像/自动推荐，点击「重新测速」会更新推荐源；清理按钮只删除安装目录 `deps/` 下的受管依赖，不应删除用户手动配置的外部路径。
+10. 如果本机曾运行开发版，安装版设置页不应继续显示项目源码目录下的 `asr-service/.venv` Python 路径；一键配置完成后应指向安装目录下的 managed `deps/asr-service/.venv`。
+11. 使用受管 FFmpeg 完成一次转录后，若 `deps/ffmpeg/current/ffprobe.exe` 存在，不应再提示“无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080”。
+12. 下载 ASR 模型时，「模型状态」区域应显示实际下载源和诊断日志路径；中国大陆镜像模式下应能在日志中看到 `HF_ENDPOINT=https://hf-mirror.com` 与 `HF_HOME=<安装目录>/deps/models/huggingface`。
+
+### 运行时依赖与下载源
+
+- FFmpeg 解析顺序：用户配置路径 → 系统 `PATH` → 安装目录 `deps/ffmpeg/current` 下的受管 FFmpeg；缺失时由相关工作流弹出下载确认。
+- Python 解析顺序：用户配置路径 → 系统 Python 3.11（Windows 会尝试 `py -3.11` 等启动器）→ 安装目录 `deps/python311/current` 下的受管 Python 3.11；ASR 配置流程只接受 Python 3.11。
+- ASR venv 位于 `deps/asr-service/.venv`，模型缓存位于 `deps/models/huggingface`，临时归档位于 `deps/downloads`。这些目录都跟随用户选择的安装目录。
+- 如果用户把 Hikaru Sub 安装到 `C:\Program Files` 等当前用户不可写目录，准备/清理受管依赖前会先尝试以管理员权限重启；取消 UAC 时会提示重新以管理员身份运行或安装到当前用户可写目录。
+- 内置下载源清单位于 `src-tauri/resources/runtime-dependency-sources.json`，二进制归档以 SHA-256 和大小锁定。中国大陆镜像当前覆盖 FFmpeg、Python 3.11、PyPI、PyTorch wheels 与 Hugging Face endpoint。
+- `hf-mirror.com` 可能按出口 IP 重定向到 Hugging Face 原站。若用户选择中国大陆镜像但模型下载仍失败，应优先查看模型状态显示的诊断日志；必要时切换到官方源、自定义稳定 endpoint，或确保模型下载流量全程走中国大陆出口。
 
 ### ASR sidecar 依赖
 
-打包后的客户端可在「设置 → 日语转录（ASR）默认」中点击「配置当前引擎依赖」，自动复制随应用提供的 ASR 服务模板、创建/复用本机虚拟环境并安装所选引擎依赖。模型权重仍在同一区域的「模型状态」中单独检测与下载，不随依赖配置一起安装。安装版会忽略明显指向源码仓库 `asr-service/.venv` 的旧开发路径，避免复用开发环境缓存。
+打包后的客户端可在「设置 → 日语转录（ASR）默认」中点击「配置当前引擎依赖」。Hikaru Sub 会先检测系统或自定义 Python 3.11；如不可用，则在确认后下载可重定位的受管 Python 3.11 归档并解压到安装目录 `deps/python311/current/`。随后会复制随应用提供的 ASR 服务模板、创建/复用安装目录 `deps/asr-service/.venv` 下的虚拟环境并安装所选引擎依赖。模型权重仍在同一区域的「模型状态」中单独检测与下载，不随依赖配置一起安装。安装版会忽略明显指向源码仓库 `asr-service/.venv` 的旧开发路径，避免复用开发环境缓存。
 
 `./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎（`requirements.txt`）。Parakeet（NeMo + PyTorch）与 Qwen3-ASR（qwen-asr + PyTorch）体积较大，**须显式传参**才会安装：
 
@@ -333,7 +347,7 @@ interface SubtitleCue {
 | `check_ffmpeg` | 检测 FFmpeg 可用性与版本 |
 | `extract_audio` | 提取 16kHz WAV 音轨 + 进度事件 |
 | `extract_waveform` | 提取归一化音频峰值数据用于时间轴波形 |
-| `get_video_info` | 获取视频分辨率、时长 |
+| `get_video_info` | 通过共享 ffprobe 解析器获取视频分辨率、时长 |
 | `discover_preview_fonts` | 枚举系统/补充字体并注册为预览可访问 URL |
 | `render_subtitle_preview_frame` | 使用 FFmpeg/libass 渲染硬字幕单帧图，用于诊断与视觉回归 |
 | `register_media_playback` | 注册本地视频到媒体 HTTP 服务，返回可播放 URL |
@@ -345,10 +359,16 @@ interface SubtitleCue {
 | `cancel_asr` | 取消转录任务 |
 | `check_asr_model` | 检查本地 ASR 模型是否可用 |
 | `download_asr_model` | 启动 ASR 模型下载任务 |
-| `get_model_download_progress` | 获取模型下载进度 |
+| `get_model_download_progress` | 获取模型下载进度、下载源与 sidecar 诊断日志路径 |
 | `save_ass_text` | 保存 ASS 文本到文件 |
 | `load_ass_text` | 加载 ASS 文件内容 |
 | `get_settings` / `set_settings` | 全局配置读写 |
+| `probe_runtime_dependencies` | 探测 FFmpeg、Python 3.11、ASR venv、模型缓存和下载缓存状态 |
+| `prepare_runtime_dependency` | 按需下载/安装受管 FFmpeg 或 Python 3.11 |
+| `get_runtime_dependency_progress` | 查询运行时依赖准备进度 |
+| `cancel_runtime_dependency` | 取消运行时依赖准备任务 |
+| `cleanup_runtime_dependency` | 清理安装目录 `deps/` 下的受管依赖或下载缓存 |
+| `probe_download_sources` | 对下载源测速并保存自动推荐源 |
 | `allow_asset_path` | 将视频或代理文件路径加入 Tauri asset scope |
 | `detect_video_codec` | 检测视频编码格式 |
 | `start_transcode` | 启动不兼容视频编码的代理视频转码 |

@@ -8,6 +8,7 @@ import {
   checkFfmpeg,
   createProject,
   getVideoDownloadProgress,
+  invalidateFfmpegStatus,
   pickDirectory,
   projectDirFromMeta,
   startVideoDownload,
@@ -17,6 +18,8 @@ import type {
   DownloadSnapshot,
   FfmpegStatus,
 } from "../../types";
+import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
+import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
 const POLL_INTERVAL_MS = 700;
 const INPUT_CLASS =
@@ -41,6 +44,7 @@ export function DownloadView() {
   const updateTask = useTaskStore((s) => s.updateTask);
 
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+  const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
   const [mode, setMode] = useState<DownloadMode>("single");
   const [name, setName] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
@@ -56,10 +60,15 @@ export function DownloadView() {
 
   const pollingRef = useRef(false);
 
+  const refreshFfmpeg = async (force = false) => {
+    if (force) invalidateFfmpegStatus();
+    const next = await checkFfmpeg({ force });
+    setFfmpeg(next);
+    return next;
+  };
+
   useEffect(() => {
-    checkFfmpeg()
-      .then(setFfmpeg)
-      .catch(() => setFfmpeg(null));
+    refreshFfmpeg().catch(() => setFfmpeg(null));
   }, []);
 
   useEffect(() => {
@@ -128,7 +137,7 @@ export function DownloadView() {
     }
   };
 
-  const handleStart = async () => {
+  const runStart = async () => {
     setError(null);
     setCompletedPath(null);
     setSnapshot(null);
@@ -155,6 +164,17 @@ export function DownloadView() {
       setBusy(false);
       updateTask("video-download", { status: "error" });
     }
+  };
+
+  const handleStart = async () => {
+    if (ffmpegMissing) {
+      await ffmpegPreparation.requestDependency(async () => {
+        const next = await refreshFfmpeg(true);
+        if (next.available) await runStart();
+      });
+      return;
+    }
+    await runStart();
   };
 
   const handleCancel = async () => {
@@ -207,7 +227,7 @@ export function DownloadView() {
       <header>
         <h2 className="text-xl font-semibold">视频下载</h2>
         <p className="mt-1 text-sm text-text-muted">
-          从 m3u8 地址下载音视频，完成后可导入为 Hikaru-Sub 项目
+          从 m3u8 地址下载音视频，完成后可导入为 Hikaru Sub 项目
         </p>
       </header>
 
@@ -216,10 +236,14 @@ export function DownloadView() {
           <span className="text-warning">未检测到 FFmpeg，无法下载媒体。</span>
           <button
             type="button"
-            onClick={() => setStep("settings")}
+            onClick={() =>
+              void ffmpegPreparation.requestDependency(async () => {
+                await refreshFfmpeg(true);
+              })
+            }
             className="shrink-0 rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
           >
-            前往设置
+            准备 FFmpeg
           </button>
         </div>
       )}
@@ -328,7 +352,7 @@ export function DownloadView() {
           <button
             type="button"
             onClick={handleStart}
-            disabled={!canStart || ffmpegMissing}
+            disabled={!canStart}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "下载中…" : "开始下载"}
@@ -401,6 +425,30 @@ export function DownloadView() {
           </div>
         </section>
       )}
+
+      <RuntimeDependencyDialog
+        open={ffmpegPreparation.open}
+        kind="ffmpeg"
+        reason="下载和封装媒体需要 FFmpeg。"
+        sizeBytes={ffmpegPreparation.item?.sizeBytes ?? 0}
+        targetPath={ffmpegPreparation.item?.path ?? "安装目录/deps/ffmpeg/current"}
+        sourceLabel={ffmpegPreparation.sourceLabel}
+        status={
+          ffmpegPreparation.snapshot?.status === "running" ||
+          ffmpegPreparation.snapshot?.status === "pending"
+            ? "running"
+            : ffmpegPreparation.snapshot?.status === "completed"
+              ? "completed"
+              : ffmpegPreparation.snapshot?.status === "failed"
+                ? "failed"
+                : "idle"
+        }
+        progressPercent={ffmpegPreparation.progressPercent}
+        error={ffmpegPreparation.error}
+        onConfirm={ffmpegPreparation.confirmPrepare}
+        onCancel={() => ffmpegPreparation.setOpen(false)}
+        onChangeSource={() => setStep("settings")}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # ASR Sidecar
 
-Hikaru-Sub 的本地语音转写服务，作为独立 Python 子进程运行，通过 localhost HTTP 与 Tauri 主进程通信。ASR 推理隔离在此进程，避免阻塞 UI 且便于更换模型/引擎。
+Hikaru Sub 的本地语音转写服务，作为独立 Python 子进程运行，通过 localhost HTTP 与 Tauri 主进程通信。ASR 推理隔离在此进程，避免阻塞 UI 且便于更换模型/引擎。
 
 ## 目录结构
 
@@ -29,9 +29,9 @@ asr-service/
 
 ## 安装
 
-需要 Python 3.10+。
+需要 Python 3.11。
 
-打包后的 Windows/macOS 客户端优先使用应用内一键配置：在「设置 → 日语转录（ASR）默认」点击「配置当前引擎依赖」，由客户端复制 ASR 服务模板、创建/复用虚拟环境并安装当前选择的引擎依赖。客户端一键配置不会安装模型权重，权重仍由桌面端「模型状态」单独检测与下载；以下脚本主要用于开发环境和手动排障。
+打包后的客户端优先使用应用内一键配置：在「设置 → 日语转录（ASR）默认」点击「配置当前引擎依赖」。客户端会先检测系统或用户配置的 Python 3.11；缺失时下载受管 Python 3.11 到安装目录 `deps/python311/current/`，再复制 ASR 服务模板到 `deps/asr-service/`、创建/复用 `deps/asr-service/.venv` 并安装当前选择的引擎依赖。客户端一键配置不会安装模型权重，权重仍由桌面端「模型状态」单独检测与下载；以下脚本主要用于开发环境和手动排障。
 
 ### 开发/排障：使用安装脚本
 
@@ -82,6 +82,12 @@ pip install -r requirements-qwen3-cuda.txt     # CUDA 12.6 torch（需 NVIDIA GP
 
 GPU 加速（faster-whisper CUDA）需另行安装匹配的 CUDA / cuDNN，详见 faster-whisper 文档；与 Parakeet / Qwen3-ASR 的 torch 安装相互独立。
 
+## 模型缓存与镜像
+
+桌面端启动 sidecar 时会把 `HF_HOME` 指向受管模型缓存目录，安装版通常为 `deps/models/huggingface`。当用户在设置页选择中国大陆镜像时，sidecar 还会接收 `HF_ENDPOINT=https://hf-mirror.com`；官方源则不设置 `HF_ENDPOINT`。
+
+模型下载进度快照会返回 `hfEndpoint`、`hfHome` 和 `debugLogPath`，桌面端「模型状态」区域会显示下载源与诊断日志路径。`hf-mirror.com` 可能按出口 IP 重定向到 Hugging Face 原站；如果用户选择中国大陆镜像但仍下载失败，应查看 `asr-debug.log` 中的 `model_download_*` 事件，并考虑切换官方源、自定义稳定 endpoint，或确保模型下载流量全程走中国大陆出口。
+
 ## 运行
 
 ```bash
@@ -100,6 +106,9 @@ python main.py --host 127.0.0.1 --port 0
 |------|------|------|
 | GET | `/health` | 健康检查，返回版本 |
 | GET | `/engines` | 列出已注册引擎及依赖可用性 |
+| GET | `/models/status` | 检查指定引擎/模型是否已在本地缓存 |
+| POST | `/models/download` | 创建模型下载任务，返回 `jobId` |
+| GET | `/models/download/{job_id}` | 查询模型下载进度、下载源和诊断日志路径 |
 | POST | `/transcribe` | 创建转录任务，返回 `jobId` |
 | GET | `/jobs/{id}` | 查询任务状态/进度/片段（`?segments=false` 仅看进度） |
 | POST | `/jobs/{id}/cancel` | 取消任务 |
@@ -172,7 +181,7 @@ python main.py --host 127.0.0.1 --port 0
 
 诊断实现见 `diagnostics.py`（JSONL 事件、`HIKARU_ASR_TRACE_MS_RANGE` 时间窗过滤、`*_in_trace` 片段 diff）。
 
-桌面端启动 sidecar 时会写入 `asr-debug.log`（见 Tauri `asr.rs`），并默认开启详细片段日志（`HIKARU_ASR_DEBUG_DETAIL=1`）。
+桌面端启动 sidecar 时会写入 `asr-debug.log`（见 Tauri `asr.rs`；安装版通常在 `deps/asr-service/asr-debug.log`），并默认开启详细片段日志（`HIKARU_ASR_DEBUG_DETAIL=1`）。
 
 手动调试时可设置：
 
@@ -191,6 +200,11 @@ Parakeet 相关事件包括：
 - `parakeet_*_in_trace`：在 `HIKARU_ASR_TRACE_MS_RANGE` 窗口内的片段快照与前后 diff
 - `parakeet_backfill_windows` / `parakeet_backfill_*_segments`：gap + 覆盖率补转窗口与结果
 - `job_segment_refresh_in_trace`：写入 ASS 前最终 refresh 列表在关注窗口内的片段
+
+模型下载相关事件包括：
+
+- `model_download_queued` / `model_download_start` / `model_download_completed` / `model_download_error`
+- 事件字段会包含 `hfEndpoint`、`hfHome`、`debugLogPath`；镜像或重定向问题优先从这些字段确认实际环境。
 
 ## 扩展新引擎
 

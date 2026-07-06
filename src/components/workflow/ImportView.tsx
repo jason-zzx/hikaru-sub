@@ -5,16 +5,19 @@ import { IconFilePlus, IconFolderOpen } from "../layout/NavIcons";
 import {
   checkFfmpeg,
   createProject,
+  invalidateFfmpegStatus,
   openProject,
   pickDirectory,
   pickVideoFile,
   projectDirFromMeta,
 } from "../../services/tauri";
 import type { FfmpegStatus } from "../../types";
+import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
+import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
 const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
   settings: "自定义路径",
-  bundled: "随应用捆绑",
+  managed: "受管下载",
   system: "系统 PATH",
 };
 
@@ -24,13 +27,19 @@ export function ImportView() {
   const setProject = useProjectStore((s) => s.setProject);
 
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+  const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const refreshFfmpeg = async (force = false) => {
+    if (force) invalidateFfmpegStatus();
+    const next = await checkFfmpeg({ force });
+    setFfmpeg(next);
+    return next;
+  };
+
   useEffect(() => {
-    checkFfmpeg()
-      .then(setFfmpeg)
-      .catch(() => setFfmpeg(null));
+    refreshFfmpeg().catch(() => setFfmpeg(null));
   }, []);
 
   const fileName = (path: string) => path.split(/[/\\]/).pop() ?? path;
@@ -128,10 +137,14 @@ export function ImportView() {
           </span>
           <button
             type="button"
-            onClick={() => setStep("settings")}
+            onClick={() =>
+              void ffmpegPreparation.requestDependency(async () => {
+                await refreshFfmpeg(true);
+              })
+            }
             className="shrink-0 rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
           >
-            前往设置
+            准备 FFmpeg
           </button>
         </div>
       )}
@@ -199,6 +212,30 @@ export function ImportView() {
           {ffmpeg.version ? ` · ${ffmpeg.version}` : ""}
         </p>
       )}
+
+      <RuntimeDependencyDialog
+        open={ffmpegPreparation.open}
+        kind="ffmpeg"
+        reason="提取音轨、下载和压制视频需要 FFmpeg。"
+        sizeBytes={ffmpegPreparation.item?.sizeBytes ?? 0}
+        targetPath={ffmpegPreparation.item?.path ?? "安装目录/deps/ffmpeg/current"}
+        sourceLabel={ffmpegPreparation.sourceLabel}
+        status={
+          ffmpegPreparation.snapshot?.status === "running" ||
+          ffmpegPreparation.snapshot?.status === "pending"
+            ? "running"
+            : ffmpegPreparation.snapshot?.status === "completed"
+              ? "completed"
+              : ffmpegPreparation.snapshot?.status === "failed"
+                ? "failed"
+                : "idle"
+        }
+        progressPercent={ffmpegPreparation.progressPercent}
+        error={ffmpegPreparation.error}
+        onConfirm={ffmpegPreparation.confirmPrepare}
+        onCancel={() => ffmpegPreparation.setOpen(false)}
+        onChangeSource={() => setStep("settings")}
+      />
     </div>
   );
 }

@@ -73,9 +73,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Fetch FFmpeg
-        run: pnpm ffmpeg:fetch
-
       - name: Prepare ASR resource
         run: pnpm asr:prepare-resource
 
@@ -98,11 +95,12 @@ jobs:
           projectPath: .
           args: ${{ matrix.args }}
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          releaseName: Hikaru-Sub ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          releaseName: Hikaru Sub ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseBody: |
-            Hikaru-Sub desktop client release.
+            Hikaru Sub desktop client release.
 
-            This release includes bundled FFmpeg/FFprobe for the packaged platform.
+            FFmpeg and Python 3.11 are prepared on demand after installation.
+            The app reuses system dependencies first and downloads managed copies only after user confirmation.
             ASR engine dependencies and model weights are configured after installation.
             This workflow currently uploads Windows bundles only.
             Windows currently ships the NSIS setup package only; MSI is disabled until the installer UX is revisited.

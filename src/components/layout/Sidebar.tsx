@@ -73,7 +73,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
         {!collapsed && (
           <div>
             <h1 className="text-sm font-semibold tracking-wide text-text">
-              Hikaru-Sub
+              Hikaru Sub
             </h1>
             <p className="text-xs text-text-muted">AI 字幕工具</p>
           </div>

@@ -3,6 +3,10 @@
 //! Rust 负责按需拉起 Python sidecar（读取其 stdout 的就绪端口），并以 reqwest
 //! 代理转录任务的创建/查询/取消，使前端无需直接处理本地 HTTP 与端口。
 
+use crate::dependencies::{
+    effective_source_profile, ensure_runtime_deps_writable_or_elevate, managed_asr_service_dir,
+    managed_model_cache_dir, RuntimeDependencySourceProfile,
+};
 use crate::process::hidden_command;
 use crate::settings::{load_settings, AppSettings};
 use serde::{Deserialize, Serialize};
@@ -19,6 +23,7 @@ pub struct Sidecar {
     base_url: String,
     child: Child,
     pid: u32,
+    env: Vec<(String, String)>,
 }
 
 impl Sidecar {
@@ -90,6 +95,9 @@ fn resolve_service_dir(app: &AppHandle, settings: &AppSettings) -> Result<PathBu
     {
         candidates.push(PathBuf::from(p));
     }
+    if let Ok(managed) = managed_asr_service_dir(app) {
+        candidates.push(managed);
+    }
     if let Ok(res) = app.path().resource_dir() {
         candidates.push(res.join("asr-service"));
     }
@@ -137,22 +145,66 @@ fn python_candidates(settings: &AppSettings, dir: &Path) -> Vec<String> {
     v
 }
 
+fn sidecar_hf_env(
+    model_cache_dir: &Path,
+    profile: &RuntimeDependencySourceProfile,
+) -> Vec<(String, String)> {
+    let mut env = vec![(
+        "HF_HOME".into(),
+        model_cache_dir.to_string_lossy().into_owned(),
+    )];
+    if let Some(endpoint) = profile
+        .huggingface_endpoint
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        env.push(("HF_ENDPOINT".into(), endpoint.to_string()));
+    }
+    env
+}
+
+fn sidecar_runtime_env(
+    app: &AppHandle,
+    settings: &AppSettings,
+) -> Result<Vec<(String, String)>, String> {
+    ensure_runtime_deps_writable_or_elevate(app)?;
+    let model_cache = managed_model_cache_dir(app)?;
+    fs::create_dir_all(&model_cache).map_err(|e| e.to_string())?;
+    let profile = effective_source_profile(settings)?;
+    Ok(sidecar_hf_env(&model_cache, &profile))
+}
+
+fn sidecar_env_matches(current: &[(String, String)], desired: &[(String, String)]) -> bool {
+    current.len() == desired.len()
+        && desired.iter().all(|(key, value)| {
+            current
+                .iter()
+                .any(|(current_key, current_value)| current_key == key && current_value == value)
+        })
+}
+
 /// 启动 sidecar 并阻塞读取其就绪端口；成功后保留进程并持续排空 stdout。
-fn spawn_sidecar(python: &str, dir: &Path) -> Result<Sidecar, String> {
+fn spawn_sidecar(python: &str, dir: &Path, env: &[(String, String)]) -> Result<Sidecar, String> {
     let debug_log_path = dir.join("asr-debug.log");
     eprintln!(
         "[asr] spawning sidecar python={python} dir={} debug_log={}",
         dir.display(),
         debug_log_path.display()
     );
-    let mut child = hidden_command(python)
+    let mut command = hidden_command(python);
+    command
         .args(["main.py", "--host", "127.0.0.1", "--port", "0"])
         .current_dir(dir)
         .env("HIKARU_ASR_DEBUG_LOG", &debug_log_path)
         .env("HIKARU_ASR_DEBUG_DETAIL", "1")
+        .env_remove("HF_ENDPOINT")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::inherit());
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    let mut child = command
         .spawn()
         .map_err(|e| format!("启动 sidecar 失败（{python}）：{e}"))?;
     let pid = child.id();
@@ -204,16 +256,31 @@ fn spawn_sidecar(python: &str, dir: &Path) -> Result<Sidecar, String> {
         base_url,
         child,
         pid,
+        env: env.to_vec(),
     })
 }
 
 /// 确保 sidecar 在运行并返回其 base_url（必要时拉起新进程）。
 async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, String> {
+    let settings = load_settings(app).unwrap_or_default();
+    let dir = resolve_service_dir(app, &settings)?;
+    let pythons = python_candidates(&settings, &dir);
+    let env = sidecar_runtime_env(app, &settings)?;
     let mut guard = state.sidecar.lock().await;
 
     if let Some(sc) = guard.as_mut() {
         match sc.child.try_wait() {
-            Ok(None) => return Ok(sc.base_url.clone()), // 仍在运行
+            Ok(None) => {
+                if sidecar_env_matches(&sc.env, &env) {
+                    return Ok(sc.base_url.clone()); // 仍在运行且环境仍匹配
+                }
+                eprintln!(
+                    "[asr] restarting sidecar because runtime env changed pid={} base_url={}",
+                    sc.pid, sc.base_url
+                );
+                sc.kill();
+                *guard = None;
+            }
             Ok(Some(status)) => {
                 eprintln!(
                     "[asr] sidecar exited pid={} base_url={} status={status}",
@@ -231,14 +298,10 @@ async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, St
         }
     }
 
-    let settings = load_settings(app).unwrap_or_default();
-    let dir = resolve_service_dir(app, &settings)?;
-    let pythons = python_candidates(&settings, &dir);
-
     let sidecar = tauri::async_runtime::spawn_blocking(move || {
         let mut last = String::from("无可用的 Python 解释器");
         for py in pythons {
-            match spawn_sidecar(&py, &dir) {
+            match spawn_sidecar(&py, &dir, &env) {
                 Ok(sc) => return Ok(sc),
                 Err(e) => last = e,
             }
@@ -473,10 +536,13 @@ pub async fn download_asr_model(
         return Err(format!("下载请求失败：HTTP {}", resp.status().as_u16()));
     }
     let v: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    v.get("jobId")
+    let job_id = v
+        .get("jobId")
         .and_then(|x| x.as_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| "sidecar 响应缺少 jobId".to_string())
+        .ok_or_else(|| "sidecar 响应缺少 jobId".to_string())?;
+    remember_job_base_url(&state, &job_id, &base).await;
+    Ok(job_id)
 }
 
 #[tauri::command]
@@ -485,7 +551,10 @@ pub async fn get_model_download_progress(
     state: State<'_, AsrState>,
     job_id: String,
 ) -> Result<serde_json::Value, String> {
-    let base = ensure_base_url(&app, &state).await?;
+    let base = match known_job_base_url(&state, &job_id).await {
+        Some(url) => url,
+        None => ensure_base_url(&app, &state).await?,
+    };
     let client = reqwest::Client::new();
     let resp = client
         .get(format!("{base}/models/download/{job_id}"))
@@ -577,5 +646,44 @@ mod tests {
         assert_eq!(with_segments["segments"].as_array().unwrap().len(), 1);
 
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn sidecar_hf_env_points_to_managed_model_cache_and_endpoint() {
+        let cache = PathBuf::from("deps").join("models").join("huggingface");
+        let profile = crate::dependencies::RuntimeDependencySourceProfile {
+            id: crate::dependencies::RuntimeDependencySourceId::China,
+            label: "中国大陆镜像".into(),
+            ffmpeg: None,
+            python311: None,
+            pip_index_url: None,
+            pip_extra_index_urls: Vec::new(),
+            pytorch_cpu_index_url: None,
+            pytorch_cuda_index_url: None,
+            pytorch_cpu_find_links_url: None,
+            pytorch_cuda_find_links_url: None,
+            huggingface_endpoint: Some("https://hf-mirror.com".into()),
+        };
+
+        let env = sidecar_hf_env(&cache, &profile);
+
+        assert!(env.iter().any(|(key, value)| key == "HF_HOME"
+            && value.ends_with("models\\huggingface")
+            || key == "HF_HOME" && value.ends_with("models/huggingface")));
+        assert!(env
+            .iter()
+            .any(|(key, value)| key == "HF_ENDPOINT" && value == "https://hf-mirror.com"));
+    }
+
+    #[test]
+    fn sidecar_env_detects_huggingface_endpoint_changes() {
+        let old_env = vec![("HF_HOME".into(), "deps/models/huggingface".into())];
+        let new_env = vec![
+            ("HF_HOME".into(), "deps/models/huggingface".into()),
+            ("HF_ENDPOINT".into(), "https://hf-mirror.com".into()),
+        ];
+
+        assert!(!sidecar_env_matches(&old_env, &new_env));
+        assert!(sidecar_env_matches(&new_env, &new_env));
     }
 }

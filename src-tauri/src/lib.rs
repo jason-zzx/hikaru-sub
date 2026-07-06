@@ -3,6 +3,7 @@ mod asr_setup;
 mod ass;
 mod asset_scope;
 mod burn;
+mod dependencies;
 mod download;
 mod ffmpeg;
 mod fonts;
@@ -29,9 +30,16 @@ pub fn run() {
         .plugin(tauri_plugin_persisted_scope::init())
         .manage(asr::AsrState::default())
         .manage(asr_setup::AsrSetupState::default())
+        .manage(dependencies::RuntimeDependencyState::default())
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
             settings::set_settings,
+            dependencies::probe_runtime_dependencies,
+            dependencies::prepare_runtime_dependency,
+            dependencies::get_runtime_dependency_progress,
+            dependencies::cancel_runtime_dependency,
+            dependencies::cleanup_runtime_dependency,
+            dependencies::probe_download_sources,
             ffmpeg::check_ffmpeg,
             ffmpeg::extract_audio,
             ffmpeg::get_video_info,
@@ -71,6 +79,10 @@ pub fn run() {
             burn::cancel_burn,
         ])
         .setup(|app| {
+            if let Err(error) = dependencies::ensure_runtime_deps_writable_or_elevate(app.handle())
+            {
+                eprintln!("[dependencies] {error}");
+            }
             transcode::init_transcode_state(app);
             download::init_download_state(app);
             burn::init_burn_state(app);
@@ -95,6 +107,10 @@ pub fn run() {
                     state.shutdown();
                 }
                 if let Some(state) = app_handle.try_state::<asr_setup::AsrSetupState>() {
+                    state.shutdown();
+                }
+                if let Some(state) = app_handle.try_state::<dependencies::RuntimeDependencyState>()
+                {
                     state.shutdown();
                 }
             }

@@ -18,8 +18,12 @@ import type {
   ProbeAsrSetupEnvironmentArgs,
   PreviewFontFile,
   ProjectMeta,
+  PrepareRuntimeDependencyArgs,
   RenderSubtitlePreviewFrameArgs,
   RenderSubtitlePreviewFrameResult,
+  RuntimeDependencyKind,
+  RuntimeDependencyProbe,
+  RuntimeDependencySnapshot,
   StartAsrArgs,
   StartAsrSetupArgs,
   StartBurnArgs,
@@ -69,8 +73,14 @@ export function projectDirFromMeta(meta: ProjectMeta): string {
 
 let ffmpegStatusPromise: Promise<FfmpegStatus> | null = null;
 
+export const FFMPEG_STATUS_INVALIDATED_EVENT =
+  "hikaru-sub:ffmpeg-status-invalidated";
+
 export function invalidateFfmpegStatus(): void {
   ffmpegStatusPromise = null;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(FFMPEG_STATUS_INVALIDATED_EVENT));
+  }
 }
 
 export async function checkFfmpeg(options: { force?: boolean } = {}): Promise<FfmpegStatus> {
@@ -193,6 +203,44 @@ export async function getAsrSetupProgress(
 /** 取消 ASR 引擎依赖配置任务。 */
 export async function cancelAsrSetup(jobId: string): Promise<void> {
   await invoke("cancel_asr_setup", { jobId });
+}
+
+/** 探测 FFmpeg、Python、ASR 依赖和模型缓存的运行时状态。 */
+export async function probeRuntimeDependencies(): Promise<RuntimeDependencyProbe> {
+  return invoke<RuntimeDependencyProbe>("probe_runtime_dependencies");
+}
+
+/** 准备一个缺失的运行时依赖，返回后台任务 jobId。 */
+export async function prepareRuntimeDependency(
+  args: PrepareRuntimeDependencyArgs,
+): Promise<string> {
+  return invoke<string>("prepare_runtime_dependency", { args });
+}
+
+/** 查询运行时依赖准备任务进度。 */
+export async function getRuntimeDependencyProgress(
+  jobId: string,
+): Promise<RuntimeDependencySnapshot> {
+  return invoke<RuntimeDependencySnapshot>("get_runtime_dependency_progress", {
+    jobId,
+  });
+}
+
+/** 取消运行时依赖准备任务。 */
+export async function cancelRuntimeDependency(jobId: string): Promise<void> {
+  await invoke("cancel_runtime_dependency", { jobId });
+}
+
+/** 清理受管运行时依赖或下载缓存。 */
+export async function cleanupRuntimeDependency(
+  kind: RuntimeDependencyKind,
+): Promise<void> {
+  await invoke("cleanup_runtime_dependency", { args: { kind } });
+}
+
+/** 对下载源进行测速并返回更新后的运行时依赖状态。 */
+export async function probeDownloadSources(): Promise<RuntimeDependencyProbe> {
+  return invoke<RuntimeDependencyProbe>("probe_download_sources");
 }
 
 /** 保存 ASS 文本到文件。 */
