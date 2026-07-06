@@ -59,7 +59,7 @@ pnpm tauri build  # 打包应用
 
 ## 发布客户端
 
-首期发布目标是 Windows 与 macOS 安装包；Linux 客户端会在 Windows/macOS 发布链路稳定后再加入。
+当前发布目标先收敛到 Windows 安装包；macOS workflow 已暂时注释，待 macOS 资源布局验证完成后再恢复。Linux 客户端会在 Windows/macOS 发布链路稳定后再加入。
 
 ### 本地打包
 
@@ -67,7 +67,7 @@ pnpm tauri build  # 打包应用
 pnpm release:local
 ```
 
-该命令用于 Windows/macOS 发布机，会先按当前平台下载 FFmpeg/FFprobe 到 `src-tauri/binaries/`，再执行 Tauri 打包。生成产物位于 `src-tauri/target/release/bundle/`。Linux 本地包不属于首期支持范围。
+该命令用于发布机，会先按当前平台下载 FFmpeg/FFprobe 到 `src-tauri/binaries/`、准备 ASR 服务资源，再执行 Tauri 打包。当前 Windows 仅生成 NSIS 安装包，产物位于 `src-tauri/target/release/bundle/nsis/`。Linux 本地包不属于首期支持范围。
 
 ### GitHub Release
 
@@ -78,19 +78,32 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-工作流会构建 Windows、macOS Intel 与 macOS Apple Silicon 产物，并上传到 GitHub Release 草稿。也可以从 GitHub Actions 手动运行 `Release Desktop Clients`，输入已存在的 tag/ref；工作流会检出该 ref，并创建或更新同名 Release 草稿。
+工作流当前只构建 Windows 产物，并上传到 GitHub Release 草稿。也可以从 GitHub Actions 手动运行 `Release Desktop Clients`，输入已存在的 tag/ref；工作流会检出该 ref，并创建或更新同名 Release 草稿。macOS Intel 与 macOS Apple Silicon matrix 已保留为注释，待 macOS 验证通过后重新启用。
 
-发布包会随平台包含 FFmpeg/FFprobe。ASR Python 依赖、Parakeet/Qwen3-ASR 可选依赖和模型权重不随安装包预装，安装后通过客户端内的 ASR 配置流程准备。
+发布包会随平台包含 FFmpeg/FFprobe 与 ASR 服务模板。ASR Python 依赖、Parakeet/Qwen3-ASR 可选依赖和模型权重不随安装包预装，安装后通过客户端内的 ASR 配置流程准备。
 
 当前发布限制：
 
+- Windows 当前只发布 NSIS setup，不发布 MSI。MSI 的安装目录选择 UI 暂不作为首选安装体验。
 - Windows 包未做代码签名，可能出现 SmartScreen 提示。
-- macOS 包使用 ad-hoc signing，但未做 notarization，可能出现 Gatekeeper 提示。
+- macOS 包暂不发布；恢复后会先使用 ad-hoc signing，notarization 另行处理。
 - Linux 包暂不发布。
+
+### Windows 安装包验证
+
+在 Windows 发布机执行 `pnpm release:local` 后，应确认：
+
+1. `src-tauri/target/release/bundle/nsis/Hikaru-Sub_0.1.0_x64-setup.exe` 存在，且干净 bundle 目录下没有新生成的 MSI。
+2. 运行 NSIS setup，可选择安装目录，安装完成后从开始菜单或安装目录启动应用。
+3. 首次启动与切换到「下载」「导入」「转录」「压制」页面时不应长时间卡住；这些页面会复用 FFmpeg 检测缓存。
+4. 进入「转录」页不会自动启动 ASR sidecar；点击「检测引擎状态」或开始转录时才会拉起 sidecar。
+5. 进入「压制」页不会自动探测原片码率/编码器；点击「检测原片参数」后才会运行 ffprobe/编码器探测。
+6. 检测 ASR、配置 ASR、FFmpeg/ffprobe 相关操作不应弹出转瞬即逝的终端窗口。
+7. 如果本机曾运行开发版，安装版设置页不应继续显示项目源码目录下的 `asr-service/.venv` Python 路径；一键配置完成后应指向应用数据目录下的 managed `asr-service/.venv`。
 
 ### ASR sidecar 依赖
 
-打包后的 Windows/macOS 客户端可在「设置 → 日语转录（ASR）默认」中点击「配置当前引擎依赖」，自动复制随应用提供的 ASR 服务模板、创建/复用本机虚拟环境并安装所选引擎依赖。模型权重仍在同一区域的「模型状态」中单独检测与下载，不随依赖配置一起安装。
+打包后的客户端可在「设置 → 日语转录（ASR）默认」中点击「配置当前引擎依赖」，自动复制随应用提供的 ASR 服务模板、创建/复用本机虚拟环境并安装所选引擎依赖。模型权重仍在同一区域的「模型状态」中单独检测与下载，不随依赖配置一起安装。安装版会忽略明显指向源码仓库 `asr-service/.venv` 的旧开发路径，避免复用开发环境缓存。
 
 `./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎（`requirements.txt`）。Parakeet（NeMo + PyTorch）与 Qwen3-ASR（qwen-asr + PyTorch）体积较大，**须显式传参**才会安装：
 
@@ -191,7 +204,7 @@ scripts/
 - 压制前将当前内存字幕序列化为 `.hikaru/burn.input.ass`，包含未保存编辑
 - 输出文件名自动生成（`{视频名}.burned.mp4` / `{视频名}.subbed.mkv`），按模式固定扩展名，不可自定义
 - 硬字幕支持“高质量 / 接近原片 / 自定义码率”导出策略；策略会同步视频码率、编码器、CRF 与 preset
-- 硬字幕会探测原视频码率与 FFmpeg 可用编码器，自动优先选择平台合适的硬件 H.264 编码器（Windows：NVENC / QSV / AMF；macOS：VideoToolbox；Linux：NVENC / QSV），不可用时回退 libx264
+- 点击「检测原片参数」后会探测原视频码率与 FFmpeg 可用编码器，自动优先选择平台合适的硬件 H.264 编码器（Windows：NVENC / QSV / AMF；macOS：VideoToolbox；Linux：NVENC / QSV），不可用时回退 libx264
 - 可手动选择编码器、视频码率、CRF、preset 与字体目录；软字幕仅 MKV
 - 同一时刻仅允许一个压制任务；终态后自动清理任务记录
 - 全局任务轮询（`useBurnJobPoller`）：切换页面后仍更新底部状态栏进度
@@ -205,7 +218,7 @@ scripts/
 - 可选引擎：parakeet（NVIDIA NeMo `nvidia/parakeet-tdt_ctc-0.6b-ja`，日语专用）
 - 可选引擎：qwen3-asr（`Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`，2026 年日语 ASR SOTA，自带字级时间戳；CPU float32 / CUDA bfloat16）
 - 模型选择：faster-whisper 为 tiny/base/small/medium/large-v2/large-v3
-- 自动模型下载与 CUDA 回退
+- 模型状态与引擎状态均为显式检测；进入转录页不会自动启动 ASR sidecar
 - 实时进度显示与任务取消
 - Parakeet 优先使用 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段
 - Parakeet + VAD/gap backfill 已完成长音频完整性增强，并复用 chunking 共享模块合并去重

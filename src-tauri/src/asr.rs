@@ -3,13 +3,14 @@
 //! Rust 负责按需拉起 Python sidecar（读取其 stdout 的就绪端口），并以 reqwest
 //! 代理转录任务的创建/查询/取消，使前端无需直接处理本地 HTTP 与端口。
 
+use crate::process::hidden_command;
 use crate::settings::{load_settings, AppSettings};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
@@ -144,7 +145,7 @@ fn spawn_sidecar(python: &str, dir: &Path) -> Result<Sidecar, String> {
         dir.display(),
         debug_log_path.display()
     );
-    let mut child = Command::new(python)
+    let mut child = hidden_command(python)
         .args(["main.py", "--host", "127.0.0.1", "--port", "0"])
         .current_dir(dir)
         .env("HIKARU_ASR_DEBUG_LOG", &debug_log_path)

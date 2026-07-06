@@ -12,6 +12,7 @@ mod hls_playlist;
 mod hls_types;
 mod media_server;
 mod preview;
+mod process;
 mod project;
 mod settings;
 mod transcode;

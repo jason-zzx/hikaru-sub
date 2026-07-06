@@ -6,13 +6,14 @@ use crate::hls_types::{
     CancellationToken, DownloadStrategy, HlsDownloadError, HlsDownloadRequest, MediaKind,
     SegmentDownloadConfig,
 };
+use crate::process::hidden_command;
 use crate::settings::load_settings;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
@@ -366,7 +367,7 @@ fn probe_url(ffprobe: &str, url: &str, headers: &str) -> Result<UrlStreamInfo, S
         "csv=p=0".to_string(),
     ]);
 
-    let output = Command::new(ffprobe)
+    let output = hidden_command(ffprobe)
         .args(&args)
         .output()
         .map_err(|e| format!("无法启动 ffprobe：{e}"))?;
@@ -675,7 +676,7 @@ fn run_ffmpeg_child_collect_progress(
     args: Vec<String>,
     mut on_progress: impl FnMut(i64, i64) + Send + 'static,
 ) -> Result<(), String> {
-    let mut child = Command::new(&ffmpeg)
+    let mut child = hidden_command(&ffmpeg)
         .args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -1324,7 +1325,7 @@ fn run_download(
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
 
-        let mut child = Command::new(&ffmpeg)
+        let mut child = hidden_command(&ffmpeg)
             .args(&args)
             .stdin(Stdio::null())
             .stdout(Stdio::null())

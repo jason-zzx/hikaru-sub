@@ -148,6 +148,7 @@ export function BurnView() {
     useState<BurnExportStrategy>("highQuality");
   const [burnProbe, setBurnProbe] = useState<BurnVideoProbe | null>(null);
   const [probeError, setProbeError] = useState<string | null>(null);
+  const [probingBurnVideo, setProbingBurnVideo] = useState(false);
   const [crf, setCrf] = useState(16);
   const [preset, setPreset] = useState("medium");
   const [videoEncoder, setVideoEncoder] = useState<BurnVideoEncoder>("auto");
@@ -224,36 +225,9 @@ export function BurnView() {
   }, [project]);
 
   useEffect(() => {
-    let cancelled = false;
     setBurnProbe(null);
     setProbeError(null);
-    if (!project?.videoPath) return;
-
-    probeBurnVideo(project.videoPath)
-      .then((probe) => {
-        if (cancelled) return;
-        setBurnProbe(probe);
-        setProbeError(null);
-        setVideoEncoder((current) =>
-          current === "auto" || probe.availableEncoders.includes(current)
-            ? current
-            : "auto",
-        );
-        if (exportStrategy === "highQuality") {
-          setVideoBitrateKbps(String(highQualityBitrate(probe)));
-        } else if (exportStrategy === "nearSource") {
-          setVideoBitrateKbps(String(nearSourceBitrate(probe)));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setProbeError("无法探测原片码率，将使用默认推荐值。");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    setProbingBurnVideo(false);
   }, [project?.videoPath]);
 
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
@@ -286,6 +260,31 @@ export function BurnView() {
       if (dir) setFontDir(dir);
     } catch (e) {
       setError(`无法选择字体目录：${String(e)}`);
+    }
+  };
+
+  const handleProbeBurnVideo = async () => {
+    if (!project?.videoPath || probingBurnVideo) return;
+    const videoPath = project.videoPath;
+    setProbingBurnVideo(true);
+    setProbeError(null);
+    try {
+      const probe = await probeBurnVideo(videoPath);
+      setBurnProbe(probe);
+      setVideoEncoder((current) =>
+        current === "auto" || probe.availableEncoders.includes(current)
+          ? current
+          : "auto",
+      );
+      if (exportStrategy === "highQuality") {
+        setVideoBitrateKbps(String(highQualityBitrate(probe)));
+      } else if (exportStrategy === "nearSource") {
+        setVideoBitrateKbps(String(nearSourceBitrate(probe)));
+      }
+    } catch {
+      setProbeError("无法探测原片码率，将使用默认推荐值。");
+    } finally {
+      setProbingBurnVideo(false);
     }
   };
 
@@ -493,10 +492,20 @@ export function BurnView() {
                     />
                   </Field>
 
-                  <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
-                    原片码率：{formatBitrate(burnProbe?.videoBitrateKbps)}；自动编码：
-                    {burnProbe ? ENCODER_LABELS[burnProbe.preferredEncoder] : "检测中"}。
-                  </p>
+                  <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
+                    <span>
+                      原片码率：{formatBitrate(burnProbe?.videoBitrateKbps)}；自动编码：
+                      {burnProbe ? ENCODER_LABELS[burnProbe.preferredEncoder] : "未检测"}。
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleProbeBurnVideo}
+                      disabled={busy || probingBurnVideo}
+                      className="rounded-md border border-border px-2.5 py-1 text-xs text-text hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {probingBurnVideo ? "检测中…" : "检测原片参数"}
+                    </button>
+                  </div>
 
                   {probeError && (
                     <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">

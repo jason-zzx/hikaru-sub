@@ -1,8 +1,8 @@
 use crate::ffmpeg::resolve_ffmpeg;
 use crate::media_server::MediaServer;
+use crate::process::hidden_command;
 use crate::settings::load_settings;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, State};
 
@@ -49,7 +49,7 @@ pub async fn render_subtitle_preview_frame(
     let settings = load_settings(&app).unwrap_or_default();
     let (ffmpeg, _) = resolve_ffmpeg(&app, &settings);
 
-    let output = Command::new(ffmpeg)
+    let output = hidden_command(ffmpeg)
         .arg("-hide_banner")
         .arg("-y")
         .arg("-ss")

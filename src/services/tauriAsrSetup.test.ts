@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -12,6 +12,8 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 const { invoke } = await import("@tauri-apps/api/core");
 const {
+  checkFfmpeg,
+  invalidateFfmpegStatus,
   probeAsrSetupEnvironment,
   startAsrSetup,
   getAsrSetupProgress,
@@ -19,6 +21,32 @@ const {
 } = await import("./tauri");
 
 describe("ASR setup Tauri wrappers", () => {
+  beforeEach(() => {
+    vi.mocked(invoke).mockReset();
+    invalidateFfmpegStatus();
+  });
+
+  it("caches FFmpeg detection until explicitly invalidated", async () => {
+    vi.mocked(invoke).mockResolvedValue({
+      available: true,
+      path: "ffmpeg",
+      source: "system",
+      version: "ffmpeg version test",
+    });
+
+    const first = await checkFfmpeg();
+    const second = await checkFfmpeg();
+
+    expect(first).toBe(second);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenLastCalledWith("check_ffmpeg");
+
+    invalidateFfmpegStatus();
+    await checkFfmpeg();
+
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
   it("calls the expected command names", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({
       managedServicePath: "managed",

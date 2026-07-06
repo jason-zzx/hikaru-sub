@@ -67,8 +67,23 @@ export function projectDirFromMeta(meta: ProjectMeta): string {
   return idx >= 0 ? ref.slice(0, idx) : ref;
 }
 
-export async function checkFfmpeg(): Promise<FfmpegStatus> {
-  return invoke<FfmpegStatus>("check_ffmpeg");
+let ffmpegStatusPromise: Promise<FfmpegStatus> | null = null;
+
+export function invalidateFfmpegStatus(): void {
+  ffmpegStatusPromise = null;
+}
+
+export async function checkFfmpeg(options: { force?: boolean } = {}): Promise<FfmpegStatus> {
+  if (options.force) {
+    invalidateFfmpegStatus();
+  }
+  if (!ffmpegStatusPromise) {
+    ffmpegStatusPromise = invoke<FfmpegStatus>("check_ffmpeg").catch((error) => {
+      ffmpegStatusPromise = null;
+      throw error;
+    });
+  }
+  return ffmpegStatusPromise;
 }
 
 /** 提取音轨为 16kHz 单声道 WAV，返回输出路径。 */

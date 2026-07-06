@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::Arc;
 use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
 
 use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
+use crate::process::hidden_command;
 use crate::settings::load_settings;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,7 +161,7 @@ pub fn evaluate_playback_compat(
 }
 
 fn probe_video_codec(ffprobe: &str, path: &str) -> Result<String, String> {
-    let output = Command::new(ffprobe)
+    let output = hidden_command(ffprobe)
         .args([
             "-v",
             "error",
@@ -186,7 +187,7 @@ fn probe_video_playback_with_ffprobe(
     ffprobe: &str,
     path: &str,
 ) -> Result<VideoPlaybackProbe, String> {
-    let output = Command::new(ffprobe)
+    let output = hidden_command(ffprobe)
         .args([
             "-v",
             "error",
@@ -266,7 +267,7 @@ fn is_valid_proxy_cache(ffprobe: &str, cache_path: &Path, format: ProxyVideoForm
         return false;
     }
 
-    let output = Command::new(ffprobe)
+    let output = hidden_command(ffprobe)
         .args([
             "-v",
             "error",
@@ -384,7 +385,7 @@ pub async fn start_transcode(
         );
 
         // 先获取视频时长
-        let duration_output = Command::new(&ffprobe)
+        let duration_output = hidden_command(&ffprobe)
             .args([
                 "-v",
                 "error",
@@ -405,7 +406,7 @@ pub async fn start_transcode(
 
         println!("FFmpeg args: {:?}", args);
 
-        let child = Command::new(&ffmpeg)
+        let child = hidden_command(&ffmpeg)
             .args(&args)
             .stdout(Stdio::null())
             .stderr(Stdio::piped())

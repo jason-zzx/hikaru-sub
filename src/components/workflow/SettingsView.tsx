@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   checkFfmpeg,
   getSettings,
+  invalidateFfmpegStatus,
   pickDirectory,
   pickExecutableFile,
   setSettings,
@@ -57,7 +58,8 @@ export function SettingsView() {
     refreshFfmpeg();
   }, []);
 
-  const refreshFfmpeg = () => {
+  const refreshFfmpeg = (force = false) => {
+    if (force) invalidateFfmpegStatus();
     checkFfmpeg()
       .then(setFfmpeg)
       .catch(() => setFfmpeg(null));
@@ -77,7 +79,7 @@ export function SettingsView() {
       await setSettings(settings);
       setDirty(false);
       setMessage({ kind: "ok", text: "设置已保存" });
-      refreshFfmpeg();
+      refreshFfmpeg(true);
     } catch (e) {
       setMessage({ kind: "error", text: `保存失败：${String(e)}` });
     } finally {

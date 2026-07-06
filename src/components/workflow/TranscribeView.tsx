@@ -91,7 +91,7 @@ export function TranscribeView() {
   const [model, setModel] = useState("large-v3");
   const [device, setDevice] = useState("auto");
   const [engines, setEngines] = useState<AsrEngineInfo[] | null>(null);
-  const [engineMsg, setEngineMsg] = useState<string | null>(null);
+  const [engineMsg, setEngineMsg] = useState<string | null>("未检测");
   const [modelCheckTrigger, setModelCheckTrigger] = useState(0);
 
   // VAD 高级配置（仅当前会话有效，不写入项目/全局设置）
@@ -202,6 +202,7 @@ export function TranscribeView() {
     const requestId = engineCheckRequestRef.current + 1;
     engineCheckRequestRef.current = requestId;
     setEngineMsg("检测中…");
+    setModelCheckTrigger((value) => value + 1);
     try {
       const list = await listAsrEngines();
       if (engineCheckRequestRef.current !== requestId) return;
@@ -219,15 +220,10 @@ export function TranscribeView() {
     }
   }, [engine]);
 
-  // 进入页面、引擎或模型变更时自动检测引擎和模型可用性
-  useEffect(() => {
-    void detectEngines();
-    setModelCheckTrigger((value) => value + 1);
-  }, [detectEngines, model]);
-
   const handleEngineChange = (nextEngine: string) => {
     setEngine(nextEngine);
     setModel(defaultAsrModel(nextEngine));
+    setEngineMsg("未检测");
   };
 
   const pollLoop = async (jobId: string) => {
@@ -508,6 +504,14 @@ export function TranscribeView() {
               {engineMsg}
             </span>
           )}
+          <button
+            type="button"
+            onClick={detectEngines}
+            disabled={transcribing}
+            className="rounded-md border border-border px-2.5 py-1 text-xs text-text hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            检测引擎状态
+          </button>
         </div>
         {selectedEngineUnavailable && !transcribing && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">

@@ -79,6 +79,14 @@ Before setup starts, the Settings page saves the current ASR selection so a user
 
 This guarantees `asr.rs::python_candidates()` uses the venv created by one-click setup. Existing manual settings still work when the user does not use managed setup.
 
+Packaged runtime settings must be sanitized before use. If an installed client
+loads stale development settings that point into a source checkout
+(`asr-service/.venv`, `src-tauri`, or a repo-local ASR service directory), clear
+those ASR paths so the packaged app does not reuse the developer venv. Managed
+paths under `<app_data_dir>/asr-service` remain valid and must not be cleared.
+Missing explicit executable paths should also be ignored so bundled/system
+fallbacks can be used.
+
 ### Rust Setup Jobs
 
 Create `src-tauri/src/asr_setup.rs` with a long-running job manager similar to the existing download/burn patterns:
@@ -99,6 +107,10 @@ python -m venv .venv
 ```
 
 This avoids Git Bash/MSYS/PowerShell portability problems on Windows and keeps cancellation simpler because each setup step is a direct child process.
+
+On Windows, setup, sidecar, FFmpeg, ffprobe, and helper subprocesses should be
+spawned with `CREATE_NO_WINDOW` so packaged-client checks do not flash transient
+console windows.
 
 ### Profile Resolution
 
@@ -144,6 +156,12 @@ The panel shows:
 - Cancel button while running.
 - Collapsible log tail.
 - Completed/failed/cancelled status text.
+
+The Transcribe page should not call `list_asr_engines` just by mounting the
+page. Engine/model checks are explicit actions: the user can click
+`检测引擎状态`, or transcription/model download flows can start the sidecar when
+actually needed. This keeps page switching responsive and avoids surprising
+sidecar startup.
 
 The panel should not download model weights. After setup completes, `SettingsView` refreshes model status by remounting or triggering `ModelManager`.
 
