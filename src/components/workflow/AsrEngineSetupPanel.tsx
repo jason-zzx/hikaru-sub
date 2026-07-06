@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelAsrSetup,
   getAsrSetupProgress,
+  getRuntimeDependencyProgress,
+  prepareRuntimeDependency,
   probeAsrSetupEnvironment,
+  probeRuntimeDependencies,
   startAsrSetup,
 } from "../../services/tauri";
 import {
@@ -10,14 +13,22 @@ import {
   resolveAsrSetupProfile,
 } from "../../constants/asrSetup";
 import type { AsrSetupEnvironment, AsrSetupSnapshot } from "../../types";
+import type { RuntimeDependencyProbe, RuntimeDependencySnapshot } from "../../types";
+import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
 const POLL_INTERVAL_MS = 800;
+const SOURCE_LABEL: Record<"official" | "china" | "custom", string> = {
+  official: "官方源",
+  china: "中国大陆镜像",
+  custom: "自定义",
+};
 
 interface AsrEngineSetupPanelProps {
   engine: string;
   device: string;
   pythonPath?: string;
   asrServicePath?: string;
+  refreshKey?: number;
   disabled?: boolean;
   onBeforeStart?: () => Promise<void>;
   onRunningChange?: (running: boolean) => void;
@@ -31,6 +42,7 @@ export function AsrEngineSetupPanel({
   device,
   pythonPath,
   asrServicePath,
+  refreshKey = 0,
   disabled = false,
   onBeforeStart,
   onRunningChange,
@@ -43,6 +55,11 @@ export function AsrEngineSetupPanel({
   const [running, setRunning] = useState(false);
   const [recreate, setRecreate] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
+  const [runtimeProbe, setRuntimeProbe] = useState<RuntimeDependencyProbe | null>(null);
+  const [dependencyDialogOpen, setDependencyDialogOpen] = useState(false);
+  const [dependencySnapshot, setDependencySnapshot] =
+    useState<RuntimeDependencySnapshot | null>(null);
+  const [dependencyError, setDependencyError] = useState<string | null>(null);
   const pollingRef = useRef(false);
 
   const refreshEnvironment = useCallback(async () => {
@@ -61,7 +78,13 @@ export function AsrEngineSetupPanel({
 
   useEffect(() => {
     void refreshEnvironment();
-  }, [refreshEnvironment, engine, device, pythonPath, asrServicePath]);
+  }, [refreshEnvironment, engine, device, pythonPath, asrServicePath, refreshKey]);
+
+  useEffect(() => {
+    probeRuntimeDependencies()
+      .then(setRuntimeProbe)
+      .catch(() => setRuntimeProbe(null));
+  }, [engine, device, pythonPath, asrServicePath]);
 
   useEffect(() => {
     onRunningChange?.(running);
@@ -115,15 +138,7 @@ export function AsrEngineSetupPanel({
     }
   };
 
-  const handleStart = async () => {
-    setSetupError(null);
-    setSnapshot(null);
-    try {
-      await onBeforeStart?.();
-    } catch (e) {
-      setSetupError(`保存当前设置失败：${String(e)}`);
-      return;
-    }
+  const startSetupJob = async () => {
     try {
       const id = await startAsrSetup({
         profile,
@@ -137,6 +152,61 @@ export function AsrEngineSetupPanel({
     } catch (e) {
       setSetupError(`启动配置失败：${String(e)}`);
       setRunning(false);
+    }
+  };
+
+  const handleStart = async () => {
+    setSetupError(null);
+    setSnapshot(null);
+    try {
+      await onBeforeStart?.();
+    } catch (e) {
+      setSetupError(`保存当前设置失败：${String(e)}`);
+      return;
+    }
+    if (env?.pythonOk === false) {
+      try {
+        const probe = await probeRuntimeDependencies();
+        setRuntimeProbe(probe);
+      } catch {
+        setRuntimeProbe(null);
+      }
+      setDependencySnapshot(null);
+      setDependencyError(null);
+      setDependencyDialogOpen(true);
+      return;
+    }
+    await startSetupJob();
+  };
+
+  const handlePreparePython = async () => {
+    setDependencyError(null);
+    setDependencySnapshot(null);
+    try {
+      const id = await prepareRuntimeDependency({ kind: "python311" });
+      for (;;) {
+        const next = await getRuntimeDependencyProgress(id);
+        setDependencySnapshot(next);
+        if (next.status === "completed") {
+          setDependencyDialogOpen(false);
+          await refreshEnvironment();
+          try {
+            const probe = await probeRuntimeDependencies();
+            setRuntimeProbe(probe);
+          } catch {
+            setRuntimeProbe(null);
+          }
+          await startSetupJob();
+          break;
+        }
+        if (next.status === "failed" || next.status === "cancelled") {
+          setDependencyError(next.error ?? "Python 3.11 准备失败");
+          break;
+        }
+        await sleep(POLL_INTERVAL_MS);
+      }
+    } catch (e) {
+      setDependencyError(`准备 Python 3.11 失败：${String(e)}`);
     }
   };
 
@@ -161,8 +231,12 @@ export function AsrEngineSetupPanel({
     !disabled &&
     !running &&
     !envError &&
-    env?.pythonOk !== false &&
     !!env?.serviceTemplatePath;
+  const pythonItem = runtimeProbe?.items.find((item) => item.kind === "python311");
+  const dependencyProgressPercent =
+    dependencySnapshot?.progress === null || dependencySnapshot?.progress === undefined
+      ? null
+      : Math.round(dependencySnapshot.progress * 100);
 
   return (
     <div className="rounded-lg border border-border bg-surface px-4 py-4">
@@ -194,7 +268,7 @@ export function AsrEngineSetupPanel({
               Python：
               {env.pythonOk
                 ? `${env.pythonVersion ?? "已检测"} · ${env.pythonPath ?? "自动检测"}`
-                : "未检测到 Python 3.10+"}
+                : "需要 Python 3.11，点击配置时会先下载受管 Python。"}
             </span>
             <span className="break-all">
               受管目录：{env.managedServicePath}
@@ -216,7 +290,7 @@ export function AsrEngineSetupPanel({
         )}
         {env && !env.pythonOk && (
           <span className="text-warning">
-            未检测到 Python 3.10+，请先在上方配置 Python 路径。
+            未检测到 Python 3.11；也可以在上方配置已有的 Python 3.11 路径。
           </span>
         )}
       </div>
@@ -266,6 +340,32 @@ export function AsrEngineSetupPanel({
           </pre>
         </details>
       ) : null}
+
+      <RuntimeDependencyDialog
+        open={dependencyDialogOpen}
+        kind="python311"
+        reason="ASR 配置需要 Python 3.11。"
+        sizeBytes={pythonItem?.sizeBytes ?? 0}
+        targetPath={pythonItem?.path ?? "安装目录/deps/python311/current"}
+        sourceLabel={
+          runtimeProbe ? SOURCE_LABEL[runtimeProbe.effectiveSource] : "自动推荐"
+        }
+        status={
+          dependencySnapshot?.status === "running" ||
+          dependencySnapshot?.status === "pending"
+            ? "running"
+            : dependencySnapshot?.status === "completed"
+              ? "completed"
+              : dependencySnapshot?.status === "failed"
+                ? "failed"
+                : "idle"
+        }
+        progressPercent={dependencyProgressPercent}
+        error={dependencyError}
+        onConfirm={handlePreparePython}
+        onCancel={() => setDependencyDialogOpen(false)}
+        onChangeSource={() => setSetupError("请在设置页的运行时依赖区域更改下载源")}
+      />
     </div>
   );
 }

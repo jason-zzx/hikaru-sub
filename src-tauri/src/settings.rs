@@ -3,6 +3,35 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RuntimeDependencySourceMode {
+    Auto,
+    Official,
+    China,
+    Custom,
+}
+
+impl Default for RuntimeDependencySourceMode {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomRuntimeSourceProfile {
+    pub ffmpeg_url: Option<String>,
+    pub python311_url: Option<String>,
+    pub pip_index_url: Option<String>,
+    pub pip_extra_index_urls: Vec<String>,
+    pub pytorch_cpu_index_url: Option<String>,
+    pub pytorch_cuda_index_url: Option<String>,
+    pub pytorch_cpu_find_links_url: Option<String>,
+    pub pytorch_cuda_find_links_url: Option<String>,
+    pub huggingface_endpoint: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppSettings {
@@ -22,6 +51,10 @@ pub struct AppSettings {
     pub translation_custom_prompt: Option<String>,
     pub translation_glossary: Option<String>,
     pub subtitle_merge_mode: String,
+    pub runtime_source_mode: RuntimeDependencySourceMode,
+    pub runtime_recommended_profile: Option<String>,
+    pub runtime_recommendation_checked_at: Option<String>,
+    pub runtime_custom_source: CustomRuntimeSourceProfile,
 }
 
 impl Default for AppSettings {
@@ -43,6 +76,10 @@ impl Default for AppSettings {
             translation_custom_prompt: None,
             translation_glossary: None,
             subtitle_merge_mode: "inline".into(),
+            runtime_source_mode: RuntimeDependencySourceMode::Auto,
+            runtime_recommended_profile: None,
+            runtime_recommendation_checked_at: None,
+            runtime_custom_source: CustomRuntimeSourceProfile::default(),
         }
     }
 }
@@ -219,6 +256,22 @@ mod tests {
     }
 
     #[test]
+    fn default_runtime_dependency_source_settings_are_auto() {
+        let settings = AppSettings::default();
+
+        assert_eq!(
+            settings.runtime_source_mode,
+            RuntimeDependencySourceMode::Auto
+        );
+        assert_eq!(settings.runtime_recommended_profile, None);
+        assert_eq!(settings.runtime_recommendation_checked_at, None);
+        assert_eq!(
+            settings.runtime_custom_source.pip_extra_index_urls,
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
     fn packaged_runtime_clears_source_checkout_asr_paths() {
         let root = temp_dir("source_checkout");
         let service = create_source_checkout_asr_service(&root);
@@ -244,9 +297,10 @@ mod tests {
     }
 
     #[test]
-    fn packaged_runtime_keeps_managed_asr_paths_under_app_data() {
-        let app_data = temp_dir("app_data");
-        let service = app_data.join("asr-service");
+    fn packaged_runtime_keeps_managed_asr_paths_under_install_deps() {
+        let install_dir = temp_dir("install_dir").join("hikaru-sub");
+        let deps = install_dir.join("deps");
+        let service = deps.join("asr-service");
         std::fs::create_dir_all(service.join(".venv").join("Scripts")).unwrap();
         std::fs::write(service.join("main.py"), "").unwrap();
         std::fs::write(service.join(".venv").join("Scripts").join("python.exe"), "").unwrap();
@@ -263,7 +317,7 @@ mod tests {
             ..AppSettings::default()
         };
 
-        sanitize_settings_for_runtime(&mut settings, Some(&app_data), true);
+        sanitize_settings_for_runtime(&mut settings, None, true);
 
         assert_eq!(
             settings.asr_service_path.as_deref(),
@@ -274,7 +328,7 @@ mod tests {
             .as_deref()
             .is_some_and(|path| path.ends_with("python.exe")));
 
-        let _ = std::fs::remove_dir_all(app_data);
+        let _ = std::fs::remove_dir_all(install_dir);
     }
 
     #[test]

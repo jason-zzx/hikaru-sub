@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
-import { checkFfmpeg } from "../../services/tauri";
+import {
+  FFMPEG_STATUS_INVALIDATED_EVENT,
+  checkFfmpeg,
+} from "../../services/tauri";
 
 export function StatusBar() {
   const isDirty = useProjectStore((s) => s.isDirty);
@@ -10,11 +13,20 @@ export function StatusBar() {
 
   const runningTask = Object.values(tasks).find((t) => t.status === "running");
 
-  useEffect(() => {
-    checkFfmpeg()
+  const refreshFfmpeg = useCallback((force = false) => {
+    checkFfmpeg({ force })
       .then((s) => setFfmpegOk(s.available))
       .catch(() => setFfmpegOk(false));
   }, []);
+
+  useEffect(() => {
+    refreshFfmpeg();
+    const handleInvalidated = () => refreshFfmpeg();
+    window.addEventListener(FFMPEG_STATUS_INVALIDATED_EVENT, handleInvalidated);
+    return () => {
+      window.removeEventListener(FFMPEG_STATUS_INVALIDATED_EVENT, handleInvalidated);
+    };
+  }, [refreshFfmpeg]);
 
   return (
     <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-surface-raised px-3 text-xs text-text-muted">

@@ -1,25 +1,14 @@
-# 捆绑的 FFmpeg 二进制
+# FFmpeg binaries directory
 
-本目录用于存放随应用打包的 FFmpeg 可执行文件，**二进制本身不纳入 git**。
+This directory is kept only as a developer fallback for old local experiments.
+Release packages do not bundle files from `src-tauri/binaries/`.
 
-- 开发时无需放置：运行时会自动回退到系统 PATH 中的 `ffmpeg`。
-- 打包发布前，先拉取对应平台的静态二进制：
+Runtime resolution is now:
 
-```bash
-pnpm ffmpeg:fetch
-```
+1. User-configured FFmpeg path.
+2. System `PATH`.
+3. Managed FFmpeg under the installation directory's `deps/ffmpeg/current`,
+   downloaded after user confirmation.
 
-脚本会把可执行文件放到本目录：
-
-| 平台 | 文件名 |
-|------|--------|
-| Windows | `ffmpeg.exe` |
-| macOS / Linux | `ffmpeg` |
-
-运行时解析优先级：**用户设置中的路径 → 本目录捆绑二进制 → 系统 PATH**。
-
-## 许可证提示
-
-静态 FFmpeg 多为 GPL 构建（含 x264 等）。分发 GPL 二进制需遵守 GPL 条款
-（随包提供对应源码或书面 offer，并保留版权与许可声明）。如需降低合规负担，
-可改用 LGPL 构建变体（如 BtbN 的 `*-lgpl` 包）。
+`pnpm ffmpeg:fetch` may still place files here for manual debugging, but release
+scripts and Tauri resources must not depend on this directory.

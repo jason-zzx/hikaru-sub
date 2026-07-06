@@ -4,12 +4,16 @@ import {
   downloadAsrModel,
   getModelDownloadProgress,
 } from "../../services/tauri";
-import type { AsrModelStatus } from "../../types";
+import type { AsrModelStatus, ModelDownloadSnapshot } from "../../types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function formatMB(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function downloadSourceLabel(snapshot: ModelDownloadSnapshot | null): string {
+  return snapshot?.hfEndpoint?.trim() || "官方 HuggingFace";
 }
 
 interface ModelManagerProps {
@@ -35,6 +39,8 @@ export function ModelManager({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
+  const [downloadDiagnostics, setDownloadDiagnostics] =
+    useState<ModelDownloadSnapshot | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const checkRequestRef = useRef(0);
 
@@ -67,6 +73,7 @@ export function ModelManager({
     setChecking(false);
     setCheckError(null);
     setProgress(null);
+    setDownloadDiagnostics(null);
     setDownloadError(null);
   }, [engine, model]);
 
@@ -86,12 +93,14 @@ export function ModelManager({
     setDownloading(true);
     setDownloadError(null);
     setProgress(null);
+    setDownloadDiagnostics(null);
     try {
       const jobId = await downloadAsrModel(engine, model);
       for (;;) {
         await sleep(800);
         const snap = await getModelDownloadProgress(jobId);
         setProgress({ done: snap.downloadedBytes, total: snap.totalBytes });
+        setDownloadDiagnostics(snap);
         if (snap.status === "completed") break;
         if (snap.status === "failed") {
           setDownloadError(snap.error ?? "下载失败");
@@ -175,11 +184,28 @@ export function ModelManager({
                 )}%）`
               : "准备下载…"}
           </span>
+          {downloadDiagnostics && (
+            <div className="flex flex-col gap-0.5 text-text-muted">
+              <span className="break-all">
+                下载源：{downloadSourceLabel(downloadDiagnostics)}
+              </span>
+              {downloadDiagnostics.debugLogPath && (
+                <span className="break-all">
+                  诊断日志：{downloadDiagnostics.debugLogPath}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {downloadError && (
-        <span className="text-danger">下载失败：{downloadError}</span>
+        <span className="text-danger">
+          下载失败：{downloadError}
+          {downloadDiagnostics?.debugLogPath
+            ? `；诊断日志：${downloadDiagnostics.debugLogPath}`
+            : ""}
+        </span>
       )}
     </div>
   );

@@ -1,17 +1,18 @@
-use crate::settings::{load_settings, AppSettings};
+use crate::dependencies::{resolve_ffmpeg_paths, ResolvedFfmpegSource};
 use crate::process::hidden_command;
+use crate::settings::{load_settings, AppSettings};
 use serde::Serialize;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::Stdio;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
-/// FFmpeg 来源：用户设置 / 随应用捆绑 / 系统 PATH。
+/// FFmpeg 来源：用户设置 / 受管下载 / 系统 PATH。
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FfmpegSource {
     Settings,
-    Bundled,
+    Managed,
     System,
 }
 
@@ -45,44 +46,20 @@ pub struct VideoInfo {
     pub fps: Option<f64>,
 }
 
-const EXECUTABLE_NAME: &str = if cfg!(windows) {
-    "ffmpeg.exe"
-} else {
-    "ffmpeg"
-};
-
-/// 随应用打包的 ffmpeg 路径（`resource_dir/binaries/ffmpeg`），仅在文件存在时返回。
-fn bundled_ffmpeg(app: &AppHandle) -> Option<PathBuf> {
-    let dir = app.path().resource_dir().ok()?;
-    let candidate = dir.join("binaries").join(EXECUTABLE_NAME);
-    candidate.is_file().then_some(candidate)
-}
-
 /// 与 `resolve_ffmpeg` 同目录解析 ffprobe 可执行路径。
 pub fn resolve_ffprobe(app: &AppHandle, settings: &AppSettings) -> String {
-    let (ffmpeg_path, _) = resolve_ffmpeg(app, settings);
-    if ffmpeg_path.ends_with("ffmpeg.exe") {
-        ffmpeg_path.replace("ffmpeg.exe", "ffprobe.exe")
-    } else if ffmpeg_path.ends_with("ffmpeg") {
-        ffmpeg_path.replace("ffmpeg", "ffprobe")
-    } else {
-        "ffprobe".to_string()
-    }
+    resolve_ffmpeg_paths(app, settings).ffprobe
 }
 
-/// 按优先级解析 ffmpeg 可执行路径：用户设置 → 捆绑 → 系统 PATH。
+/// 按优先级解析 ffmpeg 可执行路径：用户设置 → 系统 PATH → 受管下载。
 pub fn resolve_ffmpeg(app: &AppHandle, settings: &AppSettings) -> (String, FfmpegSource) {
-    if let Some(path) = settings
-        .ffmpeg_path
-        .as_ref()
-        .filter(|p| !p.trim().is_empty())
-    {
-        return (path.clone(), FfmpegSource::Settings);
-    }
-    if let Some(path) = bundled_ffmpeg(app) {
-        return (path.to_string_lossy().into_owned(), FfmpegSource::Bundled);
-    }
-    (EXECUTABLE_NAME.to_string(), FfmpegSource::System)
+    let resolved = resolve_ffmpeg_paths(app, settings);
+    let source = match resolved.source {
+        ResolvedFfmpegSource::Settings => FfmpegSource::Settings,
+        ResolvedFfmpegSource::Managed => FfmpegSource::Managed,
+        ResolvedFfmpegSource::System | ResolvedFfmpegSource::Missing => FfmpegSource::System,
+    };
+    (resolved.ffmpeg, source)
 }
 
 pub fn ffmpeg_status(app: &AppHandle) -> FfmpegStatus {
@@ -322,31 +299,25 @@ fn parse_video_info_output(stdout: &str) -> Result<VideoInfo, String> {
 
 /// 使用 ffprobe 获取视频信息（分辨率、时长、帧率）
 #[tauri::command]
-pub async fn get_video_info(
-    app: AppHandle,
-    video_path: String,
-) -> Result<VideoInfo, String> {
+pub async fn get_video_info(app: AppHandle, video_path: String) -> Result<VideoInfo, String> {
     let video = PathBuf::from(&video_path);
     if !video.is_file() {
         return Err(format!("视频文件不存在: {video_path}"));
     }
 
     let settings = load_settings(&app).unwrap_or_default();
-    let (ffmpeg_path, _) = resolve_ffmpeg(&app, &settings);
-
-    // ffprobe 通常与 ffmpeg 在同一目录
-    let ffprobe = if ffmpeg_path.ends_with("ffmpeg.exe") || ffmpeg_path.ends_with("ffmpeg") {
-        ffmpeg_path.replace("ffmpeg", "ffprobe")
-    } else {
-        "ffprobe".to_string()
-    };
+    let ffprobe = resolve_ffprobe(&app, &settings);
 
     let output = hidden_command(&ffprobe)
         .args([
-            "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,duration,r_frame_rate,avg_frame_rate",
-            "-of", "default=noprint_wrappers=1",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height,duration,r_frame_rate,avg_frame_rate",
+            "-of",
+            "default=noprint_wrappers=1",
             &video_path,
         ])
         .output()
@@ -379,16 +350,25 @@ pub async fn extract_waveform(
     .map_err(|e| format!("任务执行失败: {e}"))?
 }
 
-fn run_extract_waveform(ffmpeg: &str, video_path: &str, samples: usize) -> Result<Vec<f32>, String> {
+fn run_extract_waveform(
+    ffmpeg: &str,
+    video_path: &str,
+    samples: usize,
+) -> Result<Vec<f32>, String> {
     // FFmpeg 提取 16bit PCM，单声道，16kHz
     let mut child = hidden_command(ffmpeg)
         .args([
-            "-i", video_path,
+            "-i",
+            video_path,
             "-vn",
-            "-f", "s16le",
-            "-acodec", "pcm_s16le",
-            "-ar", "16000",
-            "-ac", "1",
+            "-f",
+            "s16le",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
             "-",
         ])
         .stdout(Stdio::piped())
@@ -398,7 +378,9 @@ fn run_extract_waveform(ffmpeg: &str, video_path: &str, samples: usize) -> Resul
 
     let mut stdout = child.stdout.take().ok_or("无法读取输出")?;
     let mut pcm_data = Vec::new();
-    stdout.read_to_end(&mut pcm_data).map_err(|e| format!("读取失败: {e}"))?;
+    stdout
+        .read_to_end(&mut pcm_data)
+        .map_err(|e| format!("读取失败: {e}"))?;
 
     let status = child.wait().map_err(|e| e.to_string())?;
     if !status.success() {
@@ -439,8 +421,8 @@ fn handle_stderr_line(app: &AppHandle, text: &str, duration_ms: &mut i64, tail: 
         }
     }
     if let Some(processed) = parse_time_token(text) {
-        let percent = (*duration_ms > 0)
-            .then(|| (processed as f64 / *duration_ms as f64).clamp(0.0, 1.0));
+        let percent =
+            (*duration_ms > 0).then(|| (processed as f64 / *duration_ms as f64).clamp(0.0, 1.0));
         let _ = app.emit(
             "audio_extract_progress",
             ExtractProgress {

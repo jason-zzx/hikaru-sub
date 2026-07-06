@@ -1,3 +1,8 @@
+use crate::dependencies::{
+    effective_source_profile, ensure_runtime_deps_writable_or_elevate, managed_asr_service_dir,
+    managed_asr_venv_python_path, managed_python_dir, python311_candidates, python_version,
+    PythonCommand,
+};
 use crate::process::hidden_command;
 use crate::settings::{load_settings, save_settings};
 use serde::{Deserialize, Serialize};
@@ -145,22 +150,6 @@ impl AsrSetupJob {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PythonCommand {
-    program: String,
-    args: Vec<String>,
-}
-
-impl PythonCommand {
-    fn display(&self) -> String {
-        if self.args.is_empty() {
-            self.program.clone()
-        } else {
-            format!("{} {}", self.program, self.args.join(" "))
-        }
-    }
-}
-
 fn requirements_for_profile(profile: AsrSetupProfile) -> &'static [&'static str] {
     match profile {
         AsrSetupProfile::Default => &["requirements.txt"],
@@ -218,21 +207,12 @@ fn is_cancelled(job: &Arc<StdMutex<AsrSetupJob>>) -> bool {
         .unwrap_or(true)
 }
 
-fn managed_service_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    Ok(dir.join("asr-service"))
-}
-
 fn venv_dir(service_dir: &Path) -> PathBuf {
     service_dir.join(".venv")
 }
 
 fn venv_python_path(service_dir: &Path) -> PathBuf {
-    if cfg!(windows) {
-        service_dir.join(".venv").join("Scripts").join("python.exe")
-    } else {
-        service_dir.join(".venv").join("bin").join("python")
-    }
+    managed_asr_venv_python_path(service_dir)
 }
 
 fn should_copy_template_entry(path: &Path) -> bool {
@@ -318,78 +298,17 @@ fn clean_managed_service_dir(target: &Path, recreate: bool) -> Result<(), String
     Ok(())
 }
 
-fn python_candidates(explicit: Option<&str>) -> Vec<PythonCommand> {
-    let mut candidates = Vec::new();
+fn missing_python311_message() -> String {
+    "未检测到 Python 3.11。请下载受管 Python 3.11 或在设置中配置 Python 3.11 路径。".into()
+}
+
+fn find_python(app: &AppHandle, explicit: Option<&str>) -> Option<(PythonCommand, String)> {
+    let mut settings = load_settings(app).unwrap_or_default();
     if let Some(path) = explicit.filter(|s| !s.trim().is_empty()) {
-        candidates.push(PythonCommand {
-            program: path.to_string(),
-            args: vec![],
-        });
+        settings.python_path = Some(path.to_string());
     }
-    if cfg!(windows) {
-        candidates.push(PythonCommand {
-            program: "python".into(),
-            args: vec![],
-        });
-        candidates.push(PythonCommand {
-            program: "py".into(),
-            args: vec!["-3".into()],
-        });
-    } else {
-        candidates.push(PythonCommand {
-            program: "python3".into(),
-            args: vec![],
-        });
-        candidates.push(PythonCommand {
-            program: "python".into(),
-            args: vec![],
-        });
-    }
-    candidates
-}
-
-fn command_output(
-    program: &str,
-    base_args: &[String],
-    args: &[&str],
-    cwd: Option<&Path>,
-) -> Result<std::process::Output, String> {
-    let mut command = hidden_command(program);
-    command.args(base_args).args(args);
-    if let Some(cwd) = cwd {
-        command.current_dir(cwd);
-    }
-    command.output().map_err(|e| {
-        let mut all_args = base_args.to_vec();
-        all_args.extend(args.iter().map(|arg| arg.to_string()));
-        format!("执行命令失败（{} {}）：{e}", program, all_args.join(" "))
-    })
-}
-
-fn python_version(command: &PythonCommand) -> Result<String, String> {
-    let output = command_output(
-        &command.program,
-        &command.args,
-        &[
-            "-c",
-            "import sys; print('.'.join(map(str, sys.version_info[:3]))); raise SystemExit(0 if sys.version_info >= (3, 10) else 1)",
-        ],
-        None,
-    )?;
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if output.status.success() {
-        Ok(stdout)
-    } else {
-        Err(if stdout.is_empty() {
-            format!("Python 版本低于 3.10 或不可用：{}", command.display())
-        } else {
-            format!("Python 版本低于 3.10：{stdout}")
-        })
-    }
-}
-
-fn find_python(explicit: Option<&str>) -> Option<(PythonCommand, String)> {
-    python_candidates(explicit)
+    let managed = managed_python_dir(app).ok();
+    python311_candidates(&settings, managed.as_deref())
         .into_iter()
         .find_map(|candidate| {
             python_version(&candidate)
@@ -412,6 +331,106 @@ fn is_cuda_profile(profile: AsrSetupProfile) -> bool {
         profile,
         AsrSetupProfile::ParakeetCuda | AsrSetupProfile::Qwen3Cuda
     )
+}
+
+fn append_base_pip_source_args(
+    args: &mut Vec<String>,
+    profile: &crate::dependencies::RuntimeDependencySourceProfile,
+) {
+    if let Some(index) = profile
+        .pip_index_url
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        args.push("--index-url".into());
+        args.push(index.to_string());
+    }
+    for extra in &profile.pip_extra_index_urls {
+        if !extra.trim().is_empty() {
+            args.push("--extra-index-url".into());
+            args.push(extra.clone());
+        }
+    }
+}
+
+fn torch_index_for_requirement(
+    profile: &crate::dependencies::RuntimeDependencySourceProfile,
+    setup_profile: AsrSetupProfile,
+    requirement: &str,
+) -> Option<String> {
+    if !requirement.contains("parakeet") && !requirement.contains("qwen3") {
+        return None;
+    }
+    if is_cuda_profile(setup_profile) || requirement.contains("cuda") {
+        profile.pytorch_cuda_index_url.clone()
+    } else if requirement.contains("cpu") {
+        profile.pytorch_cpu_index_url.clone()
+    } else {
+        None
+    }
+}
+
+fn torch_find_links_for_requirement(
+    profile: &crate::dependencies::RuntimeDependencySourceProfile,
+    setup_profile: AsrSetupProfile,
+    requirement: &str,
+) -> Option<String> {
+    if !requirement.contains("parakeet") && !requirement.contains("qwen3") {
+        return None;
+    }
+    if is_cuda_profile(setup_profile) || requirement.contains("cuda") {
+        profile.pytorch_cuda_find_links_url.clone()
+    } else if requirement.contains("cpu") {
+        profile.pytorch_cpu_find_links_url.clone()
+    } else {
+        None
+    }
+}
+
+fn pip_upgrade_args(profile: &crate::dependencies::RuntimeDependencySourceProfile) -> Vec<String> {
+    let mut args = vec!["-m".into(), "pip".into(), "install".into()];
+    append_base_pip_source_args(&mut args, profile);
+    args.extend(["--upgrade".into(), "pip".into()]);
+    args
+}
+
+fn pip_install_requirement_args(
+    profile: &crate::dependencies::RuntimeDependencySourceProfile,
+    setup_profile: AsrSetupProfile,
+    requirement: &str,
+) -> Vec<String> {
+    let mut args = vec!["-m".into(), "pip".into(), "install".into()];
+    if let Some(find_links) = torch_find_links_for_requirement(profile, setup_profile, requirement)
+        .filter(|value| !value.trim().is_empty())
+    {
+        append_base_pip_source_args(&mut args, profile);
+        args.push("--find-links".into());
+        args.push(find_links);
+    } else if let Some(torch_index) =
+        torch_index_for_requirement(profile, setup_profile, requirement)
+            .filter(|value| !value.trim().is_empty())
+    {
+        args.push("--index-url".into());
+        args.push(torch_index);
+        if let Some(pip_index) = profile
+            .pip_index_url
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            args.push("--extra-index-url".into());
+            args.push(pip_index.to_string());
+        }
+        for extra in &profile.pip_extra_index_urls {
+            if !extra.trim().is_empty() {
+                args.push("--extra-index-url".into());
+                args.push(extra.clone());
+            }
+        }
+    } else {
+        append_base_pip_source_args(&mut args, profile);
+    }
+    args.extend(["-r".into(), requirement.into()]);
+    args
 }
 
 fn paths_equivalent(left: &Path, right: &Path) -> bool {
@@ -608,16 +627,15 @@ fn run_python_command(
     )
 }
 
-fn run_venv_python_command(
+fn run_venv_python_command_args(
     job: &Arc<StdMutex<AsrSetupJob>>,
     stage: &str,
     progress: Option<f64>,
     service_dir: &Path,
-    args: &[&str],
+    args: &[String],
 ) -> Result<(), String> {
     let python = venv_python_path(service_dir);
-    let args = args.iter().map(|arg| arg.to_string()).collect::<Vec<_>>();
-    run_logged_command(job, stage, progress, &python, &args, service_dir)
+    run_logged_command(job, stage, progress, &python, args, service_dir)
 }
 
 fn verify_engine_available(service_dir: &Path, profile: AsrSetupProfile) -> Result<(), String> {
@@ -660,19 +678,21 @@ fn run_setup_job(
     job: Arc<StdMutex<AsrSetupJob>>,
     args: StartAsrSetupArgs,
 ) -> Result<(), String> {
+    ensure_runtime_deps_writable_or_elevate(&app)?;
     if is_cuda_profile(args.profile) && !has_nvidia_gpu() {
         return Err("未检测到 NVIDIA GPU，不能安装 CUDA 版 ASR 依赖".into());
     }
 
     set_stage(&job, "准备 ASR 服务目录", Some(0.05));
-    let managed = managed_service_dir(&app)?;
+    let source_profile = effective_source_profile(&load_settings(&app).unwrap_or_default())?;
+    let managed = managed_asr_service_dir(&app)?;
     let source = resolve_template_dir(&app, args.asr_service_path.as_deref(), Some(&managed))?;
     clean_managed_service_dir(&managed, args.recreate)?;
     copy_template_dir(&source, &managed)?;
 
     set_stage(&job, "检查 Python", Some(0.10));
-    let (python, version) = find_python(args.python_path.as_deref())
-        .ok_or_else(|| "未检测到 Python 3.10+，请先在设置中配置 Python 路径。".to_string())?;
+    let (python, version) =
+        find_python(&app, args.python_path.as_deref()).ok_or_else(missing_python311_message)?;
     if let Ok(mut guard) = job.lock() {
         push_log(
             &mut guard,
@@ -693,13 +713,8 @@ fn run_setup_job(
         set_stage(&job, "复用虚拟环境", Some(0.20));
     }
 
-    run_venv_python_command(
-        &job,
-        "升级 pip",
-        Some(0.35),
-        &managed,
-        &["-m", "pip", "install", "--upgrade", "pip"],
-    )?;
+    let pip_args = pip_upgrade_args(&source_profile);
+    run_venv_python_command_args(&job, "升级 pip", Some(0.35), &managed, &pip_args)?;
 
     let requirements = requirements_for_profile(args.profile);
     for (index, requirement) in requirements.iter().enumerate() {
@@ -709,13 +724,8 @@ fn run_setup_job(
         } else {
             format!("安装可选引擎依赖（{requirement}）")
         };
-        run_venv_python_command(
-            &job,
-            &stage,
-            Some(progress),
-            &managed,
-            &["-m", "pip", "install", "-r", requirement],
-        )?;
+        let pip_args = pip_install_requirement_args(&source_profile, args.profile, requirement);
+        run_venv_python_command_args(&job, &stage, Some(progress), &managed, &pip_args)?;
     }
 
     set_stage(&job, "验证引擎依赖", Some(0.92));
@@ -735,10 +745,10 @@ pub async fn probe_asr_setup_environment(
     app: AppHandle,
     args: ProbeAsrSetupEnvironmentArgs,
 ) -> Result<AsrSetupEnvironment, String> {
-    let managed = managed_service_dir(&app)?;
+    let managed = managed_asr_service_dir(&app)?;
     let template =
         resolve_template_dir(&app, args.asr_service_path.as_deref(), Some(&managed)).ok();
-    let python = find_python(args.python_path.as_deref());
+    let python = find_python(&app, args.python_path.as_deref());
     let venv = venv_dir(&managed);
     Ok(AsrSetupEnvironment {
         service_template_path: template.map(|path| path.to_string_lossy().into_owned()),
@@ -950,11 +960,90 @@ mod tests {
     }
 
     #[test]
-    fn python_candidates_put_explicit_path_first() {
-        let candidates = python_candidates(Some("custom-python"));
+    fn python311_candidates_put_explicit_path_first() {
+        let settings = crate::settings::AppSettings {
+            python_path: Some("custom-python".into()),
+            ..Default::default()
+        };
+        let candidates = python311_candidates(&settings, None);
+
         assert_eq!(
             candidates.first().map(|cmd| cmd.program.as_str()),
             Some("custom-python")
         );
+    }
+
+    #[test]
+    fn missing_python_message_requires_python_311() {
+        let message = missing_python311_message();
+
+        assert!(message.contains("Python 3.11"));
+        assert!(!message.contains("3.10"));
+    }
+
+    #[test]
+    fn pip_install_args_use_source_profile_for_torch_requirements() {
+        let profile = crate::dependencies::RuntimeDependencySourceProfile {
+            id: crate::dependencies::RuntimeDependencySourceId::China,
+            label: "中国大陆镜像".into(),
+            ffmpeg: None,
+            python311: None,
+            pip_index_url: Some("https://pypi.example/simple".into()),
+            pip_extra_index_urls: vec!["https://fallback.example/simple".into()],
+            pytorch_cpu_index_url: Some("https://torch.example/cpu".into()),
+            pytorch_cuda_index_url: Some("https://torch.example/cu126".into()),
+            pytorch_cpu_find_links_url: None,
+            pytorch_cuda_find_links_url: None,
+            huggingface_endpoint: None,
+        };
+
+        let args = pip_install_requirement_args(
+            &profile,
+            AsrSetupProfile::ParakeetCpu,
+            "requirements-parakeet-cpu.txt",
+        );
+
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--index-url", "https://torch.example/cpu"]));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--extra-index-url", "https://pypi.example/simple"]));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--extra-index-url", "https://fallback.example/simple"]));
+    }
+
+    #[test]
+    fn pip_install_args_use_find_links_for_torch_wheel_mirrors() {
+        let profile = crate::dependencies::RuntimeDependencySourceProfile {
+            id: crate::dependencies::RuntimeDependencySourceId::China,
+            label: "中国大陆镜像".into(),
+            ffmpeg: None,
+            python311: None,
+            pip_index_url: Some("https://pypi.example/simple".into()),
+            pip_extra_index_urls: vec!["https://fallback.example/simple".into()],
+            pytorch_cpu_index_url: None,
+            pytorch_cuda_index_url: None,
+            pytorch_cpu_find_links_url: Some("https://torch.example/cpu/".into()),
+            pytorch_cuda_find_links_url: Some("https://torch.example/cu126/".into()),
+            huggingface_endpoint: None,
+        };
+
+        let args = pip_install_requirement_args(
+            &profile,
+            AsrSetupProfile::Qwen3Cuda,
+            "requirements-qwen3-cuda.txt",
+        );
+
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--find-links", "https://torch.example/cu126/"]));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--index-url", "https://pypi.example/simple"]));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["--extra-index-url", "https://fallback.example/simple"]));
     }
 }

@@ -59,9 +59,13 @@ export interface AppSettings {
   translationCustomPrompt?: string;
   translationGlossary?: string;
   subtitleMergeMode: "inline" | "separate";
+  runtimeSourceMode?: RuntimeDependencySourceMode;
+  runtimeRecommendedProfile?: "official" | "china" | null;
+  runtimeRecommendationCheckedAt?: string | null;
+  runtimeCustomSource?: Partial<RuntimeDependencySourceProfile> | null;
 }
 
-export type FfmpegSource = "settings" | "bundled" | "system";
+export type FfmpegSource = "settings" | "managed" | "system";
 
 export interface FfmpegStatus {
   available: boolean;
@@ -156,6 +160,9 @@ export interface ModelDownloadSnapshot {
   downloadedBytes: number;
   totalBytes: number;
   error: string | null;
+  hfEndpoint?: string | null;
+  hfHome?: string | null;
+  debugLogPath?: string | null;
 }
 
 export type AsrSetupProfile =
@@ -204,6 +211,93 @@ export interface AsrSetupEnvironment {
   venvPath: string;
   venvExists: boolean;
   hasNvidiaGpu: boolean;
+}
+
+export type RuntimeDependencyKind =
+  | "ffmpeg"
+  | "python311"
+  | "asrVenv"
+  | "asrModels"
+  | "downloads";
+
+export type RuntimeDependencySourceMode =
+  | "auto"
+  | "official"
+  | "china"
+  | "custom";
+
+export interface RuntimeDependencyBinarySource {
+  url: string;
+  sha256: string;
+  sizeBytes: number;
+  archive: "zip" | "tar.gz" | "tar.xz" | "windowsInstaller";
+  stripPrefix?: string | null;
+}
+
+export interface RuntimeDependencySourceProfile {
+  id: "official" | "china" | "custom";
+  label: string;
+  ffmpeg?: RuntimeDependencyBinarySource;
+  python311?: RuntimeDependencyBinarySource;
+  pipIndexUrl?: string | null;
+  pipExtraIndexUrls?: string[];
+  pytorchCpuIndexUrl?: string | null;
+  pytorchCudaIndexUrl?: string | null;
+  pytorchCpuFindLinksUrl?: string | null;
+  pytorchCudaFindLinksUrl?: string | null;
+  huggingfaceEndpoint?: string | null;
+}
+
+export interface RuntimeDependencySourceSettings {
+  mode: RuntimeDependencySourceMode;
+  recommendedProfile?: "official" | "china" | null;
+  recommendationCheckedAt?: string | null;
+  customProfile?: Partial<RuntimeDependencySourceProfile> | null;
+}
+
+export type RuntimeDependencyJobStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface RuntimeDependencyItem {
+  kind: RuntimeDependencyKind;
+  status: "available" | "missing" | "needsSetup";
+  path?: string | null;
+  source?: string | null;
+  version?: string | null;
+  managed: boolean;
+  sizeBytes: number;
+}
+
+export interface RuntimeDependencyProbe {
+  items: RuntimeDependencyItem[];
+  sourceMode: RuntimeDependencySourceMode;
+  effectiveSource: "official" | "china" | "custom";
+  recommendedSource?: "official" | "china" | null;
+}
+
+export interface PrepareRuntimeDependencyArgs {
+  kind: RuntimeDependencyKind;
+  engine?: string | null;
+  model?: string | null;
+  profile?: AsrSetupProfile | null;
+  recreate?: boolean;
+}
+
+export interface RuntimeDependencySnapshot {
+  id: string;
+  kind: RuntimeDependencyKind;
+  status: RuntimeDependencyJobStatus;
+  stage: string;
+  progress: number | null;
+  downloadedBytes: number;
+  totalBytes: number;
+  resolvedPath?: string | null;
+  logTail: string[];
+  error: string | null;
 }
 
 export interface VideoInfo {

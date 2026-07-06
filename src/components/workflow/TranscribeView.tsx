@@ -20,6 +20,7 @@ import {
   checkFfmpeg,
   extractAudio,
   getAsrProgress,
+  invalidateFfmpegStatus,
   listAsrEngines,
   onAudioExtractProgress,
   pathExists,
@@ -31,6 +32,8 @@ import type {
   FfmpegStatus,
   VadConfig,
 } from "../../types";
+import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
+import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
 const ASR_DEVICES = [
   { value: "auto", label: "自动" },
@@ -79,6 +82,7 @@ export function TranscribeView() {
   const updateTask = useTaskStore((s) => s.updateTask);
 
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+  const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
 
   // 音轨提取
   const [audioReady, setAudioReady] = useState(false);
@@ -109,11 +113,16 @@ export function TranscribeView() {
   const jobIdRef = useRef<string | null>(null);
   const engineCheckRequestRef = useRef(0);
 
-  useEffect(() => {
-    checkFfmpeg()
-      .then(setFfmpeg)
-      .catch(() => setFfmpeg(null));
+  const refreshFfmpeg = useCallback(async (force = false) => {
+    if (force) invalidateFfmpegStatus();
+    const next = await checkFfmpeg({ force });
+    setFfmpeg(next);
+    return next;
   }, []);
+
+  useEffect(() => {
+    refreshFfmpeg().catch(() => setFfmpeg(null));
+  }, [refreshFfmpeg]);
 
   // 初始化配置 + 检测已有音轨
   useEffect(() => {
@@ -163,7 +172,7 @@ export function TranscribeView() {
   const selectedEngineUnavailable =
     engines?.find((item) => item.name === engine)?.available === false;
 
-  const handleExtract = async () => {
+  const runExtract = async () => {
     if (!audioPath) {
       setExtractError("项目缺少音轨输出路径");
       return;
@@ -196,6 +205,17 @@ export function TranscribeView() {
       unlisten?.();
       setExtracting(false);
     }
+  };
+
+  const handleExtract = async () => {
+    if (ffmpegMissing) {
+      await ffmpegPreparation.requestDependency(async () => {
+        const next = await refreshFfmpeg(true);
+        if (next.available) await runExtract();
+      });
+      return;
+    }
+    await runExtract();
   };
 
   const detectEngines = useCallback(async () => {
@@ -284,7 +304,7 @@ export function TranscribeView() {
                   "无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080";
               }
 
-              const doc = createDefaultDocument("Hikaru-Sub", resX, resY);
+              const doc = createDefaultDocument("Hikaru Sub", resX, resY);
               doc.cues = cues;
               setAssMetadata(doc.scriptInfo, doc.styles);
               const assText = serializeAss(doc);
@@ -403,10 +423,14 @@ export function TranscribeView() {
           <span className="text-warning">未检测到 FFmpeg，无法提取音轨。</span>
           <button
             type="button"
-            onClick={() => setStep("settings")}
+            onClick={() =>
+              void ffmpegPreparation.requestDependency(async () => {
+                await refreshFfmpeg(true);
+              })
+            }
             className="shrink-0 rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
           >
-            前往设置
+            准备 FFmpeg
           </button>
         </div>
       )}
@@ -736,6 +760,30 @@ export function TranscribeView() {
           )}
         </div>
       </StepCard>
+
+      <RuntimeDependencyDialog
+        open={ffmpegPreparation.open}
+        kind="ffmpeg"
+        reason="提取音轨需要 FFmpeg。"
+        sizeBytes={ffmpegPreparation.item?.sizeBytes ?? 0}
+        targetPath={ffmpegPreparation.item?.path ?? "安装目录/deps/ffmpeg/current"}
+        sourceLabel={ffmpegPreparation.sourceLabel}
+        status={
+          ffmpegPreparation.snapshot?.status === "running" ||
+          ffmpegPreparation.snapshot?.status === "pending"
+            ? "running"
+            : ffmpegPreparation.snapshot?.status === "completed"
+              ? "completed"
+              : ffmpegPreparation.snapshot?.status === "failed"
+                ? "failed"
+                : "idle"
+        }
+        progressPercent={ffmpegPreparation.progressPercent}
+        error={ffmpegPreparation.error}
+        onConfirm={ffmpegPreparation.confirmPrepare}
+        onCancel={() => ffmpegPreparation.setOpen(false)}
+        onChangeSource={() => setStep("settings")}
+      />
     </div>
   );
 }

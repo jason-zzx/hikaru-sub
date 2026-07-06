@@ -2,8 +2,6 @@
 # 推荐：./scripts/setup-asr.sh parakeet-cpu
 # 手动安装前须先执行 requirements.txt。
 
---index-url https://download.pytorch.org/whl/cpu
---extra-index-url https://pypi.org/simple
 torch>=2.6.0
 torchaudio>=2.6.0
 

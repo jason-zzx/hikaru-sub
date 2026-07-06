@@ -1,8 +1,6 @@
 # Qwen3-ASR 可选依赖：CPU 版 PyTorch（无 NVIDIA CUDA 运行时 wheel）。
 # 推荐：./scripts/setup-asr.sh qwen3-cpu
 # 手动安装前须先执行 requirements.txt。
---index-url https://download.pytorch.org/whl/cpu
---extra-index-url https://pypi.org/simple
 torch>=2.6.0
 
 -r requirements-qwen3.txt
