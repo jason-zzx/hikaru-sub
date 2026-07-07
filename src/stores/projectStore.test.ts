@@ -1,12 +1,24 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDefaultStyles, type AssStyle } from "@hikaru/ass-core";
 import { useProjectStore } from "./projectStore";
+import type { SubtitleCue } from "../types";
 
 function style(overrides: Partial<AssStyle> = {}): AssStyle {
   return {
     ...createDefaultStyles()[0],
     name: "Custom",
     ...overrides,
+  };
+}
+
+function cue(id: string, startMs: number, endMs: number): SubtitleCue {
+  return {
+    id,
+    startMs,
+    endMs,
+    primaryText: id,
+    style: "Primary",
+    layer: 0,
   };
 }
 
@@ -152,6 +164,45 @@ describe("projectStore style actions", () => {
     expect(state.cues[0].primaryText).toBe("こんばんは");
     expect(state.isDirty).toBe(true);
     expect(state.history.past).toHaveLength(0);
+  });
+
+  it("replaceCues replaces the list as one undoable dirty change", () => {
+    const original = [cue("a", 0, 1000), cue("b", 1000, 2000)];
+    const next = [original[1], original[0]];
+
+    useProjectStore.setState({
+      cues: original,
+      isDirty: false,
+      history: { past: [], future: [] },
+    });
+    useProjectStore.getState().replaceCues(next);
+
+    expect(useProjectStore.getState().cues.map((item) => item.id)).toEqual([
+      "b",
+      "a",
+    ]);
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    expect(useProjectStore.getState().history.past).toEqual([original]);
+
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().cues.map((item) => item.id)).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("replaceCues no-ops when the same cue object order is provided", () => {
+    const original = [cue("a", 0, 1000)];
+
+    useProjectStore.setState({
+      cues: original,
+      isDirty: false,
+      history: { past: [], future: [] },
+    });
+    useProjectStore.getState().replaceCues(original);
+
+    expect(useProjectStore.getState().isDirty).toBe(false);
+    expect(useProjectStore.getState().history.past).toEqual([]);
   });
 
   describe("renameStyle", () => {

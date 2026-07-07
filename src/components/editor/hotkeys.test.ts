@@ -71,6 +71,16 @@ describe("findHotkey", () => {
     expect(findHotkey(ev({ key: "y", ctrlKey: true, target: BODY }))?.action).toBe("redo");
   });
 
+  it("Ctrl/Cmd+C/X/V match whole-row clipboard actions only outside text inputs", () => {
+    expect(findHotkey(ev({ key: "c", ctrlKey: true, target: BODY }))?.action).toBe("copy-cues");
+    expect(findHotkey(ev({ key: "x", ctrlKey: true, target: BODY }))?.action).toBe("cut-cues");
+    expect(findHotkey(ev({ key: "v", metaKey: true, target: BODY }))?.action).toBe("paste-cues");
+
+    expect(findHotkey(ev({ key: "c", ctrlKey: true, target: TEXTAREA }))).toBeNull();
+    expect(findHotkey(ev({ key: "x", ctrlKey: true, target: TEXTAREA }))).toBeNull();
+    expect(findHotkey(ev({ key: "v", ctrlKey: true, target: INPUT }))).toBeNull();
+  });
+
   it("outside-input 作用域（Alt+←/→）框内也不匹配", () => {
     expect(findHotkey(ev({ key: "ArrowLeft", altKey: true, target: TEXTAREA }))).toBeNull();
     expect(findHotkey(ev({ key: "ArrowRight", altKey: true, target: TEXTAREA }))).toBeNull();

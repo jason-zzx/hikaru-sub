@@ -4,11 +4,15 @@ import { usePlaybackStore } from "../stores/playbackStore";
 import { useUiStore } from "../stores/uiStore";
 import { findHotkey, type EditorActionId } from "../components/editor/hotkeys";
 import {
+  copyCueRows,
   createCueAtPlayheadWithUniqueId,
+  deleteCuesById,
   findSubtitleBoundary,
   frameStepTarget,
-  selectCueAfterDelete,
+  getCueRowClipboard,
+  pasteCueRows,
   selectCueByOffset,
+  setCueRowClipboard,
 } from "../services/editorActions";
 import type { SubtitleCue } from "../types";
 
@@ -66,6 +70,25 @@ export function buildEditorActions(
       .updateCue(selectedCueId, { [field]: Math.round(currentTimeMs) });
   };
 
+  const selectedIdsOrActive = () => {
+    const pb = usePlaybackStore.getState();
+    return pb.selectedCueIds.length > 0
+      ? pb.selectedCueIds
+      : pb.selectedCueId
+        ? [pb.selectedCueId]
+        : [];
+  };
+
+  const applyCueListResult = (
+    result: { cues: SubtitleCue[]; selectedCueIds: string[] } | null,
+  ) => {
+    if (!result) return false;
+    useProjectStore.getState().replaceCues(result.cues);
+    usePlaybackStore.getState().setSelectedCueIds(result.selectedCueIds);
+    usePlaybackStore.getState().setPlayUntil(null);
+    return true;
+  };
+
   const playSegment = () => {
     const pb = usePlaybackStore.getState();
     if (pb.isPlaying && pb.playUntilMs !== null) {
@@ -98,15 +121,40 @@ export function buildEditorActions(
     useUiStore.getState().requestEditorFocus();
   };
 
-  const deleteCue = () => {
+  const copyCues = () => {
+    const selectedIds = selectedIdsOrActive();
+    if (selectedIds.length === 0) return;
+    const copied = copyCueRows(useProjectStore.getState().cues, selectedIds);
+    if (copied.length > 0) setCueRowClipboard(copied);
+  };
+
+  const cutCues = () => {
+    const selectedIds = selectedIdsOrActive();
+    if (selectedIds.length === 0) return;
+    const cues = useProjectStore.getState().cues;
+    const copied = copyCueRows(cues, selectedIds);
+    if (copied.length === 0) return;
+    setCueRowClipboard(copied);
+    applyCueListResult(deleteCuesById(cues, selectedIds));
+  };
+
+  const pasteCues = () => {
     const pb = usePlaybackStore.getState();
-    if (!pb.selectedCueId) return;
-    const before = useProjectStore.getState().cues;
-    const next = selectCueAfterDelete(before, pb.selectedCueId);
-    if (!before.some((cue) => cue.id === pb.selectedCueId)) return;
-    useProjectStore.getState().deleteCue(pb.selectedCueId);
-    pb.setSelectedCueId(next ? next.id : null);
-    pb.setPlayUntil(null);
+    const result = pasteCueRows(
+      useProjectStore.getState().cues,
+      getCueRowClipboard(),
+      pb.selectedCueId,
+    );
+    if (!applyCueListResult(result)) {
+      options.onNotify?.("info", "没有可粘贴的字幕行");
+    }
+  };
+
+  const deleteSelectedCues = () => {
+    const selectedIds = selectedIdsOrActive();
+    if (selectedIds.length === 0) return;
+    const result = deleteCuesById(useProjectStore.getState().cues, selectedIds);
+    applyCueListResult(result);
     options.onNotify?.("info", "已删除字幕，可按 Ctrl+Z 撤销");
   };
 
@@ -131,7 +179,10 @@ export function buildEditorActions(
     "stamp-start": () => stamp("startMs"),
     "stamp-end": () => stamp("endMs"),
     "new-cue": newCue,
-    "delete-cue": deleteCue,
+    "delete-cue": deleteSelectedCues,
+    "copy-cues": copyCues,
+    "cut-cues": cutCues,
+    "paste-cues": pasteCues,
     save: () => options.onSave(),
     undo: () => useProjectStore.getState().undo(),
     redo: () => useProjectStore.getState().redo(),

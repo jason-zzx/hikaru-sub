@@ -593,7 +593,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
         <div className="flex gap-2">
           <button
             onClick={handleAdd}
-            className="rounded border border-border px-3 py-1 text-xs hover:bg-surface-hover"
+            className="rounded border border-border px-3 py-1 text-xs hover:bg-surface-overlay"
             title="新建字幕（Insert）"
           >
             新建
