@@ -29,6 +29,13 @@ AI 日语字幕桌面应用：下载 m3u8 视频 → 本地 ASR 日语转录 →
 - 当用于路径、URL、包名、目录名、二进制名、git 仓库名、命令、配置 key 或其他机器可读标识时，统一使用 `hikaru-sub`。
 - 不再新增 `Hikaru-Sub` 作为用户可见名称；只有引用历史产物、旧文件名或外部已有名称时才保留。
 
+## AGENTS.md 使用约定
+
+- 本文件是面向 AI coding agents 的项目 README，补充而非替代 `README.md`。优先记录会影响自动化修改质量的构建、测试、风格、架构边界与安全约束。
+- 当前只有根目录 `AGENTS.md`，因此本文件适用于整个仓库。若未来在子目录新增 `AGENTS.md`，编辑该子目录内文件时以距离目标文件最近的 `AGENTS.md` 为准，并继续参考上层文件中的全局背景。
+- 遇到指令冲突时，先遵循用户本轮明确、直接的要求；未被用户明确覆盖的内容，按“更近层级 `AGENTS.md` 优先于上层 `AGENTS.md`，项目指令优先于外部 skill/plan/spec”的顺序处理。涉及提交、推送、合并、变基、重置等 Git 历史或远程状态操作时，仍必须满足上方「最高优先级规则」的明确授权条件。
+- 保持本文件高信噪比：不要把完整功能清单、已实现 command 清单、发布检查表或阶段进度长期堆在这里；这些内容优先放在 `README.md`、专门文档或代码附近。
+
 ## 技术栈
 
 | 层级 | 选型 |
@@ -49,249 +56,123 @@ AI 日语字幕桌面应用：下载 m3u8 视频 → 本地 ASR 日语转录 →
 pnpm install
 pnpm dev              # 仅 Vite 前端
 pnpm tauri dev        # Tauri 桌面开发
-pnpm build            # 构建前端
+pnpm build            # TypeScript + Vite 构建
 pnpm tauri build      # 打包桌面应用
-./scripts/setup-asr.sh        # ASR sidecar（默认 faster-whisper）
+pnpm release:local    # 准备 ASR 资源并本地打包
+pnpm asr:setup        # ASR sidecar 依赖（默认 faster-whisper）
 ```
 
-**始终使用 pnpm**，不要用 npm/yarn。workspace 根目录安装依赖时加 `-w`。
+- 始终使用 `pnpm`，不要用 `npm` 或 `yarn`。workspace 根目录安装依赖时加 `-w`。
+- ASR 默认只安装 faster-whisper；Parakeet / Qwen3-ASR 体积较大，只有用户明确需要时才使用 `./scripts/setup-asr.sh parakeet-cpu|parakeet-cuda|qwen3-cpu|qwen3-cuda`。
 
-### ASR sidecar 依赖
+## 测试与验证
 
-Python 3.11。`./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎；**Parakeet / Qwen3-ASR 仅在使用对应参数时安装**。
-
-| 场景 | 命令 |
-|------|------|
-| 日常开发（默认） | `./scripts/setup-asr.sh` 或 `pnpm asr:setup` |
-| 有 NVIDIA GPU、试 Parakeet | `./scripts/setup-asr.sh parakeet-cuda` |
-| 无 GPU 但想试 Parakeet | `./scripts/setup-asr.sh parakeet-cpu` |
-| 有 NVIDIA GPU、试 Qwen3-ASR | `./scripts/setup-asr.sh qwen3-cuda` |
-| 无 GPU 但想试 Qwen3-ASR | `./scripts/setup-asr.sh qwen3-cpu` |
-
-手动安装见 `asr-service/README.md`。
-
-### 运行时依赖布局
-
-- 发布包不再捆绑 FFmpeg、Python、ASR Python 依赖或模型权重；只捆绑干净 ASR 服务模板。
-- FFmpeg 解析顺序：用户设置路径 → 系统 `PATH` → 安装目录 `deps/ffmpeg/current` 下的受管 FFmpeg。缺失时由下载/导入/转录/压制等工作流弹出确认后下载。
-- Python 解析顺序：用户设置路径 → 系统 Python 3.11 → 安装目录 `deps/python311/current` 下的受管 Python 3.11。ASR 配置只接受 Python 3.11。
-- 受管 ASR venv 位于安装目录 `deps/asr-service/.venv`；模型缓存位于 `deps/models/huggingface`；临时归档位于 `deps/downloads`。不要重新引入 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 作为大型受管依赖目录。
-- 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，内置官方源、中国大陆镜像和自定义源；自动模式根据测速推荐，但用户手动选择优先。
-- 中国大陆镜像会给 sidecar 注入 `HF_ENDPOINT=https://hf-mirror.com`，模型缓存通过 `HF_HOME` 固定到安装目录 `deps/models/huggingface`。模型下载失败时优先查看 `deps/asr-service/asr-debug.log` 中的 `model_download_*` 事件。
-
-## 目录结构
-
+```bash
+pnpm test
+pnpm build
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
-src/                          # React 前端
-  components/
-    layout/                   # AppLayout、Sidebar、StatusBar
-    workflow/                 # 导入、转录、翻译、压制、设置
-    editor/                   # 字幕编辑器
-    player/                   # 视频预览 + ASS 叠加
-  stores/                     # ui、project、playback、task、burn
-  hooks/                      # useSubtitleMergeMode、useBurnJobPoller 等
-  utils/                      # ASS 文档组装等
-  services/                   # Tauri invoke 封装
-  types/                      # 共享 TS 类型
-src-tauri/                    # Rust 后端
-  src/
-    ffmpeg.rs                 # FFmpeg 检测、音轨提取、视频信息、波形提取
-    dependencies.rs           # 运行时依赖解析、下载源、受管 deps 目录、清理与提权
-    asr.rs                    # ASR sidecar 进程管理 + HTTP 代理
-    asr_setup.rs              # ASR 服务模板复制、Python 3.11 venv 与 pip 依赖配置
-    ass.rs                    # ASS 文件读写
-    asset_scope.rs            # Tauri asset protocol 动态授权（非视频播放主路径）
-    fonts.rs                  # 系统字体发现与 libass 预览字体注册
-    media_server.rs           # 本地 HTTP 媒体服务（编辑页视频 Range 播放）
-    preview.rs                # FFmpeg/libass 单帧字幕渲染（诊断/校准）
-    project.rs                # .hikaru/project.json
-    settings.rs               # 全局设置持久化
-    transcode.rs              # 不兼容视频编码的代理视频转码与缓存
-    download.rs               # 下载 command、任务状态、FFmpeg fallback 与策略编排
-    burn.rs                   # 字幕压制/封装任务、码率/编码器探测、FFmpeg 参数构建、进度与取消、并发限制、退出清理
-    hls_types.rs              # 分片计划类型、自动并发配置、取消令牌
-    hls_playlist.rs           # m3u8 解析、URL 解析、AES-128 规划、分片计划构建
-    hls_fetch.rs              # HTTP headers、Range 请求、流式分片下载与重试
-    hls_download.rs           # HTTP/2 共享 client、并发调度、临时文件组装与 remux
-packages/ass-core/              # ASS 解析/序列化（workspace 包）
-asr-service/                  # Python ASR sidecar（FastAPI HTTP）
-  main.py                     # 入口：选端口 + uvicorn + stdout 就绪协议
-  server.py                   # FastAPI 路由
-  jobs.py                     # JobManager：后台线程转录 + 进度/取消
-  requirements-parakeet*.txt    # 可选 Parakeet 依赖（cpu / cuda 分轨）
-  engines/                    # AsrEngine 抽象 + faster-whisper + parakeet + qwen3-asr + chunking + vad + registry
-scripts/
-  setup-asr.sh                # ASR 虚拟环境与依赖安装脚本
+
+- 前端、状态、字幕工具或 `packages/ass-core` 改动：至少运行相关 `pnpm test -- <test-file>`；共享逻辑或跨模块行为改动后运行完整 `pnpm test`。
+- TypeScript 类型、构建配置、Tauri command 封装或用户可见流程改动：运行 `pnpm build`。
+- Rust/Tauri 后端、FFmpeg、下载、运行时依赖、ASR 启动、压制或文件 I/O 改动：运行 `cargo test --manifest-path src-tauri/Cargo.toml`，可先用测试名过滤，再跑相关完整集合。
+- Python ASR sidecar 改动：在 `asr-service/` 下运行 `python -m unittest discover tests`；涉及可选引擎时说明本机是否已安装对应依赖或模型。
+- 若因本机缺少 FFmpeg、Python 3.11、GPU、模型权重、网络或平台能力无法运行某项验证，最终汇报中明确说明未运行项与原因。
+
+## 关键目录
+
+```text
+src/                    React 前端
+  components/layout/    AppLayout、Sidebar、StatusBar
+  components/workflow/  导入、转录、翻译、压制、设置页
+  components/editor/    字幕编辑器
+  components/player/    视频预览与 ASS 叠加
+  components/ui/        通用 UI 小组件
+  constants/            前端常量与配置映射
+  stores/               Zustand 状态
+  hooks/                React hooks
+  utils/                ASS 文档、时间、样式等工具
+  services/             Tauri invoke 封装与前端服务
+  types/                共享 TS 类型
+src-tauri/              Tauri Rust 后端
+  src/                  FFmpeg、ASR、项目、设置、下载、压制等 commands
+  resources/            打包资源与运行时依赖源清单
+packages/ass-core/      ASS 解析/序列化 workspace 包
+asr-service/            Python FastAPI ASR sidecar
+scripts/                开发、ASR、发布辅助脚本
 ```
 
 ## 架构边界
 
-- **Tauri Rust**：文件 I/O、FFmpeg、音频波形、视频代理转码、启动 ASR sidecar、项目元数据
-- **React**：全部 UI、ASS 文本编辑、翻译 API 调用
-- **Python sidecar**：ASR 推理，通过 HTTP localhost 通信，不阻塞 UI
-- **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`；`projectStore` 另缓存 `assScriptInfo` 与 `assStyles`（`[V4+ Styles]` 与 PlayRes 等），保存时完整写回 ASS
+- **Tauri Rust**：文件 I/O、FFmpeg/ffprobe、音频波形、视频代理转码、运行时依赖准备、ASR sidecar 进程管理、项目元数据、下载与压制任务。
+- **React**：全部 UI、ASS 文本编辑、翻译 API 调用、任务轮询、用户设置交互。
+- **Python sidecar**：ASR 推理，通过 localhost HTTP 与 Tauri 通信，不阻塞 UI。
+- **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`，项目 store 另缓存 `assScriptInfo` 与 `assStyles`，保存时完整写回 ASS。
+- 新增 Tauri command 时按固定链路接线：`src-tauri/src/` 实现 → `lib.rs` 注册 → `src/services/tauri.ts` 封装 → 补测试或说明验证理由。若新增/变更插件权限、文件访问范围或 shell 能力，再同步更新 `src-tauri/capabilities/`。
 
-**PlayRes 与样式**：转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。编辑页预览优先走 jASSUB/libass WASM，播放时按 `<video>` 视频帧时间同步，并按 ASS Style、同族权重和行内 `\fn` 选择预览字体；不可用时回退 `AssSubtitleOverlay` + `assStyleToCss` CSS 近似预览并在预览区提示，ASS/字体变化后会重新尝试 libass。编辑面板提供样式下拉、字体/字号/主色、B/I/U/S，以及「更多标签」面板（`\c`、`\3c`、`\4c`、`\bord`、`\shad`、`\an1-9`）；选区包裹属性标签时按当前活动文本框 Style 生成恢复标签，分离双语下译文使用 `Secondary` Style。压制页不展示字幕预览，只提供导出设置；最终压制仍以 FFmpeg/libass 输出为准。
+## 数据与字幕约定
 
-```mermaid
-flowchart LR
-  Download --> Import --> Video --> FFmpeg --> ASR --> ASS --> Translate --> Editor --> Burn
-```
+### 项目文件
 
-## 核心数据模型
+项目数据位于视频同目录的 `.hikaru/` 文件夹：
 
-### 项目 `.hikaru/project.json`
+- `.hikaru/project.json`
+- `.hikaru/audio.wav`
+- `.hikaru/subtitles.ass`
+- `.hikaru/subtitles.translated.ass`
 
-与视频同目录的 `.hikaru/` 文件夹，含 `project.json`、`audio.wav`、`subtitles.ass`。翻译后字幕保存为 `subtitles.translated.ass`。
-
-### SubtitleCue（逻辑字幕条）
+### SubtitleCue
 
 ```typescript
 interface SubtitleCue {
   id: string
   startMs: number
   endMs: number
-  primaryText: string      // 原文
-  secondaryText?: string   // 译文
+  primaryText: string
+  secondaryText?: string
   style: string
   layer: number
 }
 ```
 
-双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary`（原文）+ `Secondary`（译文），同时间轴两行 Dialogue。编辑页列表、预览与编辑框通过 `getCueDisplay` 按 `subtitleMergeMode` 展示单行或双行，与序列化规则一致。
+- 产品面向日语转录与翻译，新建项目固定 `sourceLang: "ja"`；不要重新在转录/设置页暴露源语言选择。旧项目里的其他 `sourceLang` 仍应能打开。
+- 双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary` 原文 + `Secondary` 译文，同时间轴两条 Dialogue。
+- 编辑页列表、预览与编辑框通过 `getCueDisplay` 按 `subtitleMergeMode` 展示，与序列化规则保持一致。
+- 转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。
 
-**源语言**：产品面向日语转录与翻译，新建项目固定 `sourceLang: "ja"`；转录与翻译 UI 不再暴露源语言选择。旧项目中的其他 `sourceLang` 仍可打开。
+## 运行时依赖与 ASR
 
-### ASR 引擎
+- 发布包不捆绑 FFmpeg、Python、ASR Python 依赖或模型权重，只捆绑干净 ASR 服务模板。
+- FFmpeg 解析顺序：用户设置路径 → 系统 `PATH` → 安装目录 `deps/ffmpeg/current` 下的受管 FFmpeg。
+- Python 解析顺序：用户设置路径 → 系统 Python 3.11 → 安装目录 `deps/python311/current` 下的受管 Python 3.11。ASR 配置只接受 Python 3.11。
+- 受管 ASR venv 位于安装目录 `deps/asr-service/.venv`；模型缓存位于 `deps/models/huggingface`；临时归档位于 `deps/downloads`。
+- 不要重新引入 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 作为大型受管依赖目录。
+- 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，内置官方源、中国大陆镜像和自定义源；自动模式根据测速推荐，但用户手动选择优先。
+- 中国大陆镜像会给 sidecar 注入 `HF_ENDPOINT=https://hf-mirror.com`，模型缓存通过 `HF_HOME` 固定到安装目录 `deps/models/huggingface`。模型下载失败时优先查看 `deps/asr-service/asr-debug.log` 中的 `model_download_*` 事件。
+- VAD 配置仅当前会话有效，不写入项目或全局设置。VAD 加载/检测失败时应自动降级，不中断转录。
 
-- `faster-whisper`：默认引擎，模型列表为 tiny/base/small/medium/large-v2/large-v3。
-- `parakeet`：NVIDIA NeMo 日语引擎，模型为 `nvidia/parakeet-tdt_ctc-0.6b-ja`。依赖较重，须显式执行 `./scripts/setup-asr.sh parakeet`（或 `parakeet-cpu` / `parakeet-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。该引擎优先读取 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段（`engines.chunking`）。长音频分块合并时合并重叠文本；gap backfill（≥2.5s 静音间隙 + 语音活动覆盖率补转）逐窗口调用 `apply_gap_backfill` 补全主路径间隙并清理残留碎片；收尾 `dedupe_transcript_segments` 去同文重叠与尾缀重复，并经 `TranscriptSegmentRefresh` 替换预览片段列表。
-- `qwen3-asr`：2026 年日语 ASR SOTA 引擎，模型为 `Qwen/Qwen3-ASR-1.7B`，默认携带 `Qwen/Qwen3-ForcedAligner-0.6B` 产出高精度字级时间戳。须显式执行 `./scripts/setup-asr.sh qwen3`（或 `qwen3-cpu` / `qwen3-cuda`）安装；未安装时 sidecar 仍可启动但该引擎显示不可用。引擎惰性加载 `qwen_asr.Qwen3ASRModel`，CPU 用 `torch.float32`、CUDA 用 `torch.bfloat16`；分块/合并/字幕组装复用 `engines.chunking` 共享模块，双权重（ASR + aligner）下载封装在引擎层。
+## 媒体与字幕渲染
 
-### VAD 预处理
-
-转录页提供统一的 VAD（语音活动检测）高级配置，`use_vad` 与 `vad_config` 经 `start_asr` 透传到 sidecar，各引擎按原生方式集成：
-
-- **faster-whisper**：透传 `vad_parameters` 到内置 Silero VAD（始终 `vad_filter=True`，`use_vad=True` 时用自定义参数）。
-- **Parakeet**：用独立 `engines/vad.py`（Silero VAD via `torch.hub`，`trust_repo=True`）预切分语音段，长段按 `max_segment_duration_ms` 带重叠切分后逐段转录，缓解长音频 TDT 不稳定导致的遗漏。
-- **Qwen3-ASR**：同样用 `engines/vad.py` 预切分语音段并按 `max_segment_duration_ms` 带重叠切分；VAD 失败时降级为固定分块（`plan_audio_chunks`），不中断转录。
-- 三引擎共享同一套 camelCase 配置；`schemas.VadConfig` 负责 camelCase→snake_case 转换，引擎内部读取 snake_case 键。
-- VAD 加载/检测失败时自动降级（Parakeet / Qwen3-ASR 回退固定分块，faster-whisper 回退默认参数），不中断转录。
-- VAD 配置仅当前会话有效，不写入项目/全局设置。
-
-### 视频编辑兼容策略
-
-编辑页通过应用内 **本地 HTTP 媒体服务**（`register_media_playback` → `http://127.0.0.1:PORT/media/{token}`）播放视频，支持 Range 请求与 seek；Linux WebKit 无法经 Tauri `asset://` 正常播放音视频，故全平台统一走 HTTP。`probe_video_playback` 判断容器/编解码是否需代理转码；WebView 不直接支持的编码（如 HEVC/H.265、VP9、AV1）会通过 FFmpeg 生成 480p H.264 全关键帧代理视频：
-
-```text
--vf scale=-2:480 -c:v libx264 -preset ultrafast -g 1 -crf 22 -c:a aac -b:a 128k -movflags +faststart
-```
-
-代理视频写入应用缓存目录 `transcode/*.mp4`，用于快速 seek；时间轴另行提取音频波形用于细致对轴。
-
-### m3u8 视频下载
-
-下载页（`DownloadView`）支持单 URL 或分离音视频 URL、自定义请求头、保存目录选择与完成后一键导入项目。后端策略默认为 `auto`：优先 Rust 分片并发下载，失败时回退 FFmpeg。
-
-**分片并发流程**（`hls_*` + `download.rs`）：
-
-1. 解析 VOD m3u8 → 构建 `HlsMediaPlan`（init 段、媒体分片、Byte-Range、AES-128 解密信息）
-2. 预取加密密钥；按 CPU 核数自动并发（`clamp(核数×2, 8, 32)`），每 job 共享一个 HTTP/2 `reqwest` client
-3. 并发下载分片到临时目录（保留 URL 原始扩展名如 `.cmfv`/`.ts`，便于调试）；明文分片流式写盘，AES-128 媒体分片整段缓冲解密
-4. 流式拼接 `video.bin`/`audio.bin` → FFmpeg `-c copy` remux 为最终文件
-5. 分离模式音视频并行下载，共享同一 semaphore 上限
-
-**加密与兼容**：
-
-- 支持 AES-128-CBC 加密 VOD（如 Niconico domand fMP4）
-- `EXT-X-MAP` 在 `EXT-X-KEY` 之后时 init 段为明文（按 playlist 行序判定，符合 HLS 规范）
-- 直播、无法解析的播放列表、分片策略失败等场景自动回退 FFmpeg
-- 下载过程支持取消；取消时清理子进程与临时目录
-
-前端不暴露并发数或策略选择；`start_video_download` 的 `strategy` 参数保留供调试，缺省 `auto`。
-
-## 已实现 Tauri Commands
-
-| Command | 职责 |
-|---------|------|
-| `create_project` | 初始化 `.hikaru/project.json` |
-| `open_project` | 加载已有项目 |
-| `check_ffmpeg` | 检测 FFmpeg |
-| `get_settings` / `set_settings` | 全局配置 |
-| `probe_runtime_dependencies` | 探测 FFmpeg、Python 3.11、ASR venv、模型缓存与下载缓存状态 |
-| `prepare_runtime_dependency` | 按需下载/安装受管 FFmpeg 或 Python 3.11 |
-| `get_runtime_dependency_progress` | 获取运行时依赖准备进度 |
-| `cancel_runtime_dependency` | 取消运行时依赖准备任务 |
-| `cleanup_runtime_dependency` | 清理安装目录 `deps/` 下的受管依赖或下载缓存 |
-| `probe_download_sources` | 对下载源测速并保存自动推荐源 |
-| `extract_audio` | FFmpeg 提取 16kHz WAV + 进度事件 |
-| `extract_waveform` | 提取音频波形峰值数据 |
-| `path_exists` | 判断文件/目录是否存在 |
-| `list_asr_engines` | 列出 sidecar 已注册引擎及可用性（按需拉起 sidecar） |
-| `start_asr` | 创建转录任务，返回 jobId |
-| `get_asr_progress` | 轮询任务进度/片段 |
-| `cancel_asr` | 取消转录任务 |
-| `check_asr_model` | 检查本地 ASR 模型状态 |
-| `download_asr_model` | 下载 ASR 模型 |
-| `get_model_download_progress` | 获取 ASR 模型下载进度、下载源与 sidecar 诊断日志路径 |
-| `save_ass_text` / `load_ass_text` | ASS 文件读写 |
-| `get_video_info` | 获取视频分辨率、时长等元信息 |
-| `discover_preview_fonts` | 枚举系统/补充字体并注册为预览可访问 URL |
-| `render_subtitle_preview_frame` | 使用 FFmpeg/libass 渲染硬字幕单帧图，用于诊断与校准 |
-| `register_media_playback` | 注册本地视频到媒体 HTTP 服务，返回可播放 URL |
-| `probe_video_playback` | 探测 WebView 是否需代理转码（容器/音视频编码） |
-| `allow_asset_path` | 将路径加入 Tauri asset scope（保留，非视频主路径） |
-| `detect_video_codec` | 检测视频编码格式 |
-| `start_transcode` | 启动代理视频转码 |
-| `check_transcode_progress` | 查询代理视频转码状态 |
-| `stop_transcode` | 清理转码任务记录 |
-| `probe_download_media` | 探测 m3u8 流（视频/音频/扩展名） |
-| `start_video_download` | 启动 m3u8 下载，返回 jobId |
-| `get_video_download_progress` | 轮询下载进度 |
-| `cancel_video_download` | 取消下载并清理部分输出 |
-| `probe_burn_video` | 探测压制推荐参数（原视频码率、可用 H.264 编码器、自动编码器选择） |
-| `start_burn_subtitles` | 启动字幕压制/封装任务，返回 jobId |
-| `get_burn_progress` | 轮询压制进度 |
-| `cancel_burn` | 取消压制并清理部分输出 |
-
-新增 command 时：在 `src-tauri/src/` 实现 → `lib.rs` 注册 → `src/services/tauri.ts` 封装 → 更新 capabilities 权限。
+- 编辑页视频播放统一走应用内本地 HTTP 媒体服务（`register_media_playback` → `http://127.0.0.1:PORT/media/{token}`），支持 Range 请求与 seek；不要把 Tauri `asset://` 重新作为主播放路径。
+- WebView 不直接支持的编码（如 HEVC/H.265、VP9、AV1）通过 FFmpeg 生成 480p H.264 全关键帧代理视频，写入应用缓存目录 `transcode/*.mp4`。
+- 编辑页字幕预览优先走 jASSUB/libass WASM，播放时按 `<video>` 视频帧时间同步；不可用时回退 CSS 近似预览并在预览区提示，ASS/字体变化后重新尝试 libass。
+- 压制页不展示字幕预览，只提供导出设置；最终硬字幕输出以 FFmpeg/libass 为准。
+- m3u8 下载后端默认 `auto`：优先 Rust 分片并发下载，失败时回退 FFmpeg。前端不暴露并发数或策略选择；`start_video_download.strategy` 仅保留供调试。
 
 ## 编码规范
 
-1. **最小改动**：只改与任务相关的文件，不顺手重构
-2. **遵循现有风格**：命名、目录、import 路径（`@/`、`@hikaru/ass-core`）
-3. **类型优先**：前后端共享概念在 `src/types/` 与 `ass-core` 保持一致
-4. **不提交密钥**：API Key 走 keychain/设置，不进源码
-5. **中文 UI 文案**：用户面向字符串用简体中文
-6. **图标用 SVG**：UI 图标一律使用 SVG（统一放 `src/components/layout/NavIcons.tsx`，lucide 风格 `stroke="currentColor"`），不要用 emoji/字符当图标，避免跨平台字形缺失渲染成方块
-7. **不编辑计划文件**：`.cursor/plans/` 下的方案文档除非用户明确要求
-8. **不主动提交代码**：见本文档顶部「⚠️ 最高优先级规则」第 1 条；该规则为最高优先级，优先于本规范及其他一切指引
+1. **最小改动**：只改与任务相关的文件，不顺手重构。
+2. **遵循现有风格**：命名、目录、import 路径（`@/`、`@hikaru/ass-core`）。
+3. **类型优先**：前后端共享概念在 `src/types/` 与 `ass-core` 保持一致。
+4. **不提交密钥**：API Key 走 keychain/设置，不进源码。
+5. **中文 UI 文案**：用户面向字符串用简体中文。
+6. **图标用 SVG**：UI 图标一律使用 SVG（统一放 `src/components/layout/NavIcons.tsx`，lucide 风格 `stroke="currentColor"`），不要用 emoji/字符当图标，避免跨平台字形缺失渲染成方块。
+7. **不编辑计划文件**：`.cursor/plans/` 与 `docs/superpowers/plans/` 下的方案文档除非用户明确要求。
+8. **不主动提交代码**：见本文档顶部「⚠️ 最高优先级规则」第 1 条；该规则为最高优先级，优先于本规范及其他一切指引。
 
-## 分阶段实现（当前进度）
+## 安全与隐私
 
-- [x] 项目脚手架（Tauri + React + Tailwind + Zustand + pnpm workspace）
-- [x] `ass-core`：ASS 解析/序列化、双语展开/合并
-- [x] 项目管理 + FFmpeg 音轨提取（系统优先、缺失时按需准备受管 FFmpeg）
-- [x] 导入工作流 UI（ImportView：选视频 → 建项目 → 进入转录；支持打开已有项目并加载 ASS）
-- [x] 设置页 UI（SettingsView：FFmpeg/Python 路径、运行时依赖、下载源、默认引擎、翻译 API/Key、翻译高级配置）
-- [x] Python ASR sidecar（AsrEngine 抽象 + faster-whisper / parakeet 适配器 + HTTP 进度 API）
-- [x] 转录工作流 UI（TranscribeView：音轨提取 + 转录进度 + 生成单语 ASS；使用视频实际分辨率，不强制换行）
-- [x] OpenAI 兼容翻译管线 + 翻译 UI（TranslateView：批量翻译 + 进度显示 + 术语表/自定义 prompt 支持）
-- [x] ASS 文件持久化（转录后自动保存，打开项目时自动加载）
-- [x] ASS 元数据持久化（`[V4+ Styles]` + PlayRes；转录写入、翻译/编辑沿用；打开项目 `loadAssDocument`）
-- [x] 字幕合并模式配置（默认行内 `译文 / 原文`；编辑 UI 与 ASS 序列化一致）
-- [x] 字幕编辑器（EditorView：视频播放 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做 + Aegisub 式时间输入 + 常用 ASS 行内标签面板）
-- [x] 视频播放兼容处理（本地 HTTP 媒体服务 + Range；不兼容编码生成 480p H.264 全关键帧代理视频并缓存）
-- [x] VAD 预处理（统一配置 UI；faster-whisper 透传内置 VAD，Parakeet 独立 Silero VAD 预切分；失败自动降级）
-- [x] 日语专用化（源语言固定 ja；移除转录/设置页源语言选择）
-- [x] m3u8 视频下载（DownloadView；Rust 分片并发 + AES-128 + 自动并发/HTTP/2；FFmpeg fallback）
-- [x] FFmpeg 压制（BurnView：硬字幕 MP4 / 软字幕 MKV、导出策略、原片码率探测、硬件 H.264 编码器自动选择、自动输出名、进度与取消、并发限制、全局轮询、退出清理、压制前使用当前内存字幕）
-- [x] 接入 Qwen3-ASR-1.7B 作为第三引擎（CPU/GPU 双 profile；复用 chunking 共享模块）
-- [x] Parakeet gap backfill 增强（覆盖率补转、`apply_gap_backfill` supersede/组装、收尾 dedupe + `TranscriptSegmentRefresh`、ASR 诊断日志）
-- [x] libass 预览（编辑页 jASSUB/libass WASM；视频帧同步；系统字体发现与行内字体/同族权重预加载；CSS 明示兜底并可恢复重试；FFmpeg 单帧用于诊断/校准）
-- [x] Windows 运行时依赖按需准备（安装目录 `deps/`、FFmpeg/Python 3.11、ASR venv、模型缓存、下载源与清理）
-- [ ] 错误处理、任务队列、安装脚本等整体打磨
-
-## 首期不做
-
-在线协作、OCR 硬字幕提取、多音轨选择、macOS 公证/商店发布。
+- 不把 API Key、访问令牌、Cookie、私有下载地址、真实用户资料或模型授权信息写入源码、测试快照、示例配置或日志。
+- 外部 URL、m3u8 playlist、HTTP headers、字幕文本、文件名和用户选择路径都视为不可信输入；涉及路径解析、临时目录、压制输出、下载合并和 asset scope 时保持校验、归一化与越界防护。
+- 调用 FFmpeg、Python、pip 或系统命令时优先使用结构化参数，避免把未转义的用户输入拼进 shell 字符串。
+- 诊断日志可以记录阶段、错误码、耗时和必要路径，但不要输出完整敏感请求头、密钥或翻译 API 请求正文。
