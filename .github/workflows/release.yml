@@ -103,7 +103,7 @@ jobs:
             The app reuses system dependencies first and downloads managed copies only after user confirmation.
             ASR engine dependencies and model weights are configured after installation.
             This workflow currently uploads Windows bundles only.
-            Windows currently ships the NSIS setup package only; MSI is disabled until the installer UX is revisited.
+            Windows currently ships the NSIS setup package and a portable zip; MSI is disabled until the installer UX is revisited.
             macOS packages are temporarily disabled pending bundle/resource validation.
             Linux packages are intentionally deferred until Windows/macOS releases are stable.
             Windows packages are not code-signed and may show SmartScreen warnings.
@@ -111,3 +111,12 @@ jobs:
           prerelease: ${{ contains(github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name, '-') }}
           uploadUpdaterJson: false
           uploadUpdaterSignatures: false
+
+      - name: Create portable zip
+        run: pnpm release:portable
+
+      - name: Upload portable zip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: gh release upload "$env:RELEASE_TAG" src-tauri/target/release/bundle/portable/*.zip --clobber

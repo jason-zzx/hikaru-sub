@@ -59,7 +59,7 @@ pnpm tauri build  # 打包应用
 
 ## 发布客户端
 
-当前发布目标先收敛到 Windows 安装包；macOS workflow 已暂时注释，待 macOS 资源布局验证完成后再恢复。Linux 客户端会在 Windows/macOS 发布链路稳定后再加入。
+当前发布目标先收敛到 Windows 安装包与 portable zip；macOS workflow 已暂时注释，待 macOS 资源布局验证完成后再恢复。Linux 客户端会在 Windows/macOS 发布链路稳定后再加入。
 
 ### 本地打包
 
@@ -67,7 +67,7 @@ pnpm tauri build  # 打包应用
 pnpm release:local
 ```
 
-该命令用于发布机，会准备 ASR 服务资源并执行 Tauri 打包，不会下载或捆绑 FFmpeg。当前 Windows 仅生成 NSIS 安装包，产物位于 `src-tauri/target/release/bundle/nsis/`。Linux 本地包不属于首期支持范围。
+该命令用于发布机，会准备 ASR 服务资源、执行 Tauri 打包并追加 portable zip，不会下载或捆绑 FFmpeg。当前 Windows 会生成 NSIS 安装包与 portable zip，产物分别位于 `src-tauri/target/release/bundle/nsis/` 和 `src-tauri/target/release/bundle/portable/`。Linux 本地包不属于首期支持范围。
 
 ### GitHub Release
 
@@ -78,13 +78,13 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-工作流当前只构建 Windows 产物，并上传到 GitHub Release 草稿。也可以从 GitHub Actions 手动运行 `Release Desktop Clients`，输入已存在的 tag/ref；工作流会检出该 ref，并创建或更新同名 Release 草稿。macOS Intel 与 macOS Apple Silicon matrix 已保留为注释，待 macOS 验证通过后重新启用。
+工作流当前只构建 Windows 产物，并上传 NSIS setup 与 portable zip 到 GitHub Release 草稿。也可以从 GitHub Actions 手动运行 `Release Desktop Clients`，输入已存在的 tag/ref；工作流会检出该 ref，并创建或更新同名 Release 草稿。macOS Intel 与 macOS Apple Silicon matrix 已保留为注释，待 macOS 验证通过后重新启用。
 
-发布包会包含 ASR 服务模板，但不包含 FFmpeg、Python、ASR Python 依赖或模型权重。安装后，Hikaru Sub 会在首次使用相关功能时优先复用系统 FFmpeg/Python 3.11；如缺失，会弹出确认窗口后下载到安装目录下的 `deps/` 受管依赖目录，不使用 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 存放这些大型依赖。下载源支持自动测速推荐、官方源、中国大陆镜像和自定义源；设置页可查看受管依赖占用并清理 FFmpeg、Python 3.11、ASR venv、模型缓存和临时下载缓存。
+发布包会包含 ASR 服务模板，但不包含 FFmpeg、Python、ASR Python 依赖或模型权重。安装版与 portable 版都会在首次使用相关功能时优先复用系统 FFmpeg/Python 3.11；如缺失，会弹出确认窗口后下载到 exe 所在目录下的 `deps/` 受管依赖目录，不使用 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 存放这些大型依赖。下载源支持自动测速推荐、官方源、中国大陆镜像和自定义源；设置页可查看受管依赖占用并清理 FFmpeg、Python 3.11、ASR venv、模型缓存和临时下载缓存。
 
 当前发布限制：
 
-- Windows 当前只发布 NSIS setup，不发布 MSI。MSI 的安装目录选择 UI 暂不作为首选安装体验。
+- Windows 当前发布 NSIS setup 与 portable zip，不发布 MSI。MSI 的安装目录选择 UI 暂不作为首选安装体验。
 - Windows 包未做代码签名，可能出现 SmartScreen 提示。
 - macOS 包暂不发布；恢复后会先使用 ad-hoc signing，notarization 另行处理。
 - Linux 包暂不发布。
@@ -93,18 +93,19 @@ git push origin v0.1.0
 
 在 Windows 发布机执行 `pnpm release:local` 后，应确认：
 
-1. `src-tauri/target/release/bundle/nsis/` 下存在 Hikaru Sub NSIS setup，且干净 bundle 目录下没有新生成的 MSI。
-2. 运行 NSIS setup，可选择安装目录；如果用户未手动修改目录，安装开始时会将 Tauri 目录页的默认值重定向到 `%LOCALAPPDATA%\Programs\hikaru-sub`，安装完成后从开始菜单或安装目录启动应用。
-3. 首次启动与切换到「下载」「导入」「转录」「压制」页面时不应长时间卡住；这些页面会复用 FFmpeg 检测缓存，不会自动下载 FFmpeg。
-4. 进入「转录」页不会自动启动 ASR sidecar；点击「检测引擎状态」或开始转录时才会拉起 sidecar。
-5. 进入「压制」页不会自动探测原片码率/编码器；点击「检测原片参数」后才会运行 ffprobe/编码器探测。
-6. 检测 ASR、配置 ASR、FFmpeg/ffprobe 相关操作不应弹出转瞬即逝的终端窗口。
-7. 如果本机没有系统 FFmpeg，点击「下载」「转录」「压制」中的 FFmpeg 相关操作时，应出现依赖确认窗口，显示 FFmpeg、预计大小、安装目录 `deps/` 下的保存位置和当前下载源；取消时原操作不继续，确认后下载完成并继续原操作。
-8. 如果本机没有 Python 3.11，设置页点击「配置当前引擎依赖」时，应先出现 Python 3.11 依赖确认窗口；确认后下载并解压受管 Python 3.11 归档到安装目录 `deps/python311/current/`，再继续创建 ASR venv 和安装引擎依赖。
-9. 设置页「运行时依赖」区域可切换官方源/中国大陆镜像/自动推荐，点击「重新测速」会更新推荐源；清理按钮只删除安装目录 `deps/` 下的受管依赖，不应删除用户手动配置的外部路径。
-10. 如果本机曾运行开发版，安装版设置页不应继续显示项目源码目录下的 `asr-service/.venv` Python 路径；一键配置完成后应指向安装目录下的 managed `deps/asr-service/.venv`。
-11. 使用受管 FFmpeg 完成一次转录后，若 `deps/ffmpeg/current/ffprobe.exe` 存在，不应再提示“无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080”。
-12. 下载 ASR 模型时，「模型状态」区域应显示实际下载源和诊断日志路径；中国大陆镜像模式下应能在日志中看到 `HF_ENDPOINT=https://hf-mirror.com` 与 `HF_HOME=<安装目录>/deps/models/huggingface`。
+1. `src-tauri/target/release/bundle/nsis/` 下存在 Hikaru Sub NSIS setup，`src-tauri/target/release/bundle/portable/` 下存在 Hikaru Sub portable zip，且干净 bundle 目录下没有新生成的 MSI。
+2. 解压 portable zip 后直接运行 `hikaru-sub.exe`；首次触发受管依赖下载时，FFmpeg、Python 3.11、ASR venv、模型缓存和临时下载缓存应写入该 exe 同级的 `deps/` 目录。
+3. 运行 NSIS setup，可选择安装目录；如果用户未手动修改目录，安装开始时会将 Tauri 目录页的默认值重定向到 `%LOCALAPPDATA%\Programs\hikaru-sub`，安装完成后从开始菜单或安装目录启动应用。
+4. 首次启动与切换到「下载」「导入」「转录」「压制」页面时不应长时间卡住；这些页面会复用 FFmpeg 检测缓存，不会自动下载 FFmpeg。
+5. 进入「转录」页不会自动启动 ASR sidecar；点击「检测引擎状态」或开始转录时才会拉起 sidecar。
+6. 进入「压制」页不会自动探测原片码率/编码器；点击「检测原片参数」后才会运行 ffprobe/编码器探测。
+7. 检测 ASR、配置 ASR、FFmpeg/ffprobe 相关操作不应弹出转瞬即逝的终端窗口。
+8. 如果本机没有系统 FFmpeg，点击「下载」「转录」「压制」中的 FFmpeg 相关操作时，应出现依赖确认窗口，显示 FFmpeg、预计大小、安装目录 `deps/` 下的保存位置和当前下载源；取消时原操作不继续，确认后下载完成并继续原操作。
+9. 如果本机没有 Python 3.11，设置页点击「配置当前引擎依赖」时，应先出现 Python 3.11 依赖确认窗口；确认后下载并解压受管 Python 3.11 归档到安装目录 `deps/python311/current/`，再继续创建 ASR venv 和安装引擎依赖。
+10. 设置页「运行时依赖」区域可切换官方源/中国大陆镜像/自动推荐，点击「重新测速」会更新推荐源；清理按钮只删除安装目录 `deps/` 下的受管依赖，不应删除用户手动配置的外部路径。
+11. 如果本机曾运行开发版，安装版设置页不应继续显示项目源码目录下的 `asr-service/.venv` Python 路径；一键配置完成后应指向安装目录下的 managed `deps/asr-service/.venv`。
+12. 使用受管 FFmpeg 完成一次转录后，若 `deps/ffmpeg/current/ffprobe.exe` 存在，不应再提示“无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080”。
+13. 下载 ASR 模型时，「模型状态」区域应显示实际下载源和诊断日志路径；中国大陆镜像模式下应能在日志中看到 `HF_ENDPOINT=https://hf-mirror.com` 与 `HF_HOME=<安装目录>/deps/models/huggingface`。
 
 ### 运行时依赖与下载源
 
