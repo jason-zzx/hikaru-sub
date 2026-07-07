@@ -37,7 +37,7 @@ describe("Windows bundle configuration", () => {
   it("does not bundle FFmpeg binaries in release packages", () => {
     expect(JSON.stringify(config.bundle.resources)).not.toContain("binaries/*");
     expect(packageJson.scripts["release:local"]).toBe(
-      "pnpm asr:prepare-resource && tauri build",
+      "pnpm asr:prepare-resource && tauri build && pnpm release:portable",
     );
   });
 });
