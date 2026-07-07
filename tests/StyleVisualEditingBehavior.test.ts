@@ -95,9 +95,9 @@ describe("editor style visual editing integration", () => {
   it("sizes react-colorful controls for the compact editor popover", () => {
     const source = readSource("src/styles/index.css");
 
-    expect(source).toContain(".hikaru-color-picker .react-colorful__pointer");
+    expect(source).toContain(".subtitle-color-picker .react-colorful__pointer");
     expect(source).toContain("height: 14px");
-    expect(source).toContain(".hikaru-color-picker .react-colorful__alpha");
+    expect(source).toContain(".subtitle-color-picker .react-colorful__alpha");
   });
 
   it("mounts StyleManager from EditorView", () => {

@@ -2,17 +2,16 @@ import { useEffect, useState } from "react";
 import { parseAss } from "@hikaru/ass-core";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
-import { IconFilePlus, IconFolderOpen } from "../layout/NavIcons";
+import { IconFilePlus } from "../layout/NavIcons";
 import {
   checkFfmpeg,
-  createProject,
   invalidateFfmpegStatus,
   loadAssText,
-  openProject,
   pathExists,
-  pickDirectory,
   pickVideoFile,
-  projectDirFromMeta,
+  prepareVideoSession,
+  transcribedAssPath,
+  translatedAssPath,
 } from "../../services/tauri";
 import type { FfmpegStatus } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
@@ -26,8 +25,8 @@ const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
 
 export function ImportView() {
   const setStep = useUiStore((s) => s.setStep);
-  const project = useProjectStore((s) => s.project);
-  const setProject = useProjectStore((s) => s.setProject);
+  const session = useProjectStore((s) => s.session);
+  const setSession = useProjectStore((s) => s.setSession);
 
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
@@ -60,61 +59,38 @@ export function ImportView() {
 
     setBusy(true);
     try {
-      const meta = await createProject(videoPath);
-      setProject(meta, projectDirFromMeta(meta));
-      setStep("transcribe");
-    } catch (e) {
-      setError(`创建项目失败：${String(e)}`);
-    } finally {
-      setBusy(false);
-    }
-  };
+      const session = await prepareVideoSession(videoPath);
+      setSession(session);
 
-  const handleOpenProject = async () => {
-    setError(null);
-    let dir: string | null;
-    try {
-      dir = await pickDirectory();
-    } catch (e) {
-      setError(`无法打开目录对话框：${String(e)}`);
-      return;
-    }
-    if (!dir) return;
+      const { loadAssDocument } = useProjectStore.getState();
+      const translatedPath = translatedAssPath(session);
+      const transcribedPath = transcribedAssPath(session);
 
-    setBusy(true);
-    try {
-      const meta = await openProject(dir);
-      setProject(meta, projectDirFromMeta(meta) || dir);
-
-      // 优先加载翻译后的字幕文件，回退到原始字幕
-      if (meta.assPath) {
+      let loaded = false;
+      if (await pathExists(translatedPath)) {
         try {
-          const { loadAssDocument } = useProjectStore.getState();
-
-          // 尝试加载 .translated.ass
-          const translatedPath = meta.assPath.replace(/\.ass$/i, ".translated.ass");
-          const translatedExists = await pathExists(translatedPath);
-
-          if (translatedExists) {
-            const assText = await loadAssText(translatedPath);
-            loadAssDocument(parseAss(assText));
-          } else {
-            // 回退到原始字幕
-            const exists = await pathExists(meta.assPath);
-            if (exists) {
-              const assText = await loadAssText(meta.assPath);
-              loadAssDocument(parseAss(assText));
-            }
-          }
-        } catch (loadErr) {
-          console.warn("加载 ASS 文件失败:", loadErr);
-          // 不阻塞主流程
+          loadAssDocument(parseAss(await loadAssText(translatedPath)), {
+            kind: "translated",
+            path: translatedPath,
+          });
+          loaded = true;
+        } catch {
+          loaded = false;
         }
       }
-
+      if (!loaded && await pathExists(transcribedPath)) {
+        try {
+          loadAssDocument(parseAss(await loadAssText(transcribedPath)), {
+            kind: "transcribed",
+            path: transcribedPath,
+          });
+        } catch {
+          // Treat unreadable subtitle files as an incomplete stage.
+        }
+      }
       setStep("transcribe");
     } catch (e) {
-      setError(`打开项目失败：${String(e)}`);
+      setError(`打开视频失败：${String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -127,7 +103,7 @@ export function ImportView() {
       <header>
         <h2 className="text-xl font-semibold">导入视频</h2>
         <p className="mt-1 text-sm text-text-muted">
-          选择视频文件，将在其同目录创建 .hikaru 项目文件夹
+          选择视频文件，字幕将保存到视频同目录
         </p>
       </header>
 
@@ -156,16 +132,16 @@ export function ImportView() {
         </div>
       )}
 
-      {project && (
+      {session && (
         <div className="rounded-xl border border-border bg-surface-raised p-4">
           <p className="text-xs uppercase tracking-wider text-text-muted">
-            当前项目
+            当前视频
           </p>
-          <p className="mt-1 truncate font-medium text-text" title={project.videoPath}>
-            {fileName(project.videoPath)}
+          <p className="mt-1 truncate font-medium text-text" title={session.videoPath}>
+            {fileName(session.videoPath)}
           </p>
-          <p className="mt-0.5 truncate font-mono text-xs text-text-muted" title={project.videoPath}>
-            {project.videoPath}
+          <p className="mt-0.5 truncate font-mono text-xs text-text-muted" title={session.videoPath}>
+            {session.videoPath}
           </p>
           <button
             type="button"
@@ -177,7 +153,7 @@ export function ImportView() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4">
         <button
           type="button"
           onClick={handleSelectVideo}
@@ -189,20 +165,7 @@ export function ImportView() {
             {busy ? "处理中…" : "选择视频文件"}
           </span>
           <span className="text-xs text-text-muted">
-            创建新项目并开始转录
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleOpenProject}
-          disabled={busy}
-          className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-surface-raised p-10 text-center transition-colors hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <IconFolderOpen className="h-7 w-7 text-accent" />
-          <span className="font-medium text-text">打开已有项目</span>
-          <span className="text-xs text-text-muted">
-            选择视频目录或其中的 .hikaru 目录
+            打开视频并开始转录
           </span>
         </button>
       </div>

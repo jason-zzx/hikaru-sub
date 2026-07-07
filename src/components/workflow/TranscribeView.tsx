@@ -20,8 +20,10 @@ import {
 import {
   cancelAsr,
   checkFfmpeg,
+  deleteCachedAudio,
   extractAudio,
   getAsrProgress,
+  getSettings,
   getVideoInfo,
   invalidateFfmpegStatus,
   listAsrEngines,
@@ -79,9 +81,11 @@ function formatMs(ms: number): string {
 
 export function TranscribeView() {
   const setStep = useUiStore((s) => s.setStep);
-  const project = useProjectStore((s) => s.project);
+  const session = useProjectStore((s) => s.session);
   const setCues = useProjectStore((s) => s.setCues);
   const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
+  const setActiveSubtitle = useProjectStore((s) => s.setActiveSubtitle);
+  const markSaved = useProjectStore((s) => s.markSaved);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
@@ -130,16 +134,36 @@ export function TranscribeView() {
 
   // 初始化配置 + 检测已有音轨
   useEffect(() => {
-    if (!project) return;
-    setEngine(project.asr.engine || "faster-whisper");
-    setModel(project.asr.model || "large-v3");
-    setDevice(project.asr.device || "auto");
-    if (project.audioPath) {
-      pathExists(project.audioPath)
-        .then(setAudioReady)
-        .catch(() => setAudioReady(false));
-    }
-  }, [project]);
+    if (!session) return;
+    let cancelled = false;
+
+    getSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        const nextEngine = settings.asrEngine || "faster-whisper";
+        setEngine(nextEngine);
+        setModel(settings.asrModel || defaultAsrModel(nextEngine));
+        setDevice(settings.asrDevice || "auto");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setEngine("faster-whisper");
+        setModel("large-v3");
+        setDevice("auto");
+      });
+
+    pathExists(session.audioPath)
+      .then((exists) => {
+        if (!cancelled) setAudioReady(exists);
+      })
+      .catch(() => {
+        if (!cancelled) setAudioReady(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
 
   // 卸载时停止轮询
   useEffect(() => {
@@ -148,7 +172,7 @@ export function TranscribeView() {
     };
   }, []);
 
-  if (!project) {
+  if (!session) {
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">
         <header>
@@ -158,7 +182,7 @@ export function TranscribeView() {
           </p>
         </header>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface-raised">
-          <p className="text-text-muted">尚未打开项目</p>
+          <p className="text-text-muted">尚未打开视频</p>
           <button
             type="button"
             onClick={() => setStep("import")}
@@ -171,14 +195,14 @@ export function TranscribeView() {
     );
   }
 
-  const audioPath = project.audioPath ?? "";
+  const audioPath = session.audioPath;
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
   const selectedEngineUnavailable =
     engines?.find((item) => item.name === engine)?.available === false;
 
   const runExtract = async () => {
     if (!audioPath) {
-      setExtractError("项目缺少音轨输出路径");
+      setExtractError("当前视频会话缺少音轨缓存路径");
       return;
     }
     setExtractError(null);
@@ -198,7 +222,7 @@ export function TranscribeView() {
         setExtractPercent(pct);
         if (pct !== null) updateTask("extract-audio", { progress: pct });
       });
-      await extractAudio(project.videoPath, audioPath);
+      await extractAudio(session.videoPath, audioPath);
       setAudioReady(true);
       setExtractPercent(100);
       updateTask("extract-audio", { status: "success", progress: 100 });
@@ -288,15 +312,15 @@ export function TranscribeView() {
           setJob(full);
           updateTask("asr", { status: "success", progress: 100 });
 
-          // 保存字幕到文件
-          if (project?.assPath && cues.length > 0) {
+          // 保存字幕到可见的转录文件
+          if (cues.length > 0) {
             try {
               // 获取视频分辨率（写入 ASS PlayRes，后续翻译/编辑沿用）
               let resX: number | undefined;
               let resY: number | undefined;
               let playResWarning: string | null = null;
               try {
-                const videoInfo = await getVideoInfo(project.videoPath);
+                const videoInfo = await getVideoInfo(session.videoPath);
                 resX = videoInfo.width;
                 resY = videoInfo.height;
               } catch (err) {
@@ -309,8 +333,16 @@ export function TranscribeView() {
               doc.cues = cues;
               setAssMetadata(doc.scriptInfo, doc.styles);
               const assText = serializeAss(doc);
-              await saveAssText(project.assPath, assText);
-              setSavedAssPath(project.assPath);
+              await saveAssText(session.transcribedAssPath, assText);
+              setActiveSubtitle("transcribed", session.transcribedAssPath);
+              markSaved();
+              setSavedAssPath(session.transcribedAssPath);
+              try {
+                await deleteCachedAudio(session.audioPath);
+                setAudioReady(false);
+              } catch (deleteErr) {
+                console.warn("删除缓存音轨失败:", deleteErr);
+              }
               if (playResWarning) {
                 setAsrError(playResWarning);
               }
@@ -318,8 +350,6 @@ export function TranscribeView() {
               console.warn("保存 ASS 文件失败:", saveErr);
               setAsrError(`转录完成，但保存 ASS 失败：${String(saveErr)}`);
             }
-          } else if (!project?.assPath) {
-            setAsrError("转录完成，但项目缺少字幕输出路径，未保存 ASS");
           } else if (cues.length === 0) {
             setAsrError("转录完成，但没有生成字幕片段，未保存 ASS");
           }
@@ -367,7 +397,7 @@ export function TranscribeView() {
         model,
         device,
         language: "ja",
-        outputAssPath: project.assPath ?? null,
+        outputAssPath: session.transcribedAssPath,
         useVad,
         vadConfig: useVad
           ? {

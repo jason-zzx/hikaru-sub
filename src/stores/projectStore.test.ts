@@ -13,8 +13,9 @@ function style(overrides: Partial<AssStyle> = {}): AssStyle {
 describe("projectStore style actions", () => {
   beforeEach(() => {
     useProjectStore.setState({
-      project: null,
-      projectDir: null,
+      session: null,
+      activeSubtitlePath: null,
+      activeSubtitleKind: null,
       videoPath: null,
       cues: [],
       assScriptInfo: null,
@@ -22,6 +23,27 @@ describe("projectStore style actions", () => {
       isDirty: false,
       history: { past: [], future: [] },
     });
+  });
+
+  it("stores runtime video sessions and active subtitle paths", () => {
+    useProjectStore.getState().setSession({
+      videoPath: "C:/video/episode.mp4",
+      workspacePath: "C:/cache/workspace/hash",
+      audioPath: "C:/cache/workspace/hash/audio.wav",
+      transcribedAssPath: "C:/video/episode.transcribed.ass",
+      translatedAssPath: "C:/video/episode.translated.ass",
+      burnAssPath: "C:/cache/workspace/hash/burn.input.ass",
+      sourceLang: "ja",
+    });
+
+    useProjectStore
+      .getState()
+      .setActiveSubtitle("translated", "C:/video/episode.translated.ass");
+
+    const state = useProjectStore.getState();
+    expect(state.session?.workspacePath).toBe("C:/cache/workspace/hash");
+    expect(state.activeSubtitleKind).toBe("translated");
+    expect(state.activeSubtitlePath).toBe("C:/video/episode.translated.ass");
   });
 
   it("adds a style and marks the project dirty", () => {

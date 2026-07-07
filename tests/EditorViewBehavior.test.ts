@@ -28,4 +28,30 @@ describe("EditorView Phase 2B behavior guards", () => {
     expect(source).toContain("onNotify: notify");
     expect(source).toContain("<SubtitleEditor onNotify={notify}");
   });
+
+  it("saves back to the active visible subtitle file", () => {
+    const oldHiddenSubtitlePath = "/.hi" + "karu/sub" + "titles.ass";
+    const oldProjectAssPath = "project." + "assPath";
+
+    expect(source).toContain("activeSubtitlePath");
+    expect(source).toContain("let savePath = activeSubtitlePath");
+    expect(source).toContain('const saveKind: ActiveSubtitleKind = activeSubtitleKind ?? "transcribed"');
+    expect(source).toContain("pickSaveAssFile(session.translatedAssPath)");
+    expect(source).toContain("savePath = session.transcribedAssPath");
+    expect(source).not.toContain(oldProjectAssPath);
+    expect(source).not.toContain(oldHiddenSubtitlePath);
+  });
+
+  it("opens or reveals visible subtitle files without falling back to hidden project files", () => {
+    expect(source).toContain("handleSelectSubtitleFile");
+    expect(source).toContain("pickSubtitleFile()");
+    expect(source).toContain("parseExternalSubtitleDocument");
+    expect(source).toContain('loadAssDocument(doc, { kind: "translated", path: null })');
+    expect(source).toContain("pickSaveAssFile(session.translatedAssPath)");
+    expect(source).toContain("pathExists(currentSubtitlePath)");
+    expect(source).toContain("revealItemInDir(currentSubtitlePath)");
+    expect(source).toContain("disabled={!subtitleFileExists}");
+    expect(source).toContain("选择字幕文件");
+    expect(source).not.toContain("打开字幕文件");
+  });
 });

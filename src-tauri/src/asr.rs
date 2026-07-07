@@ -85,6 +85,19 @@ pub struct StartAsrArgs {
     vad_config: Option<VadConfig>,
 }
 
+fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
+    if args
+        .output_ass_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_none()
+    {
+        return Err("缺少转录字幕输出路径".into());
+    }
+    Ok(())
+}
+
 /// 解析 asr-service 目录（含 main.py）：设置 → 资源目录 → 当前目录及其上级。
 fn resolve_service_dir(app: &AppHandle, settings: &AppSettings) -> Result<PathBuf, String> {
     let mut candidates: Vec<PathBuf> = Vec::new();
@@ -420,6 +433,7 @@ pub async fn start_asr(
     state: State<'_, AsrState>,
     args: StartAsrArgs,
 ) -> Result<String, String> {
+    validate_start_asr_args(&args)?;
     let base = ensure_base_url(&app, &state).await?;
     let client = reqwest::Client::new();
     let body = serde_json::json!({
@@ -606,11 +620,41 @@ mod tests {
     }
 
     #[test]
-    fn recovery_snapshot_path_is_derived_from_audio_parent() {
-        let path =
-            recovery_snapshot_path_for_audio(r"C:\video\.hikaru\audio.wav", "abc123").unwrap();
+    fn recovery_snapshot_path_uses_audio_cache_workspace() {
+        let path = recovery_snapshot_path_for_audio(
+            &Path::new("cache")
+                .join("workspace")
+                .join("abc")
+                .join("audio.wav")
+                .to_string_lossy(),
+            "job-123",
+        )
+        .unwrap();
 
-        assert!(path.ends_with(Path::new(".hikaru").join("asr-jobs").join("abc123.json")));
+        assert!(path.ends_with(
+            Path::new("workspace")
+                .join("abc")
+                .join("asr-jobs")
+                .join("job-123.json")
+        ));
+    }
+
+    #[test]
+    fn start_asr_args_require_output_ass_path() {
+        let args = StartAsrArgs {
+            audio_path: "cache/workspace/abc/audio.wav".into(),
+            engine: "faster-whisper".into(),
+            model: "large-v3".into(),
+            device: "auto".into(),
+            language: Some("ja".into()),
+            output_ass_path: None,
+            use_vad: false,
+            vad_config: None,
+        };
+
+        let err = validate_start_asr_args(&args).unwrap_err();
+
+        assert!(err.contains("缺少转录字幕输出路径"));
     }
 
     #[test]

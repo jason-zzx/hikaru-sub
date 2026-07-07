@@ -8,6 +8,7 @@
     "core:path:allow-resolve",
     "core:path:allow-normalize",
     "opener:default",
+    "opener:allow-open-path",
     "dialog:default",
     "fs:default",
     "fs:allow-read-file",

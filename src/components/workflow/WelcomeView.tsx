@@ -14,7 +14,7 @@ export function WelcomeView() {
 
       <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2">
         {[
-          { step: "import" as const, title: "导入视频", desc: "选择视频并创建项目" },
+          { step: "import" as const, title: "导入视频", desc: "选择视频并准备会话" },
           { step: "transcribe" as const, title: "ASR 转录", desc: "本地模型生成字幕" },
           { step: "translate" as const, title: "AI 翻译", desc: "批量生成双语字幕" },
           { step: "editor" as const, title: "校对编辑", desc: "时间轴与样式调整" },

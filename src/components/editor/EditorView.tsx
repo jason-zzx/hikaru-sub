@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -10,23 +11,36 @@ import { EditorToast, type EditorToastMessage, type EditorToastVariant } from ".
 import { Timeline } from "./Timeline";
 import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
 import { StyleManager } from "./StyleManager";
-import { getSettings, saveAssText } from "../../services/tauri";
+import {
+  getSettings,
+  getVideoInfo,
+  loadAssText,
+  pathExists,
+  pickSaveAssFile,
+  pickSubtitleFile,
+  saveAssText,
+} from "../../services/tauri";
 import { serializeAss } from "@hikaru/ass-core";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
-import type { AppSettings } from "../../types";
+import { parseExternalSubtitleDocument } from "../../utils/subtitleImport";
+import type { ActiveSubtitleKind, AppSettings } from "../../types";
 
 export function EditorView() {
-  const project = useProjectStore((s) => s.project);
-  const projectDir = useProjectStore((s) => s.projectDir);
+  const session = useProjectStore((s) => s.session);
+  const activeSubtitlePath = useProjectStore((s) => s.activeSubtitlePath);
+  const activeSubtitleKind = useProjectStore((s) => s.activeSubtitleKind);
   const cues = useProjectStore((s) => s.cues);
   const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
   const assStyles = useProjectStore((s) => s.assStyles);
   const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
+  const setActiveSubtitle = useProjectStore((s) => s.setActiveSubtitle);
+  const loadAssDocument = useProjectStore((s) => s.loadAssDocument);
   const isDirty = useProjectStore((s) => s.isDirty);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
   const canUndo = useProjectStore((s) => s.canUndo);
   const canRedo = useProjectStore((s) => s.canRedo);
+  const markDirty = useProjectStore((s) => s.markDirty);
   const markSaved = useProjectStore((s) => s.markSaved);
   const setStep = useUiStore((s) => s.setStep);
   const styleManagerOpen = useUiStore((s) => s.styleManagerOpen);
@@ -36,7 +50,14 @@ export function EditorView() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<EditorToastMessage | null>(null);
+  const [subtitleFileExists, setSubtitleFileExists] = useState(false);
   const toastIdRef = useRef(0);
+  const currentSubtitlePath =
+    activeSubtitlePath ??
+    (activeSubtitleKind === "translated"
+      ? null
+      : session?.transcribedAssPath ?? null);
+  const needsSaveTarget = activeSubtitleKind === "translated" && !activeSubtitlePath;
 
   const notify = (variant: EditorToastVariant, text: string) => {
     toastIdRef.current += 1;
@@ -47,40 +68,117 @@ export function EditorView() {
     ? { label: "保存中…", className: "border-border text-text-muted" }
     : saveError
       ? { label: "保存失败", className: "border-danger/50 text-danger" }
-      : isDirty
-        ? { label: "未保存", className: "border-warning/50 text-warning" }
-        : { label: "已保存", className: "border-success/50 text-success" };
+      : needsSaveTarget
+        ? { label: "待保存", className: "border-warning/50 text-warning" }
+        : isDirty
+          ? { label: "未保存", className: "border-warning/50 text-warning" }
+          : { label: "已保存", className: "border-success/50 text-success" };
+
+  useEffect(() => {
+    if (!currentSubtitlePath) {
+      setSubtitleFileExists(false);
+      return;
+    }
+
+    let cancelled = false;
+    pathExists(currentSubtitlePath)
+      .then((exists) => {
+        if (!cancelled) setSubtitleFileExists(exists);
+      })
+      .catch(() => {
+        if (!cancelled) setSubtitleFileExists(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSubtitlePath]);
+
+  const writeSubtitleFile = async (
+    savePath: string,
+    saveKind: ActiveSubtitleKind,
+  ) => {
+    const settings: AppSettings = await getSettings();
+    const doc = resolveAssDocumentForSave(cues, assScriptInfo, assStyles, {
+      title: "Hikaru Sub",
+    });
+    setAssMetadata(doc.scriptInfo, doc.styles);
+
+    await saveAssText(
+      savePath,
+      serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
+    );
+    setActiveSubtitle(saveKind, savePath);
+    setSubtitleFileExists(true);
+    markSaved();
+    setSaveError(null);
+    return savePath;
+  };
 
   const handleSave = async () => {
-    if (saving || !project || !projectDir || cues.length === 0) return;
+    if (saving || !session) return;
 
     setSaving(true);
     setSaveError(null);
 
     try {
-      const settings: AppSettings = await getSettings();
-      const doc = resolveAssDocumentForSave(cues, assScriptInfo, assStyles);
-      setAssMetadata(doc.scriptInfo, doc.styles);
-
-      const hasTranslation = cues.some((c) => c.secondaryText);
-      const baseAssPath =
-        project.assPath ?? `${projectDir}/.hikaru/subtitles.ass`;
-      const assPath = hasTranslation
-        ? baseAssPath.replace(/\.ass$/i, ".translated.ass")
-        : baseAssPath;
-
-      await saveAssText(
-        assPath,
-        serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
-      );
-      markSaved();
-      setSaveError(null);
+      let savePath = activeSubtitlePath;
+      const saveKind: ActiveSubtitleKind = activeSubtitleKind ?? "transcribed";
+      if (!savePath) {
+        if (saveKind === "translated") {
+          savePath = await pickSaveAssFile(session.translatedAssPath);
+          if (!savePath) return;
+        } else {
+          savePath = session.transcribedAssPath;
+        }
+      }
+      await writeSubtitleFile(savePath, saveKind);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setSaveError(message);
       notify("error", `保存失败：${message}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSelectSubtitleFile = async () => {
+    if (!session) return;
+
+    try {
+      const subtitlePath = await pickSubtitleFile();
+      if (!subtitlePath) return;
+
+      const [subtitleText, videoInfo] = await Promise.all([
+        loadAssText(subtitlePath),
+        getVideoInfo(session.videoPath),
+      ]);
+      const doc = parseExternalSubtitleDocument({
+        path: subtitlePath,
+        text: subtitleText,
+        playRes: { width: videoInfo.width, height: videoInfo.height },
+      });
+
+      loadAssDocument(doc, { kind: "translated", path: null });
+      markDirty();
+      setSubtitleFileExists(false);
+      setSaveError(null);
+      notify("info", "已载入字幕文件，首次保存时请选择保存位置");
+    } catch (err) {
+      notify("error", `选择字幕文件失败：${String(err)}`);
+    }
+  };
+
+  const handleRevealSubtitleFile = async () => {
+    if (!currentSubtitlePath) return;
+
+    try {
+      const exists = await pathExists(currentSubtitlePath);
+      setSubtitleFileExists(exists);
+      if (!exists) return;
+      await revealItemInDir(currentSubtitlePath);
+    } catch (err) {
+      notify("error", `无法在文件夹中显示：${String(err)}`);
     }
   };
 
@@ -91,11 +189,11 @@ export function EditorView() {
     enabled: !helpOpen,
   });
 
-  if (!project || !projectDir) {
+  if (!session) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-text-muted">请先导入或打开项目</p>
+          <p className="text-text-muted">请先打开视频</p>
           <button
             onClick={() => setStep("import")}
             className="mt-4 rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
@@ -124,6 +222,22 @@ export function EditorView() {
           </span>
           <button
             type="button"
+            onClick={handleSelectSubtitleFile}
+            disabled={saving}
+            className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            选择字幕文件
+          </button>
+          <button
+            type="button"
+            onClick={handleRevealSubtitleFile}
+            disabled={!subtitleFileExists}
+            className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            在文件夹中显示
+          </button>
+          <button
+            type="button"
             onClick={toggleStyleManager}
             className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay"
           >
@@ -150,7 +264,7 @@ export function EditorView() {
 
         {/* 视频播放器 */}
         <div className="col-start-2 row-start-1 bg-black">
-          <VideoPlayer videoPath={project.videoPath} />
+          <VideoPlayer videoPath={session.videoPath} />
         </div>
 
         {/* 编辑面板 */}

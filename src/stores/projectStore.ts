@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { produce } from "immer";
 import type { AssDocument, AssScriptInfo, AssStyle } from "@hikaru/ass-core";
-import type { ProjectMeta, SubtitleCue } from "../types";
+import type { ActiveSubtitleKind, SubtitleCue, VideoSession } from "../types";
 
 interface HistoryState {
   past: SubtitleCue[][];
@@ -9,17 +9,25 @@ interface HistoryState {
 }
 
 interface ProjectState {
-  project: ProjectMeta | null;
-  projectDir: string | null;
+  session: VideoSession | null;
+  activeSubtitlePath: string | null;
+  activeSubtitleKind: ActiveSubtitleKind | null;
   videoPath: string | null;
   cues: SubtitleCue[];
   assScriptInfo: AssScriptInfo | null;
   assStyles: AssStyle[];
   isDirty: boolean;
   history: HistoryState;
-  setProject: (project: ProjectMeta, projectDir: string) => void;
-  clearProject: () => void;
-  loadAssDocument: (doc: AssDocument) => void;
+  setSession: (session: VideoSession) => void;
+  setActiveSubtitle: (
+    kind: ActiveSubtitleKind | null,
+    path: string | null,
+  ) => void;
+  clearSession: () => void;
+  loadAssDocument: (
+    doc: AssDocument,
+    active?: { kind: ActiveSubtitleKind; path: string | null },
+  ) => void;
   setAssMetadata: (scriptInfo: AssScriptInfo, styles: AssStyle[]) => void;
   setCues: (cues: SubtitleCue[]) => void;
   updateCue: (id: string, updates: Partial<SubtitleCue>) => void;
@@ -56,29 +64,38 @@ function hasCueChanges(
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
-  project: null,
-  projectDir: null,
+  session: null,
+  activeSubtitlePath: null,
+  activeSubtitleKind: null,
   videoPath: null,
   cues: [],
   ...emptyAssState,
   isDirty: false,
   history: { past: [], future: [] },
 
-  setProject: (project, projectDir) =>
+  setSession: (session) =>
     set({
-      project,
-      projectDir,
-      videoPath: project.videoPath,
+      session,
+      activeSubtitlePath: null,
+      activeSubtitleKind: null,
+      videoPath: session.videoPath,
       cues: [],
       ...emptyAssState,
       isDirty: false,
       history: { past: [], future: [] },
     }),
 
-  clearProject: () =>
+  setActiveSubtitle: (kind, path) =>
     set({
-      project: null,
-      projectDir: null,
+      activeSubtitleKind: kind,
+      activeSubtitlePath: path,
+    }),
+
+  clearSession: () =>
+    set({
+      session: null,
+      activeSubtitlePath: null,
+      activeSubtitleKind: null,
       videoPath: null,
       cues: [],
       ...emptyAssState,
@@ -86,11 +103,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       history: { past: [], future: [] },
     }),
 
-  loadAssDocument: (doc) =>
+  loadAssDocument: (doc, active) =>
     set({
       cues: doc.cues,
       assScriptInfo: doc.scriptInfo,
       assStyles: doc.styles,
+      activeSubtitleKind: active?.kind ?? get().activeSubtitleKind,
+      activeSubtitlePath:
+        active === undefined ? get().activeSubtitlePath : active.path,
       isDirty: false,
       history: { past: [], future: [] },
     }),

@@ -8,28 +8,16 @@ export type WorkflowStep =
   | "burn"
   | "settings";
 
-export interface AsrConfig {
-  engine: string;
-  model: string;
-  device: "cpu" | "cuda" | "auto";
-}
+export type ActiveSubtitleKind = "transcribed" | "translated";
 
-export interface TranslationConfig {
-  provider: string;
-  baseUrl: string;
-  model: string;
-  temperature?: number;
-}
-
-export interface ProjectMeta {
-  version: number;
+export interface VideoSession {
   videoPath: string;
-  audioPath?: string;
-  assPath?: string;
-  sourceLang: string;
-  targetLang: string;
-  asr: AsrConfig;
-  translation: TranslationConfig;
+  workspacePath: string;
+  audioPath: string;
+  transcribedAssPath: string;
+  translatedAssPath: string;
+  burnAssPath: string;
+  sourceLang: "ja";
 }
 
 export interface SubtitleCue {

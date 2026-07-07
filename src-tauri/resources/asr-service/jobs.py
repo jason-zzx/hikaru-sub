@@ -149,11 +149,10 @@ class JobManager:
                 return
             segments = list(job.segments)
             output_ass_path = job.output_ass_path
-        ass_path = (
-            Path(output_ass_path)
-            if output_ass_path
-            else Path(job.audio_path).parent / "subtitles.ass"
-        )
+        if not output_ass_path:
+            debug_log("job_ass_save_skipped", jobId=job.id, reason="missing_output_path")
+            return
+        ass_path = Path(output_ass_path)
         write_ass_file(ass_path, segments)
         debug_log(
             "job_ass_saved",

@@ -104,18 +104,18 @@ mod tests {
     #[test]
     fn escapes_windows_paths_for_ffmpeg_filter() {
         assert_eq!(
-            escape_filter_path(r"F:\creates\hikaroom32\.hikaru\subtitles.ass"),
-            "F\\:/creates/hikaroom32/.hikaru/subtitles.ass",
+            escape_filter_path(r"F:\creates\hikaroom32\episode.transcribed.ass"),
+            "F\\:/creates/hikaroom32/episode.transcribed.ass",
         );
     }
 
     #[test]
     fn builds_filter_with_optional_font_dir() {
         let filter = build_subtitles_filter(
-            r"F:\creates\hikaroom32\.hikaru\subtitles.ass",
+            r"F:\creates\hikaroom32\episode.transcribed.ass",
             Some(r"C:\Windows\Fonts"),
         );
-        assert!(filter.contains("ass=filename='F\\:/creates/hikaroom32/.hikaru/subtitles.ass'"));
+        assert!(filter.contains("ass=filename='F\\:/creates/hikaroom32/episode.transcribed.ass'"));
         assert!(filter.contains("fontsdir='C\\:/Windows/Fonts'"));
     }
 

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import type {
   AppSettings,
   AsrEngineInfo,
@@ -17,7 +17,6 @@ import type {
   ProbeDownloadMediaArgs,
   ProbeAsrSetupEnvironmentArgs,
   PreviewFontFile,
-  ProjectMeta,
   PrepareRuntimeDependencyArgs,
   RenderSubtitlePreviewFrameArgs,
   RenderSubtitlePreviewFrameResult,
@@ -29,6 +28,7 @@ import type {
   StartBurnArgs,
   StartVideoDownloadArgs,
   DownloadMediaProbe,
+  VideoSession,
 } from "../types";
 
 const VIDEO_EXTENSIONS = [
@@ -42,6 +42,8 @@ const VIDEO_EXTENSIONS = [
   "m4v",
 ];
 
+const SUBTITLE_EXTENSIONS = ["ass", "srt"];
+
 /** 弹出文件对话框选择视频，取消返回 null。 */
 export async function pickVideoFile(): Promise<string | null> {
   const selected = await open({
@@ -52,7 +54,30 @@ export async function pickVideoFile(): Promise<string | null> {
   return typeof selected === "string" ? selected : null;
 }
 
-/** 弹出目录对话框，取消返回 null（如选择项目目录、sidecar 目录）。 */
+/** 弹出文件对话框选择字幕文件，取消返回 null。 */
+export async function pickSubtitleFile(): Promise<string | null> {
+  const selected = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: "字幕文件", extensions: SUBTITLE_EXTENSIONS }],
+  });
+  return typeof selected === "string" ? selected : null;
+}
+
+function ensureAssExtension(path: string): string {
+  return /\.ass$/i.test(path) ? path : `${path}.ass`;
+}
+
+/** 弹出 ASS 另存为对话框，取消返回 null。 */
+export async function pickSaveAssFile(defaultPath?: string): Promise<string | null> {
+  const selected = await save({
+    defaultPath,
+    filters: [{ name: "ASS 字幕", extensions: ["ass"] }],
+  });
+  return typeof selected === "string" ? ensureAssExtension(selected) : null;
+}
+
+/** 弹出目录对话框，取消返回 null（如选择保存目录、sidecar 目录）。 */
 export async function pickDirectory(): Promise<string | null> {
   const selected = await open({ multiple: false, directory: true });
   return typeof selected === "string" ? selected : null;
@@ -62,13 +87,6 @@ export async function pickDirectory(): Promise<string | null> {
 export async function pickExecutableFile(): Promise<string | null> {
   const selected = await open({ multiple: false, directory: false });
   return typeof selected === "string" ? selected : null;
-}
-
-/** 从项目元数据推断 .hikaru 目录（取 audio/ass 路径的父目录）。 */
-export function projectDirFromMeta(meta: ProjectMeta): string {
-  const ref = meta.audioPath ?? meta.assPath ?? "";
-  const idx = Math.max(ref.lastIndexOf("/"), ref.lastIndexOf("\\"));
-  return idx >= 0 ? ref.slice(0, idx) : ref;
 }
 
 let ffmpegStatusPromise: Promise<FfmpegStatus> | null = null;
@@ -121,12 +139,24 @@ export async function setSettings(settings: AppSettings): Promise<void> {
   return invoke("set_settings", { settings });
 }
 
-export async function createProject(videoPath: string): Promise<ProjectMeta> {
-  return invoke<ProjectMeta>("create_project", { videoPath });
+export async function prepareVideoSession(videoPath: string): Promise<VideoSession> {
+  return invoke<VideoSession>("prepare_video_session", { videoPath });
 }
 
-export async function openProject(projectDir: string): Promise<ProjectMeta> {
-  return invoke<ProjectMeta>("open_project", { projectDir });
+export function transcribedAssPath(session: VideoSession): string {
+  return session.transcribedAssPath;
+}
+
+export function translatedAssPath(session: VideoSession): string {
+  return session.translatedAssPath;
+}
+
+export function workspaceDirFromSession(session: VideoSession): string {
+  return session.workspacePath;
+}
+
+export async function deleteCachedAudio(audioPath: string): Promise<boolean> {
+  return invoke<boolean>("delete_cached_audio", { audioPath });
 }
 
 /** 判断文件/目录是否存在（如检测已提取的 audio.wav）。 */

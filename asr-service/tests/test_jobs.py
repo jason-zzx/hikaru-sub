@@ -152,11 +152,11 @@ def _wait_for_completion(job):
 class JobPersistenceTests(unittest.TestCase):
     def test_completed_job_writes_recovery_snapshot_and_ass_file(self):
         with tempfile.TemporaryDirectory() as tmp:
-            project_dir = Path(tmp) / ".hikaru"
-            project_dir.mkdir()
-            audio = project_dir / "audio.wav"
+            workspace = Path(tmp) / "cache" / "workspace" / "abc"
+            workspace.mkdir(parents=True)
+            audio = workspace / "audio.wav"
             audio.write_bytes(b"fake audio")
-            ass_path = project_dir / "subtitles.ass"
+            ass_path = Path(tmp) / "episode.transcribed.ass"
 
             manager = JobManager()
             with patch("jobs.create_engine", return_value=_FakeEngine()):
@@ -171,7 +171,7 @@ class JobPersistenceTests(unittest.TestCase):
                 snapshot = _wait_for_completion(job)
 
             self.assertEqual(snapshot["status"], "completed")
-            recovery_path = project_dir / "asr-jobs" / f"{job.id}.json"
+            recovery_path = workspace / "asr-jobs" / f"{job.id}.json"
             recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
             self.assertEqual(recovery["id"], job.id)
             self.assertEqual(recovery["status"], "completed")
@@ -183,11 +183,33 @@ class JobPersistenceTests(unittest.TestCase):
             self.assertIn("Dialogue: 0,0:00:00.00,0:00:00.60,Primary", ass_text)
             self.assertIn("こんにちは", ass_text)
 
+    def test_completed_job_without_output_path_does_not_write_default_ass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "cache" / "workspace" / "abc"
+            workspace.mkdir(parents=True)
+            audio = workspace / "audio.wav"
+            audio.write_bytes(b"fake audio")
+
+            manager = JobManager()
+            with patch("jobs.create_engine", return_value=_FakeEngine()):
+                job = manager.create(
+                    audio_path=str(audio),
+                    engine="parakeet",
+                    model="nvidia/parakeet-tdt_ctc-0.6b-ja",
+                    device="auto",
+                    language="ja",
+                )
+                snapshot = _wait_for_completion(job)
+
+            self.assertEqual(snapshot["status"], "completed")
+            legacy_ass_name = "subtitles" + ".ass"
+            self.assertFalse((workspace / legacy_ass_name).exists())
+
     def test_cancelled_job_stops_during_segment_iteration(self):
         with tempfile.TemporaryDirectory() as tmp:
-            project_dir = Path(tmp) / ".hikaru"
-            project_dir.mkdir()
-            audio = project_dir / "audio.wav"
+            workspace = Path(tmp) / "cache" / "workspace" / "abc"
+            workspace.mkdir(parents=True)
+            audio = workspace / "audio.wav"
             audio.write_bytes(b"fake audio")
 
             manager = JobManager()
@@ -208,9 +230,9 @@ class JobPersistenceTests(unittest.TestCase):
 
     def test_progress_callback_updates_running_job_without_segments(self):
         with tempfile.TemporaryDirectory() as tmp:
-            project_dir = Path(tmp) / ".hikaru"
-            project_dir.mkdir()
-            audio = project_dir / "audio.wav"
+            workspace = Path(tmp) / "cache" / "workspace" / "abc"
+            workspace.mkdir(parents=True)
+            audio = workspace / "audio.wav"
             audio.write_bytes(b"fake audio")
 
             engine = _ProgressOnlyEngine()
@@ -235,9 +257,9 @@ class JobPersistenceTests(unittest.TestCase):
 
     def test_segment_progress_does_not_regress_on_out_of_order_end_ms(self):
         with tempfile.TemporaryDirectory() as tmp:
-            project_dir = Path(tmp) / ".hikaru"
-            project_dir.mkdir()
-            audio = project_dir / "audio.wav"
+            workspace = Path(tmp) / "cache" / "workspace" / "abc"
+            workspace.mkdir(parents=True)
+            audio = workspace / "audio.wav"
             audio.write_bytes(b"fake audio")
 
             engine = _OutOfOrderProgressEngine()
@@ -265,9 +287,9 @@ class JobPersistenceTests(unittest.TestCase):
         """阻塞型引擎（如 qwen3 一次性转录）在 transcribe 返回前上报进度时，
         jobs.py 预探测的 duration 使进度不被丢弃（修复进度卡 0% 的核心）。"""
         with tempfile.TemporaryDirectory() as tmp:
-            project_dir = Path(tmp) / ".hikaru"
-            project_dir.mkdir()
-            audio = project_dir / "audio.wav"
+            workspace = Path(tmp) / "cache" / "workspace" / "abc"
+            workspace.mkdir(parents=True)
+            audio = workspace / "audio.wav"
             # 写真实 2s wav，使 _duration_ms 预探测成功
             rate = 16000
             with wave.open(str(audio), "wb") as w:

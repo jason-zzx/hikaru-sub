@@ -214,7 +214,7 @@ export function ColorPicker({
       </button>
       {open && (
         <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-border bg-surface-raised p-3 shadow-xl">
-          <div className="hikaru-color-picker">
+          <div className="subtitle-color-picker">
             <RgbaColorPicker color={rgba} onChange={handleChange} />
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">

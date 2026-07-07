@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import {
   FFMPEG_STATUS_INVALIDATED_EVENT,
@@ -7,7 +6,6 @@ import {
 } from "../../services/tauri";
 
 export function StatusBar() {
-  const isDirty = useProjectStore((s) => s.isDirty);
   const tasks = useTaskStore((s) => s.tasks);
   const [ffmpegOk, setFfmpegOk] = useState<boolean | null>(null);
 
@@ -35,7 +33,6 @@ export function StatusBar() {
           FFmpeg:{" "}
           {ffmpegOk === null ? "检测中…" : ffmpegOk ? "就绪" : "未找到"}
         </span>
-        {isDirty && <span className="text-warning">未保存</span>}
       </div>
       <div>
         {runningTask

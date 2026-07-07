@@ -27,10 +27,12 @@ const TARGET_LANGS = [
 
 export function TranslateView() {
   const setStep = useUiStore((s) => s.setStep);
-  const project = useProjectStore((s) => s.project);
+  const session = useProjectStore((s) => s.session);
   const cues = useProjectStore((s) => s.cues);
   const setCues = useProjectStore((s) => s.setCues);
   const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
+  const setActiveSubtitle = useProjectStore((s) => s.setActiveSubtitle);
+  const markSaved = useProjectStore((s) => s.markSaved);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
@@ -52,15 +54,15 @@ export function TranslateView() {
   }, []);
 
   useEffect(() => {
-    if (!project) return;
-    setTargetLang(project.targetLang || "zh-CN");
+    if (!session) return;
+    setTargetLang(settings?.defaultTargetLang || "zh-CN");
 
     // 检查字幕文件或内存中的 cues
     if (cues.length > 0) {
       setHasAss(true);
       setCheckingAss(false);
-    } else if (project.assPath) {
-      pathExists(project.assPath)
+    } else {
+      pathExists(session.transcribedAssPath)
         .then((exists) => {
           setHasAss(exists);
           setCheckingAss(false);
@@ -69,14 +71,11 @@ export function TranslateView() {
           setHasAss(false);
           setCheckingAss(false);
         });
-    } else {
-      setHasAss(false);
-      setCheckingAss(false);
     }
-  }, [project, cues.length]);
+  }, [session, settings?.defaultTargetLang, cues.length]);
 
   const handleTranslate = useCallback(async () => {
-    if (!project || !settings || cues.length === 0) return;
+    if (!session || !settings || cues.length === 0) return;
 
     setError(null);
     setSuccess(false);
@@ -135,37 +134,35 @@ export function TranslateView() {
       setCues(result.cues);
 
       // 保存翻译后的 ASS 文件
-      if (project.assPath) {
-        try {
-          const { assScriptInfo, assStyles } = useProjectStore.getState();
-          let doc;
-          if (assScriptInfo && assStyles.length > 0) {
-            // 沿用转录阶段写入的 PlayRes 与样式
-            doc = {
-              scriptInfo: assScriptInfo,
-              styles: assStyles,
-              cues: result.cues,
-            };
-          } else {
-            const originalAssText = await loadAssText(project.assPath);
-            doc = parseAss(originalAssText);
-            doc.cues = result.cues;
-            setAssMetadata(doc.scriptInfo, doc.styles);
-          }
-
-          // 生成译文文件路径：原文件名 + .translated.ass
-          const translatedPath = project.assPath.replace(/\.ass$/i, ".translated.ass");
-          await saveAssText(
-            translatedPath,
-            serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
-          );
-
+      try {
+        const { assScriptInfo, assStyles } = useProjectStore.getState();
+        let doc;
+        if (assScriptInfo && assStyles.length > 0) {
+          // 沿用转录阶段写入的 PlayRes 与样式
+          doc = {
+            scriptInfo: assScriptInfo,
+            styles: assStyles,
+            cues: result.cues,
+          };
+        } else {
+          const originalAssText = await loadAssText(session.transcribedAssPath);
+          doc = parseAss(originalAssText);
+          doc.cues = result.cues;
           setAssMetadata(doc.scriptInfo, doc.styles);
-
-          console.log(`翻译后的字幕已保存到: ${translatedPath}`);
-        } catch (saveErr) {
-          console.warn("保存翻译后的字幕失败:", saveErr);
         }
+
+        await saveAssText(
+          session.translatedAssPath,
+          serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
+        );
+
+        setAssMetadata(doc.scriptInfo, doc.styles);
+        setActiveSubtitle("translated", session.translatedAssPath);
+        markSaved();
+
+        console.log(`翻译后的字幕已保存到: ${session.translatedAssPath}`);
+      } catch (saveErr) {
+        console.warn("保存翻译后的字幕失败:", saveErr);
       }
 
       setSuccess(true);
@@ -181,11 +178,13 @@ export function TranslateView() {
       setTranslating(false);
     }
   }, [
-    project,
+    session,
     settings,
     cues,
     targetLang,
     setCues,
+    setActiveSubtitle,
+    markSaved,
     upsertTask,
     updateTask,
   ]);
@@ -227,7 +226,7 @@ export function TranslateView() {
             <span>字幕为空</span>
           </p>
           <p className="mt-1 text-yellow-300/80">
-            当前项目没有字幕条目，请先完成转录
+            当前视频没有字幕条目，请先完成转录
           </p>
         </div>
       )}

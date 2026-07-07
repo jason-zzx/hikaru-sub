@@ -41,7 +41,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
   const currentStep = useUiStore((s) => s.currentStep);
   const setStep = useUiStore((s) => s.setStep);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
-  const project = useProjectStore((s) => s.project);
+  const session = useProjectStore((s) => s.session);
 
   const renderItem = (item: NavItem) => {
     const active = currentStep === item.step;
@@ -94,12 +94,12 @@ export function Sidebar({ collapsed }: SidebarProps) {
 
       <div className="border-t border-border p-2">
         {bottomItems.map(renderItem)}
-        {!collapsed && project && (
+        {!collapsed && session && (
           <p
             className="mt-2 truncate px-3 text-xs text-text-muted"
-            title={project.videoPath}
+            title={session.videoPath}
           >
-            {project.videoPath.split(/[/\\]/).pop()}
+            {session.videoPath.split(/[/\\]/).pop()}
           </p>
         )}
       </div>

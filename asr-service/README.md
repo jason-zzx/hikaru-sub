@@ -119,7 +119,7 @@ python main.py --host 127.0.0.1 --port 0
 
 ```json
 {
-  "audioPath": "/path/to/.hikaru/audio.wav",
+  "audioPath": "/path/to/cache/workspace/audio.wav",
   "engine": "parakeet",
   "model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
   "device": "auto",
