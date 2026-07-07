@@ -325,7 +325,7 @@ pub fn managed_asr_venv_python_path(service_dir: &Path) -> PathBuf {
 }
 
 fn deps_writability_probe_path(deps_root: &Path) -> PathBuf {
-    deps_root.join(format!(".hikaru-sub-write-test-{}", unique_suffix()))
+    deps_root.join(format!("hikaru-sub-write-test-{}", unique_suffix()))
 }
 
 fn ensure_deps_writable(deps_root: &Path) -> Result<(), String> {
@@ -1767,7 +1767,7 @@ mod tests {
             .file_name()
             .unwrap()
             .to_string_lossy()
-            .starts_with(".hikaru-sub-write-test-"));
+            .starts_with("hikaru-sub-write-test-"));
     }
 
     #[test]

@@ -67,14 +67,14 @@ pub struct HlsDownloadOutput {
 }
 
 pub fn hls_download_root(base_dir: &Path) -> PathBuf {
-    base_dir.join(".hikaru-download")
+    base_dir.join("hikaru-download-cache")
 }
 
 pub fn hls_temp_root(base_dir: &Path, job_id: &str) -> PathBuf {
     hls_download_root(base_dir).join(job_id)
 }
 
-/// 删除任务临时目录；若 `.hikaru-download` 已空则一并移除。
+/// 删除任务临时目录；若下载缓存目录已空则一并移除。
 pub fn remove_hls_temp_dir(base_dir: &Path, job_id: &str) {
     let _ = std::fs::remove_dir_all(hls_temp_root(base_dir, job_id));
     let root = hls_download_root(base_dir);

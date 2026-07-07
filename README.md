@@ -5,13 +5,13 @@
 ## 当前进度
 
 ✅ **已实现**：
-- m3u8 视频下载（Rust 分片并发优先、FFmpeg 兼容回退；单 URL / 分离音视频；AES-128 加密 VOD；自定义请求头；自动并发与 HTTP/2；进度与取消；完成后可导入项目）
-- 项目管理（创建/打开项目，`.hikaru` 元数据；打开时支持选择视频目录或 `.hikaru` 目录）
+- m3u8 视频下载（Rust 分片并发优先、FFmpeg 兼容回退；单 URL / 分离音视频；AES-128 加密 VOD；自定义请求头；自动并发与 HTTP/2；进度与取消；完成后可打开视频继续转录）
+- 文件中心视频会话（打开视频即准备运行时缓存；优先加载同目录 `*.translated.ass`，不存在时回退 `*.transcribed.ass`）
 - FFmpeg 集成（系统优先、缺失时按需下载受管 FFmpeg；音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
 - Python ASR sidecar（faster-whisper + NVIDIA Parakeet + Qwen3-ASR 日语适配器 + VAD 预处理 + HTTP 进度 API）
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
-- 翻译工作流（配置界面 + 进度显示 → 生成 `.translated.ass`）
+- 翻译工作流（配置界面 + 进度显示 → 生成 `*.translated.ass`）
 - 设置页（FFmpeg/Python 路径、运行时依赖下载源与存储清理、ASR 引擎、翻译 API、高级配置）
 - ASS 文件持久化（自动保存/加载；保留 `[V4+ Styles]` 与 PlayRes；转录时按视频分辨率写入）
 - 字幕编辑器（视频播放 + libass 优先字幕预览 + CSS 明示兜底 + 行内 override 标签渲染 + 样式下拉/快速参数工具栏/更多标签面板/样式库抽屉 + 字幕列表 + 编辑面板 + 局部缩放时间轴 + 音频波形 + 撤销重做 + Aegisub 式快捷键体系（字幕导航、逐帧/边界播放头控制、Ctrl+3/4 对轴打点、Enter 提交跳转、? 键位速查）；播放时按视频帧时间同步预览；inline 模式 UI 单行展示 `译文 / 原文`）
@@ -22,7 +22,7 @@
 - VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
 
 🚧 **待优化**：
-1. 首页增加显示最近项目列表
+1. 首页增加显示最近视频列表
 2. 翻译页进度条显示优化
 3. 翻译页支持单独配置每批翻译条数、上下文条数、自定义 prompt 和术语表、字幕合并模式（当前使用全局设置）
 4. libass 预览继续增加自动化视觉回归样本与跨平台校准
@@ -176,7 +176,7 @@ src-tauri/                    # Tauri Rust 后端
     hls_fetch.rs              # 分片 HTTP 下载与 AES 解密
     hls_download.rs           # 并发调度与媒体组装
     hls_types.rs              # 下载类型与自动并发配置
-    project.rs                # 项目元数据管理
+    project.rs                # 视频会话与字幕路径准备
     settings.rs               # 全局设置持久化
 packages/ass-core/            # ASS 解析/序列化库（workspace）
   src/assTags.ts              # ASS 行内 override 标签解析
@@ -197,9 +197,9 @@ scripts/
 
 默认 `auto` 策略：解析 VOD m3u8 后按 CPU 核数自动并发（8–32）下载分片，共享 HTTP/2 连接；支持 Byte-Range 与 AES-128-CBC 加密流（如 Niconico domand fMP4）。分片按播放列表顺序流式拼接为临时媒体文件，再用 FFmpeg `-c copy` remux。直播或分片策略无法处理时自动回退 FFmpeg 兼容模式。
 
-1. **导入视频** → 创建 `.hikaru` 项目目录
-2. **日语转录** → 提取音轨 → ASR 转录（源语言固定日语）→ 生成单语 ASS
-3. **翻译** → OpenAI 兼容 API 批量翻译 → 生成双语 ASS（`.translated.ass`）
+1. **导入视频** → 准备视频运行时会话
+2. **日语转录** → 提取音轨 → ASR 转录（源语言固定日语）→ 生成 `*.transcribed.ass`
+3. **翻译** → OpenAI 兼容 API 批量翻译 → 生成 `*.translated.ass`
 4. **编辑** → 载入字幕 → 视频/波形辅助校对 → 调整文本与时间轴 → 保存 ASS
 5. **压制** → FFmpeg 硬字幕 MP4 或软字幕 MKV 输出
 
@@ -216,7 +216,7 @@ scripts/
 
 ### 字幕压制
 - 硬字幕 MP4（libass 渲染字幕 + H.264 重新编码）与软字幕 MKV（ASS 字幕轨封装）
-- 压制前将当前内存字幕序列化为 `.hikaru/burn.input.ass`，包含未保存编辑
+- 压制前将当前内存字幕序列化到运行时缓存中的压制输入 ASS，包含未保存编辑
 - 输出文件名自动生成（`{视频名}.burned.mp4` / `{视频名}.subbed.mkv`），按模式固定扩展名，不可自定义
 - 硬字幕支持“高质量 / 接近原片 / 自定义码率”导出策略；策略会同步视频码率、编码器、CRF 与 preset
 - 点击「检测原片参数」后会探测原视频码率与 FFmpeg 可用编码器，自动优先选择平台合适的硬件 H.264 编码器（Windows：NVENC / QSV / AMF；macOS：VideoToolbox；Linux：NVENC / QSV），不可用时回退 libx264
@@ -308,10 +308,10 @@ CSS 兜底仍解析常用 Style 与行内 override 标签，用于 libass 不可
 - 压制页：不显示字幕预览，只展示输出模式、导出策略、编码、码率、字体目录和任务进度。
 
 ### 文件管理
-- **项目元数据**：`.hikaru/project.json`（与视频同目录）
-- **转录字幕**：`subtitles.ass`（单语原文）
-- **翻译字幕**：`subtitles.translated.ass`（双语字幕）
-- **音频缓存**：`audio.wav`（16kHz 单声道 WAV）
+- **视频会话**：运行时对象，不写入项目元数据文件
+- **转录字幕**：`{视频文件名}.transcribed.ass`（单语原文，与视频同目录）
+- **翻译字幕**：`{视频文件名}.translated.ass`（双语字幕，与视频同目录）
+- **音频缓存**：应用缓存工作区下的 `audio.wav`（16kHz 单声道 WAV，转录保存成功后删除）
 - **代理视频缓存**：应用缓存目录下的 `transcode/*.mp4`
 
 ## 核心数据模型
@@ -337,14 +337,15 @@ interface SubtitleCue {
 - 默认 `inline` 模式：译文和原文保存为一条 Dialogue，文本格式为 `译文 / 原文`；编辑页列表/预览/编辑框同步按单行展示
 - 可选 `separate` 模式：原文和译文保存为同时间戳的两条 Dialogue
 - **PlayRes**：转录保存 ASS 时从 `get_video_info` 写入视频分辨率；翻译与编辑保存沿用，不在编辑阶段重算
-- 打开项目时优先加载 `subtitles.translated.ass`，不存在时回退到 `subtitles.ass`；`parseAss` 后 `loadAssDocument` 保留 styles 与 scriptInfo
+- 打开视频时优先加载同目录 `{视频文件名}.translated.ass`，不存在时回退到 `{视频文件名}.transcribed.ass`；`parseAss` 后 `loadAssDocument` 保留 styles 与 scriptInfo
 
 ## 已实现的 Tauri Commands
 
 | Command | 功能 |
 |---------|------|
-| `create_project` | 初始化 `.hikaru` 项目 |
-| `open_project` | 加载已有项目元数据 |
+| `prepare_video_session` | 根据视频路径准备运行时会话与标准字幕路径 |
+| `path_exists` | 检查文件或目录是否存在 |
+| `delete_cached_audio` | 删除当前会话的缓存音轨 |
 | `check_ffmpeg` | 检测 FFmpeg 可用性与版本 |
 | `extract_audio` | 提取 16kHz WAV 音轨 + 进度事件 |
 | `extract_waveform` | 提取归一化音频峰值数据用于时间轴波形 |

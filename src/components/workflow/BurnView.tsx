@@ -124,8 +124,7 @@ function defaultOutputFileName(videoPath: string, mode: BurnMode): string {
 }
 
 export function BurnView() {
-  const project = useProjectStore((s) => s.project);
-  const projectDir = useProjectStore((s) => s.projectDir);
+  const session = useProjectStore((s) => s.session);
   const cues = useProjectStore((s) => s.cues);
   const assStyles = useProjectStore((s) => s.assStyles);
   const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
@@ -162,9 +161,9 @@ export function BurnView() {
   const [fontDir, setFontDir] = useState("");
 
   const outputFileName = useMemo(() => {
-    if (!project) return "";
-    return defaultOutputFileName(project.videoPath, mode);
-  }, [project, mode]);
+    if (!session) return "";
+    return defaultOutputFileName(session.videoPath, mode);
+  }, [session, mode]);
 
   const effectiveVideoBitrateKbps = useMemo(
     () => parseBitrateInput(videoBitrateKbps),
@@ -229,15 +228,15 @@ export function BurnView() {
   }, []);
 
   useEffect(() => {
-    if (!project) return;
-    setOutputDir((current) => current || pathDir(project.videoPath));
-  }, [project]);
+    if (!session) return;
+    setOutputDir((current) => current || pathDir(session.videoPath));
+  }, [session]);
 
   useEffect(() => {
     setBurnProbe(null);
     setProbeError(null);
     setProbingBurnVideo(false);
-  }, [project?.videoPath]);
+  }, [session?.videoPath]);
 
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
   const outputPath =
@@ -249,7 +248,7 @@ export function BurnView() {
       ? Math.round(snapshot.progress * 100)
       : null;
   const canStart =
-    Boolean(project && projectDir && project.videoPath && cues.length > 0) &&
+    Boolean(session && session.videoPath && cues.length > 0) &&
     Boolean(outputPath) &&
     !busy;
 
@@ -272,8 +271,8 @@ export function BurnView() {
   };
 
   const handleProbeBurnVideo = async () => {
-    if (!project?.videoPath || probingBurnVideo) return;
-    const videoPath = project.videoPath;
+    if (!session?.videoPath || probingBurnVideo) return;
+    const videoPath = session.videoPath;
     setProbingBurnVideo(true);
     setProbeError(null);
     try {
@@ -297,7 +296,7 @@ export function BurnView() {
   };
 
   const runStart = async () => {
-    if (!project || !projectDir || !outputPath) return;
+    if (!session || !outputPath) return;
     resetForStart();
     upsertTask({
       id: "burn",
@@ -308,16 +307,17 @@ export function BurnView() {
 
     try {
       const settings = await getSettings();
-      const doc = resolveAssDocumentForSave(cues, assScriptInfo, assStyles);
+      const doc = resolveAssDocumentForSave(cues, assScriptInfo, assStyles, {
+        title: "Hikaru Sub",
+      });
       const assText = serializeAss(doc, {
         mergeMode: settings.subtitleMergeMode,
       });
-      const burnAssPath = `${projectDir}/burn.input.ass`;
-      await saveAssText(burnAssPath, assText);
+      await saveAssText(session.burnAssPath, assText);
 
       const id = await startBurnSubtitles({
-        videoPath: project.videoPath,
-        assPath: burnAssPath,
+        videoPath: session.videoPath,
+        assPath: session.burnAssPath,
         outputPath,
         mode,
         crf: mode === "hardSubMp4" ? crf : null,
@@ -393,9 +393,9 @@ export function BurnView() {
         </div>
       )}
 
-      {!project ? (
+      {!session ? (
         <div className="flex flex-1 items-center justify-center rounded-xl border border-border bg-surface-raised">
-          <p className="text-text-muted">请先导入或打开项目</p>
+          <p className="text-text-muted">请先打开视频</p>
         </div>
       ) : (
         <div className="min-h-0 flex-1">

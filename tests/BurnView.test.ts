@@ -19,8 +19,18 @@ describe("BurnView layout", () => {
   });
 
   it("waits for user action before probing source video encoding details", () => {
-    expect(source).not.toContain("probeBurnVideo(project.videoPath)");
+    const oldProbeCall = "probeBurnVideo(project." + "videoPath)";
+    expect(source).not.toContain(oldProbeCall);
     expect(source).toContain("handleProbeBurnVideo");
     expect(source).toContain("检测原片参数");
+  });
+
+  it("uses the runtime video session burn subtitle path", () => {
+    const oldProjectDir = "project" + "Dir";
+    expect(source).toContain("session.burnAssPath");
+    expect(source).toContain("videoPath: session.videoPath");
+    expect(source).toContain("assPath: session.burnAssPath");
+    expect(source).not.toContain(oldProjectDir);
+    expect(source).not.toContain("burn.input.ass");
   });
 });

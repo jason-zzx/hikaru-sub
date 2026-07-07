@@ -6,11 +6,10 @@ import { useTaskStore } from "../../stores/taskStore";
 import {
   cancelVideoDownload,
   checkFfmpeg,
-  createProject,
   getVideoDownloadProgress,
   invalidateFfmpegStatus,
   pickDirectory,
-  projectDirFromMeta,
+  prepareVideoSession,
   startVideoDownload,
 } from "../../services/tauri";
 import type {
@@ -39,7 +38,7 @@ function formatMs(ms: number): string {
 
 export function DownloadView() {
   const setStep = useUiStore((s) => s.setStep);
-  const setProject = useProjectStore((s) => s.setProject);
+  const setSession = useProjectStore((s) => s.setSession);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
@@ -207,11 +206,11 @@ export function DownloadView() {
     setImporting(true);
     setError(null);
     try {
-      const meta = await createProject(completedPath);
-      setProject(meta, projectDirFromMeta(meta));
+      const session = await prepareVideoSession(completedPath);
+      setSession(session);
       setStep("transcribe");
     } catch (e) {
-      setError(`创建项目失败：${String(e)}`);
+      setError(`打开视频失败：${String(e)}`);
     } finally {
       setImporting(false);
     }
@@ -227,7 +226,7 @@ export function DownloadView() {
       <header>
         <h2 className="text-xl font-semibold">视频下载</h2>
         <p className="mt-1 text-sm text-text-muted">
-          从 m3u8 地址下载音视频，完成后可导入为 Hikaru Sub 项目
+          从 m3u8 地址下载音视频，完成后可打开并继续转录
         </p>
       </header>
 
@@ -420,7 +419,7 @@ export function DownloadView() {
               disabled={importing}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
             >
-              {importing ? "导入中…" : "导入为项目"}
+              {importing ? "打开中…" : "打开并转录"}
             </button>
           </div>
         </section>

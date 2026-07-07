@@ -369,7 +369,7 @@ export function SettingsView() {
           />
 
           <div ref={asrSectionRef}>
-            <Section title="日语转录（ASR）默认" desc="新建项目时使用的默认转录配置（源语言固定为日语）">
+            <Section title="日语转录（ASR）默认" desc="新建视频会话时使用的默认转录配置（源语言固定为日语）">
               <Field label="引擎">
                 <Select
                   value={settings.asrEngine}
@@ -421,7 +421,7 @@ export function SettingsView() {
             </Section>
           </div>
 
-          <Section title="翻译（OpenAI 兼容）" desc="API Key 仅保存在本机配置文件中，不会写入项目或源码">
+          <Section title="翻译（OpenAI 兼容）" desc="API Key 仅保存在本机配置文件中，不会写入字幕文件或源码">
             <Field label="Base URL">
               <input
                 className={inputClass}
@@ -508,7 +508,7 @@ export function SettingsView() {
             </Field>
           </Section>
 
-          <Section title="默认目标语言" desc="新建项目时使用的翻译目标语言">
+          <Section title="默认目标语言" desc="新建视频会话时使用的翻译目标语言">
             <Field label="目标语言">
               <Select
                 value={settings.defaultTargetLang}

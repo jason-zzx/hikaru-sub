@@ -198,7 +198,7 @@ export function StyleManager() {
         ...ASS_ENCODING_OPTIONS,
         {
           value: tempStyle.encoding,
-          label: `${tempStyle.encoding} - 当前项目值`,
+          label: `${tempStyle.encoding} - 当前值`,
         },
       ];
     }

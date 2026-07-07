@@ -95,7 +95,7 @@ src/                    React 前端
   services/             Tauri invoke 封装与前端服务
   types/                共享 TS 类型
 src-tauri/              Tauri Rust 后端
-  src/                  FFmpeg、ASR、项目、设置、下载、压制等 commands
+  src/                  FFmpeg、ASR、视频会话、设置、下载、压制等 commands
   resources/            打包资源与运行时依赖源清单
 packages/ass-core/      ASS 解析/序列化 workspace 包
 asr-service/            Python FastAPI ASR sidecar
@@ -104,22 +104,24 @@ scripts/                开发、ASR、发布辅助脚本
 
 ## 架构边界
 
-- **Tauri Rust**：文件 I/O、FFmpeg/ffprobe、音频波形、视频代理转码、运行时依赖准备、ASR sidecar 进程管理、项目元数据、下载与压制任务。
+- **Tauri Rust**：文件 I/O、FFmpeg/ffprobe、音频波形、视频代理转码、运行时依赖准备、ASR sidecar 进程管理、视频会话路径准备、下载与压制任务。
 - **React**：全部 UI、ASS 文本编辑、翻译 API 调用、任务轮询、用户设置交互。
 - **Python sidecar**：ASR 推理，通过 localhost HTTP 与 Tauri 通信，不阻塞 UI。
-- **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`，项目 store 另缓存 `assScriptInfo` 与 `assStyles`，保存时完整写回 ASS。
+- **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`，project store 另缓存运行时 `VideoSession`、活动字幕路径、`assScriptInfo` 与 `assStyles`，保存时完整写回 ASS。
 - 新增 Tauri command 时按固定链路接线：`src-tauri/src/` 实现 → `lib.rs` 注册 → `src/services/tauri.ts` 封装 → 补测试或说明验证理由。若新增/变更插件权限、文件访问范围或 shell 能力，再同步更新 `src-tauri/capabilities/`。
 
 ## 数据与字幕约定
 
-### 项目文件
+### 视频会话与字幕文件
 
-项目数据位于视频同目录的 `.hikaru/` 文件夹：
+项目不再写入隐藏元数据目录。用户打开视频后，前端持有运行时 `VideoSession`：
 
-- `.hikaru/project.json`
-- `.hikaru/audio.wav`
-- `.hikaru/subtitles.ass`
-- `.hikaru/subtitles.translated.ass`
+- `transcribedAssPath`：视频同目录 `{视频文件名}.transcribed.ass`
+- `translatedAssPath`：视频同目录 `{视频文件名}.translated.ass`
+- `audioPath`：应用缓存工作区中的临时 `audio.wav`，转录保存成功后删除
+- `burnAssPath`：应用缓存工作区中的压制输入 ASS
+
+打开视频时优先加载翻译字幕，其次加载转录字幕；都不存在时准备空会话。
 
 ### SubtitleCue
 
@@ -135,7 +137,7 @@ interface SubtitleCue {
 }
 ```
 
-- 产品面向日语转录与翻译，新建项目固定 `sourceLang: "ja"`；不要重新在转录/设置页暴露源语言选择。旧项目里的其他 `sourceLang` 仍应能打开。
+- 产品面向日语转录与翻译，新建视频会话固定 `sourceLang: "ja"`；不要重新在转录/设置页暴露源语言选择。
 - 双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary` 原文 + `Secondary` 译文，同时间轴两条 Dialogue。
 - 编辑页列表、预览与编辑框通过 `getCueDisplay` 按 `subtitleMergeMode` 展示，与序列化规则保持一致。
 - 转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。
