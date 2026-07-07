@@ -19,6 +19,9 @@ export type EditorActionId =
   | "stamp-end"
   | "new-cue"
   | "delete-cue"
+  | "copy-cues"
+  | "cut-cues"
+  | "paste-cues"
   | "commit-and-next"
   | "insert-newline"
   | "discard-draft"
@@ -71,6 +74,9 @@ export const EDITOR_HOTKEYS: HotkeyDef[] = [
   { key: "Escape", scope: "inside-input", action: "discard-draft", label: "Esc", description: "放弃未提交草稿并失焦", category: "编辑", handledLocally: true },
   { key: "Insert", scope: "outside-input", action: "new-cue", label: "Insert", description: "在播放头位置新建字幕", category: "编辑" },
   { key: "Delete", scope: "outside-input", action: "delete-cue", label: "Delete", description: "删除选中字幕（可撤销）", category: "编辑" },
+  { key: "c", ctrl: true, scope: "outside-input", action: "copy-cues", label: "Ctrl+C", description: "复制选中字幕行", category: "编辑" },
+  { key: "x", ctrl: true, scope: "outside-input", action: "cut-cues", label: "Ctrl+X", description: "剪切选中字幕行", category: "编辑" },
+  { key: "v", ctrl: true, scope: "outside-input", action: "paste-cues", label: "Ctrl+V", description: "粘贴字幕行", category: "编辑" },
   // 系统
   { key: "s", ctrl: true, scope: "global", action: "save", label: "Ctrl+S", description: "保存", category: "系统" },
   { key: "z", ctrl: true, scope: "outside-input", action: "undo", label: "Ctrl+Z", description: "撤销（编辑框内为文本撤销）", category: "系统" },

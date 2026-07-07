@@ -1,15 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
+  assignCueLanes,
   appendCueAfter,
   appendCueAfterWithUniqueId,
+  copyCueRows,
   createCueAtPlayhead,
   createCueAtPlayheadWithUniqueId,
   createUniqueCueId,
+  deleteCuesById,
+  duplicateCues,
   findSubtitleBoundary,
   frameStepTarget,
+  insertCueRelative,
+  mergeSelectedCues,
   nextAfterCommit,
+  normalizeBoundaryDrag,
+  pasteCueRows,
   selectCueAfterDelete,
   selectCueByOffset,
+  splitCueAtTime,
+  swapSelectedCues,
 } from "./editorActions";
 import type { SubtitleCue } from "../types";
 
@@ -198,5 +208,244 @@ describe("nextAfterCommit", () => {
   it("找不到 id 时返回 none", () => {
     expect(nextAfterCommit(CUES, "missing")).toEqual({ kind: "none" });
     expect(nextAfterCommit([], "a")).toEqual({ kind: "none" });
+  });
+});
+
+describe("assignCueLanes", () => {
+  it("puts overlapping cues into separate lanes and reuses lanes after the overlap ends", () => {
+    const cues = [
+      cue("a", 0, 1000),
+      cue("b", 500, 1500),
+      cue("c", 1500, 2000),
+      cue("d", 1600, 1800),
+    ];
+
+    expect(assignCueLanes(cues).map((item) => [item.cue.id, item.lane])).toEqual([
+      ["a", 0],
+      ["b", 1],
+      ["c", 0],
+      ["d", 1],
+    ]);
+  });
+
+  it("keeps list ordering for cues with equal starts", () => {
+    const cues = [cue("a", 0, 1000), cue("b", 0, 500), cue("c", 500, 800)];
+
+    expect(assignCueLanes(cues).map((item) => [item.cue.id, item.lane])).toEqual([
+      ["a", 0],
+      ["b", 1],
+      ["c", 1],
+    ]);
+  });
+});
+
+describe("normalizeBoundaryDrag", () => {
+  it("updates the dragged start boundary without crossing", () => {
+    expect(normalizeBoundaryDrag(cue("a", 1000, 3000), "start", 1500, 10000)).toEqual({
+      startMs: 1500,
+      endMs: 3000,
+    });
+  });
+
+  it("swaps start and end when dragging start later than end", () => {
+    expect(normalizeBoundaryDrag(cue("a", 1000, 3000), "start", 4200, 10000)).toEqual({
+      startMs: 3000,
+      endMs: 4200,
+    });
+  });
+
+  it("swaps start and end when dragging end earlier than start", () => {
+    expect(normalizeBoundaryDrag(cue("a", 1000, 3000), "end", 400, 10000)).toEqual({
+      startMs: 400,
+      endMs: 1000,
+    });
+  });
+
+  it("clamps dragged times to the video duration and rounds to milliseconds", () => {
+    expect(normalizeBoundaryDrag(cue("a", 1000, 3000), "end", 12000.7, 10000)).toEqual({
+      startMs: 1000,
+      endMs: 10000,
+    });
+  });
+});
+
+describe("subtitle row operations", () => {
+  const richCue = (id: string, startMs: number, endMs: number): SubtitleCue => ({
+    id,
+    startMs,
+    endMs,
+    primaryText: `P-${id}`,
+    secondaryText: `S-${id}`,
+    style: "Primary",
+    layer: 2,
+  });
+
+  it("inserts empty inherited cues before and after the target", () => {
+    const cues = [richCue("a", 2000, 3000)];
+
+    expect(insertCueRelative(cues, "a", "before", () => "before")).toEqual({
+      cues: [
+        {
+          id: "before",
+          startMs: 0,
+          endMs: 2000,
+          primaryText: "",
+          secondaryText: undefined,
+          style: "Primary",
+          layer: 2,
+        },
+        cues[0],
+      ],
+      selectedCueIds: ["before"],
+    });
+
+    expect(insertCueRelative(cues, "a", "after", () => "after")).toEqual({
+      cues: [
+        cues[0],
+        {
+          id: "after",
+          startMs: 3000,
+          endMs: 5000,
+          primaryText: "",
+          secondaryText: undefined,
+          style: "Primary",
+          layer: 2,
+        },
+      ],
+      selectedCueIds: ["after"],
+    });
+  });
+
+  it("duplicates selected cues with new ids after their originals", () => {
+    const cues = [richCue("a", 0, 1000), richCue("b", 1000, 2000)];
+    const ids = ["a-copy", "b-copy"];
+
+    const result = duplicateCues(cues, ["a", "b"], () => ids.shift()!);
+
+    expect(result?.cues.map((item) => item.id)).toEqual([
+      "a",
+      "a-copy",
+      "b",
+      "b-copy",
+    ]);
+    expect(result?.cues[1]).toMatchObject({
+      startMs: 0,
+      endMs: 1000,
+      primaryText: "P-a",
+      secondaryText: "S-a",
+    });
+    expect(result?.selectedCueIds).toEqual(["a-copy", "b-copy"]);
+  });
+
+  it("splits a cue at the playhead and copies text, translation, style, and layer to the second half", () => {
+    const cues = [richCue("a", 1000, 5000)];
+
+    expect(splitCueAtTime(cues, "a", 2500, () => "split")).toEqual({
+      cues: [
+        { ...cues[0], endMs: 2500 },
+        { ...cues[0], id: "split", startMs: 2500, endMs: 5000 },
+      ],
+      selectedCueIds: ["split"],
+    });
+  });
+
+  it("does not split when the playhead is outside or on the cue boundary", () => {
+    const cues = [richCue("a", 1000, 5000)];
+
+    expect(splitCueAtTime(cues, "a", 1000, () => "split")).toBeNull();
+    expect(splitCueAtTime(cues, "a", 5000, () => "split")).toBeNull();
+    expect(splitCueAtTime(cues, "a", 900, () => "split")).toBeNull();
+  });
+
+  it("deletes selected cues and selects the next row at the first removed index", () => {
+    const cues = [
+      cue("a", 0, 1000),
+      cue("b", 1000, 2000),
+      cue("c", 2000, 3000),
+    ];
+
+    expect(deleteCuesById(cues, ["b"])).toEqual({
+      cues: [cues[0], cues[2]],
+      selectedCueIds: ["c"],
+    });
+  });
+
+  it("swaps exactly two selected rows by list position", () => {
+    const cues = [
+      cue("a", 0, 1000),
+      cue("b", 1000, 2000),
+      cue("c", 2000, 3000),
+    ];
+
+    expect(swapSelectedCues(cues, ["a", "c"])).toEqual({
+      cues: [cues[2], cues[1], cues[0]],
+      selectedCueIds: ["c", "a"],
+    });
+    expect(swapSelectedCues(cues, ["a"])).toBeNull();
+  });
+
+  it("merges selected rows by directly concatenating primary and secondary text", () => {
+    const cues = [
+      richCue("a", 0, 1000),
+      richCue("b", 500, 3000),
+      richCue("c", 3000, 4000),
+    ];
+
+    expect(mergeSelectedCues(cues, ["a", "b"], "concat")).toEqual({
+      cues: [
+        {
+          ...cues[0],
+          startMs: 0,
+          endMs: 3000,
+          primaryText: "P-aP-b",
+          secondaryText: "S-aS-b",
+        },
+        cues[2],
+      ],
+      selectedCueIds: ["a"],
+    });
+  });
+
+  it("merges selected rows while keeping the first row text", () => {
+    const cues = [
+      richCue("a", 0, 1000),
+      richCue("b", 500, 3000),
+      richCue("c", 3000, 4000),
+    ];
+
+    expect(mergeSelectedCues(cues, ["a", "b"], "keep-first")).toEqual({
+      cues: [{ ...cues[0], startMs: 0, endMs: 3000 }, cues[2]],
+      selectedCueIds: ["a"],
+    });
+  });
+});
+
+describe("cue row clipboard helpers", () => {
+  it("copies selected cue rows in list order", () => {
+    expect(copyCueRows(CUES, ["b", "a"]).map((item) => item.id)).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("pastes clipboard rows after a target with fresh ids", () => {
+    const ids = ["a2", "b2"];
+    const clipboard = copyCueRows(CUES, ["a", "b"]);
+
+    const result = pasteCueRows(CUES, clipboard, "b", () => ids.shift()!);
+
+    expect(result?.cues.map((item) => item.id)).toEqual([
+      "a",
+      "b",
+      "a2",
+      "b2",
+      "c",
+    ]);
+    expect(result?.cues[2]).toMatchObject({
+      startMs: 0,
+      endMs: 1000,
+      primaryText: "a",
+    });
+    expect(result?.selectedCueIds).toEqual(["a2", "b2"]);
   });
 });

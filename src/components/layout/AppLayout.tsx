@@ -33,7 +33,7 @@ export function AppLayout() {
     <div className="flex h-full flex-col">
       <div className="flex min-h-0 flex-1">
         <Sidebar collapsed={sidebarCollapsed} />
-        <main className="flex min-w-0 flex-1 flex-col bg-surface">
+        <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden flex-col bg-surface">
           <View />
         </main>
       </div>

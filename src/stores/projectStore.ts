@@ -30,6 +30,7 @@ interface ProjectState {
   ) => void;
   setAssMetadata: (scriptInfo: AssScriptInfo, styles: AssStyle[]) => void;
   setCues: (cues: SubtitleCue[]) => void;
+  replaceCues: (cues: SubtitleCue[]) => void;
   updateCue: (id: string, updates: Partial<SubtitleCue>) => void;
   updateCuePreview: (id: string, updates: Partial<SubtitleCue>) => void;
   addCue: (cue: SubtitleCue) => void;
@@ -61,6 +62,10 @@ function hasCueChanges(
   return (Object.keys(updates) as Array<keyof SubtitleCue>).some(
     (key) => !Object.is(cue[key], updates[key]),
   );
+}
+
+function sameCueListByReference(a: SubtitleCue[], b: SubtitleCue[]): boolean {
+  return a.length === b.length && a.every((cue, index) => cue === b[index]);
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -126,6 +131,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       cues,
       isDirty: true,
       history: { past: [], future: [] },
+    }),
+
+  replaceCues: (cues) =>
+    set((state) => {
+      if (sameCueListByReference(state.cues, cues)) return state;
+      const newPast = [...state.history.past, state.cues].slice(-MAX_HISTORY);
+      return {
+        cues,
+        isDirty: true,
+        history: { past: newPast, future: [] },
+      };
     }),
 
   updateCue: (id, updates) =>

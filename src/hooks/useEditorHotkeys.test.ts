@@ -30,6 +30,7 @@ beforeEach(() => {
     durationMs: 60000,
     isPlaying: false,
     selectedCueId: null,
+    selectedCueIds: [],
     fps: 25,
     playUntilMs: null,
   });
@@ -160,6 +161,43 @@ describe("编辑动作", () => {
     usePlaybackStore.setState({ selectedCueId: "only" });
     actions["delete-cue"]!();
     expect(usePlaybackStore.getState().selectedCueId).toBeNull();
+  });
+
+  it("copy/cut/paste operate on whole selected cue rows outside text inputs", () => {
+    usePlaybackStore.setState({ selectedCueId: "b", selectedCueIds: ["b"] });
+    const actions = make_actions();
+
+    actions["copy-cues"]!();
+    actions["paste-cues"]!();
+
+    expect(useProjectStore.getState().cues.map((cue) => cue.primaryText)).toEqual([
+      "a",
+      "b",
+      "b",
+      "c",
+    ]);
+    const pastedId = usePlaybackStore.getState().selectedCueIds[0];
+    expect(pastedId).toBeTruthy();
+    expect(pastedId).not.toBe("b");
+
+    actions["cut-cues"]!();
+    expect(useProjectStore.getState().cues.some((cue) => cue.id === pastedId)).toBe(false);
+  });
+
+  it("delete-cue deletes the whole multi-selection when selectedCueIds is populated", () => {
+    const onNotify = vi.fn();
+    usePlaybackStore.setState({
+      selectedCueId: "c",
+      selectedCueIds: ["b", "c"],
+      playUntilMs: 3000,
+    });
+
+    make_actions(onNotify)["delete-cue"]!();
+
+    expect(useProjectStore.getState().cues.map((cue) => cue.id)).toEqual(["a"]);
+    expect(usePlaybackStore.getState().selectedCueIds).toEqual(["a"]);
+    expect(usePlaybackStore.getState().playUntilMs).toBeNull();
+    expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可按 Ctrl+Z 撤销");
   });
 });
 

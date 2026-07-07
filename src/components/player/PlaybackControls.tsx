@@ -36,7 +36,7 @@ export function PlaybackControls({
       {/* 播放控制 */}
       <button
         onClick={() => handleSkip(-5000)}
-        className="rounded p-1 hover:bg-surface-hover"
+        className="rounded p-1 hover:bg-surface-overlay"
         title="后退 5 秒"
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,7 +46,7 @@ export function PlaybackControls({
 
       <button
         onClick={() => setPlaying(!isPlaying)}
-        className="rounded p-1 hover:bg-surface-hover"
+        className="rounded p-1 hover:bg-surface-overlay"
         title={isPlaying ? "暂停（空格）" : "播放（空格）"}
       >
         {isPlaying ? (
@@ -62,7 +62,7 @@ export function PlaybackControls({
 
       <button
         onClick={() => handleSkip(5000)}
-        className="rounded p-1 hover:bg-surface-hover"
+        className="rounded p-1 hover:bg-surface-overlay"
         title="前进 5 秒"
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,7 +90,7 @@ export function PlaybackControls({
         <button
           onClick={onUndo}
           disabled={!canUndo}
-          className="rounded p-1 hover:bg-surface-hover disabled:opacity-30"
+          className="rounded p-1 hover:bg-surface-overlay disabled:opacity-30"
           title="撤销（Ctrl+Z）"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -101,7 +101,7 @@ export function PlaybackControls({
         <button
           onClick={onRedo}
           disabled={!canRedo}
-          className="rounded p-1 hover:bg-surface-hover disabled:opacity-30"
+          className="rounded p-1 hover:bg-surface-overlay disabled:opacity-30"
           title="重做（Ctrl+Y / Ctrl+Shift+Z）"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

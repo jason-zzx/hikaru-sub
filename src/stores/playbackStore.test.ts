@@ -8,6 +8,7 @@ describe("playbackStore playUntil 语义", () => {
       durationMs: 60000,
       isPlaying: false,
       selectedCueId: null,
+      selectedCueIds: [],
       fps: null,
       playUntilMs: null,
     });
@@ -31,5 +32,27 @@ describe("playbackStore playUntil 语义", () => {
   it("setFps 记录帧率", () => {
     usePlaybackStore.getState().setFps(29.97);
     expect(usePlaybackStore.getState().fps).toBe(29.97);
+  });
+
+  it("setSelectedCueId keeps the multi-selection in sync for single selection", () => {
+    usePlaybackStore.getState().setSelectedCueId("cue-1");
+
+    expect(usePlaybackStore.getState().selectedCueId).toBe("cue-1");
+    expect(usePlaybackStore.getState().selectedCueIds).toEqual(["cue-1"]);
+  });
+
+  it("setSelectedCueIds records a multi-selection and uses the last id as active", () => {
+    usePlaybackStore.getState().setSelectedCueIds(["cue-1", "cue-3"]);
+
+    expect(usePlaybackStore.getState().selectedCueId).toBe("cue-3");
+    expect(usePlaybackStore.getState().selectedCueIds).toEqual(["cue-1", "cue-3"]);
+  });
+
+  it("clearCueSelection clears active and multi-selection state", () => {
+    usePlaybackStore.getState().setSelectedCueIds(["cue-1", "cue-2"]);
+    usePlaybackStore.getState().clearCueSelection();
+
+    expect(usePlaybackStore.getState().selectedCueId).toBeNull();
+    expect(usePlaybackStore.getState().selectedCueIds).toEqual([]);
   });
 });

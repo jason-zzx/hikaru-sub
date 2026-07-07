@@ -53,7 +53,7 @@ export function HotkeyHelpOverlay({ open, onClose }: HotkeyHelpOverlayProps) {
           <h3 className="text-sm font-medium">键盘快捷键</h3>
           <button
             onClick={onClose}
-            className="rounded p-1 text-text-muted hover:bg-surface-hover hover:text-text"
+            className="rounded p-1 text-text-muted hover:bg-surface-overlay hover:text-text"
             title="关闭（Esc）"
           >
             <svg

@@ -55,6 +55,23 @@ export function frameStepTarget(
 
 export type CreateIdFn = () => string;
 
+export interface TimelineLaneItem {
+  cue: SubtitleCue;
+  lane: number;
+}
+
+export type TimelineDragEdge = "start" | "end";
+
+export interface CueListActionResult {
+  cues: SubtitleCue[];
+  selectedCueIds: string[];
+}
+
+export type CueInsertPlacement = "before" | "after";
+export type CueMergeMode = "concat" | "keep-first";
+
+const DEFAULT_INSERT_DURATION_MS = 2000;
+
 /**
  * 在现有 cue 列表中生成不撞车的 id；默认用 ass-core 的 createId，最多重试 3 次。
  * 3 次仍撞车时返回 null，调用方应放弃新增并提示用户。
@@ -70,6 +87,266 @@ export function createUniqueCueId(
     if (!existingIds.has(id)) return id;
   }
   return null;
+}
+
+export function assignCueLanes(cues: SubtitleCue[]): TimelineLaneItem[] {
+  const indexed = cues.map((cue, index) => ({ cue, index }));
+  indexed.sort((a, b) => {
+    if (a.cue.startMs !== b.cue.startMs) return a.cue.startMs - b.cue.startMs;
+    return a.index - b.index;
+  });
+
+  const laneEnds: number[] = [];
+  return indexed.map(({ cue }) => {
+    let lane = laneEnds.findIndex((endMs) => cue.startMs >= endMs);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(cue.endMs);
+    } else {
+      laneEnds[lane] = cue.endMs;
+    }
+    return { cue, lane };
+  });
+}
+
+function clampTimeMs(ms: number, durationMs: number): number {
+  const max = Number.isFinite(durationMs) && durationMs > 0 ? durationMs : Infinity;
+  return Math.max(0, Math.min(Math.round(ms), max));
+}
+
+export function normalizeBoundaryDrag(
+  cue: SubtitleCue,
+  edge: TimelineDragEdge,
+  rawMs: number,
+  durationMs: number,
+): Pick<SubtitleCue, "startMs" | "endMs"> {
+  const draggedMs = clampTimeMs(rawMs, durationMs);
+  if (edge === "start") {
+    return draggedMs <= cue.endMs
+      ? { startMs: draggedMs, endMs: cue.endMs }
+      : { startMs: cue.endMs, endMs: draggedMs };
+  }
+  return draggedMs >= cue.startMs
+    ? { startMs: cue.startMs, endMs: draggedMs }
+    : { startMs: draggedMs, endMs: cue.startMs };
+}
+
+function cueIndexesById(cues: SubtitleCue[], ids: string[]): number[] {
+  const idSet = new Set(ids);
+  return cues
+    .map((cue, index) => (idSet.has(cue.id) ? index : -1))
+    .filter((index) => index >= 0);
+}
+
+function makeInheritedEmptyCue(
+  base: SubtitleCue,
+  id: string,
+  placement: CueInsertPlacement,
+): SubtitleCue {
+  if (placement === "before") {
+    return {
+      id,
+      startMs: Math.max(0, base.startMs - DEFAULT_INSERT_DURATION_MS),
+      endMs: base.startMs,
+      primaryText: "",
+      secondaryText: undefined,
+      style: base.style,
+      layer: base.layer,
+    };
+  }
+  return {
+    id,
+    startMs: base.endMs,
+    endMs: base.endMs + DEFAULT_INSERT_DURATION_MS,
+    primaryText: "",
+    secondaryText: undefined,
+    style: base.style,
+    layer: base.layer,
+  };
+}
+
+function cloneCueWithId(cue: SubtitleCue, id: string): SubtitleCue {
+  return { ...cue, id };
+}
+
+function joinCueTexts(values: Array<string | undefined>): string | undefined {
+  const nonEmpty = values.filter((value): value is string => !!value);
+  return nonEmpty.length > 0 ? nonEmpty.join("") : undefined;
+}
+
+export function insertCueRelative(
+  cues: SubtitleCue[],
+  targetId: string,
+  placement: CueInsertPlacement,
+  createIdFn?: CreateIdFn,
+): CueListActionResult | null {
+  const targetIndex = cues.findIndex((cue) => cue.id === targetId);
+  if (targetIndex < 0) return null;
+  const id = createUniqueCueId(cues, createIdFn);
+  if (!id) return null;
+  const created = makeInheritedEmptyCue(cues[targetIndex], id, placement);
+  const insertIndex = placement === "before" ? targetIndex : targetIndex + 1;
+  const next = [...cues.slice(0, insertIndex), created, ...cues.slice(insertIndex)];
+  return { cues: next, selectedCueIds: [id] };
+}
+
+export function duplicateCues(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+  createIdFn?: CreateIdFn,
+): CueListActionResult | null {
+  const indexes = cueIndexesById(cues, selectedIds);
+  if (indexes.length === 0) return null;
+  const selectedIndexSet = new Set(indexes);
+  const next: SubtitleCue[] = [];
+  const duplicatedIds: string[] = [];
+  const existingAndCreated: SubtitleCue[] = [...cues];
+
+  for (let index = 0; index < cues.length; index += 1) {
+    const cue = cues[index];
+    next.push(cue);
+    if (!selectedIndexSet.has(index)) continue;
+    const id = createUniqueCueId(existingAndCreated, createIdFn);
+    if (!id) return null;
+    const duplicated = cloneCueWithId(cue, id);
+    existingAndCreated.push(duplicated);
+    next.push(duplicated);
+    duplicatedIds.push(id);
+  }
+
+  return { cues: next, selectedCueIds: duplicatedIds };
+}
+
+export function splitCueAtTime(
+  cues: SubtitleCue[],
+  targetId: string,
+  splitMs: number,
+  createIdFn?: CreateIdFn,
+): CueListActionResult | null {
+  const targetIndex = cues.findIndex((cue) => cue.id === targetId);
+  if (targetIndex < 0) return null;
+  const target = cues[targetIndex];
+  const roundedSplit = Math.round(splitMs);
+  if (roundedSplit <= target.startMs || roundedSplit >= target.endMs) return null;
+  const id = createUniqueCueId(cues, createIdFn);
+  if (!id) return null;
+  const first = { ...target, endMs: roundedSplit };
+  const second = { ...target, id, startMs: roundedSplit };
+  const next = [
+    ...cues.slice(0, targetIndex),
+    first,
+    second,
+    ...cues.slice(targetIndex + 1),
+  ];
+  return { cues: next, selectedCueIds: [id] };
+}
+
+export function deleteCuesById(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+): CueListActionResult {
+  const indexes = cueIndexesById(cues, selectedIds);
+  if (indexes.length === 0) return { cues, selectedCueIds: [] };
+  const firstIndex = Math.min(...indexes);
+  const selectedSet = new Set(selectedIds);
+  const next = cues.filter((cue) => !selectedSet.has(cue.id));
+  const nextSelection = next[Math.min(firstIndex, next.length - 1)]?.id;
+  return { cues: next, selectedCueIds: nextSelection ? [nextSelection] : [] };
+}
+
+export function swapSelectedCues(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+): CueListActionResult | null {
+  const indexes = cueIndexesById(cues, selectedIds);
+  if (indexes.length !== 2) return null;
+  const [firstIndex, secondIndex] = indexes;
+  const next = [...cues];
+  [next[firstIndex], next[secondIndex]] = [next[secondIndex], next[firstIndex]];
+  return {
+    cues: next,
+    selectedCueIds: [next[firstIndex].id, next[secondIndex].id],
+  };
+}
+
+export function mergeSelectedCues(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+  mode: CueMergeMode,
+): CueListActionResult | null {
+  const indexes = cueIndexesById(cues, selectedIds);
+  if (indexes.length < 2) return null;
+  const selected = indexes.map((index) => cues[index]);
+  const first = selected[0];
+  const merged: SubtitleCue = {
+    ...first,
+    startMs: Math.min(...selected.map((cue) => cue.startMs)),
+    endMs: Math.max(...selected.map((cue) => cue.endMs)),
+  };
+
+  if (mode === "concat") {
+    merged.primaryText = joinCueTexts(selected.map((cue) => cue.primaryText)) ?? "";
+    merged.secondaryText = joinCueTexts(selected.map((cue) => cue.secondaryText));
+  }
+
+  const selectedSet = new Set(selectedIds);
+  const firstSelectedIndex = indexes[0];
+  const next = cues.filter(
+    (cue, index) => index === firstSelectedIndex || !selectedSet.has(cue.id),
+  );
+  const mergedIndex = next.findIndex((cue) => cue.id === first.id);
+  next[mergedIndex] = merged;
+  return { cues: next, selectedCueIds: [merged.id] };
+}
+
+export function copyCueRows(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+): SubtitleCue[] {
+  const selectedSet = new Set(selectedIds);
+  return cues.filter((cue) => selectedSet.has(cue.id)).map((cue) => ({ ...cue }));
+}
+
+export function pasteCueRows(
+  cues: SubtitleCue[],
+  clipboardCues: SubtitleCue[],
+  targetId: string | null,
+  createIdFn?: CreateIdFn,
+): CueListActionResult | null {
+  if (clipboardCues.length === 0) return null;
+  const targetIndex = targetId
+    ? cues.findIndex((cue) => cue.id === targetId)
+    : cues.length - 1;
+  const insertIndex = targetIndex >= 0 ? targetIndex + 1 : cues.length;
+  const existingAndCreated = [...cues];
+  const pasted: SubtitleCue[] = [];
+
+  for (const cue of clipboardCues) {
+    const id = createUniqueCueId(existingAndCreated, createIdFn);
+    if (!id) return null;
+    const nextCue = cloneCueWithId(cue, id);
+    existingAndCreated.push(nextCue);
+    pasted.push(nextCue);
+  }
+
+  return {
+    cues: [...cues.slice(0, insertIndex), ...pasted, ...cues.slice(insertIndex)],
+    selectedCueIds: pasted.map((cue) => cue.id),
+  };
+}
+
+let cueRowClipboard: SubtitleCue[] = [];
+
+export function setCueRowClipboard(cues: SubtitleCue[]): void {
+  cueRowClipboard = cues.map((cue) => ({ ...cue }));
+}
+
+export function getCueRowClipboard(): SubtitleCue[] {
+  return cueRowClipboard.map((cue) => ({ ...cue }));
+}
+
+export function hasCueRowClipboard(): boolean {
+  return cueRowClipboard.length > 0;
 }
 
 function buildAppendedCue(cue: SubtitleCue, id: string): SubtitleCue {

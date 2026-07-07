@@ -26,7 +26,15 @@ describe("EditorView Phase 2B behavior guards", () => {
 
   it("passes notify feedback to editor hotkeys and subtitle editor", () => {
     expect(source).toContain("onNotify: notify");
+    expect(source).toContain("<SubtitleList onNotify={notify}");
     expect(source).toContain("<SubtitleEditor onNotify={notify}");
+  });
+
+  it("isolates scrollable timeline content from resizing the editor grid", () => {
+    expect(source).toContain("grid-rows-[minmax(0,1fr)_168px]");
+    expect(source).toContain("overflow-hidden");
+    expect(source).toContain("col-start-2 row-start-1 min-h-0 overflow-hidden bg-black");
+    expect(source).toContain("col-start-2 row-start-2 min-h-0 overflow-hidden bg-surface");
   });
 
   it("saves back to the active visible subtitle file", () => {

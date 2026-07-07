@@ -206,7 +206,7 @@ export function EditorView() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* 顶部保存状态与编辑页工具条 */}
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-3">
         <div className="flex items-center gap-3">
@@ -247,9 +247,9 @@ export function EditorView() {
       </div>
 
       {/* 主编辑区 */}
-      <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr_320px] grid-rows-[1fr_120px] gap-px bg-border">
+      <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr_320px] grid-rows-[minmax(0,1fr)_168px] gap-px overflow-hidden bg-border">
         {/* 字幕列表 */}
-        <div className="col-start-1 row-span-2 bg-surface-raised">
+        <div className="col-start-1 row-span-2 min-h-0 overflow-hidden bg-surface-raised">
           <div className="flex h-full flex-col">
             <div className="border-b border-border px-3 py-2">
               <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
@@ -257,25 +257,25 @@ export function EditorView() {
               </h3>
             </div>
             <div className="flex-1 overflow-hidden">
-              <SubtitleList />
+              <SubtitleList onNotify={notify} />
             </div>
           </div>
         </div>
 
         {/* 视频播放器 */}
-        <div className="col-start-2 row-start-1 bg-black">
+        <div className="col-start-2 row-start-1 min-h-0 overflow-hidden bg-black">
           <VideoPlayer videoPath={session.videoPath} />
         </div>
 
         {/* 编辑面板 */}
-        <div className="col-start-3 row-span-2 flex min-h-0 flex-col bg-surface-raised">
+        <div className="col-start-3 row-span-2 flex min-h-0 flex-col overflow-hidden bg-surface-raised">
           <div className="min-h-0 flex-1">
             <SubtitleEditor onNotify={notify} />
           </div>
         </div>
 
         {/* 时间轴 */}
-        <div className="col-start-2 row-start-2 bg-surface">
+        <div className="col-start-2 row-start-2 min-h-0 overflow-hidden bg-surface">
           <Timeline />
         </div>
       </div>
