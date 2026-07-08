@@ -1,4 +1,5 @@
 import { useUiStore } from "../../stores/uiStore";
+import { Button } from "../ui/button";
 
 export function WelcomeView() {
   const setStep = useUiStore((s) => s.setStep);
@@ -19,15 +20,16 @@ export function WelcomeView() {
           { step: "translate" as const, title: "AI 翻译", desc: "批量生成双语字幕" },
           { step: "editor" as const, title: "校对编辑", desc: "时间轴与样式调整" },
         ].map((card) => (
-          <button
+          <Button
             key={card.step}
             type="button"
+            variant="outline"
             onClick={() => setStep(card.step)}
-            className="rounded-xl border border-border bg-surface-raised p-5 text-left transition-colors hover:border-accent/50 hover:bg-surface-overlay"
+            className="h-auto flex-col items-start gap-2 whitespace-normal rounded-xl p-5 text-left hover:border-accent/50"
           >
-            <h3 className="font-medium text-text">{card.title}</h3>
-            <p className="mt-1 text-sm text-text-muted">{card.desc}</p>
-          </button>
+            <h3 className="text-base font-medium text-text">{card.title}</h3>
+            <p className="text-sm text-text-muted">{card.desc}</p>
+          </Button>
         ))}
       </div>
     </div>

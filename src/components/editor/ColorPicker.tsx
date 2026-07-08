@@ -232,7 +232,7 @@ export function ColorPicker({
                     handleChannelChange(channel, event.target.value)
                   }
                   onBlur={resetDrafts}
-                  className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text outline-none focus:border-accent/60"
+                  className="w-full rounded border border-input bg-card px-2 py-1 text-xs text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
               </label>
             ))}
@@ -244,7 +244,7 @@ export function ColorPicker({
                 value={hexDraft}
                 onChange={(event) => handleHexChange(event.target.value)}
                 onBlur={resetDrafts}
-                className="w-full rounded border border-border bg-surface px-2 py-1 font-mono text-xs text-text outline-none focus:border-accent/60"
+                className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-xs text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -258,7 +258,7 @@ export function ColorPicker({
                   handleChannelChange("transparency", event.target.value)
                 }
                 onBlur={resetDrafts}
-                className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text outline-none focus:border-accent/60"
+                className="w-full rounded border border-input bg-card px-2 py-1 text-xs text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               />
             </label>
           </div>

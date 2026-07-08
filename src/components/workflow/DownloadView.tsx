@@ -19,10 +19,11 @@ import type {
 } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
+import { Button } from "../ui/button";
 
 const POLL_INTERVAL_MS = 700;
 const INPUT_CLASS =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent/60";
+  "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 function formatMs(ms: number): string {
   if (!ms || ms < 0) return "0:00";
@@ -233,17 +234,18 @@ export function DownloadView() {
       {ffmpegMissing && (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
           <span className="text-warning">未检测到 FFmpeg，无法下载媒体。</span>
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() =>
               void ffmpegPreparation.requestDependency(async () => {
                 await refreshFfmpeg(true);
               })
             }
-            className="shrink-0 rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
+            className="shrink-0 px-3 py-1.5 text-xs text-warning"
           >
             准备 FFmpeg
-          </button>
+          </Button>
         </div>
       )}
 
@@ -331,35 +333,37 @@ export function DownloadView() {
                 className={INPUT_CLASS}
                 disabled={busy}
               />
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={handlePickSaveDir}
                 disabled={busy}
-                className="shrink-0 rounded-lg border border-border px-3 py-2 text-sm text-text hover:bg-surface-overlay disabled:opacity-50"
+                className="shrink-0 px-3 py-2"
               >
                 浏览
-              </button>
+              </Button>
             </div>
           </Field>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button
+          <Button
             type="button"
             onClick={handleStart}
             disabled={!canStart}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
+            className="px-4 py-2"
           >
             {busy ? "下载中…" : "开始下载"}
-          </button>
+          </Button>
           {jobId && (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={handleCancel}
-              className="rounded-lg border border-border px-4 py-2 text-sm text-text hover:bg-surface-overlay"
+              className="px-4 py-2"
             >
               取消下载
-            </button>
+            </Button>
           )}
         </div>
       </section>
@@ -402,21 +406,22 @@ export function DownloadView() {
             {completedPath}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={handleReveal}
-              className="rounded-lg border border-border px-4 py-2 text-sm text-text hover:bg-surface-overlay"
+              className="px-4 py-2"
             >
               打开所在文件夹
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={handleImport}
               disabled={importing}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:opacity-50"
+              className="px-4 py-2"
             >
               {importing ? "打开中…" : "打开并转录"}
-            </button>
+            </Button>
           </div>
         </section>
       )}
@@ -465,8 +470,8 @@ function ModeButton({
       onClick={onClick}
       className={`flex min-w-[10rem] flex-col rounded-lg border px-4 py-3 text-left transition-colors ${
         active
-          ? "border-accent/50 bg-accent/10"
-          : "border-border hover:border-accent/30 hover:bg-surface-overlay"
+          ? "border-accent bg-accent text-accent-foreground ring-2 ring-ring/30"
+          : "border-border hover:border-accent/50 hover:bg-surface-overlay"
       }`}
     >
       <span className="text-sm font-medium text-text">{label}</span>

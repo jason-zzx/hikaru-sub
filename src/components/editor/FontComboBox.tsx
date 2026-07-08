@@ -143,7 +143,7 @@ export function FontComboBox({
           setOpen(true);
         }}
         onKeyDown={handleKeyDown}
-        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent/60"
+        className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
       />
       {open && (
         <div className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-auto rounded-lg border border-border bg-surface-raised py-1 shadow-lg">
@@ -164,9 +164,9 @@ export function FontComboBox({
                 onClick={() => commit(fontName)}
                 className={`w-full px-3 py-2 text-left text-sm ${
                   highlighted
-                    ? "bg-accent/20 text-accent"
+                    ? "bg-accent text-accent-foreground"
                     : active
-                      ? "text-accent"
+                      ? "font-medium text-primary"
                       : "text-text hover:bg-surface-overlay"
                 }`}
                 style={{ fontFamily: `"${fontName}", sans-serif` }}

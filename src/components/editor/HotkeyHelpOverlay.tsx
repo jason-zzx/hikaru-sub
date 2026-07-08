@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { EDITOR_HOTKEYS, type HotkeyDef } from "./hotkeys";
+import { Button } from "../ui/button";
 
 /** 按 category 分组，保持键位表内出现顺序。 */
 export function groupHotkeysByCategory(
@@ -51,9 +52,10 @@ export function HotkeyHelpOverlay({ open, onClose }: HotkeyHelpOverlayProps) {
       >
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-medium">键盘快捷键</h3>
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
-            className="rounded p-1 text-text-muted hover:bg-surface-overlay hover:text-text"
             title="关闭（Esc）"
           >
             <svg
@@ -69,7 +71,7 @@ export function HotkeyHelpOverlay({ open, onClose }: HotkeyHelpOverlayProps) {
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-          </button>
+          </Button>
         </div>
         {[...groups.entries()].map(([category, defs]) => (
           <div key={category} className="mb-4 last:mb-0">

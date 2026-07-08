@@ -43,7 +43,10 @@ AI 日语字幕桌面应用：下载 m3u8 视频 → 本地 ASR 日语转录 →
 | 包管理 | **pnpm workspace**（根目录与 `packages/*`） |
 | 桌面壳 | Tauri 2 + Rust |
 | 前端 | React 19 + TypeScript + Vite |
-| 样式 | Tailwind CSS 4（`src/styles/index.css`） |
+| 样式 | Tailwind CSS 4（`src/styles/index.css`，`@theme` + `@custom-variant dark`） |
+| UI 组件 | **shadcn/ui**（`radix-nova` 风格，组件源码在 `src/components/ui/`，底层 Radix 原语） |
+| 主题 | 自定义 `ThemeProvider`（`src/components/theme-provider.tsx`）：浅色/深色/跟随系统，`localStorage` 持久化，`<html>` 切 `.dark`；切换控件 `src/components/ModeToggle.tsx` |
+| 图标 | 业务导航/工具图标统一放 `src/components/layout/NavIcons.tsx`（lucide 风格手写 SVG）；通用 UI 与主题切换可用 `lucide-react`；**禁止用 emoji/字符当图标** |
 | 状态 | Zustand（`src/stores/`） |
 | 字幕格式 | `@hikaru/ass-core`（`packages/ass-core/`） |
 | ASR | Python sidecar（`asr-service/`，可插拔引擎：faster-whisper / parakeet / qwen3-asr） |
@@ -83,11 +86,13 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ```text
 src/                    React 前端
-  components/layout/    AppLayout、Sidebar、StatusBar
+  components/layout/    AppLayout、Sidebar、StatusBar、NavIcons
   components/workflow/  导入、转录、翻译、压制、设置页
   components/editor/    字幕编辑器
   components/player/    视频预览与 ASS 叠加
-  components/ui/        通用 UI 小组件
+  components/ui/        shadcn/ui 组件（CLI 生成，勿手改风格；新增组件用 `pnpm dlx shadcn@latest add`）
+  components/           ModeToggle、theme-provider 等顶层组件
+  lib/                  `utils.ts` 的 `cn()` 等 shadcn 工具
   constants/            前端常量与配置映射
   stores/               Zustand 状态
   hooks/                React hooks
@@ -168,9 +173,10 @@ interface SubtitleCue {
 3. **类型优先**：前后端共享概念在 `src/types/` 与 `ass-core` 保持一致。
 4. **不提交密钥**：API Key 走 keychain/设置，不进源码。
 5. **中文 UI 文案**：用户面向字符串用简体中文。
-6. **图标用 SVG**：UI 图标一律使用 SVG（统一放 `src/components/layout/NavIcons.tsx`，lucide 风格 `stroke="currentColor"`），不要用 emoji/字符当图标，避免跨平台字形缺失渲染成方块。
-7. **不编辑计划文件**：`.cursor/plans/` 与 `docs/superpowers/plans/` 下的方案文档除非用户明确要求。
-8. **不主动提交代码**：见本文档顶部「⚠️ 最高优先级规则」第 1 条；该规则为最高优先级，优先于本规范及其他一切指引。
+6. **图标用 SVG**：UI 图标一律使用 SVG，不要用 emoji/字符当图标，避免跨平台字形缺失渲染成方块。业务导航/工具图标统一放 `src/components/layout/NavIcons.tsx`（lucide 风格 `stroke="currentColor"`）；通用 UI 与主题切换可用 `lucide-react`。新增 shadcn 组件时其默认 lucide import 可保留。
+7. **UI 组件用 shadcn**：新增按钮/对话框/下拉/选择等控件优先用 `src/components/ui/` 下的 shadcn 组件，不要新写原生 `<button>`/`<select>`/`<input>` 再自己拼样式。表单输入统一走 shadcn 令牌（`border-input bg-card focus-visible:ring-2 focus-visible:ring-ring/50`），数字输入不需要 spinner（已在 `index.css` 全局隐藏）。改组件外观应改语义令牌（`src/styles/index.css` 的 `:root`/`.dark`），不要在业务文件里覆盖 shadcn 组件的内部 class。新增组件用 `pnpm dlx shadcn@latest add <name>`，不要手写。
+8. **不编辑计划文件**：`.cursor/plans/` 与 `docs/superpowers/plans/` 下的方案文档除非用户明确要求。
+9. **不主动提交代码**：见本文档顶部「⚠️ 最高优先级规则」第 1 条；该规则为最高优先级，优先于本规范及其他一切指引。
 
 ## 安全与隐私
 

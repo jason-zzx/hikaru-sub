@@ -12,6 +12,7 @@ import {
   IconTranscribe,
   IconTranslate,
 } from "./NavIcons";
+import { ModeToggle } from "../ModeToggle";
 
 interface NavItem {
   step: WorkflowStep;
@@ -51,13 +52,12 @@ export function Sidebar({ collapsed }: SidebarProps) {
         type="button"
         onClick={() => setStep(item.step)}
         title={item.label}
-        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-          active
-            ? "bg-accent/20 text-accent"
-            : "text-text-muted hover:bg-surface-overlay hover:text-text"
-        }`}
+        data-active={active}
+        className="flex w-full items-center gap-2.5 rounded-md p-2 text-sm ring-sidebar-ring transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground"
       >
-        <span className="flex shrink-0 items-center justify-center">{item.icon}</span>
+        <span className="flex shrink-0 items-center justify-center [&_svg]:size-4 [&_svg]:shrink-0">
+          {item.icon}
+        </span>
         {!collapsed && <span className="truncate">{item.label}</span>}
       </button>
     );
@@ -65,23 +65,26 @@ export function Sidebar({ collapsed }: SidebarProps) {
 
   return (
     <aside
-      className={`flex shrink-0 flex-col border-r border-border bg-surface-raised transition-[width] ${
+      className={`group flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ${
         collapsed ? "w-14" : "w-52"
       }`}
     >
-      <div className="flex items-center justify-between border-b border-border px-3 py-4">
+      <div className="flex items-center justify-between border-b border-sidebar-border px-3 py-4">
         {!collapsed && (
-          <div>
-            <h1 className="text-sm font-semibold tracking-wide text-text">
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold tracking-wide">
               Hikaru Sub
             </h1>
-            <p className="text-xs text-text-muted">AI 字幕工具</p>
+            <p className="truncate text-xs text-muted-foreground">
+              AI 字幕工具
+            </p>
           </div>
         )}
         <button
           type="button"
           onClick={toggleSidebar}
-          className="rounded p-1 text-text-muted hover:bg-surface-overlay hover:text-text"
+          title="切换侧边栏"
+          className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           aria-label="切换侧边栏"
         >
           {collapsed ? "»" : "«"}
@@ -92,11 +95,16 @@ export function Sidebar({ collapsed }: SidebarProps) {
         {navItems.map(renderItem)}
       </nav>
 
-      <div className="border-t border-border p-2">
-        {bottomItems.map(renderItem)}
+      <div className="border-t border-sidebar-border p-2">
+        <div className="mb-1 flex flex-col">
+          <ModeToggle />
+        </div>
+        <div className="flex flex-col gap-1">
+          {bottomItems.map(renderItem)}
+        </div>
         {!collapsed && session && (
           <p
-            className="mt-2 truncate px-3 text-xs text-text-muted"
+            className="mt-2 truncate px-3 text-xs text-muted-foreground"
             title={session.videoPath}
           >
             {session.videoPath.split(/[/\\]/).pop()}

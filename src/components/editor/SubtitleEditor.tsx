@@ -33,7 +33,8 @@ import {
   normalizeTimeRange,
   snapTimeInputCaret,
 } from "../../utils/timeInput";
-import { Select } from "../ui/Select";
+import { Select } from "../ui/select-adapter";
+import { Button } from "../ui/button";
 import { ColorPicker } from "./ColorPicker";
 import { FontComboBox } from "./FontComboBox";
 import { InlineOverridePanel } from "./InlineOverridePanel";
@@ -576,12 +577,9 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
         <p className="text-sm">未选中字幕</p>
-        <button
-          onClick={handleAdd}
-          className="rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
-        >
+        <Button onClick={handleAdd} className="px-4 py-2">
           在当前位置新建字幕
-        </button>
+        </Button>
       </div>
     );
   }
@@ -591,20 +589,23 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">编辑字幕</h3>
         <div className="flex gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleAdd}
-            className="rounded border border-border px-3 py-1 text-xs hover:bg-surface-overlay"
             title="新建字幕（Insert）"
           >
             新建
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleDelete}
-            className="rounded border border-red-500 px-3 py-1 text-xs text-red-500 hover:bg-red-500/10"
+            className="border-destructive/50 text-destructive hover:bg-destructive/10"
             title="删除字幕（Delete）"
           >
             删除
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -621,7 +622,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
             onKeyDown={handleTimeKeyDown("start")}
             placeholder="00:00:00.00"
             inputMode="numeric"
-            className="w-full rounded border border-border bg-surface px-2 py-1 text-sm font-mono"
+            className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
         <div>
@@ -635,7 +636,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
             onKeyDown={handleTimeKeyDown("end")}
             placeholder="00:00:00.00"
             inputMode="numeric"
-            className="w-full rounded border border-border bg-surface px-2 py-1 text-sm font-mono"
+            className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
       </div>
@@ -673,7 +674,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
                   event.currentTarget.blur();
                 }
               }}
-              className="h-9 w-full rounded border border-border bg-surface px-2 text-sm text-text outline-none focus:border-accent/60"
+              className="h-9 w-full rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
             />
           </div>
           <ColorPicker
@@ -683,38 +684,42 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
           />
         </div>
         <div className="flex flex-wrap gap-2" aria-label="快速样式标签">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => applyToggleTag("{\\b1}", "{\\b0}")}
-            className="h-9 flex-1 rounded border border-border bg-surface text-sm font-bold hover:bg-surface-overlay"
+            className="h-9 flex-1 font-bold"
             title="插入粗体标签"
           >
             B
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => applyToggleTag("{\\i1}", "{\\i0}")}
-            className="h-9 flex-1 rounded border border-border bg-surface text-sm italic hover:bg-surface-overlay"
+            className="h-9 flex-1 italic"
             title="插入斜体标签"
           >
             I
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => applyToggleTag("{\\u1}", "{\\u0}")}
-            className="h-9 flex-1 rounded border border-border bg-surface text-sm underline hover:bg-surface-overlay"
+            className="h-9 flex-1 underline"
             title="插入下划线标签"
           >
             U
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => applyToggleTag("{\\s1}", "{\\s0}")}
-            className="h-9 flex-1 rounded border border-border bg-surface text-sm line-through hover:bg-surface-overlay"
+            className="h-9 flex-1 line-through"
             title="插入删除线标签"
           >
             S
-          </button>
+          </Button>
           <InlineOverridePanel
             currentStyle={currentStyle}
             effectiveAlignment={effectiveAlignment}
@@ -736,7 +741,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
             onBlur={handleBlur}
             onFocus={() => handleTextFocus("inline")}
             onKeyDown={handleTextKeyDown}
-            className="w-full rounded border border-border bg-surface px-2 py-1 text-sm"
+            className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
             rows={5}
           />
         </div>
@@ -751,7 +756,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
               onBlur={handleBlur}
               onFocus={() => handleTextFocus("secondary")}
               onKeyDown={handleTextKeyDown}
-              className="w-full rounded border border-border bg-surface px-2 py-1 text-sm"
+              className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               rows={2}
             />
           </div>
@@ -764,7 +769,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
               onBlur={handleBlur}
               onFocus={() => handleTextFocus("primary")}
               onKeyDown={handleTextKeyDown}
-              className="w-full rounded border border-border bg-surface px-2 py-1 text-sm"
+              className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               rows={3}
             />
           </div>
@@ -779,7 +784,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
             onBlur={handleBlur}
             onFocus={() => handleTextFocus("primary")}
             onKeyDown={handleTextKeyDown}
-            className="w-full rounded border border-border bg-surface px-2 py-1 text-sm"
+            className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
             rows={5}
           />
         </div>

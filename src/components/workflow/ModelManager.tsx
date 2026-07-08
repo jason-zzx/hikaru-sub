@@ -5,6 +5,7 @@ import {
   getModelDownloadProgress,
 } from "../../services/tauri";
 import type { AsrModelStatus, ModelDownloadSnapshot } from "../../types";
+import { Button } from "../ui/button";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -148,22 +149,24 @@ export function ModelManager({
         <span>模型状态：{statusText}</span>
         <div className="flex items-center gap-2">
           {!downloading && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={refresh}
               className="text-text-muted hover:text-text"
             >
               重新检测
-            </button>
+            </Button>
           )}
           {showDownloadBtn && (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={handleDownload}
-              className="rounded-md border border-border px-2.5 py-1 text-text-muted hover:border-accent/50 hover:text-text"
+              className="px-2.5 py-1 text-sm"
             >
               下载模型
-            </button>
+            </Button>
           )}
           {downloading && <span className="text-text-muted">下载中…</span>}
         </div>

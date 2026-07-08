@@ -3,6 +3,7 @@ import { parseAss } from "@hikaru/ass-core";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { IconFilePlus } from "../layout/NavIcons";
+import { Button } from "../ui/button";
 import {
   checkFfmpeg,
   invalidateFfmpegStatus,
@@ -143,13 +144,14 @@ export function ImportView() {
           <p className="mt-0.5 truncate font-mono text-xs text-text-muted" title={session.videoPath}>
             {session.videoPath}
           </p>
-          <button
+          <Button
             type="button"
+            variant="default"
             onClick={() => setStep("transcribe")}
-            className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted"
+            className="mt-4"
           >
             继续转录
-          </button>
+          </Button>
         </div>
       )}
 

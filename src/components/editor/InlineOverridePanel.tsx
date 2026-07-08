@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssStyle } from "@hikaru/ass-core";
 import { ColorPicker } from "./ColorPicker";
+import { Button } from "../ui/button";
 
 type ColorTarget = "primaryColor" | "outlineColor" | "backColor";
 
@@ -116,14 +117,15 @@ export function InlineOverridePanel({
 
   return (
     <div ref={rootRef} className="relative">
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={() => setOpen((value) => !value)}
-        className="h-9 rounded border border-border bg-surface px-3 text-sm hover:bg-surface-overlay"
+        className="h-9 px-3"
         title="更多 ASS 行内标签"
       >
         更多标签
-      </button>
+      </Button>
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded border border-border bg-surface-raised p-3 shadow-xl">
@@ -191,7 +193,7 @@ export function InlineOverridePanel({
                       event.currentTarget.blur();
                     }
                   }}
-                  className="h-8 w-20 rounded border border-border bg-surface px-2 text-sm text-text outline-none focus:border-accent/60"
+                  className="h-8 w-20 rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
               </label>
             )}
@@ -213,7 +215,7 @@ export function InlineOverridePanel({
                       event.currentTarget.blur();
                     }
                   }}
-                  className="h-8 w-20 rounded border border-border bg-surface px-2 text-sm text-text outline-none focus:border-accent/60"
+                  className="h-8 w-20 rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
               </label>
             )}

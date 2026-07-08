@@ -10,7 +10,8 @@ import {
   probeRuntimeDependencies,
   setSettings,
 } from "../../services/tauri";
-import { Select } from "../ui/Select";
+import { Select } from "../ui/select-adapter";
+import { Button } from "../ui/button";
 import { AsrEngineSetupPanel } from "./AsrEngineSetupPanel";
 import { ModelManager } from "./ModelManager";
 import { RuntimeDependenciesPanel } from "./RuntimeDependenciesPanel";
@@ -43,7 +44,7 @@ const ASR_DEVICES = [
 ];
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent/60";
+  "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 const RUNTIME_PREPARATION_POLL_MS = 800;
 
@@ -286,14 +287,14 @@ export function SettingsView() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <Button
             type="button"
             onClick={handleSave}
             disabled={saving || !dirty || asrSetupRunning}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
+            className="px-4 py-2"
           >
             {saving ? "保存中…" : "保存"}
-          </button>
+          </Button>
         </div>
       </header>
 

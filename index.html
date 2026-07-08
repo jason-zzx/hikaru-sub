@@ -5,6 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/tauri.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hikaru-Sub</title>
+    <script>
+      // 防 FOUC：在 React 挂载前按用户主题偏好挂上 .dark/.light
+      (() => {
+        const stored = localStorage.getItem("hikaru-theme");
+        const theme =
+          stored === "light" || stored === "dark" || stored === "system"
+            ? stored
+            : "dark";
+        const isDark =
+          theme === "dark" ||
+          (theme === "system" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.add(isDark ? "dark" : "light");
+      })();
+    </script>
   </head>
 
   <body>

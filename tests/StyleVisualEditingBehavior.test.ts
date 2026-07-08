@@ -37,7 +37,7 @@ describe("editor style visual editing integration", () => {
     expect(source).not.toContain("value: selectedCue.style");
     expect(source).toContain('placeholder=""');
 
-    const selectSource = readSource("src/components/ui/Select.tsx");
+    const selectSource = readSource("src/components/ui/select-adapter.tsx");
     expect(selectSource).toContain("placeholder ?? value");
   });
 
