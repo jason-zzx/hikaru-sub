@@ -10,7 +10,8 @@ import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { IconCheck } from "../layout/NavIcons";
-import { Select } from "../ui/Select";
+import { Button } from "../ui/button";
+import { Select } from "../ui/select-adapter";
 import { ModelManager } from "./ModelManager";
 import {
   ASR_ENGINE_OPTIONS,
@@ -51,7 +52,7 @@ const ASR_PROGRESS_RETRY_LIMIT = 90;
 const ASR_PROGRESS_RETRY_MAX_DELAY_MS = 3000;
 
 const VAD_INPUT_CLASS =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent/60";
+  "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 const DEFAULT_VAD_CONFIG: Required<VadConfig> = {
   threshold: 0.5,
@@ -183,13 +184,9 @@ export function TranscribeView() {
         </header>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface-raised">
           <p className="text-text-muted">尚未打开视频</p>
-          <button
-            type="button"
-            onClick={() => setStep("import")}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted"
-          >
+          <Button className="px-4 py-2" onClick={() => setStep("import")}>
             前往导入
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -451,7 +448,8 @@ export function TranscribeView() {
       {ffmpegMissing && (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
           <span className="text-warning">未检测到 FFmpeg，无法提取音轨。</span>
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={() =>
               void ffmpegPreparation.requestDependency(async () => {
@@ -461,7 +459,7 @@ export function TranscribeView() {
             className="shrink-0 rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
           >
             准备 FFmpeg
-          </button>
+          </Button>
         </div>
       )}
 
@@ -488,14 +486,15 @@ export function TranscribeView() {
           <p className="text-sm text-danger">{extractError}</p>
         )}
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            variant="default"
             type="button"
             onClick={handleExtract}
             disabled={extracting || ffmpegMissing}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             {extracting ? "提取中…" : audioReady ? "重新提取" : "提取音轨"}
-          </button>
+          </Button>
           {audioReady && !extracting && (
             <span className="text-sm text-success">音轨已就绪</span>
           )}
@@ -557,27 +556,29 @@ export function TranscribeView() {
               {engineMsg}
             </span>
           )}
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={detectEngines}
             disabled={transcribing}
-            className="rounded-md border border-border px-2.5 py-1 text-xs text-text hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md px-2.5 py-1 text-xs text-text disabled:cursor-not-allowed disabled:opacity-50"
           >
             检测引擎状态
-          </button>
+          </Button>
         </div>
         {selectedEngineUnavailable && !transcribing && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
             <span className="text-warning">
               当前引擎依赖未安装。请先在设置中配置引擎依赖。
             </span>
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={() => setStep("settings")}
               className="rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
             >
               前往设置
-            </button>
+            </Button>
           </div>
         )}
 
@@ -749,34 +750,37 @@ export function TranscribeView() {
 
         <div className="flex flex-wrap items-center gap-3">
           {transcribing ? (
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={handleCancel}
               className="rounded-lg border border-danger/50 px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10"
             >
               取消转录
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="default"
               type="button"
               onClick={handleTranscribe}
               disabled={!audioReady || selectedEngineUnavailable}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
             >
               {resultCount !== null ? "重新转录" : "开始转录"}
-            </button>
+            </Button>
           )}
           {!audioReady && !transcribing && (
             <span className="text-xs text-text-muted">请先提取音轨</span>
           )}
           {resultCount !== null && !transcribing && (
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={() => setStep("translate")}
-              className="rounded-lg border border-border px-4 py-2 text-sm text-text hover:border-accent/50"
+              className="rounded-lg px-4 py-2 text-sm text-text"
             >
               前往翻译
-            </button>
+            </Button>
           )}
         </div>
       </StepCard>
@@ -828,7 +832,7 @@ function StepCard({
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
             done
               ? "bg-success/20 text-success"
-              : "bg-accent/15 text-accent"
+              : "bg-primary text-primary-foreground"
           }`}
         >
           {done ? <IconCheck className="h-4 w-4" /> : index}

@@ -22,12 +22,13 @@ import type {
   BurnVideoProbe,
   FfmpegStatus,
 } from "../../types";
-import { Select } from "../ui/Select";
+import { Select } from "../ui/select-adapter";
+import { Button } from "../ui/button";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
 const INPUT_CLASS =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent/60";
+  "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 const HARD_SUB_PRESETS = [
   "ultrafast",
@@ -379,17 +380,18 @@ export function BurnView() {
       {ffmpegMissing && (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
           <span className="text-warning">未检测到 FFmpeg，无法压制视频。</span>
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() =>
               void ffmpegPreparation.requestDependency(async () => {
                 await refreshFfmpeg(true);
               })
             }
-            className="shrink-0 rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
+            className="shrink-0 border-warning/50 px-3 text-xs font-medium text-warning hover:bg-warning/20"
           >
             准备 FFmpeg
-          </button>
+          </Button>
         </div>
       )}
 
@@ -430,13 +432,14 @@ export function BurnView() {
                     onChange={(e) => setOutputDir(e.target.value)}
                     className={INPUT_CLASS}
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={handlePickOutputDir}
-                    className="shrink-0 rounded-lg border border-border px-3 text-sm hover:bg-surface"
+                    className="shrink-0 px-3 text-sm"
                   >
                     选择
-                  </button>
+                  </Button>
                 </div>
               </Field>
 
@@ -520,14 +523,15 @@ export function BurnView() {
                       原片码率：{formatBitrate(burnProbe?.videoBitrateKbps)}；自动编码：
                       {burnProbe ? ENCODER_LABELS[burnProbe.preferredEncoder] : "未检测"}。
                     </span>
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={handleProbeBurnVideo}
                       disabled={busy || probingBurnVideo}
-                      className="rounded-md border border-border px-2.5 py-1 text-xs text-text hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="px-2.5 py-1 text-xs text-text hover:border-accent/50"
                     >
                       {probingBurnVideo ? "检测中…" : "检测原片参数"}
-                    </button>
+                    </Button>
                   </div>
 
                   {probeError && (
@@ -545,13 +549,14 @@ export function BurnView() {
                         placeholder="帮助 libass 找到 ASS 指定字体"
                         className={INPUT_CLASS}
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
                         onClick={handlePickFontDir}
-                        className="shrink-0 rounded-lg border border-border px-3 text-sm hover:bg-surface"
+                        className="shrink-0 px-3 text-sm"
                       >
                         选择
-                      </button>
+                      </Button>
                     </div>
                   </Field>
                 </>
@@ -600,31 +605,34 @@ export function BurnView() {
 
               <div className="flex gap-2">
                 {busy ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="destructive"
                     onClick={handleCancel}
-                    className="flex-1 rounded-lg border border-danger/40 px-4 py-2 text-sm text-danger hover:bg-danger/10"
+                    className="flex-1 px-4 py-2 text-sm"
                   >
                     取消
-                  </button>
+                  </Button>
                 ) : (
-                  <button
+                  <Button
                     type="button"
+                    variant="default"
                     disabled={!canStart}
                     onClick={handleStart}
-                    className="flex-1 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex-1 px-4 py-2 text-sm font-medium"
                   >
                     开始导出
-                  </button>
+                  </Button>
                 )}
                 {completedPath && (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={handleReveal}
-                    className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-surface"
+                    className="px-4 py-2 text-sm"
                   >
                     打开位置
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -676,11 +684,11 @@ function ModeButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-lg border px-3 py-2 text-left transition ${
+      className={`rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         active
-          ? "border-accent bg-accent/10 text-accent"
-          : "border-border bg-surface text-text hover:border-accent/50"
-      } disabled:cursor-not-allowed disabled:opacity-50`}
+          ? "border-accent bg-accent text-accent-foreground ring-2 ring-ring/30"
+          : "border-border hover:border-accent/50 hover:bg-surface-overlay"
+      }`}
     >
       <span className="block text-sm font-medium">{label}</span>
       <span className="mt-1 block text-xs text-text-muted">{desc}</span>

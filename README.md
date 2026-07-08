@@ -20,6 +20,7 @@
 - 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
 - VAD 语音检测预处理配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
+- UI 体系（shadcn/ui + Radix 原语；凉爽蓝主题；浅色 / 深色 / 跟随系统三态切换，localStorage 持久化，首帧防闪烁；按钮/对话框/下拉/选择/输入等控件统一走 shadcn 语义令牌）
 
 🚧 **待优化**：
 1. 首页增加显示最近视频列表
@@ -31,7 +32,8 @@
 
 - **桌面**: Tauri 2 + Rust
 - **前端**: React 19 + TypeScript + Vite
-- **样式**: Tailwind CSS 4
+- **样式**: Tailwind CSS 4 + shadcn/ui（Radix 原语）
+- **主题**: 浅色 / 深色 / 跟随系统（自定义 ThemeProvider，localStorage 持久化）
 - **状态**: Zustand
 - **包管理**: pnpm workspace
 - **ASR**: Python sidecar（faster-whisper / Parakeet / Qwen3-ASR + VAD）
@@ -137,7 +139,7 @@ git push origin v0.1.0
 ```
 src/                          # React 前端
   components/
-    layout/                   # 布局、侧边栏、状态栏
+    layout/                   # 布局、侧边栏、状态栏、NavIcons
     workflow/                 # 导入、转录、翻译、压制、设置页
     editor/                   # 字幕编辑器组件
       EditorView.tsx          # 编辑器主视图
@@ -152,6 +154,11 @@ src/                          # React 前端
       AssSubtitleOverlay.tsx  # CSS 兜底字幕叠加容器
       AssStyledText.tsx       # 行内 override 标签 span 渲染
       PlaybackControls.tsx    # 播放控制栏
+    ui/                       # shadcn/ui 组件（CLI 生成，勿手改风格）
+    ModeToggle.tsx            # 主题切换按钮（浅色/深色/跟随系统）
+    theme-provider.tsx        # 主题 Provider（localStorage 持久化）
+  lib/
+    utils.ts                  # cn() className 合并工具（shadcn）
   utils/
     assPreviewDocument.ts     # 当前内存字幕 → 预览 ASS 文本
     assStyleCss.ts            # ASS Style → CSS 兜底映射

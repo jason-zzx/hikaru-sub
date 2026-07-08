@@ -11,6 +11,7 @@ import { EditorToast, type EditorToastMessage, type EditorToastVariant } from ".
 import { Timeline } from "./Timeline";
 import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
 import { StyleManager } from "./StyleManager";
+import { Button } from "../ui/button";
 import {
   getSettings,
   getVideoInfo,
@@ -194,12 +195,9 @@ export function EditorView() {
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <p className="text-text-muted">请先打开视频</p>
-          <button
-            onClick={() => setStep("import")}
-            className="mt-4 rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary-hover"
-          >
+          <Button className="mt-4 px-4 py-2" onClick={() => setStep("import")}>
             前往导入
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -220,38 +218,42 @@ export function EditorView() {
           >
             {saveStatus.label}
           </span>
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={handleSave}
             disabled={saving || !session}
-            className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50"
+            className="px-3 py-1.5 text-sm hover:border-accent/50"
             title="保存 (Ctrl+S)"
           >
             {saving ? "保存中…" : "保存"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={handleSelectSubtitleFile}
             disabled={saving}
-            className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50"
+            className="px-3 py-1.5 text-sm hover:border-accent/50"
           >
             选择字幕文件
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={handleRevealSubtitleFile}
             disabled={!subtitleFileExists}
-            className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50"
+            className="px-3 py-1.5 text-sm hover:border-accent/50"
           >
             在文件夹中显示
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={toggleStyleManager}
-            className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay"
+            className="px-3 py-1.5 text-sm hover:border-accent/50"
           >
             {styleManagerOpen ? "关闭样式库" : "样式管理"}
-          </button>
+          </Button>
         </div>
       </div>
 

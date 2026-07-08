@@ -8,12 +8,14 @@ import { usePreviewFontNames } from "../../hooks/usePreviewFontNames";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { IconPlus, IconTrash, IconX } from "../layout/NavIcons";
+import { Button } from "../ui/button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { Select } from "../ui/select-adapter";
 import { ColorPicker } from "./ColorPicker";
 import { FontComboBox } from "./FontComboBox";
 
 const INPUT_CLASS =
-  "w-full rounded border border-border bg-surface px-2 py-1.5 text-sm text-text outline-none focus:border-accent/60";
+  "w-full rounded border border-input bg-card px-2 py-1.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 const COMMON_FONTS = [
   "Arial",
@@ -214,15 +216,15 @@ export function StyleManager() {
           <h2 className="text-sm font-semibold text-text">样式管理</h2>
           <p className="text-xs text-text-muted">{displayStyles.length} 个样式</p>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={toggleStyleManager}
-          className="rounded p-1 text-text-muted hover:bg-surface-overlay hover:text-text"
           title="关闭"
           aria-label="关闭样式管理"
         >
           <IconX className="h-4 w-4" />
-        </button>
+        </Button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto">
@@ -231,14 +233,16 @@ export function StyleManager() {
             <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
               样式列表
             </h3>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={handleCreate}
-              className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-text hover:border-accent/60 hover:bg-surface-overlay"
+              className="inline-flex items-center gap-1 text-xs"
             >
               <IconPlus className="h-3.5 w-3.5" />
               新建样式
-            </button>
+            </Button>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -256,7 +260,7 @@ export function StyleManager() {
                   <button
                     type="button"
                     onClick={() => setEditingStyleName(style.name)}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded text-left hover:bg-surface-overlay"
                   >
                     <span
                       className="h-4 w-4 shrink-0 rounded border border-border"
@@ -266,15 +270,17 @@ export function StyleManager() {
                       {style.name}
                     </span>
                   </button>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => handleDelete(style.name)}
-                    className="rounded p-1 text-text-muted hover:bg-danger/10 hover:text-danger"
+                    className="hover:text-destructive"
                     title="删除样式"
                     aria-label={`删除样式 ${style.name}`}
                   >
                     <IconTrash className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 </div>
               );
             })}
@@ -470,21 +476,21 @@ export function StyleManager() {
                 </summary>
                 <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
                   <Field label="边框样式">
-                    <select
-                      className={INPUT_CLASS}
-                      value={tempStyle.borderStyle}
-                      onChange={(event) =>
+                    <Select
+                      value={String(tempStyle.borderStyle)}
+                      onChange={(value) =>
                         patchStyle({
                           borderStyle: parseNumber(
-                            event.target.value,
+                            value,
                             tempStyle.borderStyle,
                           ),
                         })
                       }
-                    >
-                      <option value={1}>1 - 描边 + 阴影</option>
-                      <option value={3}>3 - 不透明方框</option>
-                    </select>
+                      options={[
+                        { value: "1", label: "1 - 描边 + 阴影" },
+                        { value: "3", label: "3 - 不透明方框" },
+                      ]}
+                    />
                   </Field>
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="边框宽度">
@@ -541,8 +547,8 @@ export function StyleManager() {
                           onClick={() => patchStyle({ alignment })}
                           className={`h-8 rounded border text-xs ${
                             tempStyle.alignment === alignment
-                              ? "border-accent bg-accent text-white"
-                              : "border-border bg-surface-raised text-text hover:bg-surface-overlay"
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-card text-text hover:bg-muted"
                           }`}
                         >
                           {alignment}
@@ -612,24 +618,18 @@ export function StyleManager() {
                 </summary>
                 <div className="border-t border-border px-3 py-3">
                   <Field label="编码">
-                    <select
-                      className={INPUT_CLASS}
-                      value={tempStyle.encoding}
-                      onChange={(event) =>
+                    <Select
+                      value={String(tempStyle.encoding)}
+                      onChange={(value) =>
                         patchStyle({
-                          encoding: parseNumber(
-                            event.target.value,
-                            tempStyle.encoding,
-                          ),
+                          encoding: parseNumber(value, tempStyle.encoding),
                         })
                       }
-                    >
-                      {encodingOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={encodingOptions.map((option) => ({
+                        value: String(option.value),
+                        label: option.label,
+                      }))}
+                    />
                   </Field>
                 </div>
               </details>

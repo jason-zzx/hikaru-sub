@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Button } from "./button";
 
 export interface ConfirmDialogOption {
   label: string;
@@ -16,13 +17,13 @@ interface ConfirmDialogProps {
   escValue?: string;
 }
 
-const VARIANT_CLASS: Record<NonNullable<ConfirmDialogOption["variant"]>, string> = {
-  default:
-    "border-border bg-surface text-text hover:bg-surface-overlay",
-  primary:
-    "border-accent bg-accent text-white hover:bg-accent/90",
-  danger:
-    "border-danger/70 bg-danger/10 text-danger hover:bg-danger/20",
+const BUTTON_VARIANT: Record<
+  NonNullable<ConfirmDialogOption["variant"]>,
+  "default" | "outline" | "destructive"
+> = {
+  default: "outline",
+  primary: "default",
+  danger: "destructive",
 };
 
 /**
@@ -65,16 +66,14 @@ export function ConfirmDialog({
         <p className="mb-4 text-sm text-text-muted">{description}</p>
         <div className="flex justify-end gap-2">
           {options.map((option) => (
-            <button
+            <Button
               key={option.value}
               type="button"
+              variant={BUTTON_VARIANT[option.variant ?? "default"]}
               onClick={() => onSelect(option.value)}
-              className={`rounded border px-3 py-1.5 text-sm ${
-                VARIANT_CLASS[option.variant ?? "default"]
-              }`}
             >
               {option.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

@@ -4,7 +4,8 @@ import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { IconAlertTriangle, IconCheck } from "../layout/NavIcons";
-import { Select } from "../ui/Select";
+import { Select } from "../ui/select-adapter";
+import { Button } from "../ui/button";
 import {
   getSettings,
   loadAssText,
@@ -208,24 +209,24 @@ export function TranslateView() {
 
       {/* 前置条件检查 */}
       {!checkingAss && !hasAss && (
-        <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-200">
+        <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-700 dark:text-yellow-200">
           <p className="flex items-center gap-2 font-medium">
             <IconAlertTriangle className="h-4 w-4" />
             <span>未检测到字幕文件</span>
           </p>
-          <p className="mt-1 text-yellow-300/80">
+          <p className="mt-1 text-yellow-800/90 dark:text-yellow-300/80">
             请先完成「转录」步骤生成单语字幕
           </p>
         </div>
       )}
 
       {cues.length === 0 && (
-        <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-200">
+        <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-700 dark:text-yellow-200">
           <p className="flex items-center gap-2 font-medium">
             <IconAlertTriangle className="h-4 w-4" />
             <span>字幕为空</span>
           </p>
-          <p className="mt-1 text-yellow-300/80">
+          <p className="mt-1 text-yellow-800/90 dark:text-yellow-300/80">
             当前视频没有字幕条目，请先完成转录
           </p>
         </div>
@@ -353,35 +354,38 @@ export function TranslateView() {
 
       {/* 操作按钮 */}
       <footer className="flex items-center justify-between">
-        <button
+        <Button
           onClick={() => setStep("transcribe")}
-          className="rounded-md border border-border px-4 py-2 text-sm hover:bg-surface-raised disabled:opacity-50"
+          variant="outline"
+          className="text-sm"
           disabled={translating}
         >
           返回转录
-        </button>
+        </Button>
 
         <div className="flex gap-3">
-          <button
+          <Button
             onClick={handleTranslate}
             disabled={!canTranslate}
-            className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+            variant="default"
+            className="px-6 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             {translating
               ? "翻译中..."
               : hasTranslation
                 ? "重新翻译"
                 : "开始翻译"}
-          </button>
+          </Button>
 
           {hasTranslation && (
-            <button
+            <Button
               onClick={() => setStep("editor")}
               disabled={translating}
-              className="rounded-md border border-primary px-6 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+              variant="outline"
+              className="px-6 py-2 text-sm font-medium border-primary text-primary hover:bg-primary/10 disabled:opacity-50"
             >
               进入编辑
-            </button>
+            </Button>
           )}
         </div>
       </footer>

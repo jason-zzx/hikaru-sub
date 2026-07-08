@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Button } from "../ui/button";
 
 export type EditorToastVariant = "success" | "error" | "info";
 
@@ -37,13 +38,15 @@ export function EditorToast({ message, onClose }: EditorToastProps) {
       role={message.variant === "error" ? "alert" : "status"}
     >
       <span className="min-w-0 flex-1 break-words">{message.text}</span>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={onClose}
-        className="shrink-0 rounded px-1.5 text-xs opacity-70 hover:opacity-100"
+        className="shrink-0 px-1.5 text-xs opacity-70 hover:opacity-100"
       >
         关闭
-      </button>
+      </Button>
     </div>
   );
 }

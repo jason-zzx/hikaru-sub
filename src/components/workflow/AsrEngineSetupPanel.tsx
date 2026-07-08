@@ -15,6 +15,7 @@ import {
 import type { AsrSetupEnvironment, AsrSetupSnapshot } from "../../types";
 import type { RuntimeDependencyProbe, RuntimeDependencySnapshot } from "../../types";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
+import { Button } from "../ui/button";
 
 const POLL_INTERVAL_MS = 800;
 const SOURCE_LABEL: Record<"official" | "china" | "custom", string> = {
@@ -247,18 +248,18 @@ export function AsrEngineSetupPanel({
             当前将配置：{ASR_SETUP_PROFILE_LABEL[profile]}
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={running ? handleCancel : handleStart}
           disabled={running ? false : !canStart}
-          className={`rounded-lg px-3 py-2 text-sm font-medium ${
+          className={`px-3 py-2 text-sm font-medium ${
             running
               ? "border border-danger/50 text-danger hover:bg-danger/10"
-              : "bg-accent text-white hover:bg-accent-muted disabled:cursor-not-allowed disabled:opacity-50"
+              : "hover:bg-accent-muted"
           }`}
         >
           {running ? "取消配置" : "配置当前引擎依赖"}
-        </button>
+        </Button>
       </div>
 
       <div className="mt-3 flex flex-col gap-2 text-xs text-text-muted">

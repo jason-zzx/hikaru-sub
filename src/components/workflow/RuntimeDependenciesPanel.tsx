@@ -4,6 +4,8 @@ import type {
   RuntimeDependencySnapshot,
   RuntimeDependencySourceMode,
 } from "../../types";
+import { Button } from "../ui/button";
+import { Select } from "../ui/select-adapter";
 import {
   RUNTIME_DEPENDENCY_LABEL,
   RUNTIME_SOURCE_MODE_LABEL,
@@ -87,27 +89,28 @@ export function RuntimeDependenciesPanel({
               </p>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
+          <div className="flex flex-nowrap items-center gap-2">
+            <Select
+              className="w-40 shrink-0"
               value={sourceMode}
-              onChange={(event) =>
-                onChangeSourceMode(event.target.value as RuntimeDependencySourceMode)
+              onChange={(value) =>
+                onChangeSourceMode(value as RuntimeDependencySourceMode)
               }
-              className="rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-text outline-none focus:border-accent/60"
-            >
-              {(["auto", "official", "china", "custom"] as const).map((mode) => (
-                <option key={mode} value={mode}>
-                  {RUNTIME_SOURCE_MODE_LABEL[mode]}
-                </option>
-              ))}
-            </select>
-            <button
+              options={(["auto", "official", "china", "custom"] as const).map(
+                (mode) => ({
+                  value: mode,
+                  label: RUNTIME_SOURCE_MODE_LABEL[mode],
+                }),
+              )}
+            />
+            <Button
               type="button"
+              variant="outline"
               onClick={onProbeSources}
-              className="rounded-md border border-border px-3 py-2 text-sm text-text-muted hover:border-accent/50 hover:text-text"
+              className="shrink-0 px-3 py-2 text-sm"
             >
               重新测速
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -195,32 +198,35 @@ export function RuntimeDependenciesPanel({
                 </div>
                 <div className="flex flex-wrap items-start gap-2 md:justify-end">
                   {canDownload && onPrepareDependency && (
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() => onPrepareDependency(item.kind)}
                       disabled={isPreparing}
-                      className="rounded-md border border-accent/40 px-3 py-1.5 text-sm text-accent hover:border-accent hover:text-accent-muted disabled:cursor-not-allowed disabled:opacity-60"
+                      className="px-3 py-1.5 text-sm border-accent/40 text-accent hover:border-accent hover:text-accent-muted"
                     >
                       {downloadButtonText(preparation)}
-                    </button>
+                    </Button>
                   )}
                   {canConfigure && onConfigureAsr && (
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={onConfigureAsr}
-                      className="rounded-md border border-border px-3 py-1.5 text-sm text-text-muted hover:border-accent/50 hover:text-text"
+                      className="px-3 py-1.5 text-sm"
                     >
                       去配置
-                    </button>
+                    </Button>
                   )}
                   {item.managed && item.sizeBytes > 0 && (
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() => onCleanup(item.kind)}
-                      className="rounded-md border border-border px-3 py-1.5 text-sm text-text-muted hover:border-danger/50 hover:text-danger"
+                      className="px-3 py-1.5 text-sm hover:border-danger/50 hover:text-danger"
                     >
                       清理
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
