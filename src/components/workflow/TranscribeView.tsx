@@ -106,7 +106,7 @@ export function TranscribeView() {
   const [engineMsg, setEngineMsg] = useState<string | null>("未检测");
   const [modelCheckTrigger, setModelCheckTrigger] = useState(0);
 
-  // VAD 高级配置（仅当前会话有效，不写入项目/全局设置）
+  // VAD 语音检测预处理配置（仅当前会话有效，不写入项目/全局设置）
   const [useVad, setUseVad] = useState(false);
   const [vadConfig, setVadConfig] = useState<VadConfig>({});
 
@@ -470,7 +470,6 @@ export function TranscribeView() {
         index={1}
         title="提取音轨"
         done={audioReady}
-        desc="使用 FFmpeg 提取 16kHz 单声道 WAV"
       >
         <p className="truncate font-mono text-xs text-text-muted" title={audioPath}>
           {audioPath || "（无输出路径）"}
@@ -582,130 +581,121 @@ export function TranscribeView() {
           </div>
         )}
 
-        <details className="rounded-lg border border-border bg-surface">
-          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-text">
-            VAD 语音检测配置（高级）
-          </summary>
-          <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={useVad}
-                disabled={transcribing}
-                onChange={(e) => setUseVad(e.target.checked)}
-                className="h-4 w-4 accent-accent"
-              />
-              <span className="text-sm text-text">启用 VAD 预处理</span>
-            </label>
-            <p className="text-xs text-text-muted">
-              对三个引擎均生效：faster-whisper 透传内置 Silero VAD 参数；Parakeet
-              与 Qwen3-ASR 用 VAD 切分语音段后逐段转录，缓解长音频遗漏。VAD 加载失败时自动回退。
-            </p>
+        <div className="rounded-lg border border-border bg-surface px-4 py-3">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={useVad}
+              disabled={transcribing}
+              onChange={(e) => setUseVad(e.target.checked)}
+              className="h-4 w-4 accent-accent"
+            />
+            <span className="text-sm text-text">启用 VAD 语音检测预处理</span>
+          </label>
 
-            {useVad && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Labeled label="语音阈值 (0.0–1.0)">
+          {useVad && (
+            <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
+              <Labeled label="语音阈值 (0.0–1.0)">
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  disabled={transcribing}
+                  value={vadConfig.threshold ?? DEFAULT_VAD_CONFIG.threshold}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    setVadConfig({
+                      ...vadConfig,
+                      threshold: Number.isNaN(v) ? undefined : v,
+                    });
+                  }}
+                  className={VAD_INPUT_CLASS}
+                />
+                <p className="mt-1 text-xs text-text-muted">
+                  默认 0.5。提高减少误检，降低提升灵敏度。
+                </p>
+              </Labeled>
+
+              <Labeled label="最小语音段长度 (ms)">
+                <input
+                  type="number"
+                  min={0}
+                  max={2000}
+                  step={100}
+                  disabled={transcribing}
+                  value={
+                    vadConfig.minSpeechDurationMs ??
+                    DEFAULT_VAD_CONFIG.minSpeechDurationMs
+                  }
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    setVadConfig({
+                      ...vadConfig,
+                      minSpeechDurationMs: Number.isNaN(v) ? undefined : v,
+                    });
+                  }}
+                  className={VAD_INPUT_CLASS}
+                />
+                <p className="mt-1 text-xs text-text-muted">
+                  过滤短于此时长的语音片段，避免噪声干扰。
+                </p>
+              </Labeled>
+
+              <Labeled label="最小静音间隔 (ms)">
+                <input
+                  type="number"
+                  min={100}
+                  max={3000}
+                  step={100}
+                  disabled={transcribing}
+                  value={
+                    vadConfig.minSilenceDurationMs ??
+                    DEFAULT_VAD_CONFIG.minSilenceDurationMs
+                  }
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    setVadConfig({
+                      ...vadConfig,
+                      minSilenceDurationMs: Number.isNaN(v) ? undefined : v,
+                    });
+                  }}
+                  className={VAD_INPUT_CLASS}
+                />
+                <p className="mt-1 text-xs text-text-muted">
+                  语音段之间需多长静音才分割。降低会产生更多更短的语音段。
+                </p>
+              </Labeled>
+
+              {(engine === "parakeet" || engine === "qwen3-asr") && (
+                <Labeled label="最大语音段长度 (ms)">
                   <input
                     type="number"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    disabled={transcribing}
-                    value={vadConfig.threshold ?? DEFAULT_VAD_CONFIG.threshold}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      setVadConfig({
-                        ...vadConfig,
-                        threshold: Number.isNaN(v) ? undefined : v,
-                      });
-                    }}
-                    className={VAD_INPUT_CLASS}
-                  />
-                  <p className="mt-1 text-xs text-text-muted">
-                    默认 0.5。提高减少误检，降低提升灵敏度。
-                  </p>
-                </Labeled>
-
-                <Labeled label="最小语音段长度 (ms)">
-                  <input
-                    type="number"
-                    min={0}
-                    max={2000}
-                    step={100}
+                    min={15000}
+                    max={35000}
+                    step={1000}
                     disabled={transcribing}
                     value={
-                      vadConfig.minSpeechDurationMs ??
-                      DEFAULT_VAD_CONFIG.minSpeechDurationMs
+                      vadConfig.maxSegmentDurationMs ??
+                      DEFAULT_VAD_CONFIG.maxSegmentDurationMs
                     }
                     onChange={(e) => {
                       const v = parseInt(e.target.value, 10);
                       setVadConfig({
                         ...vadConfig,
-                        minSpeechDurationMs: Number.isNaN(v) ? undefined : v,
+                        maxSegmentDurationMs: Number.isNaN(v) ? undefined : v,
                       });
                     }}
                     className={VAD_INPUT_CLASS}
                   />
                   <p className="mt-1 text-xs text-text-muted">
-                    过滤短于此时长的语音片段，避免噪声干扰。
+                    {engine === "parakeet" ? "Parakeet" : "Qwen3-ASR"} 专用：超过此长度的语音段会被切分。默认 25 秒。
                   </p>
                 </Labeled>
-
-                <Labeled label="最小静音间隔 (ms)">
-                  <input
-                    type="number"
-                    min={100}
-                    max={3000}
-                    step={100}
-                    disabled={transcribing}
-                    value={
-                      vadConfig.minSilenceDurationMs ??
-                      DEFAULT_VAD_CONFIG.minSilenceDurationMs
-                    }
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      setVadConfig({
-                        ...vadConfig,
-                        minSilenceDurationMs: Number.isNaN(v) ? undefined : v,
-                      });
-                    }}
-                    className={VAD_INPUT_CLASS}
-                  />
-                  <p className="mt-1 text-xs text-text-muted">
-                    语音段之间需多长静音才分割。降低会产生更多更短的语音段。
-                  </p>
-                </Labeled>
-
-                {(engine === "parakeet" || engine === "qwen3-asr") && (
-                  <Labeled label="最大语音段长度 (ms)">
-                    <input
-                      type="number"
-                      min={15000}
-                      max={35000}
-                      step={1000}
-                      disabled={transcribing}
-                      value={
-                        vadConfig.maxSegmentDurationMs ??
-                        DEFAULT_VAD_CONFIG.maxSegmentDurationMs
-                      }
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        setVadConfig({
-                          ...vadConfig,
-                          maxSegmentDurationMs: Number.isNaN(v) ? undefined : v,
-                        });
-                      }}
-                      className={VAD_INPUT_CLASS}
-                    />
-                    <p className="mt-1 text-xs text-text-muted">
-                      {engine === "parakeet" ? "Parakeet" : "Qwen3-ASR"} 专用：超过此长度的语音段会被切分。默认 25 秒。
-                    </p>
-                  </Labeled>
-                )}
-              </div>
-            )}
-          </div>
-        </details>
+              )}
+            </div>
+          )}
+        </div>
 
         <ModelManager
           engine={engine}

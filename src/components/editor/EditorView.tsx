@@ -222,6 +222,15 @@ export function EditorView() {
           </span>
           <button
             type="button"
+            onClick={handleSave}
+            disabled={saving || !session}
+            className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50"
+            title="保存 (Ctrl+S)"
+          >
+            {saving ? "保存中…" : "保存"}
+          </button>
+          <button
+            type="button"
             onClick={handleSelectSubtitleFile}
             disabled={saving}
             className="rounded border border-border bg-surface px-3 py-1.5 text-sm text-text hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50"
@@ -282,7 +291,6 @@ export function EditorView() {
 
       {/* 播放控制栏 */}
       <PlaybackControls
-        onSave={handleSave}
         canUndo={canUndo()}
         canRedo={canRedo()}
         onUndo={undo}

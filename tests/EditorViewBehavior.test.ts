@@ -21,6 +21,9 @@ describe("EditorView Phase 2B behavior guards", () => {
     expect(source).toContain("保存中");
     expect(source).toContain("保存失败");
     expect(source).toContain("已保存");
+    expect(source).toContain('title="保存 (Ctrl+S)"');
+    expect(source).toContain("onClick={handleSave}");
+    expect(source).not.toContain("onSave={handleSave}");
     expect(source).not.toContain("保存成功");
   });
 

@@ -318,11 +318,7 @@ export function DownloadView() {
               disabled={busy}
             />
             <p className="mt-1 text-xs text-text-muted">
-              每行一条，格式为 Header: Value。Nico 等站点通常需要 Cookie，建议同时加上{" "}
-              <code className="text-text">Referer: https://www.nicovideo.jp/</code>
-            </p>
-            <p className="mt-1 text-xs text-text-muted">
-              Nico 等平台音视频分离，请使用「分离音视频」模式；快速模式会并发下载分片，完成后自动合并。
+              每行一条，格式为 Header: Value。
             </p>
           </Field>
           <Field label="保存目录（可选，默认系统「下载」文件夹）">

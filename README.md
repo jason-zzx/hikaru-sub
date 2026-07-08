@@ -12,14 +12,14 @@
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
 - 翻译工作流（配置界面 + 进度显示 → 生成 `*.translated.ass`）
-- 设置页（FFmpeg/Python 路径、运行时依赖下载源与存储清理、ASR 引擎、翻译 API、高级配置）
+- 设置页（运行时依赖下载源与存储清理、ASR 引擎、翻译 API、高级配置）
 - ASS 文件持久化（自动保存/加载；保留 `[V4+ Styles]` 与 PlayRes；转录时按视频分辨率写入）
 - 字幕编辑器（视频播放 + libass 优先字幕预览 + CSS 明示兜底 + 行内 override 标签渲染 + 样式下拉/快速参数工具栏/更多标签面板/样式库抽屉 + 字幕列表右键菜单/多选行操作 + 编辑面板 + 可拖拽边界的多泳道时间轴 + 固定音频波形 + 撤销重做 + Aegisub 式快捷键体系（字幕导航、逐帧/边界播放头控制、Ctrl+3/4 对轴打点、整行复制/剪切/粘贴、Enter 提交跳转、? 键位速查）；播放时按视频帧时间同步预览；inline 模式 UI 单行展示 `译文 / 原文`）
 - FFmpeg 压制（硬字幕 MP4 / 软字幕 MKV；导出策略、原片码率探测、硬件 H.264 编码器自动选择；进度与取消；压制前使用当前内存字幕生成临时 ASS）
 - libass 预览（编辑页使用 jASSUB/libass WASM 渲染当前内存 ASS；按视频帧时间同步；自动发现系统字体并预加载 ASS 样式、同族权重与行内 `\fn` 字体；不可用时回退 CSS 并在预览区提示；FFmpeg/libass 单帧路径保留作诊断与视觉回归）
 - 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
-- VAD 高级配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
+- VAD 语音检测预处理配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
 
 🚧 **待优化**：
 1. 首页增加显示最近视频列表
@@ -103,7 +103,7 @@ git push origin v0.1.0
 8. 如果本机没有系统 FFmpeg，点击「下载」「转录」「压制」中的 FFmpeg 相关操作时，应出现依赖确认窗口，显示 FFmpeg、预计大小、安装目录 `deps/` 下的保存位置和当前下载源；取消时原操作不继续，确认后下载完成并继续原操作。
 9. 如果本机没有 Python 3.11，设置页点击「配置当前引擎依赖」时，应先出现 Python 3.11 依赖确认窗口；确认后下载并解压受管 Python 3.11 归档到安装目录 `deps/python311/current/`，再继续创建 ASR venv 和安装引擎依赖。
 10. 设置页「运行时依赖」区域可切换官方源/中国大陆镜像/自动推荐，点击「重新测速」会更新推荐源；清理按钮只删除安装目录 `deps/` 下的受管依赖，不应删除用户手动配置的外部路径。
-11. 如果本机曾运行开发版，安装版设置页不应继续显示项目源码目录下的 `asr-service/.venv` Python 路径；一键配置完成后应指向安装目录下的 managed `deps/asr-service/.venv`。
+11. 如果本机曾运行开发版，安装版 ASR 依赖配置不应继续指向项目源码目录下的 `asr-service/.venv`；一键配置完成后应指向安装目录下的 managed `deps/asr-service/.venv`。
 12. 使用受管 FFmpeg 完成一次转录后，若 `deps/ffmpeg/current/ffprobe.exe` 存在，不应再提示“无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080”。
 13. 下载 ASR 模型时，「模型状态」区域应显示实际下载源和诊断日志路径；中国大陆镜像模式下应能在日志中看到 `HF_ENDPOINT=https://hf-mirror.com` 与 `HF_HOME=<安装目录>/deps/models/huggingface`。
 
@@ -238,8 +238,8 @@ scripts/
 - Parakeet 优先使用 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段
 - Parakeet + VAD/gap backfill 已完成长音频完整性增强，并复用 chunking 共享模块合并去重
 - Qwen3-ASR 自带 ForcedAligner 产出字级时间戳，长音频自动分块转录并复用 chunking 共享模块合并去重
-- **VAD 高级配置**（可选，对三个引擎均生效）：
-  - 启用 VAD 预处理：faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 用 VAD 切分语音段后逐段转录，缓解长音频遗漏
+- **VAD 语音检测预处理配置**（可选，对三个引擎均生效）：
+  - 勾选「启用 VAD 语音检测预处理」后显示下方参数；faster-whisper 透传内置 Silero VAD 参数，Parakeet / Qwen3-ASR 用 VAD 切分语音段后逐段转录
   - 语音阈值（threshold）：0.0-1.0，默认 0.5
   - 最小语音段长度：过滤短噪声，默认 500ms
   - 最小静音间隔：语音段分割灵敏度，默认 300ms
@@ -258,7 +258,7 @@ scripts/
 ### 编辑器
 - 视频预览与字幕叠加（经 `register_media_playback` 本地 HTTP 流；`subtitleMergeMode=inline` 时单行显示 `译文 / 原文`）
 - 左侧字幕列表与右侧文本/时间编辑面板；字幕列表支持多选、右键插入/重复/分割/删除、互换 2 行、合并所选行，以及整行复制/剪切/粘贴
-- `Ctrl+S` 保存、`Ctrl+Z` 撤销、`Ctrl+Y`/`Ctrl+Shift+Z` 重做
+- 右上角保存按钮与 `Ctrl+S` 保存；`Ctrl+Z` 撤销、`Ctrl+Y`/`Ctrl+Shift+Z` 重做
 - Aegisub 式快捷键：`↑/↓` 切换字幕、`←/→` 逐帧、`Alt+←/→` 快跳 10 帧、`Ctrl+←/→` 字幕边界跳转、`R` 播放当前句、`Ctrl+3/4` 打点、`Insert`/`Delete` 增删、`Ctrl+C/X/V` 整行复制/剪切/粘贴、`Enter` 提交跳下一条（末条追加）、`Esc` 放弃草稿、`?` 键位速查；编辑框内自动放行文本输入与原生撤销
 - 样式可视化编辑：编辑面板支持样式下拉、字体/字号/主色、B/I/U/S 快速标签，以及更多标签面板（文字/描边/阴影颜色、描边粗细、阴影距离、`\an1-9` 对齐）；样式库抽屉支持新建、删除和编辑 ASS 样式的字体、颜色、边框、对齐与边距
 - 局部时间轴视图：波形与刻度固定在顶部；字幕泳道可独立上下滚动；滚轮左右平移，`Ctrl+滚轮` 缩放，点击定位播放时间
