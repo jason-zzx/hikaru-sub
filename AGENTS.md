@@ -157,7 +157,7 @@ interface SubtitleCue {
 
 - 编辑页视频播放统一走应用内本地 HTTP 媒体服务（`register_media_playback` → `http://127.0.0.1:PORT/media/{token}`），支持 Range 请求与 seek；不要把 Tauri `asset://` 重新作为主播放路径。
 - WebView 不直接支持的编码（如 HEVC/H.265、VP9、AV1）通过 FFmpeg 生成 480p H.264 全关键帧代理视频，写入应用缓存目录 `transcode/*.mp4`。
-- 编辑页字幕预览优先走 jASSUB/libass WASM，播放时按 `<video>` 视频帧时间同步；不可用时回退 CSS 近似预览并在预览区提示，ASS/字体变化后重新尝试 libass。
+- 编辑页字幕预览优先走 jASSUB/libass WASM，播放时按 `<video>` 视频帧时间同步；系统字体发现会读取字体 name table 的本地化 family/full/PostScript 名称并注册到 jASSUB `availableFonts`，不要用手写映射猜测用户选择的字体名；当前预览句缺字时通过懒检测 cmap 并插入仅用于预览的 `\fn` fallback 标签，仍保持 libass 渲染。libass 不可用时才回退 CSS 近似预览并在预览区提示，ASS/字体名称映射变化后重新尝试 libass。
 - 压制页不展示字幕预览，只提供导出设置；最终硬字幕输出以 FFmpeg/libass 为准。
 - m3u8 下载后端默认 `auto`：优先 Rust 分片并发下载，失败时回退 FFmpeg。前端不暴露并发数或策略选择；`start_video_download.strategy` 仅保留供调试。
 

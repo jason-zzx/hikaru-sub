@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SubtitleCue } from "@hikaru/ass-core";
 import {
   findPreviewCue,
+  getLibassFontKey,
   getLibassRenderTimeMs,
   shouldUseCssFallback,
 } from "./subtitlePreviewModel";
@@ -66,5 +67,25 @@ describe("subtitlePreviewModel", () => {
     expect(shouldUseCssFallback("auto", false, null)).toBe(true);
     expect(shouldUseCssFallback("auto", true, "worker failed")).toBe(true);
     expect(shouldUseCssFallback("auto", true, null)).toBe(false);
+  });
+
+  it("changes the libass retry key when available font names change", () => {
+    const first = getLibassFontKey({
+      defaultFont: ".苹方-简",
+      fontUrls: ["font://pingfang"],
+      availableFonts: {
+        ".苹方-简": "font://pingfang",
+      },
+    });
+    const second = getLibassFontKey({
+      defaultFont: ".苹方-简",
+      fontUrls: ["font://pingfang"],
+      availableFonts: {
+        ".苹方-简": "font://pingfang",
+        "PingFangSC-Regular": "font://pingfang",
+      },
+    });
+
+    expect(second).not.toBe(first);
   });
 });

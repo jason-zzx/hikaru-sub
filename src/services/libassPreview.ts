@@ -40,6 +40,7 @@ interface CreateLibassControllerArgs {
   canvas: HTMLCanvasElement;
   assText: string;
   fontUrls: string[];
+  availableFonts?: Record<string, string>;
   defaultFont?: string;
   workerUrl: string;
   wasmUrl: string;
@@ -50,6 +51,7 @@ export interface CreateDefaultLibassControllerArgs {
   canvas: HTMLCanvasElement;
   assText: string;
   fontUrls: string[];
+  availableFonts?: Record<string, string>;
   defaultFont?: string;
 }
 
@@ -65,6 +67,7 @@ export async function createLibassController({
   canvas,
   assText,
   fontUrls,
+  availableFonts,
   defaultFont,
   workerUrl,
   wasmUrl,
@@ -74,6 +77,7 @@ export async function createLibassController({
     canvas,
     subContent: assText,
     fonts: fontUrls,
+    availableFonts: availableFonts ?? {},
     defaultFont: defaultFont ?? SYSTEM_DEFAULT_FONT,
     workerUrl,
     wasmUrl,

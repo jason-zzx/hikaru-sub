@@ -6,6 +6,31 @@ import {
 
 export type SubtitlePreviewRendererMode = "auto" | "libass" | "css";
 
+interface LibassFontKeyArgs {
+  defaultFont?: string;
+  glyphFallbackFont?: string;
+  fontUrls: string[];
+  availableFonts?: Record<string, string>;
+}
+
+export function getLibassFontKey({
+  defaultFont,
+  glyphFallbackFont,
+  fontUrls,
+  availableFonts = {},
+}: LibassFontKeyArgs): string {
+  const availableFontEntries = Object.entries(availableFonts)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, url]) => `${name}:${url}`);
+
+  return [
+    defaultFont ?? "",
+    glyphFallbackFont ?? "",
+    ...fontUrls,
+    ...availableFontEntries,
+  ].join("\n");
+}
+
 export function findPreviewCue(
   cues: SubtitleCue[],
   activeCueId: string | null,

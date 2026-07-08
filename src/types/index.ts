@@ -308,6 +308,9 @@ export interface PreviewFontFile {
   path: string;
   url: string;
   fileName: string;
+  displayName?: string | null;
+  familyNames?: string[];
+  fontNames?: string[];
 }
 
 export interface RenderSubtitlePreviewFrameArgs {

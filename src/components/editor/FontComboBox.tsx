@@ -18,6 +18,23 @@ export function findMatchingFontIndex(options: string[], query: string): number 
   return options.findIndex((option) => option.toLowerCase().includes(normalized));
 }
 
+export function fontOptionsWithCurrent(value: string, options: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const option of options) {
+    if (!option || seen.has(option)) continue;
+    seen.add(option);
+    result.push(option);
+  }
+
+  if (value && !seen.has(value)) {
+    result.push(value);
+  }
+
+  return result;
+}
+
 export function FontComboBox({
   value,
   options,
@@ -36,7 +53,7 @@ export function FontComboBox({
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const fontOptions = useMemo(
-    () => Array.from(new Set([value, ...options].filter(Boolean))),
+    () => fontOptionsWithCurrent(value, options),
     [options, value],
   );
 
