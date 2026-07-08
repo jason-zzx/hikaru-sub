@@ -1,18 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { discoverPreviewFonts } from "../services/tauri";
+import type { PreviewFontFile } from "../types";
+import { previewFontNameFromFileName } from "../utils/fontFamilyAliases";
 
-const FONT_STYLE_SUFFIX =
-  /[-_\s](regular|bold|italic|bolditalic|bold-italic|medium|semibold|semi-bold|light|thin|black|heavy|demibold|demi-bold|book|oblique)$/i;
+type FontNameSource =
+  | string
+  | Pick<PreviewFontFile, "fileName"> &
+      Partial<Pick<PreviewFontFile, "displayName" | "familyNames">>;
 
-function fontNameFromFileName(fileName: string): string {
-  const stem = fileName.replace(/\.(ttf|otf|ttc|otc)$/i, "");
-  return stem.replace(FONT_STYLE_SUFFIX, "").trim() || stem;
+function previewFontNameFromSource(source: FontNameSource): string {
+  if (typeof source === "string") return previewFontNameFromFileName(source);
+
+  return (
+    source.displayName?.trim() ||
+    source.familyNames?.find((name) => name.trim().length > 0)?.trim() ||
+    previewFontNameFromFileName(source.fileName)
+  );
 }
 
-export function fontNamesFromFiles(fileNames: string[]): string[] {
+export function fontNamesFromFiles(fonts: FontNameSource[]): string[] {
   return Array.from(
-    new Set(fileNames.map(fontNameFromFileName).filter(Boolean)),
+    new Set(fonts.map(previewFontNameFromSource).filter(Boolean)),
   ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+export function mergePreviewFontNames(
+  discoveredNames: string[],
+  extraNames: string[],
+): string[] {
+  return Array.from(
+    new Set([...discoveredNames, ...extraNames.filter(Boolean)]),
+  );
 }
 
 export function usePreviewFontNames(extraNames: string[] = []) {
@@ -24,9 +42,7 @@ export function usePreviewFontNames(extraNames: string[] = []) {
     discoverPreviewFonts()
       .then((fonts) => {
         if (cancelled) return;
-        setDiscoveredNames(
-          fontNamesFromFiles(fonts.map((font) => font.fileName)),
-        );
+        setDiscoveredNames(fontNamesFromFiles(fonts));
       })
       .catch(() => {
         if (!cancelled) setDiscoveredNames([]);
@@ -38,8 +54,7 @@ export function usePreviewFontNames(extraNames: string[] = []) {
   }, []);
 
   return useMemo(
-    () =>
-      Array.from(new Set([...extraNames.filter(Boolean), ...discoveredNames])),
+    () => mergePreviewFontNames(discoveredNames, extraNames),
     [discoveredNames, extraNames],
   );
 }

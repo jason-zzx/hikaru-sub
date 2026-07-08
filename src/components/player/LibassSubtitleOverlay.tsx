@@ -4,11 +4,13 @@ import {
   type LibassController,
 } from "../../services/libassPreview";
 import { createFreshLibassCanvas } from "./libassCanvas";
+import { getLibassFontKey } from "./subtitlePreviewModel";
 import { startLibassVideoFrameSync } from "./libassVideoSync";
 
 interface LibassSubtitleOverlayProps {
   assText: string;
   fontUrls: string[];
+  availableFonts?: Record<string, string>;
   defaultFont?: string;
   width: number;
   height: number;
@@ -21,6 +23,7 @@ interface LibassSubtitleOverlayProps {
 export function LibassSubtitleOverlay({
   assText,
   fontUrls,
+  availableFonts,
   defaultFont,
   width,
   height,
@@ -35,8 +38,13 @@ export function LibassSubtitleOverlay({
   const latestFontUrlsRef = useRef(fontUrls);
   const latestPreviewRef = useRef({ assText, width, height, renderTimeMs });
   const fontKey = useMemo(
-    () => `${defaultFont ?? ""}\n${fontUrls.join("\n")}`,
-    [defaultFont, fontUrls],
+    () =>
+      getLibassFontKey({
+        defaultFont,
+        fontUrls,
+        availableFonts,
+      }),
+    [availableFonts, defaultFont, fontUrls],
   );
 
   latestFontUrlsRef.current = fontUrls;
@@ -59,6 +67,7 @@ export function LibassSubtitleOverlay({
       canvas,
       assText: initialAssText,
       fontUrls: latestFontUrlsRef.current,
+      availableFonts,
       defaultFont,
     })
       .then(async (controller) => {
@@ -93,7 +102,7 @@ export function LibassSubtitleOverlay({
         });
       }
     };
-  }, [defaultFont, fontKey, onUnavailable]);
+  }, [availableFonts, defaultFont, fontKey, onUnavailable]);
 
   useEffect(() => {
     const controller = controllerRef.current;

@@ -418,7 +418,10 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
               videoElement={videoElement}
               followVideoFrames={isPlaying}
               fontUrls={previewFontSelection.fontUrls}
+              fontFiles={previewFontSelection.fontFiles}
+              availableFonts={previewFontSelection.availableFonts}
               defaultFont={previewFontSelection.defaultFont}
+              glyphFallbackFont={previewFontSelection.glyphFallbackFont}
               displayRect={{
                 left: videoDisplayRect.left,
                 top: videoDisplayRect.top,

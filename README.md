@@ -16,7 +16,7 @@
 - ASS 文件持久化（自动保存/加载；保留 `[V4+ Styles]` 与 PlayRes；转录时按视频分辨率写入）
 - 字幕编辑器（视频播放 + libass 优先字幕预览 + CSS 明示兜底 + 行内 override 标签渲染 + 样式下拉/快速参数工具栏/更多标签面板/样式库抽屉 + 字幕列表右键菜单/多选行操作 + 编辑面板 + 可拖拽边界的多泳道时间轴 + 固定音频波形 + 撤销重做 + Aegisub 式快捷键体系（字幕导航、逐帧/边界播放头控制、Ctrl+3/4 对轴打点、整行复制/剪切/粘贴、Enter 提交跳转、? 键位速查）；播放时按视频帧时间同步预览；inline 模式 UI 单行展示 `译文 / 原文`）
 - FFmpeg 压制（硬字幕 MP4 / 软字幕 MKV；导出策略、原片码率探测、硬件 H.264 编码器自动选择；进度与取消；压制前使用当前内存字幕生成临时 ASS）
-- libass 预览（编辑页使用 jASSUB/libass WASM 渲染当前内存 ASS；按视频帧时间同步；自动发现系统字体并预加载 ASS 样式、同族权重与行内 `\fn` 字体；不可用时回退 CSS 并在预览区提示；FFmpeg/libass 单帧路径保留作诊断与视觉回归）
+- libass 预览（编辑页使用 jASSUB/libass WASM 渲染当前内存 ASS；按视频帧时间同步；自动发现系统字体并注册字体文件中的本地化 family/full/PostScript 名称，预加载 ASS 样式、同族权重与行内 `\fn` 字体；当前预览句缺字时对缺字片段生成仅用于预览的字体 fallback 标签；libass 不可用时回退 CSS 并在预览区提示；FFmpeg/libass 单帧路径保留作诊断与视觉回归）
 - 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
 - VAD 语音检测预处理配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
@@ -161,6 +161,8 @@ src/                          # React 前端
     useVideoDisplayRect.ts    # 视频真实渲染区域跟踪
   stores/                     # Zustand 状态管理
   services/                   # Tauri 命令封装 + 翻译服务
+    fontCoverage.ts           # 预览字体 cmap 字形覆盖检测
+    libassFontSelection.ts    # libass 预览字体选择与 availableFonts 注册
 src-tauri/                    # Tauri Rust 后端
   src/
     ffmpeg.rs                 # FFmpeg 检测、音轨提取、视频信息、波形提取
@@ -269,7 +271,7 @@ scripts/
 
 #### 字幕预览渲染（libass 优先，CSS 兜底）
 
-编辑页优先通过 jASSUB/libass WASM 渲染当前内存 ASS。播放时预览跟随 `<video>` 的视频帧时间，优先使用 `requestVideoFrameCallback`，不支持时回退到 `requestAnimationFrame`。若 libass WASM 或字体注册不可用，编辑页会回退到 CSS 近似预览，并在预览区显示提示；ASS 文本、字体集合或渲染模式变化后会清除回退状态并重新尝试 libass。压制页不展示字幕预览，只保留导出设置；最终硬字幕输出仍以 FFmpeg/libass 为准。
+编辑页优先通过 jASSUB/libass WASM 渲染当前内存 ASS。播放时预览跟随 `<video>` 的视频帧时间，优先使用 `requestVideoFrameCallback`，不支持时回退到 `requestAnimationFrame`。若 libass WASM 或字体注册不可用，编辑页会回退到 CSS 近似预览，并在预览区显示提示；ASS 文本、字体集合、`availableFonts` 名称映射或渲染模式变化后会清除回退状态并重新尝试 libass。压制页不展示字幕预览，只保留导出设置；最终硬字幕输出仍以 FFmpeg/libass 为准。
 
 **实现架构**
 
@@ -277,6 +279,8 @@ scripts/
 SubtitleCue + assStyles + assScriptInfo
         ↓
 resolveAssDocumentForSave + serializeAss
+        ↓
+当前预览句字形懒检测 + render-only 字体 fallback 标签
         ↓
 SubtitlePreview
         ├─ 编辑页：LibassSubtitleOverlay（jASSUB/libass WASM）
@@ -288,9 +292,11 @@ SubtitlePreview
 **字体发现**
 
 - `discover_preview_fonts` 会枚举系统字体目录，并通过本地 HTTP 媒体服务把 `.ttf` / `.otf` / `.ttc` / `.otc` 注册给浏览器端 libass。
-- 编辑页会按 ASS Style 字体名、当前字幕行内 `\fn` 覆盖，以及匹配字体家族的多个权重文件选择预加载字体，减少预览与最终压制在字重选择上的差异。
+- 字体发现会解析 OpenType name table 中的 family、typographic family、full name 与 PostScript name（含本地化名称），前端会把这些名称注册到 jASSUB `availableFonts`，避免 `.苹方-简`、`メイリオ`、中文字体名等仅因名称不匹配显示为方块。
+- 编辑页会按 ASS Style 字体名、当前字幕行内 `\fn` 覆盖，以及匹配字体家族的多个权重文件选择预加载字体；名称注册采用“真实字体名优先，去前导点兼容名后补”的规则，减少预览与最终压制在字重和字体选择上的差异。
+- 对当前正在预览的字幕，前端会懒检测所用字体的 cmap 字形覆盖；只有检测到具体字符缺字时，才在预览 ASS 文本里插入仅用于预览的 `\fn` fallback 标签，不会修改内存样式或保存到字幕文件。
 - 压制页填写的字体目录会作为最终硬字幕压制的补充字体源。
-- 字体缺失时 libass 会按运行环境回退；预览区会保留提示，便于定位字体差异。
+- 字体文件缺失或 libass 初始化失败时才回退 CSS 近似预览；预览区会保留提示，便于定位字体差异。
 
 **画面区域**
 
@@ -351,7 +357,7 @@ interface SubtitleCue {
 | `extract_audio` | 提取 16kHz WAV 音轨 + 进度事件 |
 | `extract_waveform` | 提取归一化音频峰值数据用于时间轴波形 |
 | `get_video_info` | 通过共享 ffprobe 解析器获取视频分辨率、时长 |
-| `discover_preview_fonts` | 枚举系统/补充字体并注册为预览可访问 URL |
+| `discover_preview_fonts` | 枚举系统/补充字体，解析字体名称元数据，并注册为预览可访问 URL |
 | `render_subtitle_preview_frame` | 使用 FFmpeg/libass 渲染硬字幕单帧图，用于诊断与视觉回归 |
 | `register_media_playback` | 注册本地视频到媒体 HTTP 服务，返回可播放 URL |
 | `probe_video_playback` | 探测是否需代理转码（容器/音视频编码） |

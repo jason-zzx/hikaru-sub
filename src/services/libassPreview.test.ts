@@ -52,6 +52,9 @@ describe("createLibassController", () => {
       canvas,
       assText: "[Script Info]\nTitle: Test",
       fontUrls: ["http://127.0.0.1/font.ttf"],
+      availableFonts: {
+        ".苹方-简": "http://127.0.0.1/font.ttf",
+      },
       defaultFont: "Noto Sans SC",
       workerUrl: "/worker.js",
       wasmUrl: "/worker.wasm",
@@ -63,6 +66,9 @@ describe("createLibassController", () => {
         canvas,
         subContent: "[Script Info]\nTitle: Test",
         fonts: ["http://127.0.0.1/font.ttf"],
+        availableFonts: {
+          ".苹方-简": "http://127.0.0.1/font.ttf",
+        },
         defaultFont: "Noto Sans SC",
         workerUrl: "/worker.js",
         wasmUrl: "/worker.wasm",
@@ -101,6 +107,9 @@ describe("createLibassController", () => {
       canvas,
       assText: "[Script Info]\nTitle: Default",
       fontUrls: ["http://127.0.0.1/font.ttf"],
+      availableFonts: {
+        "Custom Font": "http://127.0.0.1/font.ttf",
+      },
     });
 
     expect(jassubMock.calls[0]).toEqual(
@@ -108,6 +117,9 @@ describe("createLibassController", () => {
         canvas,
         subContent: "[Script Info]\nTitle: Default",
         fonts: ["http://127.0.0.1/font.ttf"],
+        availableFonts: {
+          "Custom Font": "http://127.0.0.1/font.ttf",
+        },
         queryFonts: false,
       }),
     );
