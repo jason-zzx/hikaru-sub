@@ -5,8 +5,6 @@ import {
   cleanupRuntimeDependency,
   getRuntimeDependencyProgress,
   invalidateFfmpegStatus,
-  pickDirectory,
-  pickExecutableFile,
   prepareRuntimeDependency,
   probeDownloadSources,
   probeRuntimeDependencies,
@@ -18,7 +16,6 @@ import { ModelManager } from "./ModelManager";
 import { RuntimeDependenciesPanel } from "./RuntimeDependenciesPanel";
 import type {
   AppSettings,
-  FfmpegStatus,
   RuntimeDependencyKind,
   RuntimeDependencyProbe,
   RuntimeDependencySnapshot,
@@ -30,12 +27,6 @@ import {
   defaultAsrModel,
 } from "../../constants/asr";
 import { RUNTIME_DEPENDENCY_LABEL } from "../../constants/runtimeDependencies";
-
-const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
-  settings: "自定义路径",
-  managed: "受管下载",
-  system: "系统 PATH",
-};
 
 const TARGET_LANGS = [
   { value: "zh-CN", label: "简体中文" },
@@ -70,7 +61,6 @@ export function SettingsView() {
   const runtimePreparationJobsRef = useRef<Partial<Record<RuntimeDependencyKind, string>>>({});
   const autoProbeRuntimeSourcesRef = useRef(false);
   const [settings, setLocal] = useState<AppSettings | null>(null);
-  const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [asrSetupRunning, setAsrSetupRunning] = useState(false);
@@ -99,8 +89,7 @@ export function SettingsView() {
   const refreshFfmpeg = (force = false) => {
     if (force) invalidateFfmpegStatus();
     checkFfmpeg()
-      .then(setFfmpeg)
-      .catch(() => setFfmpeg(null));
+      .catch(() => undefined);
   };
 
   const refreshRuntimeDependencies = async (
@@ -293,7 +282,7 @@ export function SettingsView() {
         <div>
           <h2 className="text-xl font-semibold">设置</h2>
           <p className="mt-1 text-sm text-text-muted">
-            FFmpeg 路径、ASR 引擎、翻译 API 等全局配置
+            运行时依赖、ASR 引擎、翻译 API 等全局配置
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -321,42 +310,6 @@ export function SettingsView() {
               {message.text}
             </div>
           ) : null}
-
-          <Section title="可执行程序路径" desc="留空则使用系统 PATH 或受管下载的程序">
-            <Field label="FFmpeg 路径">
-              <PathInput
-                value={settings.ffmpegPath ?? ""}
-                placeholder="留空使用系统 / 受管 ffmpeg"
-                onChange={(v) => update("ffmpegPath", v || undefined)}
-                onBrowse={pickExecutableFile}
-              />
-              <p className="mt-1.5 text-xs text-text-muted">
-                {ffmpeg
-                  ? ffmpeg.available
-                    ? `状态：就绪 · 来源 ${FFMPEG_SOURCE_LABEL[ffmpeg.source]}${
-                        ffmpeg.version ? ` · ${ffmpeg.version}` : ""
-                      }`
-                    : "状态：未找到 FFmpeg"
-                  : "状态：检测中…"}
-              </p>
-            </Field>
-            <Field label="Python 路径">
-              <PathInput
-                value={settings.pythonPath ?? ""}
-                placeholder="留空使用系统或受管 Python 3.11"
-                onChange={(v) => update("pythonPath", v || undefined)}
-                onBrowse={pickExecutableFile}
-              />
-            </Field>
-            <Field label="ASR 服务目录">
-              <PathInput
-                value={settings.asrServicePath ?? ""}
-                placeholder="asr-service 目录路径"
-                onChange={(v) => update("asrServicePath", v || undefined)}
-                onBrowse={pickDirectory}
-              />
-            </Field>
-          </Section>
 
           <RuntimeDependenciesPanel
             probe={runtimeProbe}
@@ -549,40 +502,5 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="text-sm text-text-muted">{label}</span>
       {children}
     </label>
-  );
-}
-
-function PathInput({
-  value,
-  placeholder,
-  onChange,
-  onBrowse,
-}: {
-  value: string;
-  placeholder?: string;
-  onChange: (value: string) => void;
-  onBrowse: () => Promise<string | null>;
-}) {
-  const handleBrowse = async () => {
-    const picked = await onBrowse();
-    if (picked) onChange(picked);
-  };
-
-  return (
-    <div className="flex gap-2">
-      <input
-        className={inputClass}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <button
-        type="button"
-        onClick={handleBrowse}
-        className="shrink-0 rounded-lg border border-border px-3 py-2 text-sm text-text-muted hover:border-accent/50 hover:text-text"
-      >
-        浏览…
-      </button>
-    </div>
   );
 }

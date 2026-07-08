@@ -2,7 +2,6 @@ import { usePlaybackStore } from "../../stores/playbackStore";
 import { formatPlaybackTime } from "../../utils/formatTime";
 
 interface PlaybackControlsProps {
-  onSave?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -10,7 +9,6 @@ interface PlaybackControlsProps {
 }
 
 export function PlaybackControls({
-  onSave,
   canUndo,
   canRedo,
   onUndo,
@@ -109,13 +107,6 @@ export function PlaybackControls({
           </svg>
         </button>
 
-        <button
-          onClick={onSave}
-          className="rounded bg-primary px-3 py-1 text-sm font-medium text-white hover:bg-primary-hover"
-          title="保存 (Ctrl+S)"
-        >
-          保存
-        </button>
       </div>
     </div>
   );
