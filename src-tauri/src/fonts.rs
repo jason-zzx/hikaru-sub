@@ -1,7 +1,13 @@
 use crate::media_server::MediaServer;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use tauri::State;
+
+fn preview_font_cache() -> &'static Mutex<Option<Vec<PreviewFontFile>>> {
+    static CACHE: OnceLock<Mutex<Option<Vec<PreviewFontFile>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
+}
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -316,10 +322,9 @@ fn collect_font_paths(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-#[tauri::command]
-pub fn discover_preview_fonts(
+fn discover_preview_fonts_sync(
     extra_dirs: Vec<String>,
-    server: State<'_, MediaServer>,
+    server: &MediaServer,
 ) -> Result<Vec<PreviewFontFile>, String> {
     let mut dirs = default_font_dirs();
     dirs.extend(
@@ -355,6 +360,36 @@ pub fn discover_preview_fonts(
             family_names: metadata.family_names,
             font_names: metadata.font_names,
         });
+    }
+
+    Ok(fonts)
+}
+
+#[tauri::command]
+pub async fn discover_preview_fonts(
+    extra_dirs: Vec<String>,
+    server: State<'_, MediaServer>,
+) -> Result<Vec<PreviewFontFile>, String> {
+    let use_cache = extra_dirs.iter().all(|dir| dir.trim().is_empty());
+    if use_cache {
+        if let Ok(guard) = preview_font_cache().lock() {
+            if let Some(fonts) = guard.as_ref() {
+                return Ok(fonts.clone());
+            }
+        }
+    }
+
+    let server = server.inner().clone();
+    let fonts = tauri::async_runtime::spawn_blocking(move || {
+        discover_preview_fonts_sync(extra_dirs, &server)
+    })
+    .await
+    .map_err(|e| format!("字体发现任务失败: {e}"))??;
+
+    if use_cache {
+        if let Ok(mut guard) = preview_font_cache().lock() {
+            *guard = Some(fonts.clone());
+        }
     }
 
     Ok(fonts)

@@ -177,7 +177,7 @@ src-tauri/                    # Tauri Rust 后端
     ass.rs                    # ASS 文件读写
     asset_scope.rs            # Tauri asset protocol 动态授权
     media_server.rs           # 本地 HTTP 媒体服务（编辑页视频播放）
-    fonts.rs                  # 系统字体发现与预览字体 URL 注册
+    fonts.rs                  # 系统字体发现（async/缓存）与预览字体 URL 注册
     preview.rs                # FFmpeg/libass 单帧字幕渲染（诊断/校准）
     transcode.rs              # 不兼容视频编码的代理转码与缓存
     download.rs               # m3u8 下载 command、任务状态与策略编排
@@ -298,12 +298,14 @@ SubtitlePreview
 
 **字体发现**
 
-- `discover_preview_fonts` 会枚举系统字体目录，并通过本地 HTTP 媒体服务把 `.ttf` / `.otf` / `.ttc` / `.otc` 注册给浏览器端 libass。
+- `discover_preview_fonts` 会枚举系统字体目录，并通过本地 HTTP 媒体服务把 `.ttf` / `.otf` / `.ttc` / `.otc` 注册给浏览器端 libass；命令在后台线程执行，并对默认系统目录结果做进程内缓存，避免阻塞 UI。
+- 前端经 `getPreviewFonts`（`src/services/previewFontDiscovery.ts`）单例调用：并发合并为一次 invoke，成功后复用；`VideoPlayer` 与字幕编辑区在进入编辑页时共享该结果，样式管理抽屉仅在打开时再订阅。
 - 字体发现会解析 OpenType name table 中的 family、typographic family、full name 与 PostScript name（含本地化名称），前端会把这些名称注册到 jASSUB `availableFonts`，避免 `.苹方-简`、`メイリオ`、中文字体名等仅因名称不匹配显示为方块。
 - 编辑页会按 ASS Style 字体名、当前字幕行内 `\fn` 覆盖，以及匹配字体家族的多个权重文件选择预加载字体；名称注册采用“真实字体名优先，去前导点兼容名后补”的规则，减少预览与最终压制在字重和字体选择上的差异。
 - 对当前正在预览的字幕，前端会懒检测所用字体的 cmap 字形覆盖；只有检测到具体字符缺字时，才在预览 ASS 文本里插入仅用于预览的 `\fn` fallback 标签，不会修改内存样式或保存到字幕文件。
 - 压制页填写的字体目录会作为最终硬字幕压制的补充字体源。
 - 字体文件缺失或 libass 初始化失败时才回退 CSS 近似预览；预览区会保留提示，便于定位字体差异。
+- 进程内缓存不会自动感知会话中新安装的系统字体；需重启应用后才会出现在预览字体列表中。
 
 **画面区域**
 
@@ -364,7 +366,7 @@ interface SubtitleCue {
 | `extract_audio` | 提取 16kHz WAV 音轨 + 进度事件 |
 | `extract_waveform` | 提取归一化音频峰值数据用于时间轴波形 |
 | `get_video_info` | 通过共享 ffprobe 解析器获取视频分辨率、时长 |
-| `discover_preview_fonts` | 枚举系统/补充字体，解析字体名称元数据，并注册为预览可访问 URL |
+| `discover_preview_fonts` | 后台枚举系统/补充字体，解析名称元数据并注册预览 URL；默认目录结果进程内缓存 |
 | `render_subtitle_preview_frame` | 使用 FFmpeg/libass 渲染硬字幕单帧图，用于诊断与视觉回归 |
 | `register_media_playback` | 注册本地视频到媒体 HTTP 服务，返回可播放 URL |
 | `probe_video_playback` | 探测是否需代理转码（容器/音视频编码） |

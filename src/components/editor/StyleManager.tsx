@@ -186,11 +186,14 @@ export function StyleManager() {
     }
   };
 
-  const fontOptions = usePreviewFontNames([
-    ...(tempStyle?.fontName ? [tempStyle.fontName] : []),
-    ...displayStyles.map((style) => style.fontName),
-    ...COMMON_FONTS,
-  ]);
+  const fontOptions = usePreviewFontNames(
+    [
+      ...(tempStyle?.fontName ? [tempStyle.fontName] : []),
+      ...displayStyles.map((style) => style.fontName),
+      ...COMMON_FONTS,
+    ],
+    { enabled: open },
+  );
   const encodingOptions = useMemo(() => {
     if (
       tempStyle &&
