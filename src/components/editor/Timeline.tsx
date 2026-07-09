@@ -12,6 +12,7 @@ import {
   hitTestTimelineCue,
   type TimelineCueRect,
 } from "./timelineModel";
+import { resolveTimelineColors, type TimelineColors } from "./timelineColors";
 import type { SubtitleCue } from "../../types";
 
 const RULER_HEIGHT = 22;
@@ -49,6 +50,7 @@ export function Timeline() {
   const [msPerPixel, setMsPerPixel] = useState(10);
   const [dragPreviewState, setDragPreviewState] = useState<DragPreview | null>(null);
   const [laneCursorClass, setLaneCursorClass] = useState("cursor-pointer");
+  const [themeVersion, setThemeVersion] = useState(0);
 
   const cues = useProjectStore((s) => s.cues);
   const videoPath = useProjectStore((s) => s.videoPath);
@@ -69,6 +71,15 @@ export function Timeline() {
         .catch(console.error);
     }
   }, [videoPath, durationMs]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      setThemeVersion((v) => v + 1);
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -112,7 +123,18 @@ export function Timeline() {
     const laneCtx = prepareCanvas(laneCanvas, width, laneCanvasHeight);
     if (!laneCtx) return;
 
-    drawFixedLayer(fixedCtx, width, waveform, durationMs, viewStartMs, msPerPixel, currentTimeMs);
+    const colors = resolveTimelineColors(document.documentElement);
+
+    drawFixedLayer(
+      fixedCtx,
+      width,
+      waveform,
+      durationMs,
+      viewStartMs,
+      msPerPixel,
+      currentTimeMs,
+      colors,
+    );
     const viewEndMs = viewStartMs + width * msPerPixel;
     cueRectsRef.current = laneItems
       .filter((item) => item.cue.endMs >= viewStartMs && item.cue.startMs <= viewEndMs)
@@ -125,11 +147,11 @@ export function Timeline() {
         height: LANE_HEIGHT,
       }));
 
-    drawLaneLayer(laneCtx, width, laneCanvasHeight, cueRectsRef.current, selectedCueId);
+    drawLaneLayer(laneCtx, width, laneCanvasHeight, cueRectsRef.current, selectedCueId, colors);
 
     const pointerX = (currentTimeMs - viewStartMs) / msPerPixel;
     if (pointerX >= 0 && pointerX <= width) {
-      laneCtx.strokeStyle = "#ef4444";
+      laneCtx.strokeStyle = colors.playhead;
       laneCtx.lineWidth = 2;
       laneCtx.beginPath();
       laneCtx.moveTo(pointerX, 0);
@@ -143,6 +165,7 @@ export function Timeline() {
     durationMs,
     msPerPixel,
     selectedCueId,
+    themeVersion,
     viewStartMs,
     waveform,
   ]);
@@ -393,13 +416,14 @@ function drawFixedLayer(
   viewStartMs: number,
   msPerPixel: number,
   currentTimeMs: number,
+  colors: TimelineColors,
 ) {
   const viewEndMs = viewStartMs + width * msPerPixel;
 
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = colors.bg;
   ctx.fillRect(0, 0, width, FIXED_LAYER_HEIGHT);
 
-  ctx.fillStyle = "#888";
+  ctx.fillStyle = colors.tick;
   ctx.font = "10px monospace";
   const tickIntervalMs = calculateTickInterval(msPerPixel);
   const firstTick = Math.floor(viewStartMs / tickIntervalMs) * tickIntervalMs;
@@ -409,10 +433,10 @@ function drawFixedLayer(
     ctx.fillRect(x, RULER_HEIGHT - 7, 1, 5);
   }
 
-  ctx.fillStyle = "#1a1a1a";
+  ctx.fillStyle = colors.waveBg;
   ctx.fillRect(0, WAVE_TOP, width, WAVE_HEIGHT);
   if (waveform.length > 0) {
-    ctx.strokeStyle = "#3b82f6";
+    ctx.strokeStyle = colors.wave;
     ctx.lineWidth = 1;
     const samplesPerMs = waveform.length / durationMs;
 
@@ -445,7 +469,7 @@ function drawFixedLayer(
 
   const pointerX = (currentTimeMs - viewStartMs) / msPerPixel;
   if (pointerX >= 0 && pointerX <= width) {
-    ctx.strokeStyle = "#ef4444";
+    ctx.strokeStyle = colors.playhead;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(pointerX, 0);
@@ -460,8 +484,9 @@ function drawLaneLayer(
   height: number,
   rects: TimelineCueRect[],
   selectedCueId: string | null,
+  colors: TimelineColors,
 ) {
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = colors.bg;
   ctx.fillRect(0, 0, width, height);
 
   rects.forEach((rect) => {
@@ -469,11 +494,11 @@ function drawLaneLayer(
     if (!clipped) return;
 
     const isSelected = rect.cue.id === selectedCueId;
-    ctx.fillStyle = isSelected ? "#3b82f6" : "#4b5563";
+    ctx.fillStyle = isSelected ? colors.cueSelected : colors.cue;
     const drawWidth = Math.max(2, clipped.width);
     ctx.fillRect(clipped.x, rect.y, drawWidth, rect.height);
 
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fillStyle = colors.cueHandle;
     if (clipped.showStartHandle) {
       ctx.fillRect(clipped.x, rect.y, EDGE_HANDLE_WIDTH, rect.height);
     }
@@ -487,7 +512,7 @@ function drawLaneLayer(
     }
 
     if (clipped.width > 20) {
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = colors.cueText;
       ctx.font = "11px sans-serif";
       const text = rect.cue.secondaryText || rect.cue.primaryText;
       ctx.save();
