@@ -212,6 +212,11 @@ input[type="number"] {
   border-radius: 4px;
 }
 
+/* WebKit：滚动条角落与圆角容器对齐，避免右下角露白/缺圆角 */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .subtitle-color-picker .react-colorful {
   height: 176px;
   width: 100%;

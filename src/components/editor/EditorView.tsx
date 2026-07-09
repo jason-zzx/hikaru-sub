@@ -258,7 +258,7 @@ export function EditorView() {
       </div>
 
       {/* 主编辑区 */}
-      <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr_320px] grid-rows-[minmax(0,1fr)_168px] gap-px overflow-hidden bg-border">
+      <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr_320px] grid-rows-[minmax(0,1fr)_226px] gap-px overflow-hidden bg-border">
         {/* 字幕列表 */}
         <div className="col-start-1 row-span-2 min-h-0 overflow-hidden bg-surface-raised">
           <div className="flex h-full flex-col">

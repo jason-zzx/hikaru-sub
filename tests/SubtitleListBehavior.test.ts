@@ -18,6 +18,16 @@ describe("SubtitleList 时间显示", () => {
     expect(source).not.toContain("formatPlaybackTime(cue.endMs, true)");
   });
 
+  it("在序号旁以紧凑标签显示每条字幕的样式名", () => {
+    expect(source).toContain("assStyles");
+    expect(source).toContain("cue.style");
+    expect(source).toContain("knownStyleNames");
+    expect(source).toContain("styleMissing");
+    expect(source).toContain("border-warning/50 bg-warning/10 text-warning");
+    expect(source).toContain("title={cue.style}");
+    expect(source).toContain("max-w-[6.5rem] truncate");
+  });
+
   it("支持多选和 Aegisub 风格右键行操作", () => {
     expect(source).toContain("selectedCueIds");
     expect(source).toContain("setSelectedCueIds");
