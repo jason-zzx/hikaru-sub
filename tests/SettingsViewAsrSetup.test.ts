@@ -42,6 +42,7 @@ describe("SettingsView ASR setup", () => {
     expect(panelSource).toContain("配置当前引擎依赖");
     expect(panelSource).toContain("查看安装日志");
     expect(panelSource).toContain("重建虚拟环境");
+    expect(panelSource).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
     expect(panelSource).not.toMatch(/[🚀✅❌⚠️]/u);
   });
 

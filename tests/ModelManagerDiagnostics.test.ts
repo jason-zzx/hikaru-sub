@@ -26,4 +26,14 @@ describe("ModelManager diagnostics", () => {
     expect(asrSource).toContain("known_job_base_url(&state, &job_id).await");
     expect(asrSource).toContain("get_model_download_progress");
   });
+
+  it("shows ASR engine not installed instead of generic check failure", () => {
+    expect(modelManagerSource).toContain("isAsrEngineNotInstalledError");
+    expect(modelManagerSource).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
+    expect(modelManagerSource).toContain("ASR_ENGINE_NOT_INSTALLED_HINT");
+    expect(modelManagerSource).toContain("engineNotInstalled");
+    expect(modelManagerSource).toMatch(
+      /engineNotInstalled[\s\S]{0,200}ASR_ENGINE_NOT_INSTALLED_LABEL/,
+    );
+  });
 });
