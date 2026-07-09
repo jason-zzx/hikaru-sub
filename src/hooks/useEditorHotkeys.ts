@@ -11,10 +11,10 @@ import {
   frameStepTarget,
   getCueRowClipboard,
   pasteCueRows,
+  selectCueAndSeek,
   selectCueByOffset,
   setCueRowClipboard,
 } from "../services/editorActions";
-import type { SubtitleCue } from "../types";
 
 const FAST_JUMP_FRAMES = 10;
 const PAGE_JUMP_CUES = 10;
@@ -24,15 +24,6 @@ export interface EditorHotkeyOptions {
   onToggleHelp: () => void;
   onNotify?: (variant: "success" | "error" | "info", text: string) => void;
   enabled?: boolean;
-}
-
-/** 选中指定 cue 并 seek 到起点；用户主动切换会中断「播放当前句」。 */
-function selectAndSeek(cue: SubtitleCue | null) {
-  if (!cue) return;
-  const pb = usePlaybackStore.getState();
-  pb.setSelectedCueId(cue.id);
-  pb.setCurrentTime(cue.startMs);
-  pb.setPlayUntil(null);
 }
 
 /**
@@ -45,7 +36,7 @@ export function buildEditorActions(
   const nav = (offset: number) => {
     const { cues } = useProjectStore.getState();
     const { selectedCueId } = usePlaybackStore.getState();
-    selectAndSeek(selectCueByOffset(cues, selectedCueId, offset));
+    selectCueAndSeek(selectCueByOffset(cues, selectedCueId, offset));
   };
 
   const frameStep = (frames: number) => {

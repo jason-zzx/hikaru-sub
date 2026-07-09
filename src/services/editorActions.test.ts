@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   assignCueLanes,
   appendCueAfter,
@@ -17,10 +17,12 @@ import {
   normalizeBoundaryDrag,
   pasteCueRows,
   selectCueAfterDelete,
+  selectCueAndSeek,
   selectCueByOffset,
   splitCueAtTime,
   swapSelectedCues,
 } from "./editorActions";
+import { usePlaybackStore } from "../stores/playbackStore";
 import type { SubtitleCue } from "../types";
 
 function cue(id: string, startMs: number, endMs: number): SubtitleCue {
@@ -28,6 +30,34 @@ function cue(id: string, startMs: number, endMs: number): SubtitleCue {
 }
 
 const CUES = [cue("a", 0, 1000), cue("b", 2000, 3000), cue("c", 5000, 6000)];
+
+describe("selectCueAndSeek", () => {
+  beforeEach(() => {
+    usePlaybackStore.setState({
+      selectedCueId: "old",
+      selectedCueIds: ["old"],
+      currentTimeMs: 9999,
+      playUntilMs: 8888,
+    });
+  });
+
+  it("null 时不改 playback 状态", () => {
+    selectCueAndSeek(null);
+    const pb = usePlaybackStore.getState();
+    expect(pb.selectedCueId).toBe("old");
+    expect(pb.currentTimeMs).toBe(9999);
+    expect(pb.playUntilMs).toBe(8888);
+  });
+
+  it("选中 cue 并 seek 到 startMs，清除 playUntilMs", () => {
+    selectCueAndSeek(CUES[1]);
+    const pb = usePlaybackStore.getState();
+    expect(pb.selectedCueId).toBe("b");
+    expect(pb.selectedCueIds).toEqual(["b"]);
+    expect(pb.currentTimeMs).toBe(2000);
+    expect(pb.playUntilMs).toBeNull();
+  });
+});
 
 describe("selectCueByOffset", () => {
   it("选中下一条/上一条", () => {

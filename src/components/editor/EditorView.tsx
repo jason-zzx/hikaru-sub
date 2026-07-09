@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
+import { selectCueAndSeek } from "../../services/editorActions";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { VideoPlayer } from "../player/VideoPlayer";
@@ -95,6 +96,14 @@ export function EditorView() {
     };
   }, [currentSubtitlePath]);
 
+  // 进入编辑页时强制选中第一条并 seek（空列表跳过）
+  useEffect(() => {
+    const { cues } = useProjectStore.getState();
+    if (cues.length > 0) {
+      selectCueAndSeek(cues[0]);
+    }
+  }, []);
+
   const writeSubtitleFile = async (
     savePath: string,
     saveKind: ActiveSubtitleKind,
@@ -164,6 +173,9 @@ export function EditorView() {
       markDirty();
       setSubtitleFileExists(false);
       setSaveError(null);
+      if (doc.cues.length > 0) {
+        selectCueAndSeek(doc.cues[0]);
+      }
       notify("info", "已载入字幕文件，首次保存时请选择保存位置");
     } catch (err) {
       notify("error", `选择字幕文件失败：${String(err)}`);

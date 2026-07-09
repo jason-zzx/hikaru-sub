@@ -93,24 +93,38 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   }, []);
 
   const waitForTranscodedVideo = useCallback(
-    async (sourcePath: string) => {
+    async (sourcePath: string, isCancelled?: () => boolean) => {
       console.log("Starting transcode for:", sourcePath);
       setTranscoding(true);
       setTranscodePercent(0);
       setVideoSrc("");
 
       await invoke<string>("start_transcode", { videoPath: sourcePath });
+      if (isCancelled?.()) return;
 
       const checkReady = async (): Promise<void> => {
-        const progress = await invoke<{ ready: boolean; cache_path: string }>(
-          "check_transcode_progress",
-          { videoPath: sourcePath },
-        );
+        if (isCancelled?.()) return;
+
+        const progress = await invoke<{
+          ready: boolean;
+          failed: boolean;
+          error: string;
+          cachePath: string;
+        }>("check_transcode_progress", { videoPath: sourcePath });
+
+        if (isCancelled?.()) return;
+
+        if (progress.failed) {
+          setTranscoding(false);
+          setError(progress.error || "转码失败");
+          return;
+        }
 
         if (progress.ready) {
-          console.log("Transcode ready, using cache:", progress.cache_path);
+          console.log("Transcode ready, using cache:", progress.cachePath);
           setTranscoding(false);
-          await loadHttpVideo(progress.cache_path);
+          if (isCancelled?.()) return;
+          await loadHttpVideo(progress.cachePath);
           return;
         }
 
@@ -166,7 +180,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
             "Direct playback not supported, starting transcode:",
             probe.reason ?? "unknown",
           );
-          await waitForTranscodedVideo(videoPath);
+          await waitForTranscodedVideo(videoPath, () => cancelled);
           return;
         }
 
@@ -180,8 +194,9 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       });
 
     return () => {
+      // 仅取消本轮前端等待；不要 stop_transcode。
+      // React StrictMode 会卸载再挂载，误杀进行中的 FFmpeg 任务会导致不完整缓存被当成可播文件。
       cancelled = true;
-      invoke("stop_transcode", { videoPath }).catch(console.error);
     };
   }, [videoPath, loadHttpVideo, waitForTranscodedVideo]);
 
@@ -217,8 +232,9 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       return;
     }
 
-    // MEDIA_ERR_SRC_NOT_SUPPORTED：探测遗漏时回退代理转码
-    if (code === 4 && !transcodeFallbackRef.current) {
+    // MEDIA_ERR_DECODE / MEDIA_ERR_SRC_NOT_SUPPORTED：探测遗漏或过早 seek 时回退代理转码
+    // WebView2 对 HEVC 等常以 code 3（音频包解码失败）而非 code 4 报错
+    if ((code === 3 || code === 4) && !transcodeFallbackRef.current) {
       transcodeFallbackRef.current = true;
       try {
         setError(null);
@@ -339,36 +355,68 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     };
   }, [isPlaying, videoSrc, setCurrentTime]);
 
-  // 外部跳转到指定时间（拖动进度条 / 时间轴）
+  // 外部跳转到指定时间（拖动进度条 / 时间轴 / 进入编辑页选首条）
+  // 必须等 HAVE_METADATA，否则对未就绪的 <video> 写 currentTime 会在 WebView2 触发
+  // PIPELINE_ERROR_DECODE（code 3），且此前不会回退转码。
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
-    // 暂停时收小死区以放行逐帧步进（一帧约 16-42ms）；播放时保留较大死区压制
-    // rAF/timeupdate 回写残差（≤~16ms）避免播放中误 seek。播放中逐帧步进为既有限制。
-    const deadbandMs = isPlaying ? 100 : 5;
-    if (Math.abs(video.currentTime * 1000 - currentTimeMs) < deadbandMs) return;
 
-    isSeekingRef.current = true;
-    const targetSec = currentTimeMs / 1000;
-
+    let cancelled = false;
     const onSeeked = () => {
       isSeekingRef.current = false;
       video.removeEventListener("seeked", onSeeked);
     };
-    video.addEventListener("seeked", onSeeked);
 
-    if ("fastSeek" in video && typeof video.fastSeek === "function") {
-      try {
-        video.fastSeek(targetSec);
-        return () => video.removeEventListener("seeked", onSeeked);
-      } catch {
-        // fastSeek 不可用时回退 currentTime
+    const applySeek = () => {
+      if (cancelled) return;
+      // 剪辑片字幕若仍带原片绝对时间轴，首条 startMs 可能远超视频时长；
+      // 越界 seek 会在 WebView2 触发 PIPELINE_ERROR_DECODE。
+      const durationSec =
+        Number.isFinite(video.duration) && video.duration > 0 ? video.duration : null;
+      const rawTargetSec = currentTimeMs / 1000;
+      const targetSec =
+        durationSec === null
+          ? Math.max(0, rawTargetSec)
+          : Math.min(durationSec, Math.max(0, rawTargetSec));
+      const targetMs = Math.round(targetSec * 1000);
+
+      // 越界时同步回写 store，避免时间轴/列表仍停在超大 currentTimeMs
+      if (Math.abs(targetMs - currentTimeMs) > 1) {
+        setCurrentTime(targetMs);
       }
+
+      // 暂停时收小死区以放行逐帧步进（一帧约 16-42ms）；播放时保留较大死区压制
+      // rAF/timeupdate 回写残差（≤~16ms）避免播放中误 seek。播放中逐帧步进为既有限制。
+      const deadbandMs = isPlaying ? 100 : 5;
+      if (Math.abs(video.currentTime * 1000 - targetMs) < deadbandMs) return;
+
+      isSeekingRef.current = true;
+      video.addEventListener("seeked", onSeeked);
+
+      // 不用 fastSeek：WebView2 上对代理片/Range 请求更不稳定，统一走 currentTime
+      video.currentTime = targetSec;
+    };
+
+    if (video.readyState >= 1) {
+      applySeek();
+      return () => {
+        cancelled = true;
+        video.removeEventListener("seeked", onSeeked);
+      };
     }
 
-    video.currentTime = targetSec;
-    return () => video.removeEventListener("seeked", onSeeked);
-  }, [currentTimeMs, videoSrc, isPlaying]);
+    const onLoadedMetadata = () => {
+      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      applySeek();
+    };
+    video.addEventListener("loadedmetadata", onLoadedMetadata);
+    return () => {
+      cancelled = true;
+      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      video.removeEventListener("seeked", onSeeked);
+    };
+  }, [currentTimeMs, videoSrc, isPlaying, setCurrentTime]);
 
   return (
     <div
