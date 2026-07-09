@@ -7,7 +7,11 @@ import {
   normalizeBoundaryDrag,
   type TimelineDragEdge,
 } from "../../services/editorActions";
-import { hitTestTimelineCue, type TimelineCueRect } from "./timelineModel";
+import {
+  clipVisibleCueRect,
+  hitTestTimelineCue,
+  type TimelineCueRect,
+} from "./timelineModel";
 import type { SubtitleCue } from "../../types";
 
 const RULER_HEIGHT = 22;
@@ -198,9 +202,13 @@ export function Timeline() {
 
   const localLanePoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = laneCanvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas) return { x: 0, y: 0, viewportWidth: 0 };
     const rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      viewportWidth: rect.width,
+    };
   };
 
   const handleFixedPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -242,6 +250,7 @@ export function Timeline() {
       local.x,
       local.y,
       EDGE_HANDLE_WIDTH,
+      local.viewportWidth,
     );
     if (hit.kind === "empty") {
       const clickedTime = viewStartMs + local.x * msPerPixel;
@@ -278,6 +287,7 @@ export function Timeline() {
         local.x,
         local.y,
         EDGE_HANDLE_WIDTH,
+        local.viewportWidth,
       );
       setLaneCursorClass(hit.kind === "edge" ? "cursor-ew-resize" : "cursor-pointer");
       return;
@@ -455,29 +465,40 @@ function drawLaneLayer(
   ctx.fillRect(0, 0, width, height);
 
   rects.forEach((rect) => {
+    const clipped = clipVisibleCueRect(rect, width);
+    if (!clipped) return;
+
     const isSelected = rect.cue.id === selectedCueId;
     ctx.fillStyle = isSelected ? "#3b82f6" : "#4b5563";
-    const x = Math.max(0, rect.x);
-    const visibleWidth = Math.min(rect.width, width - rect.x);
-    ctx.fillRect(x, rect.y, Math.max(2, visibleWidth), rect.height);
+    const drawWidth = Math.max(2, clipped.width);
+    ctx.fillRect(clipped.x, rect.y, drawWidth, rect.height);
 
     ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.fillRect(x, rect.y, EDGE_HANDLE_WIDTH, rect.height);
-    ctx.fillRect(
-      Math.max(x, x + Math.max(2, visibleWidth) - EDGE_HANDLE_WIDTH),
-      rect.y,
-      EDGE_HANDLE_WIDTH,
-      rect.height,
-    );
+    if (clipped.showStartHandle) {
+      ctx.fillRect(clipped.x, rect.y, EDGE_HANDLE_WIDTH, rect.height);
+    }
+    if (clipped.showEndHandle) {
+      ctx.fillRect(
+        Math.max(clipped.x, clipped.x + drawWidth - EDGE_HANDLE_WIDTH),
+        rect.y,
+        EDGE_HANDLE_WIDTH,
+        rect.height,
+      );
+    }
 
-    if (rect.width > 20) {
+    if (clipped.width > 20) {
       ctx.fillStyle = "#fff";
       ctx.font = "11px sans-serif";
       const text = rect.cue.secondaryText || rect.cue.primaryText;
       ctx.save();
-      ctx.rect(x, rect.y, Math.max(2, visibleWidth), rect.height);
+      ctx.rect(clipped.x, rect.y, drawWidth, rect.height);
       ctx.clip();
-      ctx.fillText(text, Math.max(2, rect.x + 8), rect.y + 18, rect.width - 12);
+      // Keep text anchored to the cue's true start when it is still on-screen;
+      // once scrolled past the left edge, pin text to the clipped left edge.
+      const textX = clipped.showStartHandle
+        ? clipped.x + 8
+        : clipped.x + 2;
+      ctx.fillText(text, textX, rect.y + 18, drawWidth - 12);
       ctx.restore();
     }
   });
