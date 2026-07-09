@@ -40,6 +40,11 @@ import type {
   VadConfig,
 } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
+import {
+  ASR_ENGINE_NOT_INSTALLED_HINT,
+  ASR_ENGINE_NOT_INSTALLED_LABEL,
+  isAsrEngineNotInstalledError,
+} from "../../utils/asrSidecarError";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
 const ASR_DEVICES = [
@@ -105,6 +110,7 @@ export function TranscribeView() {
   const [device, setDevice] = useState("auto");
   const [engines, setEngines] = useState<AsrEngineInfo[] | null>(null);
   const [engineMsg, setEngineMsg] = useState<string | null>("未检测");
+  const [sidecarEngineMissing, setSidecarEngineMissing] = useState(false);
   const [modelCheckTrigger, setModelCheckTrigger] = useState(0);
 
   // VAD 语音检测预处理配置（仅当前会话有效，不写入项目/全局设置）
@@ -196,6 +202,8 @@ export function TranscribeView() {
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
   const selectedEngineUnavailable =
     engines?.find((item) => item.name === engine)?.available === false;
+  const engineSetupRequired =
+    selectedEngineUnavailable || sidecarEngineMissing;
 
   const runExtract = async () => {
     if (!audioPath) {
@@ -252,16 +260,25 @@ export function TranscribeView() {
       const list = await listAsrEngines();
       if (engineCheckRequestRef.current !== requestId) return;
       setEngines(list);
+      setSidecarEngineMissing(false);
       const current = list.find((e) => e.name === engine);
       if (current && !current.available) {
-        setEngineMsg(`引擎 ${engine} 依赖未安装，请先安装 asr-service 依赖`);
+        setEngineMsg(
+          `${ASR_ENGINE_NOT_INSTALLED_LABEL}：${engine}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
+        );
       } else {
         setEngineMsg("sidecar 就绪");
       }
     } catch (e) {
       if (engineCheckRequestRef.current !== requestId) return;
       setEngines(null);
-      setEngineMsg(`无法启动 sidecar：${String(e)}`);
+      if (isAsrEngineNotInstalledError(e)) {
+        setSidecarEngineMissing(true);
+        setEngineMsg(ASR_ENGINE_NOT_INSTALLED_LABEL);
+      } else {
+        setSidecarEngineMissing(false);
+        setEngineMsg(`无法启动 sidecar：${String(e)}`);
+      }
     }
   }, [engine]);
 
@@ -269,6 +286,7 @@ export function TranscribeView() {
     setEngine(nextEngine);
     setModel(defaultAsrModel(nextEngine));
     setEngineMsg("未检测");
+    setSidecarEngineMissing(false);
   };
 
   const pollLoop = async (jobId: string) => {
@@ -372,8 +390,10 @@ export function TranscribeView() {
   };
 
   const handleTranscribe = async () => {
-    if (selectedEngineUnavailable) {
-      setAsrError("当前引擎依赖未安装，请先在设置中配置引擎依赖。");
+    if (engineSetupRequired) {
+      setAsrError(
+        `${ASR_ENGINE_NOT_INSTALLED_LABEL}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
+      );
       return;
     }
     setAsrError(null);
@@ -548,9 +568,7 @@ export function TranscribeView() {
           {engineMsg && (
             <span
               className={
-                selectedEngineUnavailable
-                  ? "text-warning"
-                  : "text-text-muted"
+                engineSetupRequired ? "text-warning" : "text-text-muted"
               }
             >
               {engineMsg}
@@ -566,10 +584,10 @@ export function TranscribeView() {
             检测引擎状态
           </Button>
         </div>
-        {selectedEngineUnavailable && !transcribing && (
+        {engineSetupRequired && !transcribing && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
             <span className="text-warning">
-              当前引擎依赖未安装。请先在设置中配置引擎依赖。
+              {ASR_ENGINE_NOT_INSTALLED_LABEL}。{ASR_ENGINE_NOT_INSTALLED_HINT}
             </span>
             <Button
               variant="outline"
@@ -763,7 +781,7 @@ export function TranscribeView() {
               variant="default"
               type="button"
               onClick={handleTranscribe}
-              disabled={!audioReady || selectedEngineUnavailable}
+              disabled={!audioReady || engineSetupRequired}
               className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
             >
               {resultCount !== null ? "重新转录" : "开始转录"}

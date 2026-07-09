@@ -5,6 +5,11 @@ import {
   getModelDownloadProgress,
 } from "../../services/tauri";
 import type { AsrModelStatus, ModelDownloadSnapshot } from "../../types";
+import {
+  ASR_ENGINE_NOT_INSTALLED_HINT,
+  ASR_ENGINE_NOT_INSTALLED_LABEL,
+  isAsrEngineNotInstalledError,
+} from "../../utils/asrSidecarError";
 import { Button } from "../ui/button";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -121,17 +126,19 @@ export function ModelManager({
       ? Math.min(progress.done / progress.total, 1)
       : null;
 
+  const engineNotInstalled =
+    (!!checkError && isAsrEngineNotInstalledError(checkError)) ||
+    (!!status && !status.available);
+
   let statusText: ReactNode;
   if (checking) {
     statusText = <span className="text-text-muted">检测中…</span>;
+  } else if (engineNotInstalled) {
+    statusText = (
+      <span className="text-danger">{ASR_ENGINE_NOT_INSTALLED_LABEL}</span>
+    );
   } else if (checkError) {
     statusText = <span className="text-danger">检测失败</span>;
-  } else if (status && !status.available) {
-    statusText = (
-      <span className="text-danger">
-        引擎不可用（未安装 {engine === "parakeet" ? "NeMo/Parakeet 可选依赖" : engine}）
-      </span>
-    );
   } else if (status?.downloaded) {
     statusText = <span className="text-success">已下载</span>;
   } else if (status) {
@@ -171,6 +178,16 @@ export function ModelManager({
           {downloading && <span className="text-text-muted">下载中…</span>}
         </div>
       </div>
+
+      {engineNotInstalled && (
+        <span className="text-xs text-warning">
+          {ASR_ENGINE_NOT_INSTALLED_HINT}
+        </span>
+      )}
+
+      {checkError && !engineNotInstalled && (
+        <span className="break-all text-xs text-danger">{checkError}</span>
+      )}
 
       {downloading && (
         <div className="flex flex-col gap-1">

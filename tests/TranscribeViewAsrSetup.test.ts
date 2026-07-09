@@ -12,9 +12,17 @@ const source = readFileSync(
 describe("TranscribeView ASR setup guidance", () => {
   it("guides users to Settings when engine dependencies are missing", () => {
     expect(source).toContain("selectedEngineUnavailable");
-    expect(source).toContain("当前引擎依赖未安装");
+    expect(source).toContain("engineSetupRequired");
+    expect(source).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
     expect(source).toContain('setStep("settings")');
-    expect(source).toContain("!audioReady || selectedEngineUnavailable");
+    expect(source).toContain("!audioReady || engineSetupRequired");
+  });
+
+  it("guides users to Settings when sidecar cannot start because engine is not installed", () => {
+    expect(source).toContain("isAsrEngineNotInstalledError");
+    expect(source).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
+    expect(source).toContain("ASR_ENGINE_NOT_INSTALLED_HINT");
+    expect(source).toContain("sidecarEngineMissing");
   });
 
   it("does not launch the ASR sidecar just by entering the page", () => {

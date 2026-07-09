@@ -14,6 +14,9 @@ import {
 } from "../../constants/asrSetup";
 import type { AsrSetupEnvironment, AsrSetupSnapshot } from "../../types";
 import type { RuntimeDependencyProbe, RuntimeDependencySnapshot } from "../../types";
+import {
+  ASR_ENGINE_NOT_INSTALLED_LABEL,
+} from "../../utils/asrSidecarError";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 import { Button } from "../ui/button";
 
@@ -278,6 +281,11 @@ export function AsrEngineSetupPanel({
               虚拟环境：{env.venvExists ? "已存在" : "未创建"}
               {env.hasNvidiaGpu ? " · 已检测到 NVIDIA GPU" : ""}
             </span>
+            {!env.venvExists && (
+              <span className="text-warning">
+                {ASR_ENGINE_NOT_INSTALLED_LABEL}。
+              </span>
+            )}
           </>
         ) : envError ? (
           <span className="text-danger">环境探测失败：{envError}</span>
