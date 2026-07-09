@@ -13,6 +13,7 @@ import {
   IconTranslate,
 } from "./NavIcons";
 import { ModeToggle } from "../ModeToggle";
+import { BrandMark } from "../brand/BrandMark";
 
 interface NavItem {
   step: WorkflowStep;
@@ -74,13 +75,16 @@ export function Sidebar({ collapsed }: SidebarProps) {
     >
       <div className="flex items-center justify-between border-b border-sidebar-border px-3 py-4">
         {!collapsed && (
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold tracking-wide">
-              Hikaru Sub
-            </h1>
-            <p className="truncate text-xs text-muted-foreground">
-              AI 字幕工具
-            </p>
+          <div className="flex min-w-0 items-center gap-2">
+            <BrandMark className="size-8" />
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold tracking-wide">
+                Hikaru Sub
+              </h1>
+              <p className="truncate text-xs text-muted-foreground">
+                AI 字幕工具
+              </p>
+            </div>
           </div>
         )}
         <button
