@@ -35,7 +35,6 @@ import {
 } from "../../utils/timeInput";
 import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
-import { ColorPicker } from "./ColorPicker";
 import { FontComboBox } from "./FontComboBox";
 import { InlineOverridePanel } from "./InlineOverridePanel";
 import type { SubtitleCue } from "../../types";
@@ -87,7 +86,6 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   const [endTime, setEndTime] = useState("");
   const [quickFontName, setQuickFontName] = useState("");
   const [quickFontSize, setQuickFontSize] = useState("48");
-  const [quickColor, setQuickColor] = useState("&H00FFFFFF");
   const [activeTextField, setActiveTextField] =
     useState<EditableTextField>("primary");
   const [inlineEditorCueId, setInlineEditorCueId] = useState<string | null>(
@@ -413,11 +411,6 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     }
   };
 
-  const handleColorChange = (color: string) => {
-    setQuickColor(color);
-    applyAttributeTag("primaryColor", colorOverrideStartTag("primaryColor", color));
-  };
-
   const handleInlineColor = (kind: ColorOverrideKind, color: string) => {
     applyAttributeTag(kind, colorOverrideStartTag(kind, color));
   };
@@ -649,7 +642,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
           options={styleOptions}
           placeholder=""
         />
-        <div className="grid grid-cols-[minmax(0,1fr)_72px_auto] items-end gap-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_72px] items-end gap-2">
           <div>
             <label className="mb-1 block text-xs text-text-muted">字体</label>
             <FontComboBox
@@ -677,11 +670,6 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
               className="h-9 w-full rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
             />
           </div>
-          <ColorPicker
-            value={quickColor}
-            onChange={handleColorChange}
-            deferChange
-          />
         </div>
         <div className="flex flex-wrap gap-2" aria-label="快速样式标签">
           <Button

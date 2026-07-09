@@ -17,8 +17,8 @@ import type { SubtitleCue } from "../../types";
 
 const RULER_HEIGHT = 22;
 const WAVE_TOP = 24;
-const WAVE_HEIGHT = 58;
-const FIXED_LAYER_HEIGHT = 88;
+const WAVE_HEIGHT = 116;
+const FIXED_LAYER_HEIGHT = 146;
 const LANE_HEIGHT = 28;
 const LANE_GAP = 4;
 const LANE_PADDING_Y = 6;

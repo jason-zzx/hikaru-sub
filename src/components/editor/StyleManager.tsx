@@ -254,30 +254,40 @@ export function StyleManager() {
               return (
                 <div
                   key={style.name}
-                  className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setEditingStyleName(style.name)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setEditingStyleName(style.name);
+                    }
+                  }}
+                  className={`flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1.5 ${
                     active
-                      ? "border-accent/70 bg-accent/10"
+                      ? "border-primary bg-primary/15 ring-1 ring-primary/40"
                       : "border-border bg-surface hover:bg-surface-overlay"
                   }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setEditingStyleName(style.name)}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded text-left hover:bg-surface-overlay"
+                  <span
+                    className="h-4 w-4 shrink-0 rounded border border-border"
+                    style={styleSwatch(style)}
+                  />
+                  <span
+                    className={`min-w-0 flex-1 truncate text-left text-sm ${
+                      active ? "font-medium text-primary" : "text-text"
+                    }`}
                   >
-                    <span
-                      className="h-4 w-4 shrink-0 rounded border border-border"
-                      style={styleSwatch(style)}
-                    />
-                    <span className="truncate text-sm text-text">
-                      {style.name}
-                    </span>
-                  </button>
+                    {style.name}
+                  </span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => handleDelete(style.name)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDelete(style.name);
+                    }}
                     className="hover:text-destructive"
                     title="删除样式"
                     aria-label={`删除样式 ${style.name}`}

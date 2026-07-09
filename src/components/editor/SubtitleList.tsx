@@ -36,6 +36,7 @@ interface ContextMenuState {
 export function SubtitleList({ onNotify }: SubtitleListProps) {
   const cues = useProjectStore((s) => s.cues);
   const replaceCues = useProjectStore((s) => s.replaceCues);
+  const assStyles = useProjectStore((s) => s.assStyles);
   const mergeMode = useSubtitleMergeMode();
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
@@ -44,6 +45,7 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
   const setSelectedCueIds = usePlaybackStore((s) => s.setSelectedCueIds);
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
   const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
+  const knownStyleNames = new Set(assStyles.map((style) => style.name));
 
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -212,6 +214,8 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
           const display = getCueDisplay(cue, mergeMode);
           const isSelected =
             selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
+          const styleMissing =
+            assStyles.length > 0 && !knownStyleNames.has(cue.style);
           return (
             <div
               key={cue.id}
@@ -224,9 +228,23 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
                   : "border-border hover:bg-surface-overlay"
               }`}
             >
-              <div className="mb-1 flex items-center justify-between text-xs text-text-muted">
-                <span>#{index + 1}</span>
-                <span>{formatTime(cue.startMs)} → {formatTime(cue.endMs)}</span>
+              <div className="mb-1 flex items-center justify-between gap-2 text-xs text-text-muted">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="shrink-0">#{index + 1}</span>
+                  <span
+                    title={cue.style}
+                    className={`max-w-[6.5rem] truncate rounded-full border px-1.5 py-px text-[10px] leading-tight ${
+                      styleMissing
+                        ? "border-warning/50 bg-warning/10 text-warning"
+                        : "border-border bg-muted text-text-muted"
+                    }`}
+                  >
+                    {cue.style}
+                  </span>
+                </div>
+                <span className="shrink-0">
+                  {formatTime(cue.startMs)} → {formatTime(cue.endMs)}
+                </span>
               </div>
               <div className="space-y-1 text-sm">
                 {display.mode === "single" ? (
