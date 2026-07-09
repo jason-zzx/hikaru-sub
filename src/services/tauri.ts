@@ -11,7 +11,10 @@ import type {
   AudioExtractProgress,
   BurnSnapshot,
   BurnVideoProbe,
+  ClipSnapshot,
   DownloadSnapshot,
+  ExtractVideoFrameArgs,
+  ExtractVideoFrameResult,
   FfmpegStatus,
   ModelDownloadSnapshot,
   ProbeDownloadMediaArgs,
@@ -26,6 +29,7 @@ import type {
   StartAsrArgs,
   StartAsrSetupArgs,
   StartBurnArgs,
+  StartVideoClipArgs,
   StartVideoDownloadArgs,
   DownloadMediaProbe,
   VideoSession,
@@ -359,4 +363,30 @@ export async function getBurnProgress(jobId: string): Promise<BurnSnapshot> {
 /** 取消字幕压制任务。 */
 export async function cancelBurn(jobId: string): Promise<void> {
   await invoke("cancel_burn", { jobId });
+}
+
+/** 启动视频剪辑任务，返回 jobId。 */
+export async function startVideoClip(
+  args: StartVideoClipArgs,
+): Promise<string> {
+  return invoke<string>("start_video_clip", { args });
+}
+
+/** 查询视频剪辑进度。 */
+export async function getVideoClipProgress(
+  jobId: string,
+): Promise<ClipSnapshot> {
+  return invoke<ClipSnapshot>("get_video_clip_progress", { jobId });
+}
+
+/** 取消视频剪辑任务。 */
+export async function cancelVideoClip(jobId: string): Promise<void> {
+  await invoke("cancel_video_clip", { jobId });
+}
+
+/** 从视频提取指定时间点的帧图。 */
+export async function extractVideoFrame(
+  args: ExtractVideoFrameArgs,
+): Promise<ExtractVideoFrameResult> {
+  return invoke<ExtractVideoFrameResult>("extract_video_frame", { args });
 }

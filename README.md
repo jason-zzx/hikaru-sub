@@ -1,11 +1,12 @@
 # Hikaru Sub
 
-日语 AI 字幕桌面应用：m3u8 视频下载 → 本地 ASR 日语转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
+日语 AI 字幕桌面应用：m3u8 视频下载 → 可选切片 → 本地 ASR 日语转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
 
 ## 当前进度
 
 ✅ **已实现**：
-- m3u8 视频下载（Rust 分片并发优先、FFmpeg 兼容回退；单 URL / 分离音视频；AES-128 加密 VOD；自定义请求头；自动并发与 HTTP/2；进度与取消；完成后可打开视频继续转录）
+- m3u8 视频下载（Rust 分片并发优先、FFmpeg 兼容回退；单 URL / 分离音视频；AES-128 加密 VOD；自定义请求头；自动并发与 HTTP/2；进度与取消；完成后进入导入页）
+- 导入页视频切片（软切关键帧拷贝 / 硬切精确重编码；静帧核对；可选设为当前工作视频；切片中锁定后续步骤）
 - 文件中心视频会话（打开视频即准备运行时缓存；优先加载同目录 `*.translated.ass`，不存在时回退 `*.transcribed.ass`）
 - FFmpeg 集成（系统优先、缺失时按需下载受管 FFmpeg；音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
 - Python ASR sidecar（faster-whisper + NVIDIA Parakeet + Qwen3-ASR 日语适配器 + VAD 预处理 + HTTP 进度 API）
@@ -140,7 +141,7 @@ git push origin v0.1.0
 src/                          # React 前端
   components/
     layout/                   # 布局、侧边栏、状态栏、NavIcons
-    workflow/                 # 导入、转录、翻译、压制、设置页
+    workflow/                 # 导入（含切片）、转录、翻译、压制、设置页
     editor/                   # 字幕编辑器组件
       EditorView.tsx          # 编辑器主视图
       SubtitleList.tsx        # 字幕列表
@@ -185,6 +186,7 @@ src-tauri/                    # Tauri Rust 后端
     hls_fetch.rs              # 分片 HTTP 下载与 AES 解密
     hls_download.rs           # 并发调度与媒体组装
     hls_types.rs              # 下载类型与自动并发配置
+    clip.rs                   # 视频切片（软/硬切）、抽帧核对、任务状态
     project.rs                # 视频会话与字幕路径准备
     settings.rs               # 全局设置持久化
 packages/ass-core/            # ASS 解析/序列化库（workspace）
@@ -206,11 +208,12 @@ scripts/
 
 默认 `auto` 策略：解析 VOD m3u8 后按 CPU 核数自动并发（8–32）下载分片，共享 HTTP/2 连接；支持 Byte-Range 与 AES-128-CBC 加密流（如 Niconico domand fMP4）。分片按播放列表顺序流式拼接为临时媒体文件，再用 FFmpeg `-c copy` remux。直播或分片策略无法处理时自动回退 FFmpeg 兼容模式。
 
-1. **导入视频** → 准备视频运行时会话
-2. **日语转录** → 提取音轨 → ASR 转录（源语言固定日语）→ 生成 `*.transcribed.ass`
-3. **翻译** → OpenAI 兼容 API 批量翻译 → 生成 `*.translated.ass`
-4. **编辑** → 载入字幕 → 视频/波形辅助校对 → 调整文本与时间轴 → 保存 ASS
-5. **压制** → FFmpeg 硬字幕 MP4 或软字幕 MKV 输出
+1. **导入视频** → 准备视频运行时会话；可「继续转录」或「切片」
+2. **切片**（可选）→ 在导入页裁出工作片段；默认可替换为当前工作视频（清空内存字幕，不迁移 ASS）
+3. **日语转录** → 提取音轨 → ASR 转录（源语言固定日语）→ 生成 `*.transcribed.ass`
+4. **翻译** → OpenAI 兼容 API 批量翻译 → 生成 `*.translated.ass`
+5. **编辑** → 载入字幕 → 视频/波形辅助校对 → 调整文本与时间轴 → 保存 ASS
+6. **压制** → FFmpeg 硬字幕 MP4 或软字幕 MKV 输出
 
 
 ## 核心功能
@@ -221,7 +224,19 @@ scripts/
 - Rust 分片路径：自动并发、流式写盘、临时分片保留原始扩展名
 - 加密 VOD：AES-128-CBC；init 段按 KEY/MAP 行序判断是否解密
 - 进度轮询与取消；失败或不可解析时回退 FFmpeg
-- 下载完成后可打开保存目录或直接进入导入流程
+- 下载完成后点「下一步」进入导入页（可继续转录或切片）
+
+### 视频切片
+- 入口在导入页「当前视频」卡片，不新增侧栏步骤
+- 下载完成 / 选择视频后留在导入页，由用户选择「继续转录」或「切片」
+- Dialog：起止时间（与编辑器相同的百分秒输入）、开始/结束静帧核对、软切/硬切（默认硬切）、可选保存目录与文件名
+- 默认文件名：`{源文件名}-{HHMMSS}-{HHMMSS}.mp4`（秒级）；重名自动追加 `_1`、`_2`…，不覆盖
+- 软切：关键帧附近 `-c copy`；失败自动回退硬切并提示「已改为硬切」
+- 硬切：精确重编码，固定 libx264 + AAC；码率优先（接近原片），与压制页一致——有有效码率时只用 `-b:v`，否则 CRF 18
+- 可选「完成后设为当前工作视频」（默认勾选）：`prepareVideoSession` + `setSession` 清空内存字幕，不自动加载旁路 ASS
+- 取消勾选时仅保存切片文件，不切换工作视频
+- 切片进行中锁定转录 / 翻译 / 编辑 / 压制；拦截页仅「返回导入」，停止入口在导入页
+- App 层 `useClipJobPoller` 在任意页面完成收尾并解除导航锁；成功提示写回导入页
 
 ### 字幕压制
 - 硬字幕 MP4（libass 渲染字幕 + H.264 重新编码）与软字幕 MKV（ASS 字幕轨封装）
@@ -396,6 +411,10 @@ interface SubtitleCue {
 | `start_video_download` | 启动 m3u8 下载任务 |
 | `get_video_download_progress` | 查询下载进度 |
 | `cancel_video_download` | 取消下载并清理部分文件 |
+| `start_video_clip` | 启动视频切片任务（软切/硬切） |
+| `get_video_clip_progress` | 查询切片进度与软切回退标记 |
+| `cancel_video_clip` | 取消切片并清理部分输出 |
+| `extract_video_frame` | 按时间戳抽静帧供切片 Dialog 核对 |
 | `probe_burn_video` | 探测压制推荐参数（原视频码率、可用编码器） |
 | `start_burn_subtitles` | 启动字幕压制/封装任务 |
 | `get_burn_progress` | 查询压制进度 |

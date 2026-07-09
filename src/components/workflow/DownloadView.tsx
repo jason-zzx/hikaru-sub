@@ -209,7 +209,7 @@ export function DownloadView() {
     try {
       const session = await prepareVideoSession(completedPath);
       setSession(session);
-      setStep("transcribe");
+      setStep("import");
     } catch (e) {
       setError(`打开视频失败：${String(e)}`);
     } finally {
@@ -227,7 +227,7 @@ export function DownloadView() {
       <header>
         <h2 className="text-xl font-semibold">视频下载</h2>
         <p className="mt-1 text-sm text-text-muted">
-          从 m3u8 地址下载音视频，完成后可打开并继续转录
+          从 m3u8 地址下载音视频，完成后可进入导入页继续转录或切片
         </p>
       </header>
 
@@ -420,7 +420,7 @@ export function DownloadView() {
               disabled={importing}
               className="px-4 py-2"
             >
-              {importing ? "打开中…" : "打开并转录"}
+              {importing ? "打开中…" : "下一步"}
             </Button>
           </div>
         </section>

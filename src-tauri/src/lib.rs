@@ -3,6 +3,7 @@ mod asr_setup;
 mod ass;
 mod asset_scope;
 mod burn;
+mod clip;
 mod dependencies;
 mod download;
 mod ffmpeg;
@@ -77,6 +78,10 @@ pub fn run() {
             burn::start_burn_subtitles,
             burn::get_burn_progress,
             burn::cancel_burn,
+            clip::start_video_clip,
+            clip::get_video_clip_progress,
+            clip::cancel_video_clip,
+            clip::extract_video_frame,
         ])
         .setup(|app| {
             if let Err(error) = dependencies::ensure_runtime_deps_writable_or_elevate(app.handle())
@@ -86,6 +91,7 @@ pub fn run() {
             transcode::init_transcode_state(app);
             download::init_download_state(app);
             burn::init_burn_state(app);
+            clip::init_clip_state(app);
             let server = tauri::async_runtime::block_on(media_server::MediaServer::start())
                 .expect("failed to start media server");
             app.manage(server);
@@ -104,6 +110,9 @@ pub fn run() {
                     }
                 }
                 if let Some(state) = app_handle.try_state::<burn::BurnState>() {
+                    state.shutdown();
+                }
+                if let Some(state) = app_handle.try_state::<clip::ClipState>() {
                     state.shutdown();
                 }
                 if let Some(state) = app_handle.try_state::<asr_setup::AsrSetupState>() {

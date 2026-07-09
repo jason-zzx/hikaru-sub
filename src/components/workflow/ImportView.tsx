@@ -2,20 +2,25 @@ import { useEffect, useState } from "react";
 import { parseAss } from "@hikaru/ass-core";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
+import { useClipStore } from "../../stores/clipStore";
+import { useTaskStore } from "../../stores/taskStore";
 import { IconFilePlus } from "../layout/NavIcons";
 import { Button } from "../ui/button";
 import {
+  cancelVideoClip,
   checkFfmpeg,
   invalidateFfmpegStatus,
   loadAssText,
   pathExists,
   pickVideoFile,
   prepareVideoSession,
+  startVideoClip,
   transcribedAssPath,
   translatedAssPath,
 } from "../../services/tauri";
 import type { FfmpegStatus } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
+import { ClipDialog } from "./ClipDialog";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
 const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
@@ -29,10 +34,27 @@ export function ImportView() {
   const session = useProjectStore((s) => s.session);
   const setSession = useProjectStore((s) => s.setSession);
 
+  const clipBusy = useClipStore((s) => s.busy);
+  const jobId = useClipStore((s) => s.jobId);
+  const snapshot = useClipStore((s) => s.snapshot);
+  const clipError = useClipStore((s) => s.error);
+  const completedPath = useClipStore((s) => s.completedPath);
+  const useAsWorkingVideo = useClipStore((s) => s.useAsWorkingVideo);
+  const clipSuccessMessage = useClipStore((s) => s.successMessage);
+  const startJob = useClipStore((s) => s.startJob);
+  const resetForStart = useClipStore((s) => s.resetForStart);
+  const clearAfterCancel = useClipStore((s) => s.clearAfterCancel);
+  const clipSetError = useClipStore((s) => s.setError);
+  const clearSuccessMessage = useClipStore((s) => s.clearSuccessMessage);
+
+  const upsertTask = useTaskStore((s) => s.upsertTask);
+  const updateTask = useTaskStore((s) => s.updateTask);
+
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clipOpen, setClipOpen] = useState(false);
 
   const refreshFfmpeg = async (force = false) => {
     if (force) invalidateFfmpegStatus();
@@ -89,7 +111,6 @@ export function ImportView() {
           // Treat unreadable subtitle files as an incomplete stage.
         }
       }
-      setStep("transcribe");
     } catch (e) {
       setError(`打开视频失败：${String(e)}`);
     } finally {
@@ -97,7 +118,28 @@ export function ImportView() {
     }
   };
 
+  const handleCancelClip = async () => {
+    if (!jobId) return;
+    let cancelError: string | null = null;
+    try {
+      await cancelVideoClip(jobId);
+    } catch (e) {
+      cancelError = String(e);
+    } finally {
+      clearAfterCancel();
+      updateTask("video-clip", { status: "idle" });
+      // 任务已终态被移除时 cancel 会失败；仍解锁，仅保留非「不存在」类错误
+      if (cancelError && !cancelError.includes("不存在")) {
+        clipSetError(cancelError);
+      }
+    }
+  };
+
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
+  const clipProgressPercent =
+    snapshot?.progress !== null && snapshot?.progress !== undefined
+      ? Math.round(snapshot.progress * 100)
+      : null;
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
@@ -133,6 +175,18 @@ export function ImportView() {
         </div>
       )}
 
+      {clipError && (
+        <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+          {clipError}
+        </div>
+      )}
+
+      {clipSuccessMessage && (
+        <div className="rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+          {clipSuccessMessage}
+        </div>
+      )}
+
       {session && (
         <div className="rounded-xl border border-border bg-surface-raised p-4">
           <p className="text-xs uppercase tracking-wider text-text-muted">
@@ -144,14 +198,61 @@ export function ImportView() {
           <p className="mt-0.5 truncate font-mono text-xs text-text-muted" title={session.videoPath}>
             {session.videoPath}
           </p>
-          <Button
-            type="button"
-            variant="default"
-            onClick={() => setStep("transcribe")}
-            className="mt-4"
-          >
-            继续转录
-          </Button>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => setStep("transcribe")}
+              disabled={clipBusy}
+            >
+              继续转录
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setClipOpen(true)}
+              disabled={clipBusy}
+            >
+              切片
+            </Button>
+          </div>
+
+          {clipBusy && (
+            <div className="mt-4 space-y-3">
+              {completedPath && useAsWorkingVideo ? (
+                <p className="text-sm text-text-muted">正在切换工作视频…</p>
+              ) : completedPath ? (
+                <p className="text-sm text-text-muted">切片完成，正在收尾…</p>
+              ) : clipProgressPercent !== null ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-text-muted">切片进度</span>
+                    <span className="font-mono text-accent">{clipProgressPercent}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-surface">
+                    <div
+                      className="h-full bg-accent transition-all"
+                      style={{ width: `${clipProgressPercent}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-text-muted">切片中…</p>
+              )}
+              {snapshot?.fellBackToHard && !completedPath && (
+                <p className="text-sm text-warning">已改为硬切</p>
+              )}
+              {!completedPath && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleCancelClip()}
+                >
+                  停止切片
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -159,7 +260,7 @@ export function ImportView() {
         <button
           type="button"
           onClick={handleSelectVideo}
-          disabled={busy}
+          disabled={busy || clipBusy}
           className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-surface-raised p-10 text-center transition-colors hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-60"
         >
           <IconFilePlus className="h-7 w-7 text-accent" />
@@ -167,7 +268,7 @@ export function ImportView() {
             {busy ? "处理中…" : "选择视频文件"}
           </span>
           <span className="text-xs text-text-muted">
-            打开视频并开始转录
+            打开视频，可切片或继续转录
           </span>
         </button>
       </div>
@@ -177,6 +278,44 @@ export function ImportView() {
           FFmpeg 就绪 · 来源：{FFMPEG_SOURCE_LABEL[ffmpeg.source]}
           {ffmpeg.version ? ` · ${ffmpeg.version}` : ""}
         </p>
+      )}
+
+      {session && (
+        <ClipDialog
+          open={clipOpen}
+          onOpenChange={setClipOpen}
+          videoPath={session.videoPath}
+          onStart={async (args) => {
+            const run = async () => {
+              setClipOpen(false);
+              clearSuccessMessage();
+              resetForStart();
+              upsertTask({ id: "video-clip", label: "视频切片", status: "running", progress: 0 });
+              try {
+                const id = await startVideoClip({
+                  videoPath: session.videoPath,
+                  startMs: args.startMs,
+                  endMs: args.endMs,
+                  mode: args.mode,
+                  saveDir: args.saveDir,
+                  fileName: args.fileName,
+                });
+                startJob(id, { useAsWorkingVideo: args.useAsWorkingVideo });
+              } catch (e) {
+                clipSetError(String(e));
+                updateTask("video-clip", { status: "error" });
+              }
+            };
+            if (ffmpegMissing) {
+              await ffmpegPreparation.requestDependency(async () => {
+                const next = await refreshFfmpeg(true);
+                if (next.available) await run();
+              });
+              return;
+            }
+            await run();
+          }}
+        />
       )}
 
       <RuntimeDependencyDialog

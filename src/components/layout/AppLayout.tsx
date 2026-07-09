@@ -1,5 +1,6 @@
 import { useUiStore } from "../../stores/uiStore";
 import { useBurnJobPoller } from "../../hooks/useBurnJobPoller";
+import { useClipJobPoller } from "../../hooks/useClipJobPoller";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { WelcomeView } from "../workflow/WelcomeView";
@@ -10,6 +11,7 @@ import { TranslateView } from "../workflow/TranslateView";
 import { EditorView } from "../editor/EditorView";
 import { BurnView } from "../workflow/BurnView";
 import { SettingsView } from "../workflow/SettingsView";
+import { ClipInProgressGate } from "../workflow/ClipInProgressGate";
 
 const stepViews = {
   welcome: WelcomeView,
@@ -28,13 +30,16 @@ export function AppLayout() {
   const View = stepViews[currentStep];
 
   useBurnJobPoller();
+  useClipJobPoller();
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex min-h-0 flex-1">
         <Sidebar collapsed={sidebarCollapsed} />
         <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden flex-col bg-surface">
-          <View />
+          <ClipInProgressGate step={currentStep}>
+            <View />
+          </ClipInProgressGate>
         </main>
       </div>
       <StatusBar />

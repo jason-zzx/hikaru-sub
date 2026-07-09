@@ -1,6 +1,6 @@
 # Hikaru Sub — Agent 指南
 
-AI 日语字幕桌面应用：下载 m3u8 视频 → 本地 ASR 日语转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
+AI 日语字幕桌面应用：下载 m3u8 视频 → 可选切片 → 本地 ASR 日语转录 → LLM 批量翻译 → 字幕校对编辑 → FFmpeg 压制。
 
 ## ⚠️ 最高优先级规则（优先于一切）
 
@@ -78,7 +78,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 - 前端、状态、字幕工具或 `packages/ass-core` 改动：至少运行相关 `pnpm test -- <test-file>`；共享逻辑或跨模块行为改动后运行完整 `pnpm test`。
 - TypeScript 类型、构建配置、Tauri command 封装或用户可见流程改动：运行 `pnpm build`。
-- Rust/Tauri 后端、FFmpeg、下载、运行时依赖、ASR 启动、压制或文件 I/O 改动：运行 `cargo test --manifest-path src-tauri/Cargo.toml`，可先用测试名过滤，再跑相关完整集合。
+- Rust/Tauri 后端、FFmpeg、下载、切片、运行时依赖、ASR 启动、压制或文件 I/O 改动：运行 `cargo test --manifest-path src-tauri/Cargo.toml`，可先用测试名过滤，再跑相关完整集合。
 - Python ASR sidecar 改动：在 `asr-service/` 下运行 `python -m unittest discover tests`；涉及可选引擎时说明本机是否已安装对应依赖或模型。
 - 若因本机缺少 FFmpeg、Python 3.11、GPU、模型权重、网络或平台能力无法运行某项验证，最终汇报中明确说明未运行项与原因。
 
@@ -87,7 +87,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 ```text
 src/                    React 前端
   components/layout/    AppLayout、Sidebar、StatusBar、NavIcons
-  components/workflow/  导入、转录、翻译、压制、设置页
+  components/workflow/  导入（含切片）、转录、翻译、压制、设置页
   components/editor/    字幕编辑器
   components/player/    视频预览与 ASS 叠加
   components/ui/        shadcn/ui 组件（CLI 生成，勿手改风格；新增组件用 `pnpm dlx shadcn@latest add`）
@@ -100,7 +100,7 @@ src/                    React 前端
   services/             Tauri invoke 封装与前端服务
   types/                共享 TS 类型
 src-tauri/              Tauri Rust 后端
-  src/                  FFmpeg、ASR、视频会话、设置、下载、压制等 commands
+  src/                  FFmpeg、ASR、视频会话、设置、下载、切片、压制等 commands
   resources/            打包资源与运行时依赖源清单
 packages/ass-core/      ASS 解析/序列化 workspace 包
 asr-service/            Python FastAPI ASR sidecar
@@ -109,7 +109,7 @@ scripts/                开发、ASR、发布辅助脚本
 
 ## 架构边界
 
-- **Tauri Rust**：文件 I/O、FFmpeg/ffprobe、音频波形、视频代理转码、运行时依赖准备、ASR sidecar 进程管理、视频会话路径准备、下载与压制任务。
+- **Tauri Rust**：文件 I/O、FFmpeg/ffprobe、音频波形、视频代理转码、运行时依赖准备、ASR sidecar 进程管理、视频会话路径准备、下载、切片与压制任务。
 - **React**：全部 UI、ASS 文本编辑、翻译 API 调用、任务轮询、用户设置交互。
 - **Python sidecar**：ASR 推理，通过 localhost HTTP 与 Tauri 通信，不阻塞 UI。
 - **ass-core**：ASS 是唯一字幕数据交换格式；内存模型为 `SubtitleCue`，project store 另缓存运行时 `VideoSession`、活动字幕路径、`assScriptInfo` 与 `assStyles`，保存时完整写回 ASS。
@@ -127,6 +127,8 @@ scripts/                开发、ASR、发布辅助脚本
 - `burnAssPath`：应用缓存工作区中的压制输入 ASS
 
 打开视频时优先加载翻译字幕，其次加载转录字幕；都不存在时准备空会话。
+
+下载完成与导入选视频后留在导入页（不自动跳转录）。导入页可「继续转录」或「切片」：切片在 Dialog 内选起止与软/硬切，完成后可选替换为当前工作视频（默认勾选）；替换时仅 `setSession`，不 `loadAssDocument`、不迁移 ASS。切片进行中由 App 层 `useClipJobPoller` 收尾并解除导航锁（勿把完成逻辑只写在 ImportView，否则离开导入页会卡住 busy）。
 
 ### SubtitleCue
 
