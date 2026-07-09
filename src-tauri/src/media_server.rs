@@ -19,6 +19,7 @@ const CORS_HEADERS: &str = concat!(
     "Access-Control-Expose-Headers: Accept-Ranges, Content-Length, Content-Range\r\n",
 );
 
+#[derive(Clone)]
 pub struct MediaServer {
     base_url: String,
     files: Arc<Mutex<HashMap<String, PathBuf>>>,

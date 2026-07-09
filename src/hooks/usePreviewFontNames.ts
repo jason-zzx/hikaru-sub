@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { discoverPreviewFonts } from "../services/tauri";
+import { getPreviewFonts } from "../services/previewFontDiscovery";
 import type { PreviewFontFile } from "../types";
 import { previewFontNameFromFileName } from "../utils/fontFamilyAliases";
 
@@ -7,6 +7,11 @@ type FontNameSource =
   | string
   | Pick<PreviewFontFile, "fileName"> &
       Partial<Pick<PreviewFontFile, "displayName" | "familyNames">>;
+
+export interface UsePreviewFontNamesOptions {
+  /** 为 false 时不触发发现（例如 StyleManager 关闭时）。默认 true。 */
+  enabled?: boolean;
+}
 
 function previewFontNameFromSource(source: FontNameSource): string {
   if (typeof source === "string") return previewFontNameFromFileName(source);
@@ -33,13 +38,19 @@ export function mergePreviewFontNames(
   );
 }
 
-export function usePreviewFontNames(extraNames: string[] = []) {
+export function usePreviewFontNames(
+  extraNames: string[] = [],
+  options: UsePreviewFontNamesOptions = {},
+) {
+  const enabled = options.enabled ?? true;
   const [discoveredNames, setDiscoveredNames] = useState<string[]>([]);
 
   useEffect(() => {
+    if (!enabled) return;
+
     let cancelled = false;
 
-    discoverPreviewFonts()
+    getPreviewFonts()
       .then((fonts) => {
         if (cancelled) return;
         setDiscoveredNames(fontNamesFromFiles(fonts));
@@ -51,7 +62,7 @@ export function usePreviewFontNames(extraNames: string[] = []) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   return useMemo(
     () => mergePreviewFontNames(discoveredNames, extraNames),

@@ -71,6 +71,25 @@ describe("editor style visual editing integration", () => {
     expect(source).toContain('step="0.1"');
   });
 
+  it("defers StyleManager font discovery until the drawer is open", () => {
+    const source = readSource("src/components/editor/StyleManager.tsx");
+
+    expect(source).toMatch(
+      /usePreviewFontNames\([\s\S]*?\{[\s\S]*enabled:\s*open/,
+    );
+  });
+
+  it("shares preview font discovery through a cached helper", () => {
+    const discovery = readSource("src/services/previewFontDiscovery.ts");
+    const hook = readSource("src/hooks/usePreviewFontNames.ts");
+    const player = readSource("src/components/player/VideoPlayer.tsx");
+
+    expect(discovery).toContain("export async function getPreviewFonts");
+    expect(hook).toContain("getPreviewFonts");
+    expect(player).toContain("getPreviewFonts");
+    expect(player).not.toContain("discoverPreviewFonts()");
+  });
+
   it("prompts to cascade style renames to referencing cues (Aegisub-style)", () => {
     const source = readSource("src/components/editor/StyleManager.tsx");
 

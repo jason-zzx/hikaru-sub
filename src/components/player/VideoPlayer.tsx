@@ -4,7 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { selectLibassPreviewFonts } from "../../services/libassFontSelection";
 import { useVideoDisplayRect } from "../../hooks/useVideoDisplayRect";
-import { discoverPreviewFonts, getVideoInfo } from "../../services/tauri";
+import { getPreviewFonts } from "../../services/previewFontDiscovery";
+import { getVideoInfo } from "../../services/tauri";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { PreviewFontFile, VideoPlaybackProbe } from "../../types";
@@ -75,7 +76,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
 
   useEffect(() => {
     let cancelled = false;
-    discoverPreviewFonts()
+    getPreviewFonts()
       .then((fonts) => {
         if (!cancelled) {
           setPreviewFonts(fonts);
