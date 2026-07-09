@@ -22,6 +22,7 @@ export type EditorActionId =
   | "copy-cues"
   | "cut-cues"
   | "paste-cues"
+  | "select-all-cues"
   | "commit-and-next"
   | "insert-newline"
   | "discard-draft"
@@ -58,6 +59,7 @@ export const EDITOR_HOTKEYS: HotkeyDef[] = [
   { key: "PageDown", scope: "outside-input", action: "select-page-down", label: "PgDn", description: "向下跳 10 条", category: "导航" },
   // 播放头控制
   { key: " ", scope: "outside-input", action: "toggle-play", label: "空格", description: "播放 / 暂停", category: "播放" },
+  { key: "p", ctrl: true, scope: "global", action: "toggle-play", label: "Ctrl+P", description: "播放 / 暂停（编辑框内可用）", category: "播放" },
   { key: "ArrowLeft", scope: "outside-input", action: "frame-prev", label: "←", description: "上一帧", category: "播放" },
   { key: "ArrowRight", scope: "outside-input", action: "frame-next", label: "→", description: "下一帧", category: "播放" },
   { key: "ArrowLeft", alt: true, scope: "outside-input", action: "frame-fast-prev", label: "Alt+←", description: "快退 10 帧", category: "播放" },
@@ -77,6 +79,7 @@ export const EDITOR_HOTKEYS: HotkeyDef[] = [
   { key: "c", ctrl: true, scope: "outside-input", action: "copy-cues", label: "Ctrl+C", description: "复制选中字幕行", category: "编辑" },
   { key: "x", ctrl: true, scope: "outside-input", action: "cut-cues", label: "Ctrl+X", description: "剪切选中字幕行", category: "编辑" },
   { key: "v", ctrl: true, scope: "outside-input", action: "paste-cues", label: "Ctrl+V", description: "粘贴字幕行", category: "编辑" },
+  { key: "a", ctrl: true, scope: "outside-input", action: "select-all-cues", label: "Ctrl+A", description: "全选字幕行", category: "编辑" },
   // 系统
   { key: "s", ctrl: true, scope: "global", action: "save", label: "Ctrl+S", description: "保存", category: "系统" },
   { key: "z", ctrl: true, scope: "outside-input", action: "undo", label: "Ctrl+Z", description: "撤销（编辑框内为文本撤销）", category: "系统" },

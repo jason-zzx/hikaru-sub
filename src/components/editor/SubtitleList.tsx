@@ -115,6 +115,7 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
     setContextMenu(null);
 
     if (event.shiftKey) {
+      event.preventDefault();
       const range = selectCueRange(cue.id);
       if (range) {
         setSelectedCueIds(range);
@@ -123,6 +124,7 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
         setSelectionAnchorId(cue.id);
       }
     } else if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
       const selectedSet = new Set(selectedCueIds);
       if (selectedSet.has(cue.id)) {
         selectedSet.delete(cue.id);
@@ -208,7 +210,7 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
   }
 
   return (
-    <div ref={listRef} className="h-full overflow-auto">
+    <div ref={listRef} className="h-full overflow-auto select-none">
       <div className="space-y-1 p-2">
         {cues.map((cue, index) => {
           const display = getCueDisplay(cue, mergeMode);

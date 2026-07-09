@@ -50,7 +50,10 @@ export function Sidebar({ collapsed }: SidebarProps) {
       <button
         key={item.step}
         type="button"
-        onClick={() => setStep(item.step)}
+        onClick={(event) => {
+          setStep(item.step);
+          event.currentTarget.blur();
+        }}
         title={item.label}
         data-active={active}
         className="flex w-full items-center gap-2.5 rounded-md p-2 text-sm ring-sidebar-ring transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground"
