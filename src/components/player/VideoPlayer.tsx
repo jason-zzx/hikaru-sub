@@ -373,7 +373,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   return (
     <div
       ref={containerRef}
-      className="relative flex h-full w-full items-center justify-center bg-black"
+      className="relative flex h-full w-full items-center justify-center bg-muted"
     >
       {error ? (
         <div className="text-center text-red-400">
@@ -384,7 +384,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       ) : transcoding ? (
         <div className="text-center text-text-muted">
           <div className="mb-4 text-sm">正在转码视频...</div>
-          <div className="mx-auto h-2 w-64 overflow-hidden rounded-full bg-gray-700">
+          <div className="mx-auto h-2 w-64 overflow-hidden rounded-full bg-muted-foreground/20">
             <div
               className="h-full bg-blue-500 transition-all duration-300"
               style={{ width: `${transcodePercent}%` }}
@@ -432,7 +432,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
             />
           )}
           {previewFontError && (
-            <div className="absolute bottom-2 left-2 rounded-md border border-warning/40 bg-black/70 px-2 py-1 text-xs text-warning">
+            <div className="absolute bottom-2 left-2 rounded-md border border-warning/40 bg-popover/90 px-2 py-1 text-xs text-warning">
               字体自动发现失败：{previewFontError}
             </div>
           )}

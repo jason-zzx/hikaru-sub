@@ -4,7 +4,7 @@ interface LibassFallbackNoticeProps {
 
 export function LibassFallbackNotice({ reason }: LibassFallbackNoticeProps) {
   return (
-    <div className="absolute left-2 top-2 z-10 rounded-md border border-warning/40 bg-black/70 px-2 py-1 text-xs text-warning">
+    <div className="absolute left-2 top-2 z-10 rounded-md border border-warning/40 bg-popover/90 px-2 py-1 text-xs text-warning">
       已使用 CSS 近似预览
       {reason ? `：${reason}` : ""}
     </div>

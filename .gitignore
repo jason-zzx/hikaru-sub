@@ -30,3 +30,7 @@ src-tauri/binaries/ffprobe.exe
 *.sln
 *.sw?
 .cache
+
+# Local agent brainstorm / plan artifacts
+.superpowers/
+docs/superpowers/

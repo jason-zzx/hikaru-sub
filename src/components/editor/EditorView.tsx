@@ -274,7 +274,7 @@ export function EditorView() {
         </div>
 
         {/* 视频播放器 */}
-        <div className="col-start-2 row-start-1 min-h-0 overflow-hidden bg-black">
+        <div className="col-start-2 row-start-1 min-h-0 overflow-hidden bg-muted">
           <VideoPlayer videoPath={session.videoPath} />
         </div>
 

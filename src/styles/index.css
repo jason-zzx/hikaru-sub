@@ -46,6 +46,16 @@
   --sidebar-accent-foreground: oklch(0.4 0.12 250);
   --sidebar-border: oklch(0.9 0.01 255);
   --sidebar-ring: oklch(0.55 0.18 250);
+  /* 编辑页时间轴（canvas 经 getComputedStyle 读取） */
+  --timeline-bg: oklch(0.96 0.008 255);
+  --timeline-wave-bg: oklch(0.93 0.01 255);
+  --timeline-tick: oklch(0.5 0.015 255);
+  --timeline-wave: oklch(0.55 0.18 250);
+  --timeline-cue: #94a3b8;
+  --timeline-cue-selected: oklch(0.55 0.18 250);
+  --timeline-cue-text: #fff;
+  --timeline-cue-handle: rgba(255, 255, 255, 0.75);
+  --timeline-playhead: #ef4444;
 }
 
 /* ===== shadcn 语义令牌（深色，.dark on <html>）===== */
@@ -83,6 +93,15 @@
   --sidebar-accent-foreground: oklch(0.85 0.06 250);
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.7 0.15 250);
+  --timeline-bg: #111827;
+  --timeline-wave-bg: #1a1a1a;
+  --timeline-tick: #888;
+  --timeline-wave: #3b82f6;
+  --timeline-cue: #4b5563;
+  --timeline-cue-selected: #3b82f6;
+  --timeline-cue-text: #fff;
+  --timeline-cue-handle: rgba(255, 255, 255, 0.75);
+  --timeline-playhead: #ef4444;
 }
 
 /* Tailwind 工具映射：把语义令牌暴露为颜色工具类 */
