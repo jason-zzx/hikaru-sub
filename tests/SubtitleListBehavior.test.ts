@@ -48,6 +48,15 @@ describe("SubtitleList 时间显示", () => {
     expect(source).toContain("合并（保留首行）");
   });
 
+  it("Shift/Ctrl 多选时禁止浏览器原生文字选中", () => {
+    expect(source).toContain("select-none");
+    expect(source).toContain("event.preventDefault()");
+    expect(source).toMatch(/if \(event\.shiftKey\)[\s\S]*?event\.preventDefault\(\)/);
+    expect(source).toMatch(
+      /else if \(event\.ctrlKey \|\| event\.metaKey\)[\s\S]*?event\.preventDefault\(\)/,
+    );
+  });
+
   it("支持整条字幕复制、剪切、粘贴并走 undoable 批量替换", () => {
     expect(source).toContain("copyCueRows");
     expect(source).toContain("pasteCueRows");

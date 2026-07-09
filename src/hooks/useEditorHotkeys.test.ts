@@ -199,6 +199,32 @@ describe("编辑动作", () => {
     expect(usePlaybackStore.getState().playUntilMs).toBeNull();
     expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可按 Ctrl+Z 撤销");
   });
+
+  it("select-all-cues 选中全部字幕行，并以最后一条为活动项", () => {
+    usePlaybackStore.setState({
+      selectedCueId: "a",
+      selectedCueIds: ["a"],
+      playUntilMs: 9000,
+    });
+
+    make_actions()["select-all-cues"]!();
+
+    const pb = usePlaybackStore.getState();
+    expect(pb.selectedCueIds).toEqual(["a", "b", "c"]);
+    expect(pb.selectedCueId).toBe("c");
+    expect(pb.playUntilMs).toBeNull();
+  });
+
+  it("select-all-cues 无字幕时 no-op", () => {
+    useProjectStore.setState({ cues: [] });
+    usePlaybackStore.setState({ selectedCueId: null, selectedCueIds: [] });
+
+    make_actions()["select-all-cues"]!();
+
+    const pb = usePlaybackStore.getState();
+    expect(pb.selectedCueIds).toEqual([]);
+    expect(pb.selectedCueId).toBeNull();
+  });
 });
 
 describe("系统动作", () => {

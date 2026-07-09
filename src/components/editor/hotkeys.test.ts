@@ -81,6 +81,31 @@ describe("findHotkey", () => {
     expect(findHotkey(ev({ key: "v", ctrlKey: true, target: INPUT }))).toBeNull();
   });
 
+  it("Ctrl/Cmd+A 框外全选字幕行，框内放行原生全选文字", () => {
+    expect(findHotkey(ev({ key: "a", ctrlKey: true, target: BODY }))?.action).toBe(
+      "select-all-cues",
+    );
+    expect(findHotkey(ev({ key: "a", metaKey: true, target: BODY }))?.action).toBe(
+      "select-all-cues",
+    );
+    expect(findHotkey(ev({ key: "a", ctrlKey: true, target: TEXTAREA }))).toBeNull();
+    expect(findHotkey(ev({ key: "a", ctrlKey: true, target: INPUT }))).toBeNull();
+  });
+
+  it("Ctrl/Cmd+P 全局播放/暂停；空格仍仅框外生效", () => {
+    expect(findHotkey(ev({ key: "p", ctrlKey: true, target: BODY }))?.action).toBe(
+      "toggle-play",
+    );
+    expect(findHotkey(ev({ key: "p", ctrlKey: true, target: TEXTAREA }))?.action).toBe(
+      "toggle-play",
+    );
+    expect(findHotkey(ev({ key: "p", metaKey: true, target: INPUT }))?.action).toBe(
+      "toggle-play",
+    );
+    expect(findHotkey(ev({ key: " ", target: BODY }))?.action).toBe("toggle-play");
+    expect(findHotkey(ev({ key: " ", target: TEXTAREA }))).toBeNull();
+  });
+
   it("outside-input 作用域（Alt+←/→）框内也不匹配", () => {
     expect(findHotkey(ev({ key: "ArrowLeft", altKey: true, target: TEXTAREA }))).toBeNull();
     expect(findHotkey(ev({ key: "ArrowRight", altKey: true, target: TEXTAREA }))).toBeNull();

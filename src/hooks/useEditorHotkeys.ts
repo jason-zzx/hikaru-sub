@@ -150,6 +150,14 @@ export function buildEditorActions(
     }
   };
 
+  const selectAllCues = () => {
+    const { cues } = useProjectStore.getState();
+    if (cues.length === 0) return;
+    const pb = usePlaybackStore.getState();
+    pb.setSelectedCueIds(cues.map((cue) => cue.id));
+    pb.setPlayUntil(null);
+  };
+
   const deleteSelectedCues = () => {
     const selectedIds = selectedIdsOrActive();
     if (selectedIds.length === 0) return;
@@ -183,6 +191,7 @@ export function buildEditorActions(
     "copy-cues": copyCues,
     "cut-cues": cutCues,
     "paste-cues": pasteCues,
+    "select-all-cues": selectAllCues,
     save: () => options.onSave(),
     undo: () => useProjectStore.getState().undo(),
     redo: () => useProjectStore.getState().redo(),
