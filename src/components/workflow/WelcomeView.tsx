@@ -1,3 +1,4 @@
+import { BrandMark } from "../brand/BrandMark";
 import { useUiStore } from "../../stores/uiStore";
 import { Button } from "../ui/button";
 
@@ -6,7 +7,8 @@ export function WelcomeView() {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
-      <div className="text-center">
+      <div className="flex flex-col items-center text-center">
+        <BrandMark className="mb-4 size-16" />
         <h2 className="text-3xl font-bold text-text">Hikaru Sub</h2>
         <p className="mt-2 max-w-md text-text-muted">
           AI 转录 · AI 翻译 · 字幕编辑 · 一键压制
