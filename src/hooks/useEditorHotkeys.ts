@@ -15,6 +15,7 @@ import {
   selectCueByOffset,
   setCueRowClipboard,
 } from "../services/editorActions";
+import type { SubtitleCue } from "../types";
 
 const FAST_JUMP_FRAMES = 10;
 const PAGE_JUMP_CUES = 10;

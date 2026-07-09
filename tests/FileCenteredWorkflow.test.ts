@@ -81,6 +81,6 @@ describe("file-centered import and download flow", () => {
 
   it("download prepares an empty session without auto-loading subtitles", () => {
     expect(downloadSource).not.toContain("loadAssDocument");
-    expect(downloadSource).toContain("完成后可打开并继续转录");
+    expect(downloadSource).toContain("完成后可进入导入页继续转录或切片");
   });
 });

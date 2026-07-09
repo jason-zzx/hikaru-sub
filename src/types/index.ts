@@ -414,3 +414,42 @@ export interface BurnSnapshot {
   outputPath: string | null;
   error: string | null;
 }
+
+export type ClipMode = "soft" | "hard";
+
+export type ClipStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface StartVideoClipArgs {
+  videoPath: string;
+  startMs: number;
+  endMs: number;
+  mode: ClipMode;
+  saveDir?: string | null;
+  fileName?: string | null;
+}
+
+export interface ClipSnapshot {
+  id: string;
+  status: ClipStatus;
+  progress: number | null;
+  processedMs: number;
+  durationMs: number;
+  outputPath: string | null;
+  error: string | null;
+  fellBackToHard: boolean;
+}
+
+export interface ExtractVideoFrameArgs {
+  videoPath: string;
+  timeMs: number;
+}
+
+export interface ExtractVideoFrameResult {
+  imagePath: string;
+  imageUrl: string;
+}
