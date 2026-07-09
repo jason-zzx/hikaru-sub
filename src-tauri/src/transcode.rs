@@ -3,10 +3,9 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::sync::Mutex;
 
 use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
 use crate::process::hidden_command;
@@ -40,6 +39,9 @@ struct TranscodeProgressEvent {
 struct TranscodeJob {
     cache_path: PathBuf,
     completed: bool,
+    /// FFmpeg/rename 失败后置位；前端据此停止轮询，而不是无限「正在转码」
+    failed: bool,
+    error: Option<String>,
     progress: f32,
 }
 
@@ -263,6 +265,7 @@ fn is_valid_proxy_cache(ffprobe: &str, cache_path: &Path, format: ProxyVideoForm
     let Ok(metadata) = fs::metadata(cache_path) else {
         return false;
     };
+    // 半成品/损坏缓存常见于并发写入；过小直接判无效
     if metadata.len() < 10240 {
         return false;
     }
@@ -283,10 +286,75 @@ fn is_valid_proxy_cache(ffprobe: &str, cache_path: &Path, format: ProxyVideoForm
 
     match output {
         Ok(output) if output.status.success() => {
+            // ffprobe 对损坏流常把错误打到 stderr；有 NAL/decode 类错误则视为无效
+            let stderr = String::from_utf8_lossy(&output.stderr).to_ascii_lowercase();
+            if stderr.contains("invalid nal")
+                || stderr.contains("error splitting")
+                || stderr.contains("corrupt")
+                || stderr.contains("truncated")
+            {
+                return false;
+            }
             let codec = String::from_utf8_lossy(&output.stdout).trim().to_string();
             format.is_valid_video_codec(&codec)
         }
         _ => false,
+    }
+}
+
+/// 转码临时路径必须仍以 `.mp4` 结尾：FFmpeg 按扩展名选 muxer，
+/// `xxx.mp4.tmp` 会失败；用 `xxx.tmp.mp4`。
+fn proxy_temp_cache_path(cache_path: &Path, format: ProxyVideoFormat) -> PathBuf {
+    let stem = cache_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("proxy");
+    cache_path.with_file_name(format!("{stem}.tmp.{}", format.extension()))
+}
+
+/// Windows 上目标已存在时 `rename` 会失败；先删再 rename。
+fn promote_temp_to_final(temp_path: &Path, final_path: &Path) -> Result<(), String> {
+    if final_path.exists() {
+        fs::remove_file(final_path).map_err(|e| {
+            format!(
+                "无法覆盖旧代理缓存 {}: {}",
+                final_path.display(),
+                e
+            )
+        })?;
+    }
+    fs::rename(temp_path, final_path).map_err(|e| {
+        format!(
+            "无法将临时文件提升为代理缓存 {} -> {}: {}",
+            temp_path.display(),
+            final_path.display(),
+            e
+        )
+    })
+}
+
+fn mark_job_failed(
+    jobs: &Arc<Mutex<HashMap<String, TranscodeJob>>>,
+    video_path: &str,
+    error: impl Into<String>,
+) {
+    if let Ok(mut jobs) = jobs.lock() {
+        if let Some(job) = jobs.get_mut(video_path) {
+            job.failed = true;
+            job.completed = false;
+            job.error = Some(error.into());
+        }
+    }
+}
+
+fn mark_job_completed(jobs: &Arc<Mutex<HashMap<String, TranscodeJob>>>, video_path: &str) {
+    if let Ok(mut jobs) = jobs.lock() {
+        if let Some(job) = jobs.get_mut(video_path) {
+            job.completed = true;
+            job.failed = false;
+            job.error = None;
+            job.progress = 100.0;
+        }
     }
 }
 
@@ -311,6 +379,8 @@ fn transcode_ffmpeg_args(input: &str, output: &str, _format: ProxyVideoFormat) -
         "128k".into(),
         "-movflags".into(),
         "+faststart".into(),
+        "-f".into(),
+        "mp4".into(),
         "-y".into(),
         output.into(),
     ]
@@ -327,12 +397,19 @@ pub async fn start_transcode(
     let proxy_format = ProxyVideoFormat::for_current_platform();
 
     let state = app.state::<TranscodeState>();
-    let mut jobs = state.jobs.lock().await;
+    let mut jobs = state
+        .jobs
+        .lock()
+        .map_err(|_| "转码任务状态锁损坏".to_string())?;
 
     // 检查是否已有任务（包括进行中的任务）
     if let Some(job) = jobs.get(&video_path) {
         println!("Task already exists for: {}", video_path);
-        if job.completed && job.cache_path.exists() {
+        if job.failed {
+            // 允许失败后重试：清掉旧记录后继续往下走
+            println!("Previous transcode failed, retrying");
+            jobs.remove(&video_path);
+        } else if job.completed && job.cache_path.exists() {
             return Ok(job.cache_path.to_string_lossy().to_string());
         } else if !job.completed {
             // 任务进行中，直接返回缓存路径
@@ -354,6 +431,8 @@ pub async fn start_transcode(
                 TranscodeJob {
                     cache_path: cache_path.clone(),
                     completed: true,
+                    failed: false,
+                    error: None,
                     progress: 100.0,
                 },
             );
@@ -369,19 +448,25 @@ pub async fn start_transcode(
         TranscodeJob {
             cache_path: cache_path.clone(),
             completed: false,
+            failed: false,
+            error: None,
             progress: 0.0,
         },
     );
 
-    let output_path = cache_path.to_string_lossy().to_string();
+    // 先写到临时文件，成功后再 rename 成正式缓存，避免半成品被当成可播文件
+    let temp_path = proxy_temp_cache_path(&cache_path, proxy_format);
+    let _ = fs::remove_file(&temp_path);
+    let output_path = temp_path.to_string_lossy().to_string();
+    let final_path = cache_path.clone();
     let input_path = video_path.clone();
     let jobs_handle = state.jobs.clone();
     let app_handle = app.clone();
 
     tokio::spawn(async move {
         println!(
-            "Starting transcode ({:?}): {} -> {}",
-            proxy_format, input_path, output_path
+            "Starting transcode ({:?}): {} -> {} (via {})",
+            proxy_format, input_path, final_path.display(), output_path
         );
 
         // 先获取视频时长
@@ -430,7 +515,7 @@ pub async fn start_transcode(
                                             0.0
                                         };
 
-                                        if let Ok(mut jobs) = jobs_handle.try_lock() {
+                                        if let Ok(mut jobs) = jobs_handle.lock() {
                                             if let Some(job) = jobs.get_mut(&input_path) {
                                                 job.progress = percent;
                                             }
@@ -447,29 +532,41 @@ pub async fn start_transcode(
                 let result = process.wait();
                 match result {
                     Ok(status) if status.success() => {
-                        println!("Transcode completed: {}", output_path);
-                        if let Ok(mut jobs) = jobs_handle.try_lock() {
-                            if let Some(job) = jobs.get_mut(&input_path) {
-                                job.completed = true;
-                                job.progress = 100.0;
+                        match promote_temp_to_final(Path::new(&output_path), &final_path) {
+                            Ok(()) => {
+                                println!("Transcode completed: {}", final_path.display());
+                                mark_job_completed(&jobs_handle, &input_path);
+                                let _ = app_handle.emit(
+                                    "transcode_progress",
+                                    TranscodeProgressEvent { percent: 100.0 },
+                                );
+                            }
+                            Err(e) => {
+                                println!("Transcode promote failed: {}", e);
+                                let _ = fs::remove_file(&output_path);
+                                mark_job_failed(&jobs_handle, &input_path, e);
                             }
                         }
-                        let _ = app_handle.emit("transcode_progress", TranscodeProgressEvent { percent: 100.0 });
                     }
                     _ => {
                         println!("Transcode failed: {}", output_path);
                         let _ = fs::remove_file(&output_path);
-                        if let Ok(mut jobs) = jobs_handle.try_lock() {
-                            jobs.remove(&input_path);
-                        }
+                        mark_job_failed(
+                            &jobs_handle,
+                            &input_path,
+                            "FFmpeg 转码失败，请检查源视频与 FFmpeg 是否可用",
+                        );
                     }
                 }
             }
             Err(e) => {
                 println!("Failed to spawn ffmpeg: {}", e);
-                if let Ok(mut jobs) = jobs_handle.try_lock() {
-                    jobs.remove(&input_path);
-                }
+                let _ = fs::remove_file(&output_path);
+                mark_job_failed(
+                    &jobs_handle,
+                    &input_path,
+                    format!("无法启动 FFmpeg: {}", e),
+                );
             }
         }
     });
@@ -495,44 +592,121 @@ pub async fn check_transcode_progress(
     video_path: String,
 ) -> Result<TranscodeProgress, String> {
     let state = app.state::<TranscodeState>();
-    let jobs = state.jobs.lock().await;
+    let settings = load_settings(&app)?;
+    let ffprobe = resolve_ffprobe(&app, &settings);
+    let proxy_format = ProxyVideoFormat::for_current_platform();
+    let hash = format!("{:x}", md5::compute(&video_path));
+    let cache_path = proxy_cache_path(&state.cache_dir, &hash, proxy_format);
 
-    if let Some(job) = jobs.get(&video_path) {
-        if job.completed && job.cache_path.exists() {
-            println!("Transcode completed, ready to play");
+    {
+        let mut jobs = state
+            .jobs
+            .lock()
+            .map_err(|_| "转码任务状态锁损坏".to_string())?;
+
+        if let Some(job) = jobs.get_mut(&video_path) {
+            if job.failed {
+                return Ok(TranscodeProgress {
+                    ready: false,
+                    failed: true,
+                    error: job
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "代理转码失败".to_string()),
+                    cache_path: String::new(),
+                });
+            }
+
+            if job.completed && job.cache_path.exists() {
+                println!("Transcode completed, ready to play");
+                return Ok(TranscodeProgress {
+                    ready: true,
+                    failed: false,
+                    error: String::new(),
+                    cache_path: job.cache_path.to_string_lossy().to_string(),
+                });
+            }
+
+            if job.completed && !job.cache_path.exists() {
+                return Ok(TranscodeProgress {
+                    ready: false,
+                    failed: true,
+                    error: "代理缓存文件丢失，请重新打开视频以再次转码".to_string(),
+                    cache_path: String::new(),
+                });
+            }
+
+            // 文件已提升成功，但 completed 标记因 panic/锁失败未写入时，按有效缓存自愈
+            if !job.completed && job.cache_path.exists() {
+                let path = job.cache_path.clone();
+                drop(jobs);
+                if is_valid_proxy_cache(&ffprobe, &path, proxy_format) {
+                    mark_job_completed(&state.jobs, &video_path);
+                    println!("Transcode cache healed as ready: {}", path.display());
+                    return Ok(TranscodeProgress {
+                        ready: true,
+                        failed: false,
+                        error: String::new(),
+                        cache_path: path.to_string_lossy().to_string(),
+                    });
+                }
+                // 正式缓存已存在但无效：视为失败，避免永久「进行中」
+                mark_job_failed(
+                    &state.jobs,
+                    &video_path,
+                    "代理缓存无效或损坏，请重新打开视频以再次转码",
+                );
+                return Ok(TranscodeProgress {
+                    ready: false,
+                    failed: true,
+                    error: "代理缓存无效或损坏，请重新打开视频以再次转码".to_string(),
+                    cache_path: String::new(),
+                });
+            }
+
             return Ok(TranscodeProgress {
-                ready: true,
-                cache_path: job.cache_path.to_string_lossy().to_string(),
+                ready: false,
+                failed: false,
+                error: String::new(),
+                cache_path: String::new(),
             });
         }
+    }
 
-        if job.cache_path.exists() {
-            if let Ok(metadata) = fs::metadata(&job.cache_path) {
-                let size = metadata.len();
-                println!(
-                    "Transcode in progress - size: {} bytes, completed: {}",
-                    size, job.completed
-                );
-            }
-        }
+    // 任务记录已不存在：若正式缓存仍在且有效，视为成功；否则视为失败，避免前端无限轮询。
+    if is_valid_proxy_cache(&ffprobe, &cache_path, proxy_format) {
+        return Ok(TranscodeProgress {
+            ready: true,
+            failed: false,
+            error: String::new(),
+            cache_path: cache_path.to_string_lossy().to_string(),
+        });
     }
 
     Ok(TranscodeProgress {
         ready: false,
+        failed: true,
+        error: "代理转码任务已中断或失败".to_string(),
         cache_path: String::new(),
     })
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TranscodeProgress {
     ready: bool,
+    failed: bool,
+    error: String,
     cache_path: String,
 }
 
 #[tauri::command]
 pub async fn stop_transcode(app: AppHandle, video_path: String) -> Result<(), String> {
     let state = app.state::<TranscodeState>();
-    let mut jobs = state.jobs.lock().await;
+    let mut jobs = state
+        .jobs
+        .lock()
+        .map_err(|_| "转码任务状态锁损坏".to_string())?;
     jobs.remove(&video_path);
     Ok(())
 }
@@ -549,7 +723,56 @@ pub fn init_transcode_state(app: &mut tauri::App) {
 
 #[cfg(test)]
 mod tests {
-    use super::evaluate_playback_compat;
+    use super::{
+        evaluate_playback_compat, promote_temp_to_final, proxy_temp_cache_path, ProxyVideoFormat,
+    };
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn proxy_temp_path_keeps_mp4_extension_for_ffmpeg_muxer() {
+        let cache = PathBuf::from(r"C:\cache\transcode\abc123.mp4");
+        let temp = proxy_temp_cache_path(&cache, ProxyVideoFormat::Mp4H264);
+        assert_eq!(
+            temp.file_name().and_then(|n| n.to_str()),
+            Some("abc123.tmp.mp4")
+        );
+        assert!(temp
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("mp4")));
+    }
+
+    #[test]
+    fn promote_temp_replaces_existing_final_on_windows() {
+        let dir = std::env::temp_dir().join(format!(
+            "hikaru-sub-transcode-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let final_path = dir.join("proxy.mp4");
+        let temp_path = dir.join("proxy.tmp.mp4");
+        fs::write(&final_path, b"old-final").unwrap();
+        fs::write(&temp_path, b"new-temp").unwrap();
+
+        promote_temp_to_final(&temp_path, &final_path).unwrap();
+
+        assert!(!temp_path.exists());
+        assert_eq!(fs::read(&final_path).unwrap(), b"new-temp");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn hevc_mp4_needs_transcode() {
+        let (needs, reason) = evaluate_playback_compat(
+            "mov,mp4,m4v,3gp,3g2,mj2",
+            "hevc",
+            Some("aac"),
+        );
+        assert!(needs);
+        assert!(reason.unwrap().contains("视频编码"));
+    }
 
     #[test]
     fn h264_in_mkv_needs_transcode() {

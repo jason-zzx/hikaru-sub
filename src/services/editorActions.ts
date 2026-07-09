@@ -1,5 +1,15 @@
 import { createId as createAssId } from "@hikaru/ass-core";
+import { usePlaybackStore } from "../stores/playbackStore";
 import type { SubtitleCue } from "../types";
+
+/** 选中指定 cue 并 seek 到起点；用户主动切换会中断「播放当前句」。 */
+export function selectCueAndSeek(cue: SubtitleCue | null) {
+  if (!cue) return;
+  const pb = usePlaybackStore.getState();
+  pb.setSelectedCueId(cue.id);
+  pb.setCurrentTime(cue.startMs);
+  pb.setPlayUntil(null);
+}
 
 /**
  * 按列表顺序选择相邻字幕；offset 越界时收在首/末条（±Infinity 即跳首/末）。

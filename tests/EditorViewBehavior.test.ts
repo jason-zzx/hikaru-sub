@@ -65,4 +65,10 @@ describe("EditorView Phase 2B behavior guards", () => {
     expect(source).toContain("选择字幕文件");
     expect(source).not.toContain("打开字幕文件");
   });
+
+  it("auto-selects the first cue on mount and after loading a subtitle file", () => {
+    expect(source).toContain("selectCueAndSeek");
+    expect(source).toMatch(/selectCueAndSeek\(cues\[0\]\)/);
+    expect(source).toMatch(/selectCueAndSeek\(doc\.cues\[0\]\)/);
+  });
 });
