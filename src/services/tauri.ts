@@ -272,11 +272,6 @@ export async function cleanupRuntimeDependency(
   await invoke("cleanup_runtime_dependency", { args: { kind } });
 }
 
-/** 对下载源进行测速并返回更新后的运行时依赖状态。 */
-export async function probeDownloadSources(): Promise<RuntimeDependencyProbe> {
-  return invoke<RuntimeDependencyProbe>("probe_download_sources");
-}
-
 /** 保存 ASS 文本到文件。 */
 export async function saveAssText(
   assPath: string,

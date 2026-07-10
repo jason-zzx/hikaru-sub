@@ -13,7 +13,7 @@ describe("runtime dependency constants", () => {
   });
 
   it("labels source modes", () => {
-    expect(RUNTIME_SOURCE_MODE_LABEL.auto).toBe("自动推荐");
+    expect(RUNTIME_SOURCE_MODE_LABEL.official).toBe("官方源");
     expect(RUNTIME_SOURCE_MODE_LABEL.china).toBe("中国大陆镜像");
   });
 

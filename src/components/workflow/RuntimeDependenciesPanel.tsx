@@ -12,12 +12,6 @@ import {
   formatDependencyBytes,
 } from "../../constants/runtimeDependencies";
 
-const SOURCE_LABEL: Record<"official" | "china" | "custom", string> = {
-  official: "官方源",
-  china: "中国大陆镜像",
-  custom: "自定义",
-};
-
 const STATUS_LABEL: Record<string, string> = {
   available: "就绪",
   missing: "未安装",
@@ -27,7 +21,6 @@ const STATUS_LABEL: Record<string, string> = {
 interface RuntimeDependenciesPanelProps {
   probe: RuntimeDependencyProbe | null;
   onChangeSourceMode: (mode: RuntimeDependencySourceMode) => void;
-  onProbeSources: () => void;
   onCleanup: (kind: RuntimeDependencyKind) => void;
   onPrepareDependency?: (kind: RuntimeDependencyKind) => void;
   onConfigureAsr?: () => void;
@@ -37,14 +30,12 @@ interface RuntimeDependenciesPanelProps {
 export function RuntimeDependenciesPanel({
   probe,
   onChangeSourceMode,
-  onProbeSources,
   onCleanup,
   onPrepareDependency,
   onConfigureAsr,
   preparations = {},
 }: RuntimeDependenciesPanelProps) {
-  const sourceMode = probe?.sourceMode ?? "auto";
-  const effectiveSource = probe?.effectiveSource ?? "official";
+  const sourceMode = probe?.sourceMode ?? "official";
 
   const preparationProgress = (snapshot?: RuntimeDependencySnapshot) => {
     if (!snapshot || snapshot.progress === null || snapshot.progress === undefined) {
@@ -72,47 +63,25 @@ export function RuntimeDependenciesPanel({
       </div>
 
       <div className="rounded-lg border border-border bg-surface px-4 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-text">
-              {RUNTIME_SOURCE_MODE_LABEL[sourceMode]}
-            </p>
-            <p className="mt-1 text-xs text-text-muted">
-              当前使用：{SOURCE_LABEL[effectiveSource]}
-              {probe?.recommendedSource
-                ? ` · 自动推荐：${SOURCE_LABEL[probe.recommendedSource]}`
-                : ""}
-            </p>
-            {effectiveSource === "china" && (
-              <p className="mt-1 text-xs leading-relaxed text-warning">
-                ASR 模型使用 hf-mirror；它会按出口 IP 分流。模型下载失败时，请切换官方源或确保模型下载流量全程使用中国大陆出口。
-              </p>
-            )}
-          </div>
-          <div className="flex flex-nowrap items-center gap-2">
-            <Select
-              className="w-40 shrink-0"
-              value={sourceMode}
-              onChange={(value) =>
-                onChangeSourceMode(value as RuntimeDependencySourceMode)
-              }
-              options={(["auto", "official", "china", "custom"] as const).map(
-                (mode) => ({
-                  value: mode,
-                  label: RUNTIME_SOURCE_MODE_LABEL[mode],
-                }),
-              )}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onProbeSources}
-              className="shrink-0 px-3 py-2 text-sm"
-            >
-              重新测速
-            </Button>
-          </div>
+        <div className="flex h-8 flex-nowrap items-center justify-between gap-3">
+          <p className="text-sm font-medium leading-none text-text">下载源</p>
+          <Select
+            className="h-8 w-40 shrink-0"
+            value={sourceMode}
+            onChange={(value) =>
+              onChangeSourceMode(value as RuntimeDependencySourceMode)
+            }
+            options={Object.entries(RUNTIME_SOURCE_MODE_LABEL).map(([value, label]) => ({
+              value,
+              label,
+            }))}
+          />
         </div>
+        {sourceMode === "china" && (
+          <p className="mt-1 text-xs leading-relaxed text-warning">
+            ASR 模型使用 hf-mirror；它会按出口 IP 分流。模型下载失败时，请切换官方源或确保模型下载流量全程使用中国大陆出口。
+          </p>
+        )}
 
         <div className="mt-4 divide-y divide-border">
           {(probe?.items ?? []).map((item) => {

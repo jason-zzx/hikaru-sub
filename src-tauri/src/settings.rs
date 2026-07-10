@@ -1,35 +1,30 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum RuntimeDependencySourceMode {
-    Auto,
     Official,
     China,
-    Custom,
 }
 
 impl Default for RuntimeDependencySourceMode {
     fn default() -> Self {
-        Self::Auto
+        Self::Official
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct CustomRuntimeSourceProfile {
-    pub ffmpeg_url: Option<String>,
-    pub python311_url: Option<String>,
-    pub pip_index_url: Option<String>,
-    pub pip_extra_index_urls: Vec<String>,
-    pub pytorch_cpu_index_url: Option<String>,
-    pub pytorch_cuda_index_url: Option<String>,
-    pub pytorch_cpu_find_links_url: Option<String>,
-    pub pytorch_cuda_find_links_url: Option<String>,
-    pub huggingface_endpoint: Option<String>,
+impl<'de> Deserialize<'de> for RuntimeDependencySourceMode {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = String::deserialize(deserializer)?;
+        match value.as_str() {
+            "china" => Ok(Self::China),
+            // official + legacy auto/custom + anything unknown → official
+            _ => Ok(Self::Official),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,9 +47,6 @@ pub struct AppSettings {
     pub translation_glossary: Option<String>,
     pub subtitle_merge_mode: String,
     pub runtime_source_mode: RuntimeDependencySourceMode,
-    pub runtime_recommended_profile: Option<String>,
-    pub runtime_recommendation_checked_at: Option<String>,
-    pub runtime_custom_source: CustomRuntimeSourceProfile,
 }
 
 impl Default for AppSettings {
@@ -76,10 +68,7 @@ impl Default for AppSettings {
             translation_custom_prompt: None,
             translation_glossary: None,
             subtitle_merge_mode: "inline".into(),
-            runtime_source_mode: RuntimeDependencySourceMode::Auto,
-            runtime_recommended_profile: None,
-            runtime_recommendation_checked_at: None,
-            runtime_custom_source: CustomRuntimeSourceProfile::default(),
+            runtime_source_mode: RuntimeDependencySourceMode::Official,
         }
     }
 }
@@ -256,19 +245,47 @@ mod tests {
     }
 
     #[test]
-    fn default_runtime_dependency_source_settings_are_auto() {
+    fn default_runtime_dependency_source_settings_are_official() {
         let settings = AppSettings::default();
-
         assert_eq!(
             settings.runtime_source_mode,
-            RuntimeDependencySourceMode::Auto
+            RuntimeDependencySourceMode::Official
         );
-        assert_eq!(settings.runtime_recommended_profile, None);
-        assert_eq!(settings.runtime_recommendation_checked_at, None);
+    }
+
+    #[test]
+    fn legacy_runtime_source_modes_deserialize_as_official() {
+        for mode in ["auto", "custom", "unknown-mode"] {
+            let json = format!(
+                r#"{{"runtimeSourceMode":"{mode}","asrEngine":"faster-whisper","asrModel":"large-v3","asrDevice":"auto","translationBaseUrl":"https://api.openai.com/v1","translationModel":"gpt-4o-mini","defaultSourceLang":"ja","defaultTargetLang":"zh-CN","translationBatchSize":25,"translationContextWindow":2,"subtitleMergeMode":"inline"}}"#
+            );
+            let settings: AppSettings = serde_json::from_str(&json).unwrap();
+            assert_eq!(
+                settings.runtime_source_mode,
+                RuntimeDependencySourceMode::Official,
+                "mode={mode}"
+            );
+        }
+    }
+
+    #[test]
+    fn china_runtime_source_mode_deserializes() {
+        let json = r#"{"runtimeSourceMode":"china","asrEngine":"faster-whisper","asrModel":"large-v3","asrDevice":"auto","translationBaseUrl":"https://api.openai.com/v1","translationModel":"gpt-4o-mini","defaultSourceLang":"ja","defaultTargetLang":"zh-CN","translationBatchSize":25,"translationContextWindow":2,"subtitleMergeMode":"inline"}"#;
+        let settings: AppSettings = serde_json::from_str(json).unwrap();
         assert_eq!(
-            settings.runtime_custom_source.pip_extra_index_urls,
-            Vec::<String>::new()
+            settings.runtime_source_mode,
+            RuntimeDependencySourceMode::China
         );
+    }
+
+    #[test]
+    fn deprecated_runtime_source_fields_are_ignored_on_load() {
+        let json = r#"{"runtimeSourceMode":"official","runtimeRecommendedProfile":"china","runtimeRecommendationCheckedAt":"123","runtimeCustomSource":{"ffmpegUrl":"https://example.com/ffmpeg.zip"},"asrEngine":"faster-whisper","asrModel":"large-v3","asrDevice":"auto","translationBaseUrl":"https://api.openai.com/v1","translationModel":"gpt-4o-mini","defaultSourceLang":"ja","defaultTargetLang":"zh-CN","translationBatchSize":25,"translationContextWindow":2,"subtitleMergeMode":"inline"}"#;
+        let settings: AppSettings = serde_json::from_str(json).unwrap();
+        let serialized = serde_json::to_value(&settings).unwrap();
+        assert!(serialized.get("runtimeRecommendedProfile").is_none());
+        assert!(serialized.get("runtimeRecommendationCheckedAt").is_none());
+        assert!(serialized.get("runtimeCustomSource").is_none());
     }
 
     #[test]

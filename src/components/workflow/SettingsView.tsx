@@ -6,7 +6,6 @@ import {
   getRuntimeDependencyProgress,
   invalidateFfmpegStatus,
   prepareRuntimeDependency,
-  probeDownloadSources,
   probeRuntimeDependencies,
   setSettings,
 } from "../../services/tauri";
@@ -55,13 +54,9 @@ type RuntimePreparationSnapshots = Partial<
   Record<RuntimeDependencyKind, RuntimeDependencySnapshot>
 >;
 
-const shouldAutoProbeRuntimeSources = (probe: RuntimeDependencyProbe) =>
-  probe.sourceMode === "auto";
-
 export function SettingsView() {
   const asrSectionRef = useRef<HTMLDivElement | null>(null);
   const runtimePreparationJobsRef = useRef<Partial<Record<RuntimeDependencyKind, string>>>({});
-  const autoProbeRuntimeSourcesRef = useRef(false);
   const [settings, setLocal] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -82,7 +77,7 @@ export function SettingsView() {
       } catch (e) {
         setMessage({ kind: "error", text: `加载设置失败：${String(e)}` });
       }
-      await refreshRuntimeDependencies({ autoProbeSources: true });
+      await refreshRuntimeDependencies();
     };
     refreshFfmpeg();
     void initialize();
@@ -94,28 +89,9 @@ export function SettingsView() {
       .catch(() => undefined);
   };
 
-  const refreshRuntimeDependencies = async (
-    options: { autoProbeSources?: boolean } = {},
-  ) => {
+  const refreshRuntimeDependencies = async () => {
     try {
       const probe = await probeRuntimeDependencies();
-      if (
-        options.autoProbeSources &&
-        !autoProbeRuntimeSourcesRef.current &&
-        shouldAutoProbeRuntimeSources(probe)
-      ) {
-        autoProbeRuntimeSourcesRef.current = true;
-        try {
-          const probed = await probeDownloadSources();
-          setRuntimeProbe(probed);
-          const next = await getSettings();
-          setLocal(next);
-          setDirty(false);
-          return;
-        } catch (e) {
-          console.warn("自动测速下载源失败", e);
-        }
-      }
       setRuntimeProbe(probe);
     } catch (e) {
       setMessage({ kind: "error", text: `检测运行时依赖失败：${String(e)}` });
@@ -166,23 +142,6 @@ export function SettingsView() {
       void refreshRuntimeDependencies();
     } catch (e) {
       setMessage({ kind: "error", text: `保存下载源失败：${String(e)}` });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleProbeSources = async () => {
-    setSaving(true);
-    setMessage(null);
-    try {
-      const probe = await probeDownloadSources();
-      setRuntimeProbe(probe);
-      const next = await getSettings();
-      setLocal(next);
-      setDirty(false);
-      setMessage(null);
-    } catch (e) {
-      setMessage({ kind: "error", text: `下载源测速失败：${String(e)}` });
     } finally {
       setSaving(false);
     }
@@ -316,7 +275,6 @@ export function SettingsView() {
           <RuntimeDependenciesPanel
             probe={runtimeProbe}
             onChangeSourceMode={handleRuntimeSourceModeChange}
-            onProbeSources={handleProbeSources}
             onCleanup={handleCleanupDependency}
             onPrepareDependency={handlePrepareRuntimeDependency}
             onConfigureAsr={handleConfigureAsrFromRuntimePanel}
