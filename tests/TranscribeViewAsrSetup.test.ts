@@ -30,4 +30,15 @@ describe("TranscribeView ASR setup guidance", () => {
     expect(source).toContain("检测引擎状态");
     expect(source).toContain("onClick={detectEngines}");
   });
+
+  it("shows the approved Kotoba description under its model selector", () => {
+    expect(source).toContain("KOTOBA_FASTER_WHISPER_DESCRIPTION");
+    expect(source).toContain('engine === "kotoba-faster-whisper"');
+  });
+
+  it("resets the model for engine changes and wires ModelManager", () => {
+    expect(source).toContain("setModel(defaultAsrModel(nextEngine))");
+    expect(source).toContain("engine={engine}");
+    expect(source).toContain("model={model}");
+  });
 });

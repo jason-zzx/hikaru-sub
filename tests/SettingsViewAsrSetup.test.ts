@@ -82,4 +82,19 @@ describe("SettingsView ASR setup", () => {
     expect(settingsSource).not.toContain("{message && (");
     expect(settingsSource).not.toContain("setMessage({ kind: \"ok\"");
   });
+
+  it("shows the approved Kotoba description in default ASR settings", () => {
+    expect(settingsSource).toContain("KOTOBA_FASTER_WHISPER_DESCRIPTION");
+    expect(settingsSource).toContain(
+      'settings.asrEngine === "kotoba-faster-whisper"',
+    );
+  });
+
+  it("resets the default model for engine changes and wires ModelManager", () => {
+    expect(settingsSource).toContain(
+      'update("asrModel", defaultAsrModel(engine))',
+    );
+    expect(settingsSource).toContain("engine={settings.asrEngine}");
+    expect(settingsSource).toContain("model={settings.asrModel}");
+  });
 });

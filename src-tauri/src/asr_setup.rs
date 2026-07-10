@@ -44,6 +44,7 @@ pub enum AsrSetupStatus {
 #[serde(rename_all = "camelCase")]
 pub struct StartAsrSetupArgs {
     pub profile: AsrSetupProfile,
+    pub engine: String,
     #[serde(default)]
     pub recreate: bool,
     #[serde(default)]
@@ -160,12 +161,29 @@ fn requirements_for_profile(profile: AsrSetupProfile) -> &'static [&'static str]
     }
 }
 
-fn engine_for_profile(profile: AsrSetupProfile) -> &'static str {
-    match profile {
-        AsrSetupProfile::Default => "faster-whisper",
-        AsrSetupProfile::ParakeetCpu | AsrSetupProfile::ParakeetCuda => "parakeet",
-        AsrSetupProfile::Qwen3Cpu | AsrSetupProfile::Qwen3Cuda => "qwen3-asr",
+fn validate_engine_for_profile(profile: AsrSetupProfile, engine: &str) -> Result<(), String> {
+    let compatible = match profile {
+        AsrSetupProfile::Default => {
+            matches!(engine, "faster-whisper" | "kotoba-faster-whisper")
+        }
+        AsrSetupProfile::ParakeetCpu | AsrSetupProfile::ParakeetCuda => engine == "parakeet",
+        AsrSetupProfile::Qwen3Cpu | AsrSetupProfile::Qwen3Cuda => engine == "qwen3-asr",
+    };
+    if compatible {
+        Ok(())
+    } else {
+        Err(format!("ASR 引擎与依赖配置不匹配：{engine}"))
     }
+}
+
+fn engine_is_available(engines: &[serde_json::Value], required: &str) -> bool {
+    engines.iter().any(|engine| {
+        engine.get("name").and_then(|value| value.as_str()) == Some(required)
+            && engine
+                .get("available")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false)
+    })
 }
 
 fn push_log(job: &mut AsrSetupJob, line: impl Into<String>) {
@@ -654,7 +672,7 @@ fn run_venv_python_command_args(
     run_logged_command(job, stage, progress, &python, args, service_dir)
 }
 
-fn verify_engine_available(service_dir: &Path, profile: AsrSetupProfile) -> Result<(), String> {
+fn verify_engine_available(service_dir: &Path, required: &str) -> Result<(), String> {
     let python = venv_python_path(service_dir);
     let output = hidden_command(&python)
         .arg("-c")
@@ -674,14 +692,7 @@ fn verify_engine_available(service_dir: &Path, profile: AsrSetupProfile) -> Resu
         .ok_or_else(|| "验证引擎依赖失败：未返回引擎列表".to_string())?;
     let engines: Vec<serde_json::Value> =
         serde_json::from_str(line).map_err(|e| format!("解析引擎列表失败：{e}"))?;
-    let required = engine_for_profile(profile);
-    let ok = engines.iter().any(|engine| {
-        engine.get("name").and_then(|value| value.as_str()) == Some(required)
-            && engine
-                .get("available")
-                .and_then(|value| value.as_bool())
-                .unwrap_or(false)
-    });
+    let ok = engine_is_available(&engines, required);
     if ok {
         Ok(())
     } else {
@@ -694,6 +705,7 @@ fn run_setup_job(
     job: Arc<StdMutex<AsrSetupJob>>,
     args: StartAsrSetupArgs,
 ) -> Result<(), String> {
+    validate_engine_for_profile(args.profile, &args.engine)?;
     ensure_runtime_deps_writable_or_elevate(&app)?;
     if is_cuda_profile(args.profile) && !has_nvidia_gpu() {
         return Err("未检测到 NVIDIA GPU，不能安装 CUDA 版 ASR 依赖".into());
@@ -740,7 +752,7 @@ fn run_setup_job(
     for (index, requirement) in requirements.iter().enumerate() {
         let progress = if index == 0 { 0.60 } else { 0.85 };
         let stage = if index == 0 {
-            "安装 faster-whisper 依赖".to_string()
+            "安装 faster-whisper / kotoba-faster-whisper 依赖".to_string()
         } else {
             format!("安装可选引擎依赖（{requirement}）")
         };
@@ -749,7 +761,7 @@ fn run_setup_job(
     }
 
     set_stage(&job, "验证引擎依赖", Some(0.92));
-    verify_engine_available(&target, args.profile)?;
+    verify_engine_available(&target, &args.engine)?;
 
     set_stage(&job, "保存设置", Some(0.97));
     let mut settings = load_settings(&app).unwrap_or_default();
@@ -894,16 +906,37 @@ mod tests {
     }
 
     #[test]
-    fn profile_maps_to_engine_name() {
-        assert_eq!(
-            engine_for_profile(AsrSetupProfile::Default),
-            "faster-whisper"
+    fn profile_accepts_only_engines_installed_by_its_requirements() {
+        assert!(validate_engine_for_profile(AsrSetupProfile::Default, "faster-whisper").is_ok());
+        assert!(
+            validate_engine_for_profile(AsrSetupProfile::Default, "kotoba-faster-whisper").is_ok()
         );
-        assert_eq!(
-            engine_for_profile(AsrSetupProfile::ParakeetCuda),
-            "parakeet"
-        );
-        assert_eq!(engine_for_profile(AsrSetupProfile::Qwen3Cpu), "qwen3-asr");
+        assert!(validate_engine_for_profile(AsrSetupProfile::Default, "parakeet").is_err());
+        assert!(validate_engine_for_profile(AsrSetupProfile::ParakeetCuda, "parakeet").is_ok());
+        assert!(validate_engine_for_profile(AsrSetupProfile::Qwen3Cpu, "qwen3-asr").is_ok());
+    }
+
+    #[test]
+    fn verification_requires_the_requested_engine_to_be_available() {
+        let engines = vec![
+            serde_json::json!({"name": "faster-whisper", "available": true}),
+            serde_json::json!({"name": "kotoba-faster-whisper", "available": false}),
+        ];
+
+        assert!(engine_is_available(&engines, "faster-whisper"));
+        assert!(!engine_is_available(&engines, "kotoba-faster-whisper"));
+        assert!(!engine_is_available(&engines, "parakeet"));
+    }
+
+    #[test]
+    fn setup_args_preserve_the_requested_engine() {
+        let args: StartAsrSetupArgs = serde_json::from_value(serde_json::json!({
+            "profile": "default",
+            "engine": "kotoba-faster-whisper"
+        }))
+        .unwrap();
+
+        assert_eq!(args.engine, "kotoba-faster-whisper");
     }
 
     #[test]

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# 安装 asr-service Python 依赖（创建 .venv、faster-whisper 引擎、可选 Parakeet / Qwen3-ASR）。
+# 安装 asr-service Python 依赖（创建 .venv、faster-whisper / kotoba-faster-whisper、可选 Parakeet / Qwen3-ASR）。
 #
-#   ./scripts/setup-asr.sh                    # 默认：faster-whisper（requirements.txt）
+#   ./scripts/setup-asr.sh                    # faster-whisper / kotoba-faster-whisper 依赖
 #   ./scripts/setup-asr.sh parakeet           # 额外安装 Parakeet（按 GPU 选 CPU/CUDA torch）
 #   ./scripts/setup-asr.sh parakeet-cuda
 #   ./scripts/setup-asr.sh qwen3              # 额外安装 Qwen3-ASR（按 GPU 选 CPU/CUDA torch）
 #   ./scripts/setup-asr.sh qwen3-cuda
-#   ./scripts/setup-asr.sh --recreate         # 重建 .venv 后安装默认引擎
+#   ./scripts/setup-asr.sh --recreate         # 重建 .venv 后安装共用依赖
 #
 # 环境变量：
 #   PYTHON=python3.11   指定用于创建 venv 的解释器
@@ -22,10 +22,10 @@ usage() {
   cat <<'EOF'
 用法: setup-asr.sh [选项] [引擎...]
 
-默认（无引擎参数）安装 faster-whisper 及 sidecar 运行依赖。
+默认（无引擎参数）安装 faster-whisper / kotoba-faster-whisper 依赖。
 仅当显式声明 Parakeet 引擎时，才会额外安装 NeMo / PyTorch。
 
-引擎（可组合，默认 faster-whisper 始终会安装）：
+引擎（可组合，faster-whisper / kotoba-faster-whisper 依赖始终会安装）：
   parakeet       安装 Parakeet；torch 按 GPU 自动选择 CPU / CUDA
   parakeet-cpu   安装 Parakeet（CPU 版 torch，无 nvidia-cudnn 等）
   parakeet-cuda  安装 Parakeet（CUDA 12.6 torch）
@@ -84,7 +84,7 @@ create_venv() {
 }
 
 install_faster_whisper() {
-  log "安装 faster-whisper 引擎 (requirements.txt)"
+  log "安装 faster-whisper / kotoba-faster-whisper 依赖 (requirements.txt)"
   pip install -r requirements.txt
 }
 
@@ -221,7 +221,7 @@ install_engines() {
       parakeet | parakeet-cpu | parakeet-cuda) ;;
       qwen3 | qwen3-cpu | qwen3-cuda) ;;
       base)
-        echo "提示: 引擎参数 'base' 已弃用，默认即安装 faster-whisper；可省略该参数。" >&2
+        echo "提示: 引擎参数 'base' 已弃用，默认即安装 faster-whisper / kotoba-faster-whisper 依赖；可省略该参数。" >&2
         ;;
       *)
         echo "未知引擎: $engine" >&2
@@ -268,7 +268,7 @@ main() {
         shift
         ;;
       auto)
-        echo "提示: 模式 'auto' 已移除；默认仅安装 faster-whisper。" >&2
+        echo "提示: 模式 'auto' 已移除；默认安装 faster-whisper / kotoba-faster-whisper 依赖。" >&2
         echo "      需要 Parakeet 时请显式传入 parakeet / parakeet-cpu / parakeet-cuda。" >&2
         shift
         ;;
@@ -283,9 +283,9 @@ main() {
   ensure_python
 
   if [[ ${#engines[@]} -eq 0 ]]; then
-    log "将安装默认引擎: faster-whisper"
+    log "将安装 faster-whisper / kotoba-faster-whisper 依赖"
   else
-    log "将安装 faster-whisper + 额外引擎: ${engines[*]}"
+    log "将安装 faster-whisper / kotoba-faster-whisper 依赖 + 额外引擎: ${engines[*]}"
   fi
 
   create_venv

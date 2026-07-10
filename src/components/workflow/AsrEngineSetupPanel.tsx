@@ -146,6 +146,7 @@ export function AsrEngineSetupPanel({
     try {
       const id = await startAsrSetup({
         profile,
+        engine,
         recreate,
         pythonPath: pythonPath ?? null,
         asrServicePath: asrServicePath ?? null,

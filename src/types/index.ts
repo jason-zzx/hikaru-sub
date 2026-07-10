@@ -169,6 +169,7 @@ export type AsrSetupStatus =
 
 export interface StartAsrSetupArgs {
   profile: AsrSetupProfile;
+  engine: string;
   recreate?: boolean;
   pythonPath?: string | null;
   asrServicePath?: string | null;

@@ -1,3 +1,5 @@
+import type { AsrEngineInfo } from "../types";
+
 /** 判断 ASR sidecar 启动/连接错误是否表示引擎依赖尚未安装。 */
 export function isAsrEngineNotInstalledError(error: unknown): boolean {
   const message = String(error);
@@ -12,3 +14,15 @@ export const ASR_ENGINE_NOT_INSTALLED_LABEL = "ASR 引擎未安装";
 
 export const ASR_ENGINE_NOT_INSTALLED_HINT =
   "请先在设置中点击「配置当前引擎依赖」完成安装。";
+
+export function isSelectedAsrEngineUnavailable(
+  engines: AsrEngineInfo[] | null,
+  selectedEngine: string,
+): boolean {
+  return (
+    engines !== null &&
+    !engines.some(
+      (engine) => engine.name === selectedEngine && engine.available,
+    )
+  );
+}

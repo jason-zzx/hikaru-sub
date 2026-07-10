@@ -1,5 +1,5 @@
 # Qwen3-ASR 引擎上层依赖（不含 PyTorch）。
-# 须先安装 requirements.txt（faster-whisper + sidecar 运行依赖），再执行：
+# 须先安装 requirements.txt（faster-whisper / kotoba-faster-whisper 依赖 + sidecar 运行依赖），再执行：
 #   ./scripts/setup-asr.sh qwen3-cuda   # 或 qwen3-cpu / qwen3
 # 也可在自行安装匹配的 torch 后：
 #   pip install -r requirements-qwen3.txt

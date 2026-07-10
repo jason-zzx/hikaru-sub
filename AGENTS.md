@@ -49,7 +49,7 @@ AI 日语字幕桌面应用：下载 m3u8 视频 → 可选切片 → 本地 ASR
 | 图标 | 业务导航/工具图标统一放 `src/components/layout/NavIcons.tsx`（lucide 风格手写 SVG）；通用 UI 与主题切换可用 `lucide-react`；**禁止用 emoji/字符当图标** |
 | 状态 | Zustand（`src/stores/`） |
 | 字幕格式 | `@hikaru/ass-core`（`packages/ass-core/`） |
-| ASR | Python sidecar（`asr-service/`，可插拔引擎：faster-whisper / parakeet / qwen3-asr） |
+| ASR | Python sidecar（`asr-service/`，可插拔引擎：faster-whisper / kotoba-faster-whisper / parakeet / qwen3-asr） |
 | 翻译 | OpenAI 兼容 API 适配器（前端） |
 | 音视频 | 系统 FFmpeg 优先；缺失时按需下载受管 FFmpeg |
 
@@ -62,11 +62,11 @@ pnpm tauri dev        # Tauri 桌面开发
 pnpm build            # TypeScript + Vite 构建
 pnpm tauri build      # 打包桌面应用
 pnpm release:local    # 准备 ASR 资源并本地打包
-pnpm asr:setup        # ASR sidecar 依赖（默认 faster-whisper）
+pnpm asr:setup        # ASR sidecar（faster-whisper / kotoba-faster-whisper 依赖）
 ```
 
 - 始终使用 `pnpm`，不要用 `npm` 或 `yarn`。workspace 根目录安装依赖时加 `-w`。
-- ASR 默认只安装 faster-whisper；Parakeet / Qwen3-ASR 体积较大，只有用户明确需要时才使用 `./scripts/setup-asr.sh parakeet-cpu|parakeet-cuda|qwen3-cpu|qwen3-cuda`。
+- ASR 默认安装 faster-whisper / kotoba-faster-whisper 依赖。Parakeet / Qwen3-ASR 体积较大，只有用户明确需要时才使用 `./scripts/setup-asr.sh parakeet-cpu|parakeet-cuda|qwen3-cpu|qwen3-cuda`。
 
 ## 测试与验证
 
@@ -159,6 +159,7 @@ interface SubtitleCue {
 - 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，内置官方源、中国大陆镜像和自定义源；自动模式根据测速推荐，但用户手动选择优先。
 - 中国大陆镜像会给 sidecar 注入 `HF_ENDPOINT=https://hf-mirror.com`，模型缓存通过 `HF_HOME` 固定到安装目录 `deps/models/huggingface`。模型下载失败时优先查看 `deps/asr-service/asr-debug.log` 中的 `model_download_*` 事件。
 - VAD 配置仅当前会话有效，不写入项目或全局设置。VAD 加载/检测失败时应自动降级，不中断转录。
+- `kotoba-faster-whisper` 复用默认依赖，但要求 `faster-whisper>=1.1.1`；其模型缓存还必须包含 `preprocessor_config.json`。该文件要求只适用于 Kotoba，不要扩展到普通 faster-whisper 模型。
 
 ## 媒体与字幕渲染
 

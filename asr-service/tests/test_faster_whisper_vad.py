@@ -5,6 +5,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from engines.base import AsrError
 from engines.faster_whisper import FasterWhisperEngine
 
 
@@ -78,6 +79,62 @@ class FasterWhisperVadTests(unittest.TestCase):
         vad_params = mock_model.transcribe.call_args.kwargs['vad_parameters']
         self.assertEqual(vad_params['min_speech_duration_ms'], 500)
         self.assertEqual(vad_params['min_silence_duration_ms'], 300)
+
+    def test_passes_engine_specific_transcribe_options(self):
+        class _ConfiguredEngine(FasterWhisperEngine):
+            def _transcribe_options(self) -> dict:
+                return {
+                    "chunk_length": 15,
+                    "condition_on_previous_text": False,
+                }
+
+        engine = _ConfiguredEngine(model="base")
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = (
+            [],
+            MagicMock(duration=10.0, language="ja"),
+        )
+        engine._model = mock_model
+
+        engine.transcribe("dummy.wav", language="ja")
+
+        call_kwargs = mock_model.transcribe.call_args.kwargs
+        self.assertEqual(call_kwargs["chunk_length"], 15)
+        self.assertFalse(call_kwargs["condition_on_previous_text"])
+
+    def test_wraps_lazy_inference_errors_as_asr_errors(self):
+        def broken_segments():
+            raise RuntimeError("lazy inference failed")
+            yield
+
+        engine = FasterWhisperEngine(model="base")
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = (
+            broken_segments(),
+            MagicMock(duration=10.0, language="ja"),
+        )
+        engine._model = mock_model
+
+        transcription = engine.transcribe("dummy.wav", language="ja")
+
+        with self.assertRaisesRegex(AsrError, "转录失败"):
+            list(transcription.segments)
+
+    def test_default_engine_does_not_pass_specialized_options(self):
+        engine = FasterWhisperEngine(model="base")
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = (
+            [],
+            MagicMock(duration=10.0, language="ja"),
+        )
+        engine._model = mock_model
+
+        engine.transcribe("dummy.wav", language="ja")
+
+        call_kwargs = mock_model.transcribe.call_args.kwargs
+        self.assertNotIn("chunk_length", call_kwargs)
+        self.assertNotIn("condition_on_previous_text", call_kwargs)
+        self.assertEqual(call_kwargs["beam_size"], 5)
 
 
 if __name__ == "__main__":
