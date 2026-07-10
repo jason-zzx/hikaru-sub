@@ -4,8 +4,8 @@
 //! 代理转录任务的创建/查询/取消，使前端无需直接处理本地 HTTP 与端口。
 
 use crate::dependencies::{
-    effective_source_profile, ensure_runtime_deps_writable_or_elevate, managed_asr_service_dir,
-    managed_model_cache_dir, RuntimeDependencySourceProfile,
+    effective_asr_service_dir, effective_source_profile, ensure_runtime_deps_writable_or_elevate,
+    managed_asr_service_dir, managed_model_cache_dir, RuntimeDependencySourceProfile,
 };
 use crate::process::hidden_command;
 use crate::settings::{load_settings, AppSettings};
@@ -98,7 +98,7 @@ fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
     Ok(())
 }
 
-/// 解析 asr-service 目录（含 main.py）：设置 → 资源目录 → 当前目录及其上级。
+/// 解析 asr-service 目录（含 main.py）：设置 → 有效目录（debug 仓库 / release deps）→ 资源 → cwd。
 fn resolve_service_dir(app: &AppHandle, settings: &AppSettings) -> Result<PathBuf, String> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Some(p) = settings
@@ -107,6 +107,9 @@ fn resolve_service_dir(app: &AppHandle, settings: &AppSettings) -> Result<PathBu
         .filter(|s| !s.trim().is_empty())
     {
         candidates.push(PathBuf::from(p));
+    }
+    if let Ok(effective) = effective_asr_service_dir(app, settings.asr_service_path.as_deref()) {
+        candidates.push(effective);
     }
     if let Ok(managed) = managed_asr_service_dir(app) {
         candidates.push(managed);

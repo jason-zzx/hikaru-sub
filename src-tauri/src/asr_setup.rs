@@ -1,5 +1,5 @@
 use crate::dependencies::{
-    effective_source_profile, ensure_runtime_deps_writable_or_elevate, managed_asr_service_dir,
+    effective_asr_service_dir, effective_source_profile, ensure_runtime_deps_writable_or_elevate,
     managed_asr_venv_python_path, managed_python_dir, python311_candidates, python_version,
     PythonCommand,
 };
@@ -296,6 +296,22 @@ fn clean_managed_service_dir(target: &Path, recreate: bool) -> Result<(), String
         }
     }
     Ok(())
+}
+
+/// 准备 ASR 服务目录：目标与模板相同时仅处理 `.venv`（开发仓库 in-place），否则 clean + copy。
+fn prepare_asr_service_dir(source: &Path, target: &Path, recreate: bool) -> Result<(), String> {
+    if paths_equivalent(source, target) {
+        if recreate {
+            let venv = venv_dir(target);
+            if venv.exists() {
+                std::fs::remove_dir_all(&venv)
+                    .map_err(|e| format!("删除虚拟环境失败（{}）：{e}", venv.display()))?;
+            }
+        }
+        return Ok(());
+    }
+    clean_managed_service_dir(target, recreate)?;
+    copy_template_dir(source, target)
 }
 
 fn missing_python311_message() -> String {
@@ -685,10 +701,14 @@ fn run_setup_job(
 
     set_stage(&job, "准备 ASR 服务目录", Some(0.05));
     let source_profile = effective_source_profile(&load_settings(&app).unwrap_or_default())?;
-    let managed = managed_asr_service_dir(&app)?;
-    let source = resolve_template_dir(&app, args.asr_service_path.as_deref(), Some(&managed))?;
-    clean_managed_service_dir(&managed, args.recreate)?;
-    copy_template_dir(&source, &managed)?;
+    let target = effective_asr_service_dir(&app, args.asr_service_path.as_deref())?;
+    let source = match resolve_template_dir(&app, args.asr_service_path.as_deref(), Some(&target))
+    {
+        Ok(dir) => dir,
+        Err(_err) if target.join("main.py").is_file() => target.clone(),
+        Err(err) => return Err(err),
+    };
+    prepare_asr_service_dir(&source, &target, args.recreate)?;
 
     set_stage(&job, "检查 Python", Some(0.10));
     let (python, version) =
@@ -700,21 +720,21 @@ fn run_setup_job(
         );
     }
 
-    if !venv_python_path(&managed).is_file() {
+    if !venv_python_path(&target).is_file() {
         run_python_command(
             &job,
             "创建虚拟环境",
             Some(0.20),
             &python,
             &["-m", "venv", ".venv"],
-            &managed,
+            &target,
         )?;
     } else {
         set_stage(&job, "复用虚拟环境", Some(0.20));
     }
 
     let pip_args = pip_upgrade_args(&source_profile);
-    run_venv_python_command_args(&job, "升级 pip", Some(0.35), &managed, &pip_args)?;
+    run_venv_python_command_args(&job, "升级 pip", Some(0.35), &target, &pip_args)?;
 
     let requirements = requirements_for_profile(args.profile);
     for (index, requirement) in requirements.iter().enumerate() {
@@ -725,19 +745,29 @@ fn run_setup_job(
             format!("安装可选引擎依赖（{requirement}）")
         };
         let pip_args = pip_install_requirement_args(&source_profile, args.profile, requirement);
-        run_venv_python_command_args(&job, &stage, Some(progress), &managed, &pip_args)?;
+        run_venv_python_command_args(&job, &stage, Some(progress), &target, &pip_args)?;
     }
 
     set_stage(&job, "验证引擎依赖", Some(0.92));
-    verify_engine_available(&managed, args.profile)?;
+    verify_engine_available(&target, args.profile)?;
 
     set_stage(&job, "保存设置", Some(0.97));
     let mut settings = load_settings(&app).unwrap_or_default();
-    settings.asr_service_path = Some(managed.to_string_lossy().into_owned());
-    settings.python_path = Some(venv_python_path(&managed).to_string_lossy().into_owned());
+    settings.asr_service_path = Some(target.to_string_lossy().into_owned());
+    settings.python_path = Some(venv_python_path(&target).to_string_lossy().into_owned());
     save_settings(&app, &settings)?;
 
     Ok(())
+}
+
+fn resolve_probe_template_path(
+    app: &AppHandle,
+    configured: Option<&str>,
+    service: &Path,
+) -> Option<PathBuf> {
+    resolve_template_dir(app, configured, Some(service))
+        .ok()
+        .or_else(|| service.join("main.py").is_file().then(|| service.to_path_buf()))
 }
 
 #[tauri::command]
@@ -745,14 +775,13 @@ pub async fn probe_asr_setup_environment(
     app: AppHandle,
     args: ProbeAsrSetupEnvironmentArgs,
 ) -> Result<AsrSetupEnvironment, String> {
-    let managed = managed_asr_service_dir(&app)?;
-    let template =
-        resolve_template_dir(&app, args.asr_service_path.as_deref(), Some(&managed)).ok();
+    let service = effective_asr_service_dir(&app, args.asr_service_path.as_deref())?;
+    let template = resolve_probe_template_path(&app, args.asr_service_path.as_deref(), &service);
     let python = find_python(&app, args.python_path.as_deref());
-    let venv = venv_dir(&managed);
+    let venv = venv_dir(&service);
     Ok(AsrSetupEnvironment {
         service_template_path: template.map(|path| path.to_string_lossy().into_owned()),
-        managed_service_path: managed.to_string_lossy().into_owned(),
+        managed_service_path: service.to_string_lossy().into_owned(),
         python_path: python.as_ref().map(|(cmd, _)| cmd.display()),
         python_version: python.as_ref().map(|(_, version)| version.clone()),
         python_ok: python.is_some(),
@@ -933,6 +962,41 @@ mod tests {
 
         clean_managed_service_dir(&dir, true).unwrap();
         assert!(!dir.join(".venv").exists());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn prepare_service_dir_in_place_skips_clean_and_copy() {
+        let dir = temp_dir("asr_inplace_prepare");
+        fs::create_dir_all(dir.join(".venv")).unwrap();
+        fs::write(dir.join("main.py"), "keep").unwrap();
+        fs::write(dir.join("custom_dev.py"), "dev").unwrap();
+        fs::write(dir.join(".venv").join("marker"), "").unwrap();
+
+        prepare_asr_service_dir(&dir, &dir, false).unwrap();
+        assert_eq!(fs::read_to_string(dir.join("main.py")).unwrap(), "keep");
+        assert_eq!(fs::read_to_string(dir.join("custom_dev.py")).unwrap(), "dev");
+        assert!(dir.join(".venv").join("marker").is_file());
+
+        prepare_asr_service_dir(&dir, &dir, true).unwrap();
+        assert_eq!(fs::read_to_string(dir.join("main.py")).unwrap(), "keep");
+        assert_eq!(fs::read_to_string(dir.join("custom_dev.py")).unwrap(), "dev");
+        assert!(!dir.join(".venv").exists());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn configured_path_equal_to_service_still_counts_as_template_for_probe() {
+        let dir = temp_dir("asr_probe_inplace_template");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("main.py"), "").unwrap();
+
+        assert_eq!(configured_template_dir(dir.to_str(), Some(&dir)), None);
+        let template = configured_template_dir(dir.to_str(), Some(&dir))
+            .or_else(|| dir.join("main.py").is_file().then(|| dir.clone()));
+        assert_eq!(template, Some(dir.clone()));
 
         let _ = fs::remove_dir_all(dir);
     }

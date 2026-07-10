@@ -312,6 +312,93 @@ pub fn managed_asr_service_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(deps_dir(app)?.join("asr-service"))
 }
 
+/// 判断目录是否位于源码仓库 checkout 的 `asr-service`（与 settings 启发式对齐）。
+pub fn is_source_checkout_asr_service_dir(service_dir: &Path) -> bool {
+    if !service_dir.join("main.py").is_file() {
+        return false;
+    }
+    service_dir.ancestors().any(|ancestor| {
+        ancestor.join("src-tauri").join("tauri.conf.json").is_file()
+            && (ancestor.join("package.json").is_file()
+                || ancestor.join("pnpm-workspace.yaml").is_file())
+            && ancestor.join("asr-service").join("main.py").is_file()
+    })
+}
+
+fn looks_like_repo_root(dir: &Path) -> bool {
+    dir.join("src-tauri").join("tauri.conf.json").is_file()
+        && (dir.join("package.json").is_file() || dir.join("pnpm-workspace.yaml").is_file())
+        && dir.join("asr-service").join("main.py").is_file()
+}
+
+/// 从起点向上查找仓库根；`cwd_hint` 可覆盖 `current_dir`（便于测试）。
+pub fn find_source_checkout_root(
+    exe_path: &Path,
+    cwd_hint: Option<&Path>,
+) -> Option<PathBuf> {
+    let mut starts = Vec::new();
+    if let Some(cwd) = cwd_hint {
+        starts.push(cwd.to_path_buf());
+    } else if let Ok(cwd) = std::env::current_dir() {
+        starts.push(cwd);
+    }
+    starts.push(exe_path.to_path_buf());
+    if let Some(parent) = exe_path.parent() {
+        starts.push(parent.to_path_buf());
+    }
+
+    for start in starts {
+        for ancestor in start.ancestors() {
+            if looks_like_repo_root(ancestor) {
+                return Some(ancestor.to_path_buf());
+            }
+        }
+    }
+    None
+}
+
+/// 解析当前应使用的 ASR 服务目录（纯函数，便于单测）。
+///
+/// 顺序：有效配置路径 →（prefer_source_checkout 时）仓库 `asr-service` → exe 旁 `deps/asr-service`。
+pub fn resolve_effective_asr_service_dir(
+    configured: Option<&str>,
+    exe_path: &Path,
+    prefer_source_checkout: bool,
+    cwd_hint: Option<&Path>,
+) -> Result<PathBuf, String> {
+    if let Some(path) = configured.map(str::trim).filter(|s| !s.is_empty()) {
+        let dir = PathBuf::from(path);
+        if dir.join("main.py").is_file() {
+            return Ok(dir);
+        }
+    }
+
+    if prefer_source_checkout {
+        if let Some(root) = find_source_checkout_root(exe_path, cwd_hint) {
+            let service = root.join("asr-service");
+            if service.join("main.py").is_file() {
+                return Ok(service);
+            }
+        }
+    }
+
+    Ok(deps_dir_from_exe(exe_path)?.join("asr-service"))
+}
+
+/// 当前运行时有效的 ASR 服务目录（debug 优先仓库，release 用安装目录 deps）。
+pub fn effective_asr_service_dir(
+    _app: &AppHandle,
+    configured: Option<&str>,
+) -> Result<PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    resolve_effective_asr_service_dir(
+        configured,
+        &exe,
+        cfg!(debug_assertions),
+        None,
+    )
+}
+
 pub fn managed_model_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(deps_dir(app)?.join("models").join("huggingface"))
 }
@@ -1392,6 +1479,28 @@ fn safe_remove_dir_under_deps(target: &Path, deps_root: &Path) -> Result<(), Str
     fs::remove_dir_all(&target).map_err(|e| format!("清理失败（{}）：{e}", target.display()))
 }
 
+/// 允许清理：exe 旁 deps 下路径，或源码仓库 `asr-service/.venv`（仅该目录）。
+fn safe_remove_runtime_dependency_dir(target: &Path, deps_root: &Path) -> Result<(), String> {
+    if !target.exists() {
+        return Ok(());
+    }
+    let canonical = target
+        .canonicalize()
+        .map_err(|e| format!("解析清理路径失败（{}）：{e}", target.display()))?;
+    if canonical
+        .file_name()
+        .is_some_and(|name| name == ".venv")
+    {
+        if let Some(service_dir) = canonical.parent() {
+            if is_source_checkout_asr_service_dir(service_dir) {
+                return fs::remove_dir_all(&canonical)
+                    .map_err(|e| format!("清理失败（{}）：{e}", canonical.display()));
+            }
+        }
+    }
+    safe_remove_dir_under_deps(target, deps_root)
+}
+
 fn cleanup_target_for_kind(
     app: &AppHandle,
     kind: RuntimeDependencyKind,
@@ -1399,7 +1508,11 @@ fn cleanup_target_for_kind(
     match kind {
         RuntimeDependencyKind::Ffmpeg => managed_ffmpeg_dir(app),
         RuntimeDependencyKind::Python311 => managed_python_dir(app),
-        RuntimeDependencyKind::AsrVenv => Ok(managed_asr_service_dir(app)?.join(".venv")),
+        RuntimeDependencyKind::AsrVenv => {
+            let settings = load_settings(app).unwrap_or_default();
+            Ok(effective_asr_service_dir(app, settings.asr_service_path.as_deref())?
+                .join(".venv"))
+        }
         RuntimeDependencyKind::AsrModels => managed_model_cache_dir(app),
         RuntimeDependencyKind::Downloads => downloads_dir(app),
     }
@@ -1492,8 +1605,9 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         size_bytes: python_size,
     });
 
-    let service = managed_asr_service_dir(app)?;
+    let service = effective_asr_service_dir(app, settings.asr_service_path.as_deref())?;
     let venv_python = managed_asr_venv_python_path(&service);
+    let source_checkout = is_source_checkout_asr_service_dir(&service);
     items.push(RuntimeDependencyItem {
         kind: RuntimeDependencyKind::AsrVenv,
         status: if venv_python.is_file() {
@@ -1502,9 +1616,13 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
             RuntimeDependencyStatus::NeedsSetup
         },
         path: Some(service.to_string_lossy().into_owned()),
-        source: Some("managed".into()),
+        source: Some(if source_checkout {
+            "source".into()
+        } else {
+            "managed".into()
+        }),
         version: None,
-        managed: true,
+        managed: !source_checkout,
         size_bytes: dir_size(&service.join(".venv")),
     });
 
@@ -1656,7 +1774,7 @@ pub async fn cleanup_runtime_dependency(
     let deps = deps_dir(&app)?;
     fs::create_dir_all(&deps).map_err(|e| e.to_string())?;
     let target = cleanup_target_for_kind(&app, args.kind)?;
-    safe_remove_dir_under_deps(&target, &deps)
+    safe_remove_runtime_dependency_dir(&target, &deps)
 }
 
 #[tauri::command]
@@ -1963,5 +2081,91 @@ mod tests {
         } else {
             assert!(path.ends_with(Path::new(".venv").join("bin").join("python")));
         }
+    }
+
+    fn create_fake_repo(root: &Path) {
+        std::fs::create_dir_all(root.join("src-tauri")).unwrap();
+        std::fs::create_dir_all(root.join("asr-service")).unwrap();
+        std::fs::write(root.join("src-tauri").join("tauri.conf.json"), "{}").unwrap();
+        std::fs::write(root.join("package.json"), "{}").unwrap();
+        std::fs::write(root.join("asr-service").join("main.py"), "").unwrap();
+    }
+
+    #[test]
+    fn effective_asr_service_prefers_source_checkout_in_dev() {
+        let root = std::env::temp_dir().join(format!(
+            "hikaru_sub_asr_effective_dev_{}",
+            unique_suffix()
+        ));
+        create_fake_repo(&root);
+        let exe = root
+            .join("src-tauri")
+            .join("target")
+            .join("debug")
+            .join("hikaru-sub.exe");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+
+        let resolved = resolve_effective_asr_service_dir(
+            None,
+            &exe,
+            true,
+            Some(&root),
+        )
+        .unwrap();
+
+        assert_eq!(resolved, root.join("asr-service"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn effective_asr_service_uses_exe_deps_when_not_preferring_checkout() {
+        let root = std::env::temp_dir().join(format!(
+            "hikaru_sub_asr_effective_release_{}",
+            unique_suffix()
+        ));
+        create_fake_repo(&root);
+        let install = root.join("install");
+        let exe = install.join("hikaru-sub.exe");
+        std::fs::create_dir_all(&install).unwrap();
+
+        let resolved = resolve_effective_asr_service_dir(
+            None,
+            &exe,
+            false,
+            Some(&root),
+        )
+        .unwrap();
+
+        assert_eq!(resolved, install.join("deps").join("asr-service"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn effective_asr_service_honors_configured_path() {
+        let root = std::env::temp_dir().join(format!(
+            "hikaru_sub_asr_effective_configured_{}",
+            unique_suffix()
+        ));
+        create_fake_repo(&root);
+        let custom = root.join("custom-asr");
+        std::fs::create_dir_all(&custom).unwrap();
+        std::fs::write(custom.join("main.py"), "").unwrap();
+        let exe = root
+            .join("src-tauri")
+            .join("target")
+            .join("debug")
+            .join("hikaru-sub.exe");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+
+        let resolved = resolve_effective_asr_service_dir(
+            custom.to_str(),
+            &exe,
+            true,
+            Some(&root),
+        )
+        .unwrap();
+
+        assert_eq!(resolved, custom);
+        let _ = std::fs::remove_dir_all(root);
     }
 }
