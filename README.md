@@ -9,7 +9,7 @@
 - 导入页视频切片（软切关键帧拷贝 / 硬切精确重编码；静帧核对；可选设为当前工作视频；切片中锁定后续步骤）
 - 文件中心视频会话（打开视频即准备运行时缓存；优先加载同目录 `*.translated.ass`，不存在时回退 `*.transcribed.ass`）
 - FFmpeg 集成（系统优先、缺失时按需下载受管 FFmpeg；音轨提取、视频信息获取、音频波形提取、H.265/HEVC 等不兼容编码代理视频转码）
-- Python ASR sidecar（faster-whisper + NVIDIA Parakeet + Qwen3-ASR 日语适配器 + VAD 预处理 + HTTP 进度 API）
+- Python ASR sidecar（faster-whisper + kotoba-faster-whisper + NVIDIA Parakeet + Qwen3-ASR 日语适配器 + VAD 预处理 + HTTP 进度 API）
 - 转录工作流（音频提取 → ASR 转录 → 生成单语 ASS）
 - OpenAI 兼容翻译管线（批量翻译 + 上下文窗口 + 术语表）
 - 翻译工作流（配置界面 + 进度显示 → 生成 `*.translated.ass`）
@@ -20,7 +20,7 @@
 - libass 预览（编辑页使用 jASSUB/libass WASM 渲染当前内存 ASS；按视频帧时间同步；自动发现系统字体并注册字体文件中的本地化 family/full/PostScript 名称，预加载 ASS 样式、同族权重与行内 `\fn` 字体；当前预览句缺字时对缺字片段生成仅用于预览的字体 fallback 标签；libass 不可用时回退 CSS 并在预览区提示；FFmpeg/libass 单帧路径保留作诊断与视觉回归）
 - 编辑页视频播放（本地 HTTP 媒体服务 + Range；全平台统一，支持 seek）
 - 视频代理转码（480p 全关键帧 H.264，带缓存和进度显示，用于精准 seek）
-- VAD 语音检测预处理配置（faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
+- VAD 语音检测预处理配置（faster-whisper / kotoba-faster-whisper 透传内置 Silero VAD 参数；Parakeet / Qwen3-ASR 独立 VAD 切分语音段，失败自动降级）
 - UI 体系（shadcn/ui + Radix 原语；凉爽蓝主题；浅色 / 深色 / 跟随系统三态切换，localStorage 持久化，首帧防闪烁；按钮/对话框/下拉/选择/输入等控件统一走 shadcn 语义令牌）
 
 🚧 **待优化**：
@@ -37,7 +37,7 @@
 - **主题**: 浅色 / 深色 / 跟随系统（自定义 ThemeProvider，localStorage 持久化）
 - **状态**: Zustand
 - **包管理**: pnpm workspace
-- **ASR**: Python sidecar（faster-whisper / Parakeet / Qwen3-ASR + VAD）
+- **ASR**: Python sidecar（faster-whisper / kotoba-faster-whisper / Parakeet / Qwen3-ASR + VAD）
 - **翻译**: OpenAI 兼容 API 适配器
 
 ## 环境要求
@@ -47,13 +47,13 @@
 - Rust（[安装指南](https://www.rust-lang.org/learn/get-started)）
 - FFmpeg（PATH/自定义路径优先；缺失时客户端按需下载受管副本）
 - Python 3.11（系统/自定义路径优先；ASR 配置时缺失则按需下载受管 Python 3.11）
-- 可选：CUDA（faster-whisper GPU 加速；Parakeet / Qwen3-ASR 需单独安装 CUDA 版依赖）
+- 可选：CUDA（faster-whisper / kotoba-faster-whisper GPU 加速；Parakeet / Qwen3-ASR 需单独安装 CUDA 版依赖）
 
 ## 开发
 
 ```bash
 pnpm install
-./scripts/setup-asr.sh        # ASR 依赖（默认 faster-whisper）
+./scripts/setup-asr.sh        # faster-whisper / kotoba-faster-whisper 依赖
 pnpm dev          # 仅前端
 pnpm tauri dev    # 桌面开发模式
 pnpm build        # 构建前端
@@ -109,6 +109,7 @@ git push origin v0.1.0
 11. 如果本机曾运行开发版，安装版 ASR 依赖配置不应继续指向项目源码目录下的 `asr-service/.venv`；一键配置完成后应指向安装目录下的 managed `deps/asr-service/.venv`。
 12. 使用受管 FFmpeg 完成一次转录后，若 `deps/ffmpeg/current/ffprobe.exe` 存在，不应再提示“无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080”。
 13. 下载 ASR 模型时，「模型状态」区域应显示实际下载源和诊断日志路径；中国大陆镜像模式下应能在日志中看到 `HF_ENDPOINT=https://hf-mirror.com` 与 `HF_HOME=<安装目录>/deps/models/huggingface`。
+14. 选择 `kotoba-faster-whisper` 时，设置页应显示“faster-whisper / kotoba-faster-whisper 依赖”；旧 sidecar 未注册该引擎或依赖版本过低时应提示“ASR 引擎未安装”，重新配置依赖后应验证 Kotoba 本身可用，而不只是验证 faster-whisper。
 
 ### 运行时依赖与下载源
 
@@ -123,11 +124,13 @@ git push origin v0.1.0
 
 打包后的客户端可在「设置 → 日语转录（ASR）默认」中点击「配置当前引擎依赖」。Hikaru Sub 会先检测系统或自定义 Python 3.11；如不可用，则在确认后下载可重定位的受管 Python 3.11 归档并解压到安装目录 `deps/python311/current/`。随后会复制随应用提供的 ASR 服务模板、创建/复用安装目录 `deps/asr-service/.venv` 下的虚拟环境并安装所选引擎依赖。模型权重仍在同一区域的「模型状态」中单独检测与下载，不随依赖配置一起安装。安装版会忽略明显指向源码仓库 `asr-service/.venv` 的旧开发路径，避免复用开发环境缓存。
 
-`./scripts/setup-asr.sh` 默认安装 **faster-whisper** 引擎（`requirements.txt`）。Parakeet（NeMo + PyTorch）与 Qwen3-ASR（qwen-asr + PyTorch）体积较大，**须显式传参**才会安装：
+`./scripts/setup-asr.sh` 默认安装 `requirements.txt` 中的 **faster-whisper / kotoba-faster-whisper 依赖**，同时提供两个引擎。Kotoba 使用官方 `kotoba-tech/kotoba-whisper-v2.0-faster` 模型，不需要额外 Python 依赖。Parakeet（NeMo + PyTorch）与 Qwen3-ASR（qwen-asr + PyTorch）体积较大，**须显式传参**才会安装：
+
+Kotoba 要求 `faster-whisper>=1.1.1`。旧虚拟环境缺少该版本或旧 sidecar 尚未注册 Kotoba 时，客户端会将所选引擎标记为未安装；受管安装可通过「配置当前引擎依赖」更新共用依赖和服务模板，并验证实际选择的引擎。使用自定义 ASR 服务路径时，需要先确保该服务模板已经包含 Kotoba 适配器；验证不会以 faster-whisper 可用代替 Kotoba 可用。
 
 | 场景 | 命令 |
 |------|------|
-| 日常开发（默认） | `./scripts/setup-asr.sh` 或 `pnpm asr:setup` |
+| 日常开发（faster-whisper / kotoba-faster-whisper 依赖） | `./scripts/setup-asr.sh` 或 `pnpm asr:setup` |
 | 有 NVIDIA GPU、试 Parakeet | `./scripts/setup-asr.sh parakeet-cuda` |
 | 无 GPU 但想试 Parakeet | `./scripts/setup-asr.sh parakeet-cpu` |
 | 有 NVIDIA GPU、试 Qwen3-ASR | `./scripts/setup-asr.sh qwen3-cuda` |
@@ -197,7 +200,8 @@ asr-service/                  # Python ASR sidecar
   jobs.py                     # 后台转录任务管理
   requirements-parakeet*.txt    # 可选 Parakeet（cpu / cuda）
   requirements-qwen3*.txt       # 可选 Qwen3-ASR（cpu / cuda）
-  engines/                    # ASR 引擎抽象与实现（faster-whisper / parakeet / qwen3-asr / chunking / vad）
+  engines/                    # ASR 引擎抽象与实现（faster-whisper / kotoba-faster-whisper / parakeet / qwen3-asr / chunking / vad）
+    kotoba_faster_whisper.py  # Kotoba Whisper v2.0 的 faster-whisper 薄适配器
 scripts/
   setup-asr.sh                # ASR 依赖安装（推荐）
 ```
@@ -254,21 +258,22 @@ scripts/
 ### 转录配置（日语源语言）
 - 源语言固定为日语（`ja`），转录页不提供语言选择
 - 引擎选择：faster-whisper（支持 CPU/CUDA/auto）
+- 可选引擎：kotoba-faster-whisper（`kotoba-tech/kotoba-whisper-v2.0-faster`，复用 faster-whisper/CTranslate2，支持 CPU/CUDA/auto；固定 `chunk_length=15`、`condition_on_previous_text=false`）
 - 可选引擎：parakeet（NVIDIA NeMo `nvidia/parakeet-tdt_ctc-0.6b-ja`，日语专用）
 - 可选引擎：qwen3-asr（`Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`，2026 年日语 ASR SOTA，自带字级时间戳；CPU float32 / CUDA bfloat16）
-- 模型选择：faster-whisper 为 tiny/base/small/medium/large-v2/large-v3
+- 模型选择：faster-whisper 为 tiny/base/small/medium/large-v2/large-v3；kotoba-faster-whisper 固定使用 `kotoba-tech/kotoba-whisper-v2.0-faster`
 - 模型状态与引擎状态均为显式检测；进入转录页不会自动启动 ASR sidecar
 - 实时进度显示与任务取消
 - Parakeet 优先使用 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段
 - Parakeet + VAD/gap backfill 已完成长音频完整性增强，并复用 chunking 共享模块合并去重
 - Qwen3-ASR 自带 ForcedAligner 产出字级时间戳，长音频自动分块转录并复用 chunking 共享模块合并去重
-- **VAD 语音检测预处理配置**（可选，对三个引擎均生效）：
-  - 勾选「启用 VAD 语音检测预处理」后显示下方参数；faster-whisper 透传内置 Silero VAD 参数，Parakeet / Qwen3-ASR 用 VAD 切分语音段后逐段转录
+- **VAD 语音检测预处理配置**（可选，对四个引擎均生效）：
+  - 勾选「启用 VAD 语音检测预处理」后显示下方参数；faster-whisper / kotoba-faster-whisper 透传内置 Silero VAD 参数，Parakeet / Qwen3-ASR 用 VAD 切分语音段后逐段转录
   - 语音阈值（threshold）：0.0-1.0，默认 0.5
   - 最小语音段长度：过滤短噪声，默认 500ms
   - 最小静音间隔：语音段分割灵敏度，默认 300ms
   - 最大语音段长度（Parakeet / Qwen3-ASR 专用）：长段切分阈值，默认 25s
-  - VAD 加载失败时自动降级（Parakeet / Qwen3-ASR 回退固定分块，faster-whisper 回退默认参数）
+  - VAD 加载失败时自动降级（Parakeet / Qwen3-ASR 回退固定分块，faster-whisper / kotoba-faster-whisper 回退默认参数）
 
 ### 翻译配置
 - OpenAI 兼容 API（支持 OpenAI、DeepSeek、Ollama 等）

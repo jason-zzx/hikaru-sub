@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import threading
+from pathlib import Path
 from typing import Callable, Iterator, Optional
 
 from .base import AsrEngine, AsrError, AsrSegment, Transcription
@@ -20,6 +21,25 @@ _ALLOW_PATTERNS = [
     "tokenizer.json",
     "vocabulary.*",
 ]
+
+
+def _has_required_model_files(
+    model_path: str,
+    *,
+    require_preprocessor_config: bool = False,
+) -> bool:
+    path = Path(model_path)
+    return (
+        path.is_dir()
+        and (path / "config.json").is_file()
+        and (path / "model.bin").is_file()
+        and (path / "tokenizer.json").is_file()
+        and any(candidate.is_file() for candidate in path.glob("vocabulary.*"))
+        and (
+            not require_preprocessor_config
+            or (path / "preprocessor_config.json").is_file()
+        )
+    )
 
 
 def _model_repo(model: str) -> str:
@@ -90,6 +110,7 @@ def _resolve_compute_type(device: str, compute_type: Optional[str]) -> str:
 
 class FasterWhisperEngine(AsrEngine):
     name = "faster-whisper"
+    require_preprocessor_config = False
 
     def __init__(
         self,
@@ -117,18 +138,24 @@ class FasterWhisperEngine(AsrEngine):
         except ImportError:
             return False
 
-    @staticmethod
-    def is_model_downloaded(model: str) -> bool:
+    @classmethod
+    def is_model_downloaded(cls, model: str) -> bool:
         """本地缓存是否已具备该模型所需的全部文件（不触发网络）。"""
         if os.path.isdir(model):
-            return True
+            return _has_required_model_files(
+                model,
+                require_preprocessor_config=cls.require_preprocessor_config,
+            )
         try:
             from faster_whisper import download_model
         except ImportError:
             return False
         try:
-            download_model(model, local_files_only=True)
-            return True
+            model_path = download_model(model, local_files_only=True)
+            return _has_required_model_files(
+                model_path,
+                require_preprocessor_config=cls.require_preprocessor_config,
+            )
         except Exception:  # noqa: BLE001 未缓存时抛出 LocalEntryNotFoundError 等
             return False
 
@@ -176,6 +203,10 @@ class FasterWhisperEngine(AsrEngine):
         segments, _ = model.transcribe(silent, beam_size=1)
         for _ in segments:  # 触发生成器执行（即真正的编码/解码）
             break
+
+    def _transcribe_options(self) -> dict:
+        """Return engine-specific faster-whisper transcribe keyword arguments."""
+        return {}
 
     def load(self) -> None:
         if self._model is not None:
@@ -252,6 +283,8 @@ class FasterWhisperEngine(AsrEngine):
             if max_seg_ms is not None:
                 vad_parameters['max_speech_duration_s'] = max_seg_ms / 1000.0
 
+        transcribe_options = self._transcribe_options()
+
         try:
             segments, info = self._model.transcribe(
                 audio_path,
@@ -259,6 +292,7 @@ class FasterWhisperEngine(AsrEngine):
                 vad_filter=vad_filter,
                 vad_parameters=vad_parameters,
                 beam_size=5,
+                **transcribe_options,
             )
         except Exception as exc:
             raise AsrError(f"转录失败：{exc}") from exc
@@ -267,17 +301,22 @@ class FasterWhisperEngine(AsrEngine):
         detected = getattr(info, "language", None)
 
         def _iter() -> Iterator[AsrSegment]:
-            for seg in segments:
-                if cancel_check and cancel_check():
-                    return
-                text = (seg.text or "").strip()
-                if not text:
-                    continue
-                yield AsrSegment(
-                    start_ms=int(round(seg.start * 1000)),
-                    end_ms=int(round(seg.end * 1000)),
-                    text=text,
-                )
+            try:
+                for seg in segments:
+                    if cancel_check and cancel_check():
+                        return
+                    text = (seg.text or "").strip()
+                    if not text:
+                        continue
+                    yield AsrSegment(
+                        start_ms=int(round(seg.start * 1000)),
+                        end_ms=int(round(seg.end * 1000)),
+                        text=text,
+                    )
+            except AsrError:
+                raise
+            except Exception as exc:
+                raise AsrError(f"转录失败：{exc}") from exc
 
         return Transcription(
             duration_ms=duration_ms,

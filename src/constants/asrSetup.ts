@@ -19,7 +19,7 @@ export function resolveAsrSetupProfile(
 }
 
 export const ASR_SETUP_PROFILE_LABEL: Record<AsrSetupProfile, string> = {
-  default: "faster-whisper 默认依赖",
+  default: "faster-whisper / kotoba-faster-whisper 依赖",
   "parakeet-cpu": "Parakeet CPU 依赖",
   "parakeet-cuda": "Parakeet CUDA 依赖",
   "qwen3-cpu": "Qwen3-ASR CPU 依赖",

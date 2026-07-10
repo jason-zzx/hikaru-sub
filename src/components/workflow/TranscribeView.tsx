@@ -15,6 +15,7 @@ import { Select } from "../ui/select-adapter";
 import { ModelManager } from "./ModelManager";
 import {
   ASR_ENGINE_OPTIONS,
+  KOTOBA_FASTER_WHISPER_DESCRIPTION,
   asrModelOptions,
   defaultAsrModel,
 } from "../../constants/asr";
@@ -44,6 +45,7 @@ import {
   ASR_ENGINE_NOT_INSTALLED_HINT,
   ASR_ENGINE_NOT_INSTALLED_LABEL,
   isAsrEngineNotInstalledError,
+  isSelectedAsrEngineUnavailable,
 } from "../../utils/asrSidecarError";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
@@ -200,8 +202,10 @@ export function TranscribeView() {
 
   const audioPath = session.audioPath;
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
-  const selectedEngineUnavailable =
-    engines?.find((item) => item.name === engine)?.available === false;
+  const selectedEngineUnavailable = isSelectedAsrEngineUnavailable(
+    engines,
+    engine,
+  );
   const engineSetupRequired =
     selectedEngineUnavailable || sidecarEngineMissing;
 
@@ -262,7 +266,7 @@ export function TranscribeView() {
       setEngines(list);
       setSidecarEngineMissing(false);
       const current = list.find((e) => e.name === engine);
-      if (current && !current.available) {
+      if (!current || !current.available) {
         setEngineMsg(
           `${ASR_ENGINE_NOT_INSTALLED_LABEL}：${engine}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
         );
@@ -543,6 +547,11 @@ export function TranscribeView() {
               disabled={transcribing}
               options={asrModelOptions(engine)}
             />
+            {engine === "kotoba-faster-whisper" && (
+              <p className="mt-1 text-xs text-text-muted">
+                {KOTOBA_FASTER_WHISPER_DESCRIPTION}
+              </p>
+            )}
             {engine === "parakeet" && (
               <p className="mt-1 text-xs text-text-muted">
                 Parakeet 日语模型优先使用 char timestamps，并会重新按日语标点与长度切分字幕。

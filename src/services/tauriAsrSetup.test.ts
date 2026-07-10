@@ -80,9 +80,17 @@ describe("ASR setup Tauri wrappers", () => {
     });
 
     vi.mocked(invoke).mockResolvedValueOnce("job-1");
-    await startAsrSetup({ profile: "default", recreate: true });
+    await startAsrSetup({
+      profile: "default",
+      engine: "kotoba-faster-whisper",
+      recreate: true,
+    });
     expect(invoke).toHaveBeenLastCalledWith("start_asr_setup", {
-      args: { profile: "default", recreate: true },
+      args: {
+        profile: "default",
+        engine: "kotoba-faster-whisper",
+        recreate: true,
+      },
     });
 
     vi.mocked(invoke).mockResolvedValueOnce({

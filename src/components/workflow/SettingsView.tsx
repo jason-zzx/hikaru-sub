@@ -24,6 +24,7 @@ import type {
 } from "../../types";
 import {
   ASR_ENGINE_OPTIONS,
+  KOTOBA_FASTER_WHISPER_DESCRIPTION,
   asrModelOptions,
   defaultAsrModel,
 } from "../../constants/asr";
@@ -340,6 +341,11 @@ export function SettingsView() {
                 {settings.asrEngine === "parakeet" && (
                   <p className="mt-1 text-xs text-text-muted">
                     Parakeet 使用 NVIDIA NeMo，可选依赖需单独安装；当前集成针对日语模型。
+                  </p>
+                )}
+                {settings.asrEngine === "kotoba-faster-whisper" && (
+                  <p className="mt-1 text-xs text-text-muted">
+                    {KOTOBA_FASTER_WHISPER_DESCRIPTION}
                   </p>
                 )}
                 <div className="mt-1.5">

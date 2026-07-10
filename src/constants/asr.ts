@@ -1,5 +1,9 @@
+export const KOTOBA_FASTER_WHISPER_DESCRIPTION =
+  "基于 faster-whisper 的日语优化模型";
+
 export const ASR_ENGINE_OPTIONS = [
   { value: "faster-whisper", label: "faster-whisper" },
+  { value: "kotoba-faster-whisper", label: "kotoba-faster-whisper" },
   { value: "parakeet", label: "parakeet" },
   { value: "qwen3-asr", label: "qwen3" },
 ];
@@ -9,6 +13,12 @@ export const ASR_ENGINE_MODELS: Record<string, Array<{ value: string; label: str
     value: m,
     label: m,
   })),
+  "kotoba-faster-whisper": [
+    {
+      value: "kotoba-tech/kotoba-whisper-v2.0-faster",
+      label: "kotoba-whisper-v2.0-faster",
+    },
+  ],
   parakeet: [
     {
       value: "nvidia/parakeet-tdt_ctc-0.6b-ja",

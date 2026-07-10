@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { resolveAsrSetupProfile } from "./asrSetup";
+import { ASR_SETUP_PROFILE_LABEL, resolveAsrSetupProfile } from "./asrSetup";
 
 describe("resolveAsrSetupProfile", () => {
   it("uses default dependencies for faster-whisper", () => {
     expect(
       resolveAsrSetupProfile("faster-whisper", "cuda", {
+        hasNvidiaGpu: true,
+      }),
+    ).toBe("default");
+  });
+
+  it("reuses default dependencies for kotoba-faster-whisper", () => {
+    expect(
+      resolveAsrSetupProfile("kotoba-faster-whisper", "cuda", {
         hasNvidiaGpu: true,
       }),
     ).toBe("default");
@@ -34,5 +42,13 @@ describe("resolveAsrSetupProfile", () => {
         hasNvidiaGpu: false,
       }),
     ).toBe("qwen3-cpu");
+  });
+});
+
+describe("ASR_SETUP_PROFILE_LABEL", () => {
+  it("names the dependencies shared by faster-whisper and kotoba-faster-whisper", () => {
+    expect(ASR_SETUP_PROFILE_LABEL.default).toBe(
+      "faster-whisper / kotoba-faster-whisper 依赖",
+    );
   });
 });
