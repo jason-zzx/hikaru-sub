@@ -200,10 +200,9 @@ export function RuntimeDependenciesPanel({
                   {canDownload && onPrepareDependency && (
                     <Button
                       type="button"
-                      variant="outline"
                       onClick={() => onPrepareDependency(item.kind)}
                       disabled={isPreparing}
-                      className="px-3 py-1.5 text-sm border-accent/40 text-accent hover:border-accent hover:text-accent-muted"
+                      className="px-3 py-2 text-sm"
                     >
                       {downloadButtonText(preparation)}
                     </Button>
@@ -213,7 +212,7 @@ export function RuntimeDependenciesPanel({
                       type="button"
                       variant="outline"
                       onClick={onConfigureAsr}
-                      className="px-3 py-1.5 text-sm"
+                      className="px-3 py-2 text-sm"
                     >
                       去配置
                     </Button>
@@ -223,7 +222,7 @@ export function RuntimeDependenciesPanel({
                       type="button"
                       variant="outline"
                       onClick={() => onCleanup(item.kind)}
-                      className="px-3 py-1.5 text-sm hover:border-danger/50 hover:text-danger"
+                      className="px-3 py-2 text-sm hover:border-danger/50 hover:text-danger"
                     >
                       清理
                     </Button>
