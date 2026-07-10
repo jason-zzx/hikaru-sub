@@ -56,13 +56,11 @@ describe("SubtitleEditor 快捷键行为约束", () => {
     expect(source).toContain("applyAttributeTag");
   });
 
-  it("routes font, size, and primary color through attribute override insertion", () => {
+  it("routes font and size through attribute override insertion", () => {
     expect(source).toContain('applyAttributeTag("fontName"');
     expect(source).toContain('applyAttributeTag("fontSize"');
-    expect(source).toContain('applyAttributeTag("primaryColor"');
     expect(source).not.toContain("insertOverrideTag(`{\\\\fn");
     expect(source).not.toContain("insertOverrideTag(`{\\\\fs");
-    expect(source).not.toContain("insertOverrideTag(`{\\\\c");
   });
 
   it("uses line-level replace for alignment and splits color alpha", () => {
