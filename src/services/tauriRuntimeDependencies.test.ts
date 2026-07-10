@@ -17,7 +17,6 @@ const {
   cleanupRuntimeDependency,
   getRuntimeDependencyProgress,
   prepareRuntimeDependency,
-  probeDownloadSources,
   probeRuntimeDependencies,
 } = await import("./tauri");
 
@@ -27,8 +26,7 @@ describe("runtime dependency Tauri wrappers", () => {
   it("probes runtime dependencies", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({
       items: [],
-      sourceMode: "auto",
-      effectiveSource: "official",
+      sourceMode: "official",
     });
 
     await probeRuntimeDependencies();
@@ -68,18 +66,5 @@ describe("runtime dependency Tauri wrappers", () => {
     expect(invoke).toHaveBeenCalledWith("cleanup_runtime_dependency", {
       args: { kind: "downloads" },
     });
-  });
-
-  it("probes download sources", async () => {
-    vi.mocked(invoke).mockResolvedValueOnce({
-      items: [],
-      sourceMode: "auto",
-      effectiveSource: "china",
-      recommendedSource: "china",
-    });
-
-    await probeDownloadSources();
-
-    expect(invoke).toHaveBeenCalledWith("probe_download_sources");
   });
 });

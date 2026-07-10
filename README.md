@@ -83,7 +83,7 @@ git push origin v0.1.0
 
 工作流当前只构建 Windows 产物，并上传 NSIS setup 与 portable zip 到 GitHub Release 草稿。也可以从 GitHub Actions 手动运行 `Release Desktop Clients`，输入已存在的 tag/ref；工作流会检出该 ref，并创建或更新同名 Release 草稿。macOS Intel 与 macOS Apple Silicon matrix 已保留为注释，待 macOS 验证通过后重新启用。
 
-发布包会包含 ASR 服务模板，但不包含 FFmpeg、Python、ASR Python 依赖或模型权重。安装版与 portable 版都会在首次使用相关功能时优先复用系统 FFmpeg/Python 3.11；如缺失，会弹出确认窗口后下载到 exe 所在目录下的 `deps/` 受管依赖目录，不使用 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 存放这些大型依赖。下载源支持自动测速推荐、官方源、中国大陆镜像和自定义源；设置页可查看受管依赖占用并清理 FFmpeg、Python 3.11、ASR venv、模型缓存和临时下载缓存。
+发布包会包含 ASR 服务模板，但不包含 FFmpeg、Python、ASR Python 依赖或模型权重。安装版与 portable 版都会在首次使用相关功能时优先复用系统 FFmpeg/Python 3.11；如缺失，会弹出确认窗口后下载到 exe 所在目录下的 `deps/` 受管依赖目录，不使用 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 存放这些大型依赖。下载源支持官方源与中国大陆镜像（默认官方源）；设置页可查看受管依赖占用并清理 FFmpeg、Python 3.11、ASR venv、模型缓存和临时下载缓存。
 
 当前发布限制：
 
@@ -105,7 +105,7 @@ git push origin v0.1.0
 7. 检测 ASR、配置 ASR、FFmpeg/ffprobe 相关操作不应弹出转瞬即逝的终端窗口。
 8. 如果本机没有系统 FFmpeg，点击「下载」「转录」「压制」中的 FFmpeg 相关操作时，应出现依赖确认窗口，显示 FFmpeg、预计大小、安装目录 `deps/` 下的保存位置和当前下载源；取消时原操作不继续，确认后下载完成并继续原操作。
 9. 如果本机没有 Python 3.11，设置页点击「配置当前引擎依赖」时，应先出现 Python 3.11 依赖确认窗口；确认后下载并解压受管 Python 3.11 归档到安装目录 `deps/python311/current/`，再继续创建 ASR venv 和安装引擎依赖。
-10. 设置页「运行时依赖」区域可切换官方源/中国大陆镜像/自动推荐，点击「重新测速」会更新推荐源；清理按钮只删除安装目录 `deps/` 下的受管依赖，不应删除用户手动配置的外部路径。
+10. 设置页「运行时依赖」区域可切换官方源/中国大陆镜像（默认官方源）；清理按钮只删除安装目录 `deps/` 下的受管依赖，不应删除用户手动配置的外部路径。
 11. 如果本机曾运行开发版，安装版 ASR 依赖配置不应继续指向项目源码目录下的 `asr-service/.venv`；一键配置完成后应指向安装目录下的 managed `deps/asr-service/.venv`。
 12. 使用受管 FFmpeg 完成一次转录后，若 `deps/ffmpeg/current/ffprobe.exe` 存在，不应再提示“无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080”。
 13. 下载 ASR 模型时，「模型状态」区域应显示实际下载源和诊断日志路径；中国大陆镜像模式下应能在日志中看到 `HF_ENDPOINT=https://hf-mirror.com` 与 `HF_HOME=<安装目录>/deps/models/huggingface`。
@@ -118,7 +118,7 @@ git push origin v0.1.0
 - ASR venv 位于 `deps/asr-service/.venv`，模型缓存位于 `deps/models/huggingface`，临时归档位于 `deps/downloads`。这些目录都跟随用户选择的安装目录。
 - 如果用户把 Hikaru Sub 安装到 `C:\Program Files` 等当前用户不可写目录，准备/清理受管依赖前会先尝试以管理员权限重启；取消 UAC 时会提示重新以管理员身份运行或安装到当前用户可写目录。
 - 内置下载源清单位于 `src-tauri/resources/runtime-dependency-sources.json`，二进制归档以 SHA-256 和大小锁定。中国大陆镜像当前覆盖 FFmpeg、Python 3.11、PyPI、PyTorch wheels 与 Hugging Face endpoint。
-- `hf-mirror.com` 可能按出口 IP 重定向到 Hugging Face 原站。若用户选择中国大陆镜像但模型下载仍失败，应优先查看模型状态显示的诊断日志；必要时切换到官方源、自定义稳定 endpoint，或确保模型下载流量全程走中国大陆出口。
+- `hf-mirror.com` 可能按出口 IP 重定向到 Hugging Face 原站。若用户选择中国大陆镜像但模型下载仍失败，应优先查看模型状态显示的诊断日志；必要时切换到官方源，或确保模型下载流量全程走中国大陆出口。
 
 ### ASR sidecar 依赖
 
@@ -406,7 +406,6 @@ interface SubtitleCue {
 | `get_runtime_dependency_progress` | 查询运行时依赖准备进度 |
 | `cancel_runtime_dependency` | 取消运行时依赖准备任务 |
 | `cleanup_runtime_dependency` | 清理安装目录 `deps/` 下的受管依赖或下载缓存 |
-| `probe_download_sources` | 对下载源测速并保存自动推荐源 |
 | `allow_asset_path` | 将视频或代理文件路径加入 Tauri asset scope |
 | `detect_video_codec` | 检测视频编码格式 |
 | `start_transcode` | 启动不兼容视频编码的代理视频转码 |

@@ -9,14 +9,9 @@ import type {
   RuntimeDependencyProbe,
   RuntimeDependencySnapshot,
 } from "../types";
+import { RUNTIME_SOURCE_MODE_LABEL } from "../constants/runtimeDependencies";
 
 const POLL_INTERVAL_MS = 800;
-
-const SOURCE_LABEL: Record<"official" | "china" | "custom", string> = {
-  official: "官方源",
-  china: "中国大陆镜像",
-  custom: "自定义",
-};
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -89,7 +84,9 @@ export function useRuntimeDependencyPreparation(kind: RuntimeDependencyKind) {
     requestDependency,
     setOpen,
     snapshot,
-    sourceLabel: probe ? SOURCE_LABEL[probe.effectiveSource] : "自动推荐",
+    sourceLabel: probe
+      ? RUNTIME_SOURCE_MODE_LABEL[probe.sourceMode]
+      : RUNTIME_SOURCE_MODE_LABEL.official,
     confirmPrepare,
     refreshProbe,
   };

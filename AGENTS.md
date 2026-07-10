@@ -156,7 +156,7 @@ interface SubtitleCue {
 - Python 解析顺序：用户设置路径 → 系统 Python 3.11 → 安装目录 `deps/python311/current` 下的受管 Python 3.11。ASR 配置只接受 Python 3.11。
 - 受管 ASR venv 位于安装目录 `deps/asr-service/.venv`；模型缓存位于 `deps/models/huggingface`；临时归档位于 `deps/downloads`。
 - 不要重新引入 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 作为大型受管依赖目录。
-- 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，内置官方源、中国大陆镜像和自定义源；自动模式根据测速推荐，但用户手动选择优先。
+- 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，设置页仅可选官方源或中国大陆镜像（默认官方源）。旧配置中的 `auto`/`custom` 加载时静默迁移为官方源。
 - 中国大陆镜像会给 sidecar 注入 `HF_ENDPOINT=https://hf-mirror.com`，模型缓存通过 `HF_HOME` 固定到安装目录 `deps/models/huggingface`。模型下载失败时优先查看 `deps/asr-service/asr-debug.log` 中的 `model_download_*` 事件。
 - VAD 配置仅当前会话有效，不写入项目或全局设置。VAD 加载/检测失败时应自动降级，不中断转录。
 - `kotoba-faster-whisper` 复用默认依赖，但要求 `faster-whisper>=1.1.1`；其模型缓存还必须包含 `preprocessor_config.json`。该文件要求只适用于 Kotoba，不要扩展到普通 faster-whisper 模型。

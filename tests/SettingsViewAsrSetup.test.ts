@@ -72,12 +72,6 @@ describe("SettingsView ASR setup", () => {
     expect(panelSource).toContain("asrServicePath, refreshKey]");
   });
 
-  it("auto probes download sources when auto mode has no recommendation", () => {
-    expect(settingsSource).toContain("refreshRuntimeDependencies({ autoProbeSources: true })");
-    expect(settingsSource).toContain("shouldAutoProbeRuntimeSources");
-    expect(settingsSource).toContain("probeDownloadSources()");
-  });
-
   it("keeps runtime dependency status out of the settings header", () => {
     expect(settingsSource).not.toContain("{message && (");
     expect(settingsSource).not.toContain("setMessage({ kind: \"ok\"");

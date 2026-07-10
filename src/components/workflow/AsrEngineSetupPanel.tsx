@@ -17,15 +17,11 @@ import type { RuntimeDependencyProbe, RuntimeDependencySnapshot } from "../../ty
 import {
   ASR_ENGINE_NOT_INSTALLED_LABEL,
 } from "../../utils/asrSidecarError";
+import { RUNTIME_SOURCE_MODE_LABEL } from "../../constants/runtimeDependencies";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 import { Button } from "../ui/button";
 
 const POLL_INTERVAL_MS = 800;
-const SOURCE_LABEL: Record<"official" | "china" | "custom", string> = {
-  official: "官方源",
-  china: "中国大陆镜像",
-  custom: "自定义",
-};
 
 interface AsrEngineSetupPanelProps {
   engine: string;
@@ -358,7 +354,9 @@ export function AsrEngineSetupPanel({
         sizeBytes={pythonItem?.sizeBytes ?? 0}
         targetPath={pythonItem?.path ?? "安装目录/deps/python311/current"}
         sourceLabel={
-          runtimeProbe ? SOURCE_LABEL[runtimeProbe.effectiveSource] : "自动推荐"
+          runtimeProbe
+            ? RUNTIME_SOURCE_MODE_LABEL[runtimeProbe.sourceMode]
+            : RUNTIME_SOURCE_MODE_LABEL.official
         }
         status={
           dependencySnapshot?.status === "running" ||

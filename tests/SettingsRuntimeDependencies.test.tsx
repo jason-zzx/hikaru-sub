@@ -11,9 +11,7 @@ describe("RuntimeDependenciesPanel", () => {
     render(
       <RuntimeDependenciesPanel
         probe={{
-          sourceMode: "auto",
-          effectiveSource: "china",
-          recommendedSource: "china",
+          sourceMode: "china",
           items: [
             {
               kind: "ffmpeg",
@@ -36,7 +34,6 @@ describe("RuntimeDependenciesPanel", () => {
           ],
         }}
         onChangeSourceMode={vi.fn()}
-        onProbeSources={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={vi.fn()}
@@ -44,11 +41,14 @@ describe("RuntimeDependenciesPanel", () => {
     );
 
     expect(screen.getByText("运行时依赖")).toBeTruthy();
-    expect(screen.getAllByText(/自动推荐/).length).toBeGreaterThan(0);
+    expect(screen.getByText("下载源")).toBeTruthy();
     expect(screen.getAllByText(/中国大陆镜像/).length).toBeGreaterThan(0);
     expect(screen.getByText(/hf-mirror/)).toBeTruthy();
     expect(screen.getByText(/中国大陆出口/)).toBeTruthy();
     expect(screen.getByText(/30.0 MB/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /重新测速/ })).toBeNull();
+    expect(screen.queryByText(/自动推荐/)).toBeNull();
+    expect(screen.queryByText(/当前使用/)).toBeNull();
   });
 
   it("asks the caller to clean managed dependency storage", async () => {
@@ -57,7 +57,6 @@ describe("RuntimeDependenciesPanel", () => {
       <RuntimeDependenciesPanel
         probe={{
           sourceMode: "official",
-          effectiveSource: "official",
           items: [
             {
               kind: "downloads",
@@ -68,7 +67,6 @@ describe("RuntimeDependenciesPanel", () => {
           ],
         }}
         onChangeSourceMode={vi.fn()}
-        onProbeSources={vi.fn()}
         onCleanup={onCleanup}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={vi.fn()}
@@ -86,7 +84,6 @@ describe("RuntimeDependenciesPanel", () => {
       <RuntimeDependenciesPanel
         probe={{
           sourceMode: "china",
-          effectiveSource: "china",
           items: [
             {
               kind: "ffmpeg",
@@ -103,7 +100,6 @@ describe("RuntimeDependenciesPanel", () => {
           ],
         }}
         onChangeSourceMode={vi.fn()}
-        onProbeSources={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={onPrepareDependency}
         onConfigureAsr={vi.fn()}
@@ -125,7 +121,6 @@ describe("RuntimeDependenciesPanel", () => {
       <RuntimeDependenciesPanel
         probe={{
           sourceMode: "china",
-          effectiveSource: "china",
           items: [
             {
               kind: "ffmpeg",
@@ -142,7 +137,6 @@ describe("RuntimeDependenciesPanel", () => {
           ],
         }}
         onChangeSourceMode={vi.fn()}
-        onProbeSources={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={vi.fn()}
@@ -182,7 +176,6 @@ describe("RuntimeDependenciesPanel", () => {
       <RuntimeDependenciesPanel
         probe={{
           sourceMode: "china",
-          effectiveSource: "china",
           items: [
             {
               kind: "ffmpeg",
@@ -193,7 +186,6 @@ describe("RuntimeDependenciesPanel", () => {
           ],
         }}
         onChangeSourceMode={vi.fn()}
-        onProbeSources={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={vi.fn()}
@@ -227,7 +219,6 @@ describe("RuntimeDependenciesPanel", () => {
       <RuntimeDependenciesPanel
         probe={{
           sourceMode: "china",
-          effectiveSource: "china",
           items: [
             {
               kind: "asrVenv",
@@ -244,7 +235,6 @@ describe("RuntimeDependenciesPanel", () => {
           ],
         }}
         onChangeSourceMode={vi.fn()}
-        onProbeSources={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={onConfigureAsr}

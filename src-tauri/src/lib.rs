@@ -40,7 +40,6 @@ pub fn run() {
             dependencies::get_runtime_dependency_progress,
             dependencies::cancel_runtime_dependency,
             dependencies::cleanup_runtime_dependency,
-            dependencies::probe_download_sources,
             ffmpeg::check_ffmpeg,
             ffmpeg::extract_audio,
             ffmpeg::get_video_info,

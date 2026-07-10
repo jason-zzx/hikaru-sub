@@ -15,10 +15,8 @@ export const RUNTIME_SOURCE_MODE_LABEL: Record<
   RuntimeDependencySourceMode,
   string
 > = {
-  auto: "自动推荐",
   official: "官方源",
   china: "中国大陆镜像",
-  custom: "自定义",
 };
 
 export function formatDependencyBytes(bytes: number): string {

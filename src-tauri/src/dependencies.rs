@@ -1,8 +1,5 @@
 use crate::process::hidden_command;
-use crate::settings::{
-    load_settings, save_settings, AppSettings, CustomRuntimeSourceProfile,
-    RuntimeDependencySourceMode,
-};
+use crate::settings::{load_settings, AppSettings, RuntimeDependencySourceMode};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -11,7 +8,7 @@ use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex as StdMutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
@@ -51,7 +48,6 @@ pub enum RuntimeDependencyJobStatus {
 pub enum RuntimeDependencySourceId {
     Official,
     China,
-    Custom,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -125,8 +121,6 @@ pub struct RuntimeDependencyItem {
 pub struct RuntimeDependencyProbe {
     pub items: Vec<RuntimeDependencyItem>,
     pub source_mode: RuntimeDependencySourceMode,
-    pub effective_source: RuntimeDependencySourceId,
-    pub recommended_source: Option<RuntimeDependencySourceId>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -683,34 +677,10 @@ fn platform_sources() -> Result<RuntimeDependencyPlatformSources, String> {
         .ok_or_else(|| format!("运行时依赖源配置缺少平台：{key}"))
 }
 
-fn parse_source_id(value: &str) -> Option<RuntimeDependencySourceId> {
-    match value {
-        "official" => Some(RuntimeDependencySourceId::Official),
-        "china" => Some(RuntimeDependencySourceId::China),
-        "custom" => Some(RuntimeDependencySourceId::Custom),
-        _ => None,
-    }
-}
-
-fn source_id_to_settings_value(id: RuntimeDependencySourceId) -> &'static str {
-    match id {
-        RuntimeDependencySourceId::Official => "official",
-        RuntimeDependencySourceId::China => "china",
-        RuntimeDependencySourceId::Custom => "custom",
-    }
-}
-
 fn effective_source_id(settings: &AppSettings) -> RuntimeDependencySourceId {
     match settings.runtime_source_mode {
         RuntimeDependencySourceMode::Official => RuntimeDependencySourceId::Official,
         RuntimeDependencySourceMode::China => RuntimeDependencySourceId::China,
-        RuntimeDependencySourceMode::Custom => RuntimeDependencySourceId::Custom,
-        RuntimeDependencySourceMode::Auto => settings
-            .runtime_recommended_profile
-            .as_deref()
-            .and_then(parse_source_id)
-            .filter(|id| *id != RuntimeDependencySourceId::Custom)
-            .unwrap_or(RuntimeDependencySourceId::Official),
     }
 }
 
@@ -718,87 +688,10 @@ pub fn effective_source_profile(
     settings: &AppSettings,
 ) -> Result<RuntimeDependencySourceProfile, String> {
     let sources = platform_sources()?;
-    let id = effective_source_id(settings);
-    let profile = match id {
+    Ok(match effective_source_id(settings) {
         RuntimeDependencySourceId::Official => sources.official,
         RuntimeDependencySourceId::China => sources.china,
-        RuntimeDependencySourceId::Custom => {
-            apply_custom_source_profile(sources.official, &settings.runtime_custom_source)
-        }
-    };
-    Ok(profile)
-}
-
-fn apply_custom_source_profile(
-    mut base: RuntimeDependencySourceProfile,
-    custom: &CustomRuntimeSourceProfile,
-) -> RuntimeDependencySourceProfile {
-    base.id = RuntimeDependencySourceId::Custom;
-    base.label = "自定义".into();
-    if let (Some(source), Some(url)) = (base.ffmpeg.as_mut(), custom.ffmpeg_url.as_deref()) {
-        if !url.trim().is_empty() {
-            source.url = url.trim().to_string();
-        }
-    }
-    if let (Some(source), Some(url)) = (base.python311.as_mut(), custom.python311_url.as_deref()) {
-        if !url.trim().is_empty() {
-            source.url = url.trim().to_string();
-        }
-    }
-    if custom
-        .pip_index_url
-        .as_deref()
-        .is_some_and(|url| !url.trim().is_empty())
-    {
-        base.pip_index_url = custom.pip_index_url.clone();
-    }
-    if !custom.pip_extra_index_urls.is_empty() {
-        base.pip_extra_index_urls = custom.pip_extra_index_urls.clone();
-    }
-    if custom
-        .pytorch_cpu_index_url
-        .as_deref()
-        .is_some_and(|url| !url.trim().is_empty())
-    {
-        base.pytorch_cpu_index_url = custom.pytorch_cpu_index_url.clone();
-    }
-    if custom
-        .pytorch_cuda_index_url
-        .as_deref()
-        .is_some_and(|url| !url.trim().is_empty())
-    {
-        base.pytorch_cuda_index_url = custom.pytorch_cuda_index_url.clone();
-    }
-    if custom
-        .pytorch_cpu_find_links_url
-        .as_deref()
-        .is_some_and(|url| !url.trim().is_empty())
-    {
-        base.pytorch_cpu_find_links_url = custom.pytorch_cpu_find_links_url.clone();
-    }
-    if custom
-        .pytorch_cuda_find_links_url
-        .as_deref()
-        .is_some_and(|url| !url.trim().is_empty())
-    {
-        base.pytorch_cuda_find_links_url = custom.pytorch_cuda_find_links_url.clone();
-    }
-    if custom
-        .huggingface_endpoint
-        .as_deref()
-        .is_some_and(|url| !url.trim().is_empty())
-    {
-        base.huggingface_endpoint = custom.huggingface_endpoint.clone();
-    }
-    base
-}
-
-fn recommended_source(settings: &AppSettings) -> Option<RuntimeDependencySourceId> {
-    settings
-        .runtime_recommended_profile
-        .as_deref()
-        .and_then(parse_source_id)
-        .filter(|id| *id != RuntimeDependencySourceId::Custom)
+    })
 }
 
 fn push_log(job: &mut RuntimeDependencyJob, line: impl Into<String>) {
@@ -1521,8 +1414,6 @@ fn cleanup_target_for_kind(
 fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependencyProbe, String> {
     let settings = load_settings(app).unwrap_or_default();
     let source_mode = settings.runtime_source_mode.clone();
-    let effective_source = effective_source_id(&settings);
-    let recommended_source = recommended_source(&settings);
     let source_profile = effective_source_profile(&settings).ok();
     let mut items = Vec::new();
 
@@ -1661,28 +1552,7 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
     Ok(RuntimeDependencyProbe {
         items,
         source_mode,
-        effective_source,
-        recommended_source,
     })
-}
-
-async fn probe_profile_latency(profile: &RuntimeDependencySourceProfile) -> Option<u128> {
-    let url = profile
-        .python311
-        .as_ref()
-        .or(profile.ffmpeg.as_ref())
-        .map(|source| source.url.as_str())?;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .ok()?;
-    let started = Instant::now();
-    let response = client.head(url).send().await.ok()?;
-    if response.status().is_success() || response.status().is_redirection() {
-        Some(started.elapsed().as_millis())
-    } else {
-        None
-    }
 }
 
 #[tauri::command]
@@ -1775,35 +1645,6 @@ pub async fn cleanup_runtime_dependency(
     fs::create_dir_all(&deps).map_err(|e| e.to_string())?;
     let target = cleanup_target_for_kind(&app, args.kind)?;
     safe_remove_runtime_dependency_dir(&target, &deps)
-}
-
-#[tauri::command]
-pub async fn probe_download_sources(app: AppHandle) -> Result<RuntimeDependencyProbe, String> {
-    let mut settings = load_settings(&app).unwrap_or_default();
-    let sources = platform_sources()?;
-    let official = probe_profile_latency(&sources.official).await;
-    let china = probe_profile_latency(&sources.china).await;
-    let recommendation = match (official, china) {
-        (Some(official), Some(china)) => {
-            if china <= official {
-                RuntimeDependencySourceId::China
-            } else {
-                RuntimeDependencySourceId::Official
-            }
-        }
-        (None, Some(_)) => RuntimeDependencySourceId::China,
-        _ => RuntimeDependencySourceId::Official,
-    };
-    settings.runtime_recommended_profile =
-        Some(source_id_to_settings_value(recommendation).to_string());
-    settings.runtime_recommendation_checked_at = Some(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs().to_string())
-            .unwrap_or_else(|_| "0".into()),
-    );
-    save_settings(&app, &settings)?;
-    probe_runtime_dependencies_inner(&app)
 }
 
 #[cfg(test)]
@@ -1899,43 +1740,22 @@ mod tests {
     }
 
     #[test]
-    fn source_selection_prefers_manual_mode_over_recommendation() {
-        let settings = AppSettings {
+    fn source_selection_uses_runtime_source_mode() {
+        let china = AppSettings {
             runtime_source_mode: RuntimeDependencySourceMode::China,
-            runtime_recommended_profile: Some("official".into()),
             ..Default::default()
         };
-
         assert_eq!(
-            effective_source_id(&settings),
+            effective_source_id(&china),
             RuntimeDependencySourceId::China
         );
-    }
 
-    #[test]
-    fn source_selection_uses_auto_recommendation() {
-        let settings = AppSettings {
-            runtime_source_mode: RuntimeDependencySourceMode::Auto,
-            runtime_recommended_profile: Some("china".into()),
+        let official = AppSettings {
+            runtime_source_mode: RuntimeDependencySourceMode::Official,
             ..Default::default()
         };
-
         assert_eq!(
-            effective_source_id(&settings),
-            RuntimeDependencySourceId::China
-        );
-    }
-
-    #[test]
-    fn source_selection_falls_back_to_official() {
-        let settings = AppSettings {
-            runtime_source_mode: RuntimeDependencySourceMode::Auto,
-            runtime_recommended_profile: None,
-            ..Default::default()
-        };
-
-        assert_eq!(
-            effective_source_id(&settings),
+            effective_source_id(&official),
             RuntimeDependencySourceId::Official
         );
     }

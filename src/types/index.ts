@@ -48,9 +48,6 @@ export interface AppSettings {
   translationGlossary?: string;
   subtitleMergeMode: "inline" | "separate";
   runtimeSourceMode?: RuntimeDependencySourceMode;
-  runtimeRecommendedProfile?: "official" | "china" | null;
-  runtimeRecommendationCheckedAt?: string | null;
-  runtimeCustomSource?: Partial<RuntimeDependencySourceProfile> | null;
 }
 
 export type FfmpegSource = "settings" | "managed" | "system";
@@ -209,11 +206,7 @@ export type RuntimeDependencyKind =
   | "asrModels"
   | "downloads";
 
-export type RuntimeDependencySourceMode =
-  | "auto"
-  | "official"
-  | "china"
-  | "custom";
+export type RuntimeDependencySourceMode = "official" | "china";
 
 export interface RuntimeDependencyBinarySource {
   url: string;
@@ -224,7 +217,7 @@ export interface RuntimeDependencyBinarySource {
 }
 
 export interface RuntimeDependencySourceProfile {
-  id: "official" | "china" | "custom";
+  id: "official" | "china";
   label: string;
   ffmpeg?: RuntimeDependencyBinarySource;
   python311?: RuntimeDependencyBinarySource;
@@ -235,13 +228,6 @@ export interface RuntimeDependencySourceProfile {
   pytorchCpuFindLinksUrl?: string | null;
   pytorchCudaFindLinksUrl?: string | null;
   huggingfaceEndpoint?: string | null;
-}
-
-export interface RuntimeDependencySourceSettings {
-  mode: RuntimeDependencySourceMode;
-  recommendedProfile?: "official" | "china" | null;
-  recommendationCheckedAt?: string | null;
-  customProfile?: Partial<RuntimeDependencySourceProfile> | null;
 }
 
 export type RuntimeDependencyJobStatus =
@@ -264,8 +250,6 @@ export interface RuntimeDependencyItem {
 export interface RuntimeDependencyProbe {
   items: RuntimeDependencyItem[];
   sourceMode: RuntimeDependencySourceMode;
-  effectiveSource: "official" | "china" | "custom";
-  recommendedSource?: "official" | "china" | null;
 }
 
 export interface PrepareRuntimeDependencyArgs {
