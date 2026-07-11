@@ -1,6 +1,6 @@
 use crate::dependencies::{
     effective_asr_service_dir, effective_source_profile, ensure_runtime_deps_writable_or_elevate,
-    managed_asr_venv_python_path, managed_python_dir, python311_candidates, python_version,
+    managed_asr_venv_python_path, python311_candidates, python311_lookup_fallbacks, python_version,
     PythonCommand,
 };
 use crate::process::hidden_command;
@@ -333,7 +333,12 @@ fn prepare_asr_service_dir(source: &Path, target: &Path, recreate: bool) -> Resu
 }
 
 fn missing_python311_message() -> String {
-    "未检测到 Python 3.11。请下载受管 Python 3.11 或在设置中配置 Python 3.11 路径。".into()
+    if cfg!(debug_assertions) {
+        "未检测到 Python 3.11。请安装系统 Python 3.11，或先运行 `pnpm asr:setup` 创建 asr-service/.venv。"
+            .into()
+    } else {
+        "未检测到 Python 3.11。请下载受管 Python 3.11 或在设置中配置 Python 3.11 路径。".into()
+    }
 }
 
 fn find_python(app: &AppHandle, explicit: Option<&str>) -> Option<(PythonCommand, String)> {
@@ -341,8 +346,8 @@ fn find_python(app: &AppHandle, explicit: Option<&str>) -> Option<(PythonCommand
     if let Some(path) = explicit.filter(|s| !s.trim().is_empty()) {
         settings.python_path = Some(path.to_string());
     }
-    let managed = managed_python_dir(app).ok();
-    python311_candidates(&settings, managed.as_deref())
+    let (managed, venv_exe) = python311_lookup_fallbacks(app, &settings);
+    python311_candidates(&settings, managed.as_deref(), venv_exe.as_deref())
         .into_iter()
         .find_map(|candidate| {
             python_version(&candidate)
@@ -1062,7 +1067,7 @@ mod tests {
             python_path: Some("custom-python".into()),
             ..Default::default()
         };
-        let candidates = python311_candidates(&settings, None);
+        let candidates = python311_candidates(&settings, None, None);
 
         assert_eq!(
             candidates.first().map(|cmd| cmd.program.as_str()),
@@ -1076,6 +1081,11 @@ mod tests {
 
         assert!(message.contains("Python 3.11"));
         assert!(!message.contains("3.10"));
+        if cfg!(debug_assertions) {
+            assert!(message.contains("asr-service/.venv"));
+        } else {
+            assert!(message.contains("受管 Python 3.11"));
+        }
     }
 
     #[test]

@@ -499,9 +499,14 @@ pub fn python_version(command: &PythonCommand) -> Result<String, String> {
     }
 }
 
+/// Python 3.11 候选：设置路径 → 系统 →（可选）额外解释器 →（可选）受管目录。
+///
+/// 开发环境通常传 `extra_python_exe`（`asr-service/.venv`），不传受管 `deps/python311`；
+/// 发布版传受管目录，不传仓库 venv。
 pub fn python311_candidates(
     settings: &AppSettings,
     managed_python: Option<&Path>,
+    extra_python_exe: Option<&Path>,
 ) -> Vec<PythonCommand> {
     let mut candidates = Vec::new();
     if let Some(path) = settings
@@ -545,6 +550,12 @@ pub fn python311_candidates(
             args: vec![],
         });
     }
+    if let Some(exe) = extra_python_exe.filter(|path| path.is_file()) {
+        candidates.push(PythonCommand {
+            program: exe.to_string_lossy().into_owned(),
+            args: vec![],
+        });
+    }
     if let Some(dir) = managed_python {
         if let Some(exe) = find_managed_python_executable(dir) {
             candidates.push(PythonCommand {
@@ -556,13 +567,32 @@ pub fn python311_candidates(
     candidates
 }
 
+/// 开发环境：系统之后回退到仓库 `asr-service/.venv`；发布版：回退到 `deps/python311`。
+pub(crate) fn python311_lookup_fallbacks(
+    app: &AppHandle,
+    settings: &AppSettings,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    if cfg!(debug_assertions) {
+        let venv = effective_asr_service_dir(app, settings.asr_service_path.as_deref())
+            .ok()
+            .map(|service| managed_asr_venv_python_path(&service));
+        (None, venv)
+    } else {
+        (managed_python_dir(app).ok(), None)
+    }
+}
+
 pub fn resolve_python311(app: &AppHandle, settings: &AppSettings) -> Option<ResolvedPython> {
-    let managed = managed_python_dir(app).ok();
+    let (managed, venv_exe) = python311_lookup_fallbacks(app, settings);
     let settings_path = settings
         .python_path
         .as_deref()
         .filter(|s| !s.trim().is_empty());
-    python311_candidates(settings, managed.as_deref())
+    let venv_program = venv_exe
+        .as_deref()
+        .filter(|path| path.is_file())
+        .map(|path| path.to_string_lossy().into_owned());
+    python311_candidates(settings, managed.as_deref(), venv_exe.as_deref())
         .into_iter()
         .find_map(|candidate| {
             let version = python_version(&candidate).ok()?;
@@ -570,10 +600,15 @@ pub fn resolve_python311(app: &AppHandle, settings: &AppSettings) -> Option<Reso
                 path_is_under(Path::new(&candidate.program), dir)
                     || Path::new(&candidate.program) == dir.join("python.exe")
             });
+            let venv_path = venv_program
+                .as_deref()
+                .is_some_and(|path| path == candidate.program);
             let source = if settings_path == Some(candidate.program.as_str()) {
                 "settings"
             } else if managed_path {
                 "managed"
+            } else if venv_path {
+                "venv"
             } else {
                 "system"
             };
@@ -1466,15 +1501,19 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
     });
 
     let python = resolve_python311(app, &settings);
-    let python_managed_dir = managed_python_dir(app).ok();
-    let python_size = python_managed_dir.as_deref().map_or(0, dir_size).max(
-        source_profile
-            .as_ref()
-            .and_then(|profile| profile.python311.as_ref())
-            .map(|source| source.size_bytes)
-            .filter(|_| python.is_none())
-            .unwrap_or(0),
-    );
+    let (python_managed_dir, python_venv_exe) = python311_lookup_fallbacks(app, &settings);
+    let python_size = if let Some(venv) = python_venv_exe.as_deref() {
+        dir_size(venv.parent().and_then(|p| p.parent()).unwrap_or(venv))
+    } else {
+        python_managed_dir.as_deref().map_or(0, dir_size).max(
+            source_profile
+                .as_ref()
+                .and_then(|profile| profile.python311.as_ref())
+                .map(|source| source.size_bytes)
+                .filter(|_| python.is_none())
+                .unwrap_or(0),
+        )
+    };
     items.push(RuntimeDependencyItem {
         kind: RuntimeDependencyKind::Python311,
         status: if python.is_some() {
@@ -1486,9 +1525,14 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
             .as_ref()
             .map(|value| value.command.clone())
             .or_else(|| {
-                python_managed_dir
+                python_venv_exe
                     .as_ref()
                     .map(|path| path.to_string_lossy().into_owned())
+                    .or_else(|| {
+                        python_managed_dir
+                            .as_ref()
+                            .map(|path| path.to_string_lossy().into_owned())
+                    })
             }),
         source: python.as_ref().map(|value| value.source.clone()),
         version: python.as_ref().map(|value| value.version.clone()),
@@ -1660,13 +1704,35 @@ mod tests {
             ..Default::default()
         };
 
-        let candidates =
-            python311_candidates(&settings, Some(Path::new("C:/managed/python311/current")));
+        let candidates = python311_candidates(
+            &settings,
+            Some(Path::new("C:/managed/python311/current")),
+            None,
+        );
 
         assert_eq!(
             candidates.first().unwrap().program,
             "C:/Python311/python.exe"
         );
+    }
+
+    #[test]
+    fn python311_candidates_put_extra_exe_after_system() {
+        let settings = AppSettings::default();
+        let temp = tempfile::tempdir().unwrap();
+        let exe = if cfg!(windows) {
+            temp.path().join("python.exe")
+        } else {
+            temp.path().join("python")
+        };
+        std::fs::write(&exe, "").unwrap();
+
+        let candidates = python311_candidates(&settings, None, Some(&exe));
+        let last = candidates.last().unwrap();
+        assert_eq!(last.program, exe.to_string_lossy());
+        assert!(candidates.iter().any(|cmd| {
+            cmd.program == "python" || cmd.program == "python3" || cmd.program == "py"
+        }));
     }
 
     #[test]
