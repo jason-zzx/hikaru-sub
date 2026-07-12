@@ -1,7 +1,7 @@
 use crate::dependencies::{
     effective_asr_service_dir, effective_source_profile, ensure_runtime_deps_writable_or_elevate,
-    managed_asr_venv_python_path, python311_candidates, python311_lookup_fallbacks, python_version,
-    PythonCommand,
+    is_source_checkout_asr_service_dir, managed_asr_venv_python_path, python311_candidates,
+    python311_lookup_fallbacks, python_version, PythonCommand,
 };
 use crate::process::hidden_command;
 use crate::settings::{load_settings, save_settings};
@@ -321,9 +321,10 @@ fn clean_managed_service_dir(target: &Path, recreate: bool) -> Result<(), String
     Ok(())
 }
 
-/// 准备 ASR 服务目录：目标与模板相同时仅处理 `.venv`（开发仓库 in-place），否则 clean + copy。
+/// 准备 ASR 服务目录：目标与模板相同，或目标为源码仓库 `asr-service` 时仅处理 `.venv`；
+/// 否则 clean + copy（发布版 managed 目录）。
 fn prepare_asr_service_dir(source: &Path, target: &Path, recreate: bool) -> Result<(), String> {
-    if paths_equivalent(source, target) {
+    if should_prepare_asr_service_in_place(source, target) {
         if recreate {
             let venv = venv_dir(target);
             if venv.exists() {
@@ -335,6 +336,10 @@ fn prepare_asr_service_dir(source: &Path, target: &Path, recreate: bool) -> Resu
     }
     clean_managed_service_dir(target, recreate)?;
     copy_template_dir(source, target)
+}
+
+fn should_prepare_asr_service_in_place(source: &Path, target: &Path) -> bool {
+    paths_equivalent(source, target) || is_source_checkout_asr_service_dir(target)
 }
 
 fn missing_python311_message() -> String {
@@ -436,6 +441,52 @@ fn pip_upgrade_args(profile: &crate::dependencies::RuntimeDependencySourceProfil
     append_base_pip_source_args(&mut args, profile);
     args.extend(["--upgrade".into(), "pip".into()]);
     args
+}
+
+fn ensurepip_bootstrap_args() -> Vec<String> {
+    vec!["-m".into(), "ensurepip".into(), "--upgrade".into()]
+}
+
+fn missing_venv_pip_message() -> String {
+    "当前虚拟环境缺少 pip（常见于 uv 创建且未使用 --seed 的环境）。已尝试 ensurepip 仍失败；请勾选「重建虚拟环境」后重试，或改用 python -m venv / uv venv --seed。".into()
+}
+
+fn venv_has_pip(service_dir: &Path) -> bool {
+    let python = venv_python_path(service_dir);
+    if !python.is_file() {
+        return false;
+    }
+    hidden_command(&python)
+        .args(["-c", "import pip"])
+        .current_dir(service_dir)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn ensure_venv_pip(
+    job: &Arc<StdMutex<AsrSetupJob>>,
+    service_dir: &Path,
+) -> Result<(), String> {
+    if venv_has_pip(service_dir) {
+        set_stage(job, "检测到 pip", Some(0.30));
+        return Ok(());
+    }
+    if let Err(error) = run_venv_python_command_args(
+        job,
+        "引导安装 pip（ensurepip）",
+        Some(0.30),
+        service_dir,
+        &ensurepip_bootstrap_args(),
+    ) {
+        return Err(format!("{error}\n{}", missing_venv_pip_message()));
+    }
+    if !venv_has_pip(service_dir) {
+        return Err(missing_venv_pip_message());
+    }
+    Ok(())
 }
 
 fn pip_install_requirement_args(
@@ -724,11 +775,15 @@ fn run_setup_job(
     set_stage(&job, "准备 ASR 服务目录", Some(0.05));
     let source_profile = effective_source_profile(&load_settings(&app).unwrap_or_default())?;
     let target = effective_asr_service_dir(&app, args.asr_service_path.as_deref())?;
-    let source = match resolve_template_dir(&app, args.asr_service_path.as_deref(), Some(&target))
-    {
-        Ok(dir) => dir,
-        Err(_err) if target.join("main.py").is_file() => target.clone(),
-        Err(err) => return Err(err),
+    let source = if is_source_checkout_asr_service_dir(&target) {
+        // 开发仓库：就地使用 asr-service，只维护 .venv，避免 Resource 模板 clean+copy 误删测试等文件。
+        target.clone()
+    } else {
+        match resolve_template_dir(&app, args.asr_service_path.as_deref(), Some(&target)) {
+            Ok(dir) => dir,
+            Err(_err) if target.join("main.py").is_file() => target.clone(),
+            Err(err) => return Err(err),
+        }
     };
     prepare_asr_service_dir(&source, &target, args.recreate)?;
 
@@ -754,6 +809,8 @@ fn run_setup_job(
     } else {
         set_stage(&job, "复用虚拟环境", Some(0.20));
     }
+
+    ensure_venv_pip(&job, &target)?;
 
     let pip_args = pip_upgrade_args(&source_profile);
     run_venv_python_command_args(&job, "升级 pip", Some(0.35), &target, &pip_args)?;
@@ -1058,6 +1115,47 @@ mod tests {
     }
 
     #[test]
+    fn prepare_source_checkout_skips_template_clean_even_when_paths_differ() {
+        let root = temp_dir("asr_checkout_root");
+        fs::create_dir_all(root.join("src-tauri")).unwrap();
+        fs::write(root.join("src-tauri").join("tauri.conf.json"), "{}").unwrap();
+        fs::write(root.join("package.json"), "{}").unwrap();
+
+        let service = root.join("asr-service");
+        fs::create_dir_all(service.join("tests")).unwrap();
+        fs::create_dir_all(service.join(".venv")).unwrap();
+        fs::write(service.join("main.py"), "repo").unwrap();
+        fs::write(service.join(".gitignore"), "__pycache__/\n").unwrap();
+        fs::write(service.join("tests").join("test_x.py"), "").unwrap();
+        fs::write(service.join("custom_dev.py"), "dev").unwrap();
+        fs::write(service.join(".venv").join("marker"), "").unwrap();
+
+        let template = temp_dir("asr_resource_template");
+        fs::create_dir_all(&template).unwrap();
+        fs::write(template.join("main.py"), "template").unwrap();
+        fs::write(template.join("requirements.txt"), "").unwrap();
+
+        assert!(is_source_checkout_asr_service_dir(&service));
+        assert!(should_prepare_asr_service_in_place(&template, &service));
+
+        prepare_asr_service_dir(&template, &service, false).unwrap();
+        assert_eq!(fs::read_to_string(service.join("main.py")).unwrap(), "repo");
+        assert!(service.join("tests").join("test_x.py").is_file());
+        assert!(service.join(".gitignore").is_file());
+        assert!(service.join("custom_dev.py").is_file());
+        assert!(service.join(".venv").join("marker").is_file());
+        assert!(!service.join("requirements.txt").exists());
+
+        prepare_asr_service_dir(&template, &service, true).unwrap();
+        assert!(service.join("tests").join("test_x.py").is_file());
+        assert!(service.join(".gitignore").is_file());
+        assert!(!service.join(".venv").exists());
+
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(template);
+    }
+
+    #[test]
     fn configured_path_equal_to_service_still_counts_as_template_for_probe() {
         let dir = temp_dir("asr_probe_inplace_template");
         fs::create_dir_all(&dir).unwrap();
@@ -1126,6 +1224,29 @@ mod tests {
         let (ok, err) = probe_engine_status(dir.path(), "faster-whisper");
         assert!(!ok);
         assert!(err.unwrap().contains("虚拟环境解释器不存在"));
+    }
+
+    #[test]
+    fn ensurepip_bootstrap_args_upgrade_pip_seed() {
+        assert_eq!(
+            ensurepip_bootstrap_args(),
+            vec!["-m".to_string(), "ensurepip".to_string(), "--upgrade".to_string()]
+        );
+    }
+
+    #[test]
+    fn missing_venv_pip_message_mentions_uv_seed() {
+        let message = missing_venv_pip_message();
+        assert!(message.contains("pip"));
+        assert!(message.contains("uv"));
+        assert!(message.contains("--seed"));
+        assert!(message.contains("重建虚拟环境"));
+    }
+
+    #[test]
+    fn venv_has_pip_is_false_without_interpreter() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!venv_has_pip(dir.path()));
     }
 
     #[test]

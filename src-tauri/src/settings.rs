@@ -198,15 +198,7 @@ fn is_source_checkout_asr_service(service_dir: &Path, app_data_dir: Option<&Path
     if app_data_dir.is_some_and(|dir| path_is_under(service_dir, dir)) {
         return false;
     }
-    if !service_dir.join("main.py").is_file() {
-        return false;
-    }
-    service_dir.ancestors().any(|ancestor| {
-        ancestor.join("src-tauri").join("tauri.conf.json").is_file()
-            && (ancestor.join("package.json").is_file()
-                || ancestor.join("pnpm-workspace.yaml").is_file())
-            && ancestor.join("asr-service").join("main.py").is_file()
-    })
+    crate::dependencies::is_source_checkout_asr_service_dir(service_dir)
 }
 
 fn is_source_checkout_python(python_path: &Path, app_data_dir: Option<&Path>) -> bool {
