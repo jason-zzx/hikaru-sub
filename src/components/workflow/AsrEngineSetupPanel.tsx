@@ -252,13 +252,14 @@ export function AsrEngineSetupPanel({
         </div>
         <Button
           type="button"
+          variant={running ? "outline" : "default"}
           onClick={running ? handleCancel : handleStart}
           disabled={running ? false : !canStart}
-          className={`px-3 py-2 text-sm font-medium ${
+          className={
             running
-              ? "border border-danger/50 text-danger hover:bg-danger/10"
-              : "hover:bg-accent-muted"
-          }`}
+              ? "border-danger/50 text-danger hover:bg-danger/10 hover:text-danger"
+              : undefined
+          }
         >
           {running ? "取消配置" : "配置当前引擎依赖"}
         </Button>
