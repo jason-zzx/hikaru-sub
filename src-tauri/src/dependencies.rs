@@ -306,17 +306,25 @@ pub fn managed_asr_service_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(deps_dir(app)?.join("asr-service"))
 }
 
-/// 判断目录是否位于源码仓库 checkout 的 `asr-service`（与 settings 启发式对齐）。
+/// 判断目录是否为源码仓库 checkout 根下的 `asr-service`（与 settings 启发式对齐）。
+///
+/// 必须等于 `repo/asr-service`，避免把仓库树内的 `resources/asr-service`、
+/// `target/*/deps/asr-service` 等误判为源码服务目录。
 pub fn is_source_checkout_asr_service_dir(service_dir: &Path) -> bool {
     if !service_dir.join("main.py").is_file() {
         return false;
     }
     service_dir.ancestors().any(|ancestor| {
-        ancestor.join("src-tauri").join("tauri.conf.json").is_file()
-            && (ancestor.join("package.json").is_file()
-                || ancestor.join("pnpm-workspace.yaml").is_file())
-            && ancestor.join("asr-service").join("main.py").is_file()
+        looks_like_repo_root(ancestor)
+            && paths_loosely_equal(service_dir, &ancestor.join("asr-service"))
     })
+}
+
+fn paths_loosely_equal(left: &Path, right: &Path) -> bool {
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
+    }
 }
 
 fn looks_like_repo_root(dir: &Path) -> bool {
@@ -1975,6 +1983,38 @@ mod tests {
         std::fs::write(root.join("src-tauri").join("tauri.conf.json"), "{}").unwrap();
         std::fs::write(root.join("package.json"), "{}").unwrap();
         std::fs::write(root.join("asr-service").join("main.py"), "").unwrap();
+    }
+
+    #[test]
+    fn source_checkout_asr_service_requires_exact_repo_asr_service_path() {
+        let root = std::env::temp_dir().join(format!(
+            "hikaru_sub_asr_checkout_exact_{}",
+            unique_suffix()
+        ));
+        create_fake_repo(&root);
+
+        let service = root.join("asr-service");
+        assert!(is_source_checkout_asr_service_dir(&service));
+
+        let resources = root
+            .join("src-tauri")
+            .join("resources")
+            .join("asr-service");
+        std::fs::create_dir_all(&resources).unwrap();
+        std::fs::write(resources.join("main.py"), "").unwrap();
+        assert!(!is_source_checkout_asr_service_dir(&resources));
+
+        let managed = root
+            .join("src-tauri")
+            .join("target")
+            .join("debug")
+            .join("deps")
+            .join("asr-service");
+        std::fs::create_dir_all(&managed).unwrap();
+        std::fs::write(managed.join("main.py"), "").unwrap();
+        assert!(!is_source_checkout_asr_service_dir(&managed));
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
