@@ -30,8 +30,8 @@ describe("ModelManager diagnostics", () => {
   it("shows ASR engine not installed instead of generic check failure", () => {
     expect(modelManagerSource).toContain("isAsrEngineNotInstalledError");
     expect(modelManagerSource).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
-    expect(modelManagerSource).toContain("ASR_ENGINE_NOT_INSTALLED_HINT");
     expect(modelManagerSource).toContain("engineNotInstalled");
+    expect(modelManagerSource).not.toContain("ASR_ENGINE_NOT_INSTALLED_HINT");
     expect(modelManagerSource).toMatch(
       /engineNotInstalled[\s\S]{0,200}ASR_ENGINE_NOT_INSTALLED_LABEL/,
     );

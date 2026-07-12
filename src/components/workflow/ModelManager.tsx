@@ -6,7 +6,6 @@ import {
 } from "../../services/tauri";
 import type { AsrModelStatus, ModelDownloadSnapshot } from "../../types";
 import {
-  ASR_ENGINE_NOT_INSTALLED_HINT,
   ASR_ENGINE_NOT_INSTALLED_LABEL,
   isAsrEngineNotInstalledError,
 } from "../../utils/asrSidecarError";
@@ -178,12 +177,6 @@ export function ModelManager({
           {downloading && <span className="text-text-muted">下载中…</span>}
         </div>
       </div>
-
-      {engineNotInstalled && (
-        <span className="text-xs text-warning">
-          {ASR_ENGINE_NOT_INSTALLED_HINT}
-        </span>
-      )}
 
       {checkError && !engineNotInstalled && (
         <span className="break-all text-xs text-danger">{checkError}</span>

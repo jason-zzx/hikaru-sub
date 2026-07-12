@@ -15,6 +15,7 @@ import {
 import type { AsrSetupEnvironment, AsrSetupSnapshot } from "../../types";
 import type { RuntimeDependencyProbe, RuntimeDependencySnapshot } from "../../types";
 import {
+  ASR_ENGINE_NOT_INSTALLED_HINT_ON_SETTINGS,
   ASR_ENGINE_NOT_INSTALLED_LABEL,
 } from "../../utils/asrSidecarError";
 import { RUNTIME_SOURCE_MODE_LABEL } from "../../constants/runtimeDependencies";
@@ -67,6 +68,7 @@ export function AsrEngineSetupPanel({
       const next = await probeAsrSetupEnvironment({
         pythonPath: pythonPath ?? null,
         asrServicePath: asrServicePath ?? null,
+        engine,
       });
       setEnv(next);
       setEnvError(null);
@@ -74,7 +76,7 @@ export function AsrEngineSetupPanel({
       setEnv(null);
       setEnvError(String(e));
     }
-  }, [asrServicePath, pythonPath]);
+  }, [asrServicePath, engine, pythonPath]);
 
   useEffect(() => {
     void refreshEnvironment();
@@ -276,11 +278,17 @@ export function AsrEngineSetupPanel({
             </span>
             <span>
               虚拟环境：{env.venvExists ? "已存在" : "未创建"}
+              {env.venvExists
+                ? env.engineOk
+                  ? " · 当前引擎依赖已就绪"
+                  : " · 当前引擎依赖未就绪"
+                : ""}
               {env.hasNvidiaGpu ? " · 已检测到 NVIDIA GPU" : ""}
             </span>
-            {!env.venvExists && (
+            {(!env.venvExists || !env.engineOk) && (
               <span className="text-warning">
                 {ASR_ENGINE_NOT_INSTALLED_LABEL}。
+                {ASR_ENGINE_NOT_INSTALLED_HINT_ON_SETTINGS}
               </span>
             )}
           </>

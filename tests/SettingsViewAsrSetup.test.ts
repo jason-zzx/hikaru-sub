@@ -34,6 +34,7 @@ describe("SettingsView ASR setup", () => {
     expect(panelSource).toContain("probeAsrSetupEnvironment({");
     expect(panelSource).toContain("pythonPath: pythonPath ?? null");
     expect(panelSource).toContain("asrServicePath: asrServicePath ?? null");
+    expect(panelSource).toContain("engine,");
     expect(panelSource).toContain("刷新配置进度失败");
     expect(panelSource).toContain("setRunning(false)");
   });
@@ -43,6 +44,9 @@ describe("SettingsView ASR setup", () => {
     expect(panelSource).toContain("查看安装日志");
     expect(panelSource).toContain("重建虚拟环境");
     expect(panelSource).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
+    expect(panelSource).toContain("当前引擎依赖未就绪");
+    expect(panelSource).toContain("当前引擎依赖已就绪");
+    expect(panelSource).toContain("ASR_ENGINE_NOT_INSTALLED_HINT_ON_SETTINGS");
     expect(panelSource).not.toMatch(/[🚀✅❌⚠️]/u);
   });
 

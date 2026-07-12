@@ -278,7 +278,9 @@ export function TranscribeView() {
       setEngines(null);
       if (isAsrEngineNotInstalledError(e)) {
         setSidecarEngineMissing(true);
-        setEngineMsg(ASR_ENGINE_NOT_INSTALLED_LABEL);
+        setEngineMsg(
+          `${ASR_ENGINE_NOT_INSTALLED_LABEL}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
+        );
       } else {
         setSidecarEngineMissing(false);
         setEngineMsg(`无法启动 sidecar：${String(e)}`);
@@ -583,6 +585,16 @@ export function TranscribeView() {
               {engineMsg}
             </span>
           )}
+          {engineSetupRequired && !transcribing && (
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setStep("settings")}
+              className="rounded-md border border-warning/50 px-2.5 py-1 text-xs font-medium text-warning hover:bg-warning/20"
+            >
+              前往设置
+            </Button>
+          )}
           <Button
             variant="outline"
             type="button"
@@ -593,21 +605,6 @@ export function TranscribeView() {
             检测引擎状态
           </Button>
         </div>
-        {engineSetupRequired && !transcribing && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-            <span className="text-warning">
-              {ASR_ENGINE_NOT_INSTALLED_LABEL}。{ASR_ENGINE_NOT_INSTALLED_HINT}
-            </span>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => setStep("settings")}
-              className="rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
-            >
-              前往设置
-            </Button>
-          </div>
-        )}
 
         <div className="rounded-lg border border-border bg-surface px-4 py-3">
           <label className="flex items-center gap-2">
