@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ASR_ENGINE_NOT_INSTALLED_HINT,
+  ASR_ENGINE_NOT_INSTALLED_HINT_ON_SETTINGS,
   ASR_ENGINE_NOT_INSTALLED_LABEL,
   isAsrEngineNotInstalledError,
   isSelectedAsrEngineUnavailable,
@@ -28,12 +29,30 @@ describe("isAsrEngineNotInstalledError", () => {
       false,
     );
   });
+
+  it("does not treat missing Python interpreter as missing engine deps", () => {
+    expect(
+      isAsrEngineNotInstalledError(
+        "未找到可用的 Python 3.11。请安装系统 Python 3.11，或先配置 ASR 引擎依赖。",
+      ),
+    ).toBe(false);
+  });
+
+  it("does not treat raw py program-not-found alone as engine deps signal", () => {
+    expect(
+      isAsrEngineNotInstalledError("启动 sidecar 失败（py）：program not found"),
+    ).toBe(false);
+  });
 });
 
 describe("ASR engine not installed copy", () => {
   it("exposes user-facing label and setup hint", () => {
     expect(ASR_ENGINE_NOT_INSTALLED_LABEL).toBe("ASR 引擎未安装");
     expect(ASR_ENGINE_NOT_INSTALLED_HINT).toContain("配置当前引擎依赖");
+    expect(ASR_ENGINE_NOT_INSTALLED_HINT).toContain("设置中");
+    expect(ASR_ENGINE_NOT_INSTALLED_HINT_ON_SETTINGS).toBe(
+      "请先点击「配置当前引擎依赖」完成安装。",
+    );
   });
 });
 

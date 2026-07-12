@@ -54,6 +54,9 @@ describe("ASR setup Tauri wrappers", () => {
       pythonOk: true,
       venvPath: "managed/.venv",
       venvExists: false,
+      engine: "faster-whisper",
+      engineOk: false,
+      engineError: "虚拟环境未创建",
       hasNvidiaGpu: false,
     });
     await probeAsrSetupEnvironment();
@@ -66,16 +69,21 @@ describe("ASR setup Tauri wrappers", () => {
       pythonOk: true,
       venvPath: "managed/.venv",
       venvExists: false,
+      engine: "kotoba-faster-whisper",
+      engineOk: false,
+      engineError: "虚拟环境未创建",
       hasNvidiaGpu: false,
     });
     await probeAsrSetupEnvironment({
       pythonPath: "C:/Python/python.exe",
       asrServicePath: "C:/custom/asr-service",
+      engine: "kotoba-faster-whisper",
     });
     expect(invoke).toHaveBeenLastCalledWith("probe_asr_setup_environment", {
       args: {
         pythonPath: "C:/Python/python.exe",
         asrServicePath: "C:/custom/asr-service",
+        engine: "kotoba-faster-whisper",
       },
     });
 

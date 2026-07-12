@@ -175,6 +175,7 @@ export interface StartAsrSetupArgs {
 export interface ProbeAsrSetupEnvironmentArgs {
   pythonPath?: string | null;
   asrServicePath?: string | null;
+  engine?: string | null;
 }
 
 export interface AsrSetupSnapshot {
@@ -196,6 +197,9 @@ export interface AsrSetupEnvironment {
   pythonOk: boolean;
   venvPath: string;
   venvExists: boolean;
+  engine: string;
+  engineOk: boolean;
+  engineError?: string | null;
   hasNvidiaGpu: boolean;
 }
 

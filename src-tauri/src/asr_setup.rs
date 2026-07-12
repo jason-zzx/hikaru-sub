@@ -60,6 +60,8 @@ pub struct ProbeAsrSetupEnvironmentArgs {
     pub python_path: Option<String>,
     #[serde(default)]
     pub asr_service_path: Option<String>,
+    #[serde(default)]
+    pub engine: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -85,6 +87,9 @@ pub struct AsrSetupEnvironment {
     pub python_ok: bool,
     pub venv_path: String,
     pub venv_exists: bool,
+    pub engine: String,
+    pub engine_ok: bool,
+    pub engine_error: Option<String>,
     pub has_nvidia_gpu: bool,
 }
 
@@ -787,15 +792,39 @@ fn resolve_probe_template_path(
         .or_else(|| service.join("main.py").is_file().then(|| service.to_path_buf()))
 }
 
+fn probe_engine_status(service_dir: &Path, engine: &str) -> (bool, Option<String>) {
+    if !venv_python_path(service_dir).is_file() {
+        return (false, Some("虚拟环境解释器不存在".into()));
+    }
+    match verify_engine_available(service_dir, engine) {
+        Ok(()) => (true, None),
+        Err(error) => (false, Some(error)),
+    }
+}
+
 #[tauri::command]
 pub async fn probe_asr_setup_environment(
     app: AppHandle,
     args: ProbeAsrSetupEnvironmentArgs,
 ) -> Result<AsrSetupEnvironment, String> {
+    let settings = load_settings(&app).unwrap_or_default();
     let service = effective_asr_service_dir(&app, args.asr_service_path.as_deref())?;
     let template = resolve_probe_template_path(&app, args.asr_service_path.as_deref(), &service);
     let python = find_python(&app, args.python_path.as_deref());
     let venv = venv_dir(&service);
+    let venv_exists = venv.is_dir();
+    let engine = args
+        .engine
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(settings.asr_engine.as_str())
+        .to_string();
+    let (engine_ok, engine_error) = if venv_exists {
+        probe_engine_status(&service, &engine)
+    } else {
+        (false, Some("虚拟环境未创建".into()))
+    };
     Ok(AsrSetupEnvironment {
         service_template_path: template.map(|path| path.to_string_lossy().into_owned()),
         managed_service_path: service.to_string_lossy().into_owned(),
@@ -803,7 +832,10 @@ pub async fn probe_asr_setup_environment(
         python_version: python.as_ref().map(|(_, version)| version.clone()),
         python_ok: python.is_some(),
         venv_path: venv.to_string_lossy().into_owned(),
-        venv_exists: venv.is_dir(),
+        venv_exists,
+        engine,
+        engine_ok,
+        engine_error,
         has_nvidia_gpu: has_nvidia_gpu(),
     })
 }
@@ -1086,6 +1118,14 @@ mod tests {
         } else {
             assert!(message.contains("受管 Python 3.11"));
         }
+    }
+
+    #[test]
+    fn probe_engine_status_reports_missing_venv_python() {
+        let dir = tempfile::tempdir().unwrap();
+        let (ok, err) = probe_engine_status(dir.path(), "faster-whisper");
+        assert!(!ok);
+        assert!(err.unwrap().contains("虚拟环境解释器不存在"));
     }
 
     #[test]

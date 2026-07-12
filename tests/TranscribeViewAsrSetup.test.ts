@@ -15,6 +15,7 @@ describe("TranscribeView ASR setup guidance", () => {
     expect(source).toContain("engineSetupRequired");
     expect(source).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
     expect(source).toContain('setStep("settings")');
+    expect(source).toContain("前往设置");
     expect(source).toContain("!audioReady || engineSetupRequired");
   });
 

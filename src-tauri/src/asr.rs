@@ -199,6 +199,43 @@ fn sidecar_env_matches(current: &[(String, String)], desired: &[(String, String)
         })
 }
 
+fn is_interpreter_missing_error(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("program not found")
+        || message.contains("系统找不到指定的文件")
+        || lower.contains("no such file or directory")
+        || lower.contains("cannot find the file")
+}
+
+fn is_dependency_spawn_error(message: &str) -> bool {
+    message.contains("sidecar 未输出就绪端口")
+        || message.contains("请检查 Python 依赖是否已安装")
+        || message.contains("ModuleNotFoundError")
+        || message.contains("No module named")
+}
+
+/// 多候选 sidecar 启动失败时，优先返回依赖语义错误，避免被末尾 `py` 找不到盖住。
+fn select_sidecar_spawn_error(errors: &[String]) -> String {
+    if errors.is_empty() {
+        return "无可用的 Python 解释器".into();
+    }
+    if let Some(message) = errors
+        .iter()
+        .rev()
+        .find(|message| is_dependency_spawn_error(message))
+    {
+        return (*message).clone();
+    }
+    if errors.iter().all(|message| is_interpreter_missing_error(message)) {
+        return "未找到可用的 Python 3.11。请安装系统 Python 3.11，或先配置 ASR 引擎依赖。"
+            .into();
+    }
+    errors
+        .last()
+        .cloned()
+        .unwrap_or_else(|| "无可用的 Python 解释器".into())
+}
+
 /// 启动 sidecar 并阻塞读取其就绪端口；成功后保留进程并持续排空 stdout。
 fn spawn_sidecar(python: &str, dir: &Path, env: &[(String, String)]) -> Result<Sidecar, String> {
     let debug_log_path = dir.join("asr-debug.log");
@@ -315,14 +352,14 @@ async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, St
     }
 
     let sidecar = tauri::async_runtime::spawn_blocking(move || {
-        let mut last = String::from("无可用的 Python 解释器");
+        let mut errors = Vec::new();
         for py in pythons {
             match spawn_sidecar(&py, &dir, &env) {
                 Ok(sc) => return Ok(sc),
-                Err(e) => last = e,
+                Err(e) => errors.push(e),
             }
         }
-        Err(last)
+        Err(select_sidecar_spawn_error(&errors))
     })
     .await
     .map_err(|e| format!("任务执行失败：{e}"))??;
@@ -732,5 +769,31 @@ mod tests {
 
         assert!(!sidecar_env_matches(&old_env, &new_env));
         assert!(sidecar_env_matches(&new_env, &new_env));
+    }
+
+    #[test]
+    fn sidecar_spawn_error_prefers_dependency_failure_over_program_not_found() {
+        let errors = [
+            "sidecar 未输出就绪端口（请检查 Python 依赖是否已安装）".to_string(),
+            "启动 sidecar 失败（python）：program not found".to_string(),
+            "启动 sidecar 失败（py）：program not found".to_string(),
+        ];
+
+        let selected = select_sidecar_spawn_error(&errors);
+        assert!(selected.contains("请检查 Python 依赖是否已安装"));
+        assert!(!selected.contains("program not found"));
+    }
+
+    #[test]
+    fn sidecar_spawn_error_reports_missing_python_when_all_interpreters_missing() {
+        let errors = [
+            "启动 sidecar 失败（python）：program not found".to_string(),
+            "启动 sidecar 失败（py）：program not found".to_string(),
+        ];
+
+        assert_eq!(
+            select_sidecar_spawn_error(&errors),
+            "未找到可用的 Python 3.11。请安装系统 Python 3.11，或先配置 ASR 引擎依赖。"
+        );
     }
 }

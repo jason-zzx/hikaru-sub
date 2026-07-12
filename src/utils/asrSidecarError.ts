@@ -15,6 +15,10 @@ export const ASR_ENGINE_NOT_INSTALLED_LABEL = "ASR 引擎未安装";
 export const ASR_ENGINE_NOT_INSTALLED_HINT =
   "请先在设置中点击「配置当前引擎依赖」完成安装。";
 
+/** 已在设置页时使用的精简引导文案。 */
+export const ASR_ENGINE_NOT_INSTALLED_HINT_ON_SETTINGS =
+  "请先点击「配置当前引擎依赖」完成安装。";
+
 export function isSelectedAsrEngineUnavailable(
   engines: AsrEngineInfo[] | null,
   selectedEngine: string,
