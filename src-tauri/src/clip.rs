@@ -1,3 +1,4 @@
+use crate::dependencies::work_cache_dir;
 use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
 use crate::media_server::MediaServer;
 use crate::process::hidden_command;
@@ -842,9 +843,7 @@ pub async fn extract_video_frame(
         return Err(format!("视频文件不存在: {}", args.video_path));
     }
 
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
+    let cache_dir = work_cache_dir(&app)
         .map_err(|e| format!("无法读取应用缓存目录: {e}"))?
         .join("clip-frames");
     fs::create_dir_all(&cache_dir).map_err(|e| format!("无法创建抽帧缓存目录: {e}"))?;

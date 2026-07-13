@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::dependencies::work_cache_dir;
 use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
 use crate::process::hidden_command;
 use crate::settings::load_settings;
@@ -712,9 +713,7 @@ pub async fn stop_transcode(app: AppHandle, video_path: String) -> Result<(), St
 }
 
 pub fn init_transcode_state(app: &mut tauri::App) {
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
+    let cache_dir = work_cache_dir(app.handle())
         .unwrap_or_else(|_| PathBuf::from(".cache"))
         .join("transcode");
 

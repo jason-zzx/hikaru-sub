@@ -208,7 +208,8 @@ export type RuntimeDependencyKind =
   | "python311"
   | "asrVenv"
   | "asrModels"
-  | "downloads";
+  | "downloads"
+  | "appCache";
 
 export type RuntimeDependencySourceMode = "official" | "china";
 

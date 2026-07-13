@@ -1,8 +1,8 @@
+use crate::dependencies::work_cache_dir;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,7 +25,7 @@ fn video_stem(video_path: &Path) -> Result<String, String> {
         .ok_or_else(|| "无法解析视频文件名".to_string())
 }
 
-fn workspace_key_for_video(video_path: &Path) -> Result<String, String> {
+pub(crate) fn workspace_key_for_video(video_path: &Path) -> Result<String, String> {
     let canonical = video_path
         .canonicalize()
         .map_err(|e| format!("无法解析视频绝对路径: {e}"))?;
@@ -78,10 +78,7 @@ pub fn prepare_video_session(
     video_path: String,
 ) -> Result<VideoSession, String> {
     let video = PathBuf::from(&video_path);
-    let cache_root = app
-        .path()
-        .app_cache_dir()
-        .map_err(|e| format!("无法读取应用缓存目录: {e}"))?;
+    let cache_root = work_cache_dir(&app)?;
     let session = build_video_session(&video, &cache_root)?;
     fs::create_dir_all(&session.workspace_path)
         .map_err(|e| format!("无法创建缓存工作目录: {e}"))?;
@@ -120,10 +117,7 @@ pub fn delete_cached_audio(app: tauri::AppHandle, audio_path: String) -> Result<
         return Ok(false);
     }
 
-    let cache_root = app
-        .path()
-        .app_cache_dir()
-        .map_err(|e| format!("无法读取应用缓存目录: {e}"))?;
+    let cache_root = work_cache_dir(&app)?;
     if !is_cached_audio_path(&cache_root, &path)? {
         return Err("拒绝删除非会话音频缓存文件".into());
     }

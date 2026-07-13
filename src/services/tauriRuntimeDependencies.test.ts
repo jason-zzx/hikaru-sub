@@ -65,15 +65,34 @@ describe("runtime dependency Tauri wrappers", () => {
     await cleanupRuntimeDependency("downloads");
 
     expect(invoke).toHaveBeenCalledWith("cleanup_runtime_dependency", {
-      args: { kind: "downloads" },
+      args: { kind: "downloads", preserveVideoPath: null },
     });
   });
 
   it("measures managed dependency storage sizes", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ items: [] });
 
-    await measureRuntimeDependencyStorage();
+    await measureRuntimeDependencyStorage({
+      preserveVideoPath: "C:/video/demo.mp4",
+    });
 
-    expect(invoke).toHaveBeenCalledWith("measure_runtime_dependency_storage");
+    expect(invoke).toHaveBeenCalledWith("measure_runtime_dependency_storage", {
+      args: { preserveVideoPath: "C:/video/demo.mp4" },
+    });
+  });
+
+  it("cleans app cache while preserving the current video path", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(undefined);
+
+    await cleanupRuntimeDependency("appCache", {
+      preserveVideoPath: "C:/video/demo.mp4",
+    });
+
+    expect(invoke).toHaveBeenCalledWith("cleanup_runtime_dependency", {
+      args: {
+        kind: "appCache",
+        preserveVideoPath: "C:/video/demo.mp4",
+      },
+    });
   });
 });

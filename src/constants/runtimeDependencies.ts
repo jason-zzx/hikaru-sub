@@ -9,6 +9,7 @@ export const RUNTIME_DEPENDENCY_LABEL: Record<RuntimeDependencyKind, string> = {
   asrVenv: "ASR 引擎依赖",
   asrModels: "ASR 模型缓存",
   downloads: "临时下载缓存",
+  appCache: "应用缓存",
 };
 
 export const RUNTIME_SOURCE_MODE_LABEL: Record<
