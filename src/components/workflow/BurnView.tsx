@@ -643,7 +643,7 @@ export function BurnView() {
         open={ffmpegPreparation.open}
         kind="ffmpeg"
         reason="压制或封装字幕需要 FFmpeg。"
-        sizeBytes={ffmpegPreparation.item?.sizeBytes ?? 0}
+        sizeBytes={ffmpegPreparation.item?.expectedDownloadBytes ?? 0}
         targetPath={ffmpegPreparation.item?.path ?? "安装目录/deps/ffmpeg/current"}
         sourceLabel={ffmpegPreparation.sourceLabel}
         status={

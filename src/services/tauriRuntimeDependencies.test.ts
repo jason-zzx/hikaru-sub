@@ -16,6 +16,7 @@ const {
   cancelRuntimeDependency,
   cleanupRuntimeDependency,
   getRuntimeDependencyProgress,
+  measureRuntimeDependencyStorage,
   prepareRuntimeDependency,
   probeRuntimeDependencies,
 } = await import("./tauri");
@@ -66,5 +67,13 @@ describe("runtime dependency Tauri wrappers", () => {
     expect(invoke).toHaveBeenCalledWith("cleanup_runtime_dependency", {
       args: { kind: "downloads" },
     });
+  });
+
+  it("measures managed dependency storage sizes", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({ items: [] });
+
+    await measureRuntimeDependencyStorage();
+
+    expect(invoke).toHaveBeenCalledWith("measure_runtime_dependency_storage");
   });
 });

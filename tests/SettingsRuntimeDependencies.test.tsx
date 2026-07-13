@@ -7,7 +7,7 @@ import { RuntimeDependenciesPanel } from "../src/components/workflow/RuntimeDepe
 afterEach(() => cleanup());
 
 describe("RuntimeDependenciesPanel", () => {
-  it("shows source mode and managed storage", () => {
+  it("shows source mode without scanning storage sizes", () => {
     render(
       <RuntimeDependenciesPanel
         probe={{
@@ -20,7 +20,6 @@ describe("RuntimeDependenciesPanel", () => {
               source: "managed",
               version: "ffmpeg 7",
               managed: true,
-              sizeBytes: 30 * 1024 * 1024,
             },
             {
               kind: "python311",
@@ -29,11 +28,13 @@ describe("RuntimeDependenciesPanel", () => {
               source: null,
               version: null,
               managed: false,
-              sizeBytes: 0,
+              expectedDownloadBytes: 30 * 1024 * 1024,
             },
           ],
         }}
+        storage={null}
         onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={vi.fn()}
@@ -45,15 +46,19 @@ describe("RuntimeDependenciesPanel", () => {
     expect(screen.getAllByText(/中国大陆镜像/).length).toBeGreaterThan(0);
     expect(screen.getByText(/hf-mirror/)).toBeTruthy();
     expect(screen.getByText(/中国大陆出口/)).toBeTruthy();
-    expect(screen.getByText(/30.0 MB/)).toBeTruthy();
+    expect(screen.getByText("存储空间")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "计算占用空间" })).toBeTruthy();
+    expect(screen.queryByText(/30.0 MB/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /清理/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /重新测速/ })).toBeNull();
     expect(screen.queryByText(/自动推荐/)).toBeNull();
     expect(screen.queryByText(/当前使用/)).toBeNull();
   });
 
-  it("asks the caller to clean managed dependency storage", async () => {
+  it("asks the caller to measure storage before cleanup is available", async () => {
+    const onMeasureStorage = vi.fn();
     const onCleanup = vi.fn();
-    render(
+    const { rerender } = render(
       <RuntimeDependenciesPanel
         probe={{
           sourceMode: "official",
@@ -62,19 +67,54 @@ describe("RuntimeDependenciesPanel", () => {
               kind: "downloads",
               status: "available",
               managed: true,
-              sizeBytes: 1024,
             },
           ],
         }}
+        storage={null}
         onChangeSourceMode={vi.fn()}
+        onMeasureStorage={onMeasureStorage}
         onCleanup={onCleanup}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={vi.fn()}
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /清理/ }));
+    await userEvent.click(screen.getByRole("button", { name: "计算占用空间" }));
+    expect(onMeasureStorage).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /清理/ })).toBeNull();
 
+    rerender(
+      <RuntimeDependenciesPanel
+        probe={{
+          sourceMode: "official",
+          items: [
+            {
+              kind: "downloads",
+              status: "available",
+              managed: true,
+            },
+          ],
+        }}
+        storage={{
+          items: [
+            {
+              kind: "downloads",
+              path: "C:/deps/downloads",
+              managed: true,
+              sizeBytes: 1024,
+            },
+          ],
+        }}
+        onChangeSourceMode={vi.fn()}
+        onMeasureStorage={onMeasureStorage}
+        onCleanup={onCleanup}
+        onPrepareDependency={vi.fn()}
+        onConfigureAsr={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/1.00 KB/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /清理/ }));
     expect(onCleanup).toHaveBeenCalledWith("downloads");
   });
 
@@ -89,17 +129,17 @@ describe("RuntimeDependenciesPanel", () => {
               kind: "ffmpeg",
               status: "missing",
               managed: false,
-              sizeBytes: 0,
             },
             {
               kind: "python311",
               status: "missing",
               managed: false,
-              sizeBytes: 0,
             },
           ],
         }}
+        storage={null}
         onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={onPrepareDependency}
         onConfigureAsr={vi.fn()}
@@ -126,17 +166,17 @@ describe("RuntimeDependenciesPanel", () => {
               kind: "ffmpeg",
               status: "missing",
               managed: false,
-              sizeBytes: 0,
             },
             {
               kind: "python311",
               status: "missing",
               managed: false,
-              sizeBytes: 0,
             },
           ],
         }}
+        storage={null}
         onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={vi.fn()}
@@ -181,11 +221,12 @@ describe("RuntimeDependenciesPanel", () => {
               kind: "ffmpeg",
               status: "missing",
               managed: false,
-              sizeBytes: 0,
             },
           ],
         }}
+        storage={null}
         onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={vi.fn()}
@@ -224,17 +265,17 @@ describe("RuntimeDependenciesPanel", () => {
               kind: "asrVenv",
               status: "needsSetup",
               managed: false,
-              sizeBytes: 0,
             },
             {
               kind: "asrModels",
               status: "missing",
               managed: false,
-              sizeBytes: 0,
             },
           ],
         }}
+        storage={null}
         onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
         onCleanup={vi.fn()}
         onPrepareDependency={vi.fn()}
         onConfigureAsr={onConfigureAsr}
@@ -247,5 +288,40 @@ describe("RuntimeDependenciesPanel", () => {
     await userEvent.click(buttons[0]);
 
     expect(onConfigureAsr).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides cleanup for non-managed storage items", () => {
+    render(
+      <RuntimeDependenciesPanel
+        probe={{
+          sourceMode: "official",
+          items: [
+            {
+              kind: "asrVenv",
+              status: "available",
+              managed: false,
+            },
+          ],
+        }}
+        storage={{
+          items: [
+            {
+              kind: "asrVenv",
+              path: "C:/repo/asr-service/.venv",
+              managed: false,
+              sizeBytes: 50 * 1024 * 1024,
+            },
+          ],
+        }}
+        onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
+        onCleanup={vi.fn()}
+        onPrepareDependency={vi.fn()}
+        onConfigureAsr={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/50.0 MB/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /清理/ })).toBeNull();
   });
 });

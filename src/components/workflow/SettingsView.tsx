@@ -5,12 +5,21 @@ import {
   cleanupRuntimeDependency,
   getRuntimeDependencyProgress,
   invalidateFfmpegStatus,
+  measureRuntimeDependencyStorage,
   prepareRuntimeDependency,
   probeRuntimeDependencies,
   setSettings,
 } from "../../services/tauri";
 import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import { AsrEngineSetupPanel } from "./AsrEngineSetupPanel";
 import { ModelManager } from "./ModelManager";
 import { RuntimeDependenciesPanel } from "./RuntimeDependenciesPanel";
@@ -20,6 +29,7 @@ import type {
   RuntimeDependencyProbe,
   RuntimeDependencySnapshot,
   RuntimeDependencySourceMode,
+  RuntimeDependencyStorage,
 } from "../../types";
 import {
   ASR_ENGINE_OPTIONS,
@@ -63,6 +73,10 @@ export function SettingsView() {
   const [asrSetupRunning, setAsrSetupRunning] = useState(false);
   const [asrSetupRefreshKey, setAsrSetupRefreshKey] = useState(0);
   const [runtimeProbe, setRuntimeProbe] = useState<RuntimeDependencyProbe | null>(null);
+  const [runtimeStorage, setRuntimeStorage] = useState<RuntimeDependencyStorage | null>(null);
+  const [runtimeStorageLoading, setRuntimeStorageLoading] = useState(false);
+  const [cleanupKind, setCleanupKind] = useState<RuntimeDependencyKind | null>(null);
+  const [cleaning, setCleaning] = useState(false);
   const [runtimePreparationSnapshots, setRuntimePreparationSnapshots] =
     useState<RuntimePreparationSnapshots>({});
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(
@@ -98,6 +112,18 @@ export function SettingsView() {
     }
   };
 
+  const refreshRuntimeStorage = async () => {
+    setRuntimeStorageLoading(true);
+    try {
+      const next = await measureRuntimeDependencyStorage();
+      setRuntimeStorage(next);
+    } catch (e) {
+      setMessage({ kind: "error", text: `计算依赖占用失败：${String(e)}` });
+    } finally {
+      setRuntimeStorageLoading(false);
+    }
+  };
+
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setLocal((prev) => (prev ? { ...prev, [key]: value } : prev));
     setDirty(true);
@@ -125,6 +151,7 @@ export function SettingsView() {
     setLocal(next);
     setDirty(false);
     setAsrSetupRefreshKey((value) => value + 1);
+    setRuntimeStorage(null);
     void refreshRuntimeDependencies();
     setMessage(null);
   };
@@ -147,26 +174,30 @@ export function SettingsView() {
     }
   };
 
-  const handleCleanupDependency = async (kind: RuntimeDependencyKind) => {
-    const item = runtimeProbe?.items.find((entry) => entry.kind === kind);
-    const label = item?.path
-      ? `${item.path}`
-      : kind;
-    if (!window.confirm(`确认清理 ${label}？`)) return;
-    setSaving(true);
+  const handleCleanupDependency = (kind: RuntimeDependencyKind) => {
+    if (cleaning) return;
+    setCleanupKind(kind);
+  };
+
+  const confirmCleanupDependency = async () => {
+    if (!cleanupKind || cleaning) return;
+    const kind = cleanupKind;
+    setCleaning(true);
     setMessage(null);
     try {
       await cleanupRuntimeDependency(kind);
+      setCleanupKind(null);
       if (kind === "ffmpeg") refreshFfmpeg(true);
       if (kind === "python311" || kind === "asrVenv") {
         setAsrSetupRefreshKey((value) => value + 1);
       }
       void refreshRuntimeDependencies();
+      await refreshRuntimeStorage();
       setMessage(null);
     } catch (e) {
       setMessage({ kind: "error", text: `清理失败：${String(e)}` });
     } finally {
-      setSaving(false);
+      setCleaning(false);
     }
   };
 
@@ -203,6 +234,7 @@ export function SettingsView() {
           if (kind === "python311") {
             setAsrSetupRefreshKey((value) => value + 1);
           }
+          setRuntimeStorage(null);
           void refreshRuntimeDependencies();
           setMessage(null);
           return;
@@ -274,11 +306,17 @@ export function SettingsView() {
 
           <RuntimeDependenciesPanel
             probe={runtimeProbe}
+            storage={runtimeStorage}
+            storageLoading={runtimeStorageLoading}
             onChangeSourceMode={handleRuntimeSourceModeChange}
+            onMeasureStorage={() => {
+              void refreshRuntimeStorage();
+            }}
             onCleanup={handleCleanupDependency}
             onPrepareDependency={handlePrepareRuntimeDependency}
             onConfigureAsr={handleConfigureAsrFromRuntimePanel}
             preparations={runtimePreparationSnapshots}
+            cleanupDisabled={cleaning}
           />
 
           <div ref={asrSectionRef}>
@@ -437,6 +475,46 @@ export function SettingsView() {
           </Section>
         </div>
       </div>
+
+      <Dialog
+        open={cleanupKind !== null}
+        onOpenChange={(open) => {
+          if (!open && !cleaning) setCleanupKind(null);
+        }}
+      >
+        <DialogContent className="gap-5 p-5 sm:max-w-sm" showCloseButton={!cleaning}>
+          <DialogHeader className="gap-2 pr-6">
+            <DialogTitle>确认清理</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+              {cleanupKind
+                ? `即将清理「${RUNTIME_DEPENDENCY_LABEL[cleanupKind]}」。清理后再次使用需要重新安装依赖，是否确认清理`
+                : "清理后再次使用需要重新安装依赖，是否确认清理"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="-mx-0 -mb-0 gap-2 rounded-none border-0 bg-transparent p-0 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={cleaning}
+              className="px-3"
+              onClick={() => setCleanupKind(null)}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={cleaning}
+              className="px-3"
+              onClick={() => {
+                void confirmCleanupDependency();
+              }}
+            >
+              {cleaning ? "清理中…" : "确认清理"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

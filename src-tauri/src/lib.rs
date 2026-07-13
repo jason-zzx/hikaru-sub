@@ -36,6 +36,7 @@ pub fn run() {
             settings::get_settings,
             settings::set_settings,
             dependencies::probe_runtime_dependencies,
+            dependencies::measure_runtime_dependency_storage,
             dependencies::prepare_runtime_dependency,
             dependencies::get_runtime_dependency_progress,
             dependencies::cancel_runtime_dependency,

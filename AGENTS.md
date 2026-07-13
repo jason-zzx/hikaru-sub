@@ -155,6 +155,7 @@ interface SubtitleCue {
 - FFmpeg 解析顺序：用户设置路径 → 系统 `PATH` → 安装目录 `deps/ffmpeg/current` 下的受管 FFmpeg。
 - Python 解析顺序：用户设置路径 → 系统 Python 3.11 → 安装目录 `deps/python311/current` 下的受管 Python 3.11。ASR 配置只接受 Python 3.11。
 - 受管 ASR venv 位于安装目录 `deps/asr-service/.venv`；模型缓存位于 `deps/models/huggingface`；临时归档位于 `deps/downloads`。
+- 设置页进入时只调用 `probe_runtime_dependencies`（状态/路径/版本，不做递归扫盘）；磁盘占用走独立 `measure_runtime_dependency_storage`，由「存储空间 → 计算占用空间」触发。清理按钮只在已计算且占用 > 0、且该项为受管目标时显示；不要把 `dir_size` 重新塞回 probe。
 - 不要重新引入 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 作为大型受管依赖目录。
 - 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，设置页仅可选官方源或中国大陆镜像（默认官方源）。旧配置中的 `auto`/`custom` 加载时静默迁移为官方源。
 - 中国大陆镜像会给 sidecar 注入 `HF_ENDPOINT=https://hf-mirror.com`，模型缓存通过 `HF_HOME` 固定到安装目录 `deps/models/huggingface`。模型下载失败时优先查看 `deps/asr-service/asr-debug.log` 中的 `model_download_*` 事件。
