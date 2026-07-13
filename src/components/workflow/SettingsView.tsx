@@ -38,6 +38,7 @@ import {
   defaultAsrModel,
 } from "../../constants/asr";
 import { RUNTIME_DEPENDENCY_LABEL } from "../../constants/runtimeDependencies";
+import { useProjectStore } from "../../stores/projectStore";
 
 const TARGET_LANGS = [
   { value: "zh-CN", label: "简体中文" },
@@ -67,6 +68,7 @@ type RuntimePreparationSnapshots = Partial<
 export function SettingsView() {
   const asrSectionRef = useRef<HTMLDivElement | null>(null);
   const runtimePreparationJobsRef = useRef<Partial<Record<RuntimeDependencyKind, string>>>({});
+  const sessionVideoPath = useProjectStore((state) => state.session?.videoPath ?? null);
   const [settings, setLocal] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -115,7 +117,9 @@ export function SettingsView() {
   const refreshRuntimeStorage = async () => {
     setRuntimeStorageLoading(true);
     try {
-      const next = await measureRuntimeDependencyStorage();
+      const next = await measureRuntimeDependencyStorage({
+        preserveVideoPath: sessionVideoPath,
+      });
       setRuntimeStorage(next);
     } catch (e) {
       setMessage({ kind: "error", text: `计算依赖占用失败：${String(e)}` });
@@ -185,7 +189,9 @@ export function SettingsView() {
     setCleaning(true);
     setMessage(null);
     try {
-      await cleanupRuntimeDependency(kind);
+      await cleanupRuntimeDependency(kind, {
+        preserveVideoPath: kind === "appCache" ? sessionVideoPath : null,
+      });
       setCleanupKind(null);
       if (kind === "ffmpeg") refreshFfmpeg(true);
       if (kind === "python311" || kind === "asrVenv") {
@@ -486,9 +492,13 @@ export function SettingsView() {
           <DialogHeader className="gap-2 pr-6">
             <DialogTitle>确认清理</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-              {cleanupKind
-                ? `即将清理「${RUNTIME_DEPENDENCY_LABEL[cleanupKind]}」。清理后再次使用需要重新安装依赖，是否确认清理`
-                : "清理后再次使用需要重新安装依赖，是否确认清理"}
+              {cleanupKind === "appCache"
+                ? sessionVideoPath
+                  ? "将清理应用缓存中的 workspace、转码代理、预览与切片抽帧（保留当前工作视频相关缓存），是否确认清理"
+                  : "将清理应用缓存中的 workspace、转码代理、预览与切片抽帧，是否确认清理"
+                : cleanupKind
+                  ? `即将清理「${RUNTIME_DEPENDENCY_LABEL[cleanupKind]}」。清理后再次使用需要重新安装依赖，是否确认清理`
+                  : "清理后再次使用需要重新安装依赖，是否确认清理"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="-mx-0 -mb-0 gap-2 rounded-none border-0 bg-transparent p-0 sm:justify-end">

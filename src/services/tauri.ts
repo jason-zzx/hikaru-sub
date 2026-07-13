@@ -246,8 +246,14 @@ export async function probeRuntimeDependencies(): Promise<RuntimeDependencyProbe
 }
 
 /** 计算受管依赖目录磁盘占用。 */
-export async function measureRuntimeDependencyStorage(): Promise<RuntimeDependencyStorage> {
-  return invoke<RuntimeDependencyStorage>("measure_runtime_dependency_storage");
+export async function measureRuntimeDependencyStorage(options?: {
+  preserveVideoPath?: string | null;
+}): Promise<RuntimeDependencyStorage> {
+  return invoke<RuntimeDependencyStorage>("measure_runtime_dependency_storage", {
+    args: {
+      preserveVideoPath: options?.preserveVideoPath ?? null,
+    },
+  });
 }
 
 /** 准备一个缺失的运行时依赖，返回后台任务 jobId。 */
@@ -271,11 +277,17 @@ export async function cancelRuntimeDependency(jobId: string): Promise<void> {
   await invoke("cancel_runtime_dependency", { jobId });
 }
 
-/** 清理受管运行时依赖或下载缓存。 */
+/** 清理受管运行时依赖、下载缓存或应用缓存。 */
 export async function cleanupRuntimeDependency(
   kind: RuntimeDependencyKind,
+  options?: { preserveVideoPath?: string | null },
 ): Promise<void> {
-  await invoke("cleanup_runtime_dependency", { args: { kind } });
+  await invoke("cleanup_runtime_dependency", {
+    args: {
+      kind,
+      preserveVideoPath: options?.preserveVideoPath ?? null,
+    },
+  });
 }
 
 /** 保存 ASS 文本到文件。 */

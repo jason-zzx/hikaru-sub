@@ -23,6 +23,7 @@ pub enum RuntimeDependencyKind {
     AsrVenv,
     AsrModels,
     Downloads,
+    AppCache,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -157,6 +158,9 @@ pub struct PrepareRuntimeDependencyArgs {
 #[serde(rename_all = "camelCase")]
 pub struct CleanupRuntimeDependencyArgs {
     pub kind: RuntimeDependencyKind,
+    /// 清理应用缓存时保留该视频相关的 workspace / 代理转码缓存。
+    #[serde(default)]
+    pub preserve_video_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1349,6 +1353,7 @@ async fn run_prepare_job(
         RuntimeDependencyKind::AsrVenv => Err("ASR 引擎依赖由 ASR 一键配置流程准备".into()),
         RuntimeDependencyKind::AsrModels => Err("ASR 模型由模型管理器按具体引擎和模型下载".into()),
         RuntimeDependencyKind::Downloads => Err("下载缓存不需要准备".into()),
+        RuntimeDependencyKind::AppCache => Err("应用缓存不需要准备".into()),
     }
 }
 
@@ -1474,7 +1479,160 @@ fn cleanup_target_for_kind(
         }
         RuntimeDependencyKind::AsrModels => managed_model_cache_dir(app),
         RuntimeDependencyKind::Downloads => downloads_dir(app),
+        RuntimeDependencyKind::AppCache => work_cache_dir(app),
     }
+}
+
+/// Tauri 应用缓存根目录（Windows：`%LOCALAPPDATA%\com.hikaru.sub`）。
+fn tauri_app_cache_root(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_cache_dir()
+        .map_err(|e| format!("无法读取应用缓存目录: {e}"))
+}
+
+/// 业务工作缓存根目录：`%LOCALAPPDATA%\com.hikaru.sub\cache`。
+/// 会话 workspace、代理转码、预览帧、切片抽帧等均放在此目录下。
+pub fn work_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(tauri_app_cache_root(app)?.join("cache"))
+}
+
+const APP_CACHE_CLEARABLE_DIRS: &[&str] = &["workspace", "transcode", "preview", "clip-frames"];
+
+fn proxy_cache_hash_for_video_path(video_path: &str) -> String {
+    format!("{:x}", md5::compute(video_path))
+}
+
+fn preserve_keys_for_video(video_path: Option<&str>) -> (Option<String>, Option<String>) {
+    let Some(raw) = video_path.map(str::trim).filter(|value| !value.is_empty()) else {
+        return (None, None);
+    };
+    let workspace_key = crate::project::workspace_key_for_video(Path::new(raw)).ok();
+    let proxy_hash = Some(proxy_cache_hash_for_video_path(raw));
+    (workspace_key, proxy_hash)
+}
+
+/// 统计应用缓存可清理占用：仅 `cache/` 下 workspace/transcode/preview/clip-frames。
+fn measure_app_cache_size(cache_root: &Path, preserve_video_path: Option<&str>) -> u64 {
+    measure_app_cache_tree(cache_root, preserve_video_path)
+}
+
+fn measure_app_cache_tree(root: &Path, preserve_video_path: Option<&str>) -> u64 {
+    let (preserve_workspace, preserve_proxy) = preserve_keys_for_video(preserve_video_path);
+    APP_CACHE_CLEARABLE_DIRS
+        .iter()
+        .map(|name| {
+            let dir = root.join(name);
+            match *name {
+                "workspace" => measure_workspace_cache_size(&dir, preserve_workspace.as_deref()),
+                "transcode" => measure_transcode_cache_size(&dir, preserve_proxy.as_deref()),
+                _ => dir_size(&dir),
+            }
+        })
+        .sum()
+}
+
+fn measure_workspace_cache_size(workspace_root: &Path, preserve_key: Option<&str>) -> u64 {
+    let Ok(entries) = fs::read_dir(workspace_root) else {
+        return 0;
+    };
+    entries
+        .filter_map(Result::ok)
+        .map(|entry| {
+            let path = entry.path();
+            if preserve_key.is_some_and(|key| entry.file_name() == *key) {
+                0
+            } else if path.is_dir() {
+                dir_size(&path)
+            } else {
+                entry.metadata().map(|m| m.len()).unwrap_or(0)
+            }
+        })
+        .sum()
+}
+
+fn measure_transcode_cache_size(transcode_root: &Path, preserve_hash: Option<&str>) -> u64 {
+    let Ok(entries) = fs::read_dir(transcode_root) else {
+        return 0;
+    };
+    entries
+        .filter_map(Result::ok)
+        .map(|entry| {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if preserve_hash.is_some_and(|hash| name.starts_with(hash)) {
+                0
+            } else {
+                entry.metadata().map(|m| m.len()).unwrap_or(0)
+            }
+        })
+        .sum()
+}
+
+fn cleanup_app_cache_dir(cache_root: &Path, preserve_video_path: Option<&str>) -> Result<(), String> {
+    cleanup_app_cache_tree(cache_root, preserve_video_path)
+}
+
+fn cleanup_app_cache_tree(root: &Path, preserve_video_path: Option<&str>) -> Result<(), String> {
+    let (preserve_workspace, preserve_proxy) = preserve_keys_for_video(preserve_video_path);
+    for name in APP_CACHE_CLEARABLE_DIRS {
+        let dir = root.join(name);
+        if !dir.exists() {
+            continue;
+        }
+        match *name {
+            "workspace" => cleanup_workspace_cache(&dir, preserve_workspace.as_deref())?,
+            "transcode" => cleanup_transcode_cache(&dir, preserve_proxy.as_deref())?,
+            _ => {
+                if dir.is_dir() {
+                    fs::remove_dir_all(&dir)
+                        .map_err(|e| format!("清理应用缓存失败（{}）：{e}", dir.display()))?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn cleanup_workspace_cache(workspace_root: &Path, preserve_key: Option<&str>) -> Result<(), String> {
+    let Ok(entries) = fs::read_dir(workspace_root) else {
+        return Ok(());
+    };
+    for entry in entries.filter_map(Result::ok) {
+        if preserve_key.is_some_and(|key| entry.file_name() == *key) {
+            continue;
+        }
+        let path = entry.path();
+        if path.is_dir() {
+            fs::remove_dir_all(&path)
+                .map_err(|e| format!("清理应用缓存失败（{}）：{e}", path.display()))?;
+        } else {
+            fs::remove_file(&path)
+                .map_err(|e| format!("清理应用缓存失败（{}）：{e}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
+fn cleanup_transcode_cache(transcode_root: &Path, preserve_hash: Option<&str>) -> Result<(), String> {
+    let Ok(entries) = fs::read_dir(transcode_root) else {
+        return Ok(());
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if preserve_hash.is_some_and(|hash| name.starts_with(hash)) {
+            continue;
+        }
+        let path = entry.path();
+        if path.is_dir() {
+            fs::remove_dir_all(&path)
+                .map_err(|e| format!("清理应用缓存失败（{}）：{e}", path.display()))?;
+        } else {
+            fs::remove_file(&path)
+                .map_err(|e| format!("清理应用缓存失败（{}）：{e}", path.display()))?;
+        }
+    }
+    Ok(())
 }
 
 fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependencyProbe, String> {
@@ -1597,21 +1755,6 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         expected_download_bytes: None,
     });
 
-    let downloads = downloads_dir(app)?;
-    items.push(RuntimeDependencyItem {
-        kind: RuntimeDependencyKind::Downloads,
-        status: if dir_nonempty(&downloads) {
-            RuntimeDependencyStatus::Available
-        } else {
-            RuntimeDependencyStatus::Missing
-        },
-        path: Some(downloads.to_string_lossy().into_owned()),
-        source: Some("managed".into()),
-        version: None,
-        managed: true,
-        expected_download_bytes: None,
-    });
-
     Ok(RuntimeDependencyProbe {
         items,
         source_mode,
@@ -1620,6 +1763,7 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
 
 fn measure_runtime_dependency_storage_inner(
     app: &AppHandle,
+    preserve_video_path: Option<&str>,
 ) -> Result<RuntimeDependencyStorage, String> {
     let settings = load_settings(app).unwrap_or_default();
     let kinds = [
@@ -1628,10 +1772,10 @@ fn measure_runtime_dependency_storage_inner(
         RuntimeDependencyKind::AsrVenv,
         RuntimeDependencyKind::AsrModels,
         RuntimeDependencyKind::Downloads,
+        RuntimeDependencyKind::AppCache,
     ];
     let mut items = Vec::with_capacity(kinds.len());
     for kind in kinds {
-        let target = cleanup_target_for_kind(app, kind)?;
         let managed = match kind {
             RuntimeDependencyKind::Ffmpeg => {
                 resolve_ffmpeg_paths(app, &settings).source == ResolvedFfmpegSource::Managed
@@ -1643,13 +1787,29 @@ fn measure_runtime_dependency_storage_inner(
                     effective_asr_service_dir(app, settings.asr_service_path.as_deref())?;
                 !is_source_checkout_asr_service_dir(&service)
             }
-            RuntimeDependencyKind::AsrModels | RuntimeDependencyKind::Downloads => true,
+            RuntimeDependencyKind::AsrModels
+            | RuntimeDependencyKind::Downloads
+            | RuntimeDependencyKind::AppCache => true,
+        };
+        // 系统/自定义 FFmpeg、Python 不占用受管安装目录，存储列表中不展示。
+        if matches!(
+            kind,
+            RuntimeDependencyKind::Ffmpeg | RuntimeDependencyKind::Python311
+        ) && !managed
+        {
+            continue;
+        }
+        let target = cleanup_target_for_kind(app, kind)?;
+        let size_bytes = if kind == RuntimeDependencyKind::AppCache {
+            measure_app_cache_size(&target, preserve_video_path)
+        } else {
+            dir_size(&target)
         };
         items.push(RuntimeDependencyStorageItem {
             kind,
             path: Some(target.to_string_lossy().into_owned()),
             managed,
-            size_bytes: dir_size(&target),
+            size_bytes,
         });
     }
     Ok(RuntimeDependencyStorage { items })
@@ -1662,13 +1822,26 @@ pub async fn probe_runtime_dependencies(app: AppHandle) -> Result<RuntimeDepende
         .map_err(|e| format!("探测运行时依赖失败：{e}"))?
 }
 
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MeasureRuntimeDependencyStorageArgs {
+    #[serde(default)]
+    pub preserve_video_path: Option<String>,
+}
+
 #[tauri::command]
 pub async fn measure_runtime_dependency_storage(
     app: AppHandle,
+    args: MeasureRuntimeDependencyStorageArgs,
 ) -> Result<RuntimeDependencyStorage, String> {
-    tauri::async_runtime::spawn_blocking(move || measure_runtime_dependency_storage_inner(&app))
-        .await
-        .map_err(|e| format!("计算依赖占用失败：{e}"))?
+    let preserve = args
+        .preserve_video_path
+        .filter(|value| !value.trim().is_empty());
+    tauri::async_runtime::spawn_blocking(move || {
+        measure_runtime_dependency_storage_inner(&app, preserve.as_deref())
+    })
+    .await
+    .map_err(|e| format!("计算依赖占用失败：{e}"))?
 }
 
 #[tauri::command]
@@ -1751,11 +1924,28 @@ pub async fn cleanup_runtime_dependency(
     app: AppHandle,
     args: CleanupRuntimeDependencyArgs,
 ) -> Result<(), String> {
+    if args.kind == RuntimeDependencyKind::AppCache {
+        let preserve = args.preserve_video_path;
+        return tauri::async_runtime::spawn_blocking(move || {
+            let cache_root = work_cache_dir(&app)?;
+            fs::create_dir_all(&cache_root).map_err(|e| e.to_string())?;
+            cleanup_app_cache_dir(&cache_root, preserve.as_deref())
+        })
+        .await
+        .map_err(|e| format!("清理应用缓存失败：{e}"))?;
+    }
+
+    // 可能触发提权重启，放在阻塞扫盘之前。
     ensure_runtime_deps_writable_or_elevate(&app)?;
-    let deps = deps_dir(&app)?;
-    fs::create_dir_all(&deps).map_err(|e| e.to_string())?;
-    let target = cleanup_target_for_kind(&app, args.kind)?;
-    safe_remove_runtime_dependency_dir(&target, &deps)
+    let kind = args.kind;
+    tauri::async_runtime::spawn_blocking(move || {
+        let deps = deps_dir(&app)?;
+        fs::create_dir_all(&deps).map_err(|e| e.to_string())?;
+        let target = cleanup_target_for_kind(&app, kind)?;
+        safe_remove_runtime_dependency_dir(&target, &deps)
+    })
+    .await
+    .map_err(|e| format!("清理运行时依赖失败：{e}"))?
 }
 
 #[cfg(test)]
@@ -1861,6 +2051,59 @@ mod tests {
         assert!(dir_nonempty(temp.path()));
         assert!(!dir_nonempty(&temp.path().join("missing")));
     }
+
+    #[test]
+    fn app_cache_measure_skips_webview_and_preserves_current_video() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        fs::create_dir_all(root.join("EBWebView").join("Default")).unwrap();
+        fs::write(root.join("EBWebView").join("Default").join("big.bin"), [1u8; 100]).unwrap();
+        fs::create_dir_all(root.join("preview")).unwrap();
+        fs::write(root.join("preview").join("a.png"), [1u8; 7]).unwrap();
+        fs::create_dir_all(root.join("workspace").join("keep")).unwrap();
+        fs::write(root.join("workspace").join("keep").join("audio.wav"), [1u8; 11]).unwrap();
+        fs::create_dir_all(root.join("workspace").join("drop")).unwrap();
+        fs::write(root.join("workspace").join("drop").join("audio.wav"), [1u8; 13]).unwrap();
+        fs::create_dir_all(root.join("transcode")).unwrap();
+        fs::write(root.join("transcode").join("abcd.mp4"), [1u8; 17]).unwrap();
+        fs::write(root.join("transcode").join("ffff.mp4"), [1u8; 19]).unwrap();
+
+        // 直接指定 preserve keys 行为：通过临时视频路径不可用时，测 preview+全部 workspace+transcode
+        let without_preserve = measure_app_cache_size(root, None);
+        assert_eq!(without_preserve, 7 + 11 + 13 + 17 + 19);
+
+        // 伪造 preserve：用 cleanup/measure 的子函数验证
+        assert_eq!(
+            measure_workspace_cache_size(&root.join("workspace"), Some("keep")),
+            13
+        );
+        assert_eq!(
+            measure_transcode_cache_size(&root.join("transcode"), Some("abcd")),
+            19
+        );
+    }
+
+    #[test]
+    fn app_cache_measure_only_counts_cache_subdir() {
+        let temp = tempfile::tempdir().unwrap();
+        let app_root = temp.path();
+        let cache_root = app_root.join("cache");
+        fs::create_dir_all(cache_root.join("preview")).unwrap();
+        fs::write(cache_root.join("preview").join("a.png"), [1u8; 5]).unwrap();
+        fs::create_dir_all(app_root.join("EBWebView")).unwrap();
+        fs::write(app_root.join("EBWebView").join("x.bin"), [1u8; 50]).unwrap();
+        // 旧版路径残留：不计入占用，也不由应用缓存清理
+        fs::create_dir_all(app_root.join("clip-frames")).unwrap();
+        fs::write(app_root.join("clip-frames").join("a.jpg"), [1u8; 9]).unwrap();
+
+        assert_eq!(measure_app_cache_size(&cache_root, None), 5);
+
+        cleanup_app_cache_dir(&cache_root, None).unwrap();
+        assert!(!cache_root.join("preview").exists());
+        assert!(app_root.join("clip-frames").join("a.jpg").is_file());
+        assert!(app_root.join("EBWebView").join("x.bin").is_file());
+    }
+
 
     #[test]
     fn cleanup_rejects_paths_outside_deps() {

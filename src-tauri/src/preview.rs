@@ -1,10 +1,11 @@
+use crate::dependencies::work_cache_dir;
 use crate::ffmpeg::resolve_ffmpeg;
 use crate::media_server::MediaServer;
 use crate::process::hidden_command;
 use crate::settings::load_settings;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,9 +29,7 @@ pub async fn render_subtitle_preview_frame(
     args: RenderSubtitlePreviewFrameArgs,
     server: State<'_, MediaServer>,
 ) -> Result<RenderSubtitlePreviewFrameResult, String> {
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
+    let cache_dir = work_cache_dir(&app)
         .map_err(|e| format!("无法读取应用缓存目录: {e}"))?
         .join("preview");
     std::fs::create_dir_all(&cache_dir).map_err(|e| format!("无法创建预览缓存目录: {e}"))?;

@@ -64,7 +64,7 @@ describe("RuntimeDependenciesPanel", () => {
           sourceMode: "official",
           items: [
             {
-              kind: "downloads",
+              kind: "ffmpeg",
               status: "available",
               managed: true,
             },
@@ -89,7 +89,7 @@ describe("RuntimeDependenciesPanel", () => {
           sourceMode: "official",
           items: [
             {
-              kind: "downloads",
+              kind: "ffmpeg",
               status: "available",
               managed: true,
             },
@@ -114,8 +114,83 @@ describe("RuntimeDependenciesPanel", () => {
     );
 
     expect(screen.getByText(/1.00 KB/)).toBeTruthy();
+    expect(screen.queryByText("临时下载缓存")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: /清理/ }));
     expect(onCleanup).toHaveBeenCalledWith("downloads");
+  });
+
+  it("shows app cache under storage with cleanup when size is positive", async () => {
+    const onCleanup = vi.fn();
+    render(
+      <RuntimeDependenciesPanel
+        probe={{
+          sourceMode: "official",
+          items: [],
+        }}
+        storage={{
+          items: [
+            {
+              kind: "appCache",
+              path: "C:/Users/me/AppData/Local/com.hikaru.sub/cache",
+              managed: true,
+              sizeBytes: 2048,
+            },
+          ],
+        }}
+        onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
+        onCleanup={onCleanup}
+        onPrepareDependency={vi.fn()}
+        onConfigureAsr={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("应用缓存")).toBeTruthy();
+    expect(screen.getByText(/2.00 KB/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /清理/ }));
+    expect(onCleanup).toHaveBeenCalledWith("appCache");
+  });
+
+  it("does not list downloads under the dependency status card", () => {
+    render(
+      <RuntimeDependenciesPanel
+        probe={{
+          sourceMode: "official",
+          items: [
+            {
+              kind: "ffmpeg",
+              status: "available",
+              managed: true,
+            },
+            {
+              kind: "python311",
+              status: "available",
+              managed: true,
+            },
+            {
+              kind: "asrVenv",
+              status: "available",
+              managed: true,
+            },
+            {
+              kind: "asrModels",
+              status: "available",
+              managed: true,
+            },
+          ],
+        }}
+        storage={null}
+        onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
+        onCleanup={vi.fn()}
+        onPrepareDependency={vi.fn()}
+        onConfigureAsr={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("FFmpeg")).toBeTruthy();
+    expect(screen.getByText("Python 3.11")).toBeTruthy();
+    expect(screen.queryByText("临时下载缓存")).toBeNull();
   });
 
   it("offers direct downloads for missing FFmpeg and Python", async () => {
