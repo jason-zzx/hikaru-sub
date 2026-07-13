@@ -292,11 +292,7 @@ fn default_save_dir(app: &AppHandle) -> Result<PathBuf, String> {
             return Ok(dir);
         }
     }
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("downloads");
+    let dir = crate::app_paths::app_data_dir(app)?.join("downloads");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }

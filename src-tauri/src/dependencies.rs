@@ -1483,17 +1483,11 @@ fn cleanup_target_for_kind(
     }
 }
 
-/// Tauri 应用缓存根目录（Windows：`%LOCALAPPDATA%\com.hikaru.sub`）。
-fn tauri_app_cache_root(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_cache_dir()
-        .map_err(|e| format!("无法读取应用缓存目录: {e}"))
-}
-
-/// 业务工作缓存根目录：`%LOCALAPPDATA%\com.hikaru.sub\cache`。
-/// 会话 workspace、代理转码、预览帧、切片抽帧等均放在此目录下。
+/// 业务工作缓存根目录。
+/// - 安装/开发：`%LOCALAPPDATA%\com.hikaru.sub\cache`
+/// - portable（exe 旁有 `.portable`）：`<exe>/cache`
 pub fn work_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(tauri_app_cache_root(app)?.join("cache"))
+    crate::app_paths::work_cache_dir(app)
 }
 
 const APP_CACHE_CLEARABLE_DIRS: &[&str] = &["workspace", "transcode", "preview", "clip-frames"];

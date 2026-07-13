@@ -1,7 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -74,7 +74,7 @@ impl Default for AppSettings {
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let dir = crate::app_paths::app_config_dir(app)?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("settings.json"))
 }
@@ -86,7 +86,7 @@ pub fn load_settings(app: &AppHandle) -> Result<AppSettings, String> {
     }
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let mut settings: AppSettings = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-    let app_data_dir = app.path().app_data_dir().ok();
+    let app_data_dir = crate::app_paths::app_data_dir(app).ok();
     sanitize_settings_for_runtime(
         &mut settings,
         app_data_dir.as_deref(),

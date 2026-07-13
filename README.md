@@ -97,7 +97,7 @@ git push origin v0.1.0
 在 Windows 发布机执行 `pnpm release:local` 后，应确认：
 
 1. `src-tauri/target/release/bundle/nsis/` 下存在 Hikaru Sub NSIS setup，`src-tauri/target/release/bundle/portable/` 下存在 Hikaru Sub portable zip，且干净 bundle 目录下没有新生成的 MSI。
-2. 解压 portable zip 后直接运行 `hikaru-sub.exe`；首次触发受管依赖下载时，FFmpeg、Python 3.11、ASR venv、模型缓存和临时下载缓存应写入该 exe 同级的 `deps/` 目录。
+2. 解压 portable zip 后应有 `.portable`；直接运行 `hikaru-sub.exe` 时，业务数据应写入 exe 同级的 `data/`、`cache/`、`webview/`，不把 settings/工作缓存写到 `%APPDATA%` / `%LOCALAPPDATA%\com.hikaru.sub`（`tauri-plugin-persisted-scope` 残留除外）。若程序目录不可写导致便携初始化失败，应弹出错误对话框，用户确认后退出，且不得半初始化继续运行。首次触发受管依赖下载时，FFmpeg、Python 3.11、ASR venv、模型缓存和临时下载缓存应写入该 exe 同级的 `deps/` 目录。
 3. 运行 NSIS setup，可选择安装目录；如果用户未手动修改目录，安装开始时会将 Tauri 目录页的默认值重定向到 `%LOCALAPPDATA%\Programs\hikaru-sub`，安装完成后从开始菜单或安装目录启动应用。
 4. 首次启动与切换到「下载」「导入」「转录」「压制」页面时不应长时间卡住；这些页面会复用 FFmpeg 检测缓存，不会自动下载 FFmpeg。
 5. 进入「转录」页不会自动启动 ASR sidecar；点击「检测引擎状态」或开始转录时才会拉起 sidecar。
@@ -105,7 +105,7 @@ git push origin v0.1.0
 7. 检测 ASR、配置 ASR、FFmpeg/ffprobe 相关操作不应弹出转瞬即逝的终端窗口。
 8. 如果本机没有系统 FFmpeg，点击「下载」「转录」「压制」中的 FFmpeg 相关操作时，应出现依赖确认窗口，显示 FFmpeg、预计大小、安装目录 `deps/` 下的保存位置和当前下载源；取消时原操作不继续，确认后下载完成并继续原操作。
 9. 如果本机没有 Python 3.11，设置页点击「配置当前引擎依赖」时，应先出现 Python 3.11 依赖确认窗口；确认后下载并解压受管 Python 3.11 归档到安装目录 `deps/python311/current/`，再继续创建 ASR venv 和安装引擎依赖。
-10. 设置页「运行时依赖」区域可切换官方源/中国大陆镜像（默认官方源）。进入设置页只探测依赖状态，不自动扫盘；「存储空间」需点击「计算占用空间」后才显示体积，「清理」仅在已计算且该项占用 > 0 时出现，并经确认后只删除安装目录 `deps/` 下的受管依赖或 `%LOCALAPPDATA%\com.hikaru.sub\cache` 应用缓存（可保留当前工作视频相关缓存），不应删除用户手动配置的外部路径或源码仓开发用 `.venv`。
+10. 设置页「运行时依赖」区域可切换官方源/中国大陆镜像（默认官方源）。进入设置页只探测依赖状态，不自动扫盘；「存储空间」需点击「计算占用空间」后才显示体积，「清理」仅在已计算且该项占用 > 0 时出现，并经确认后只删除安装目录 `deps/` 下的受管依赖或应用缓存（安装版为 `%LOCALAPPDATA%\com.hikaru.sub\cache`，portable 为 `<exe>/cache`；可保留当前工作视频相关缓存），不应删除用户手动配置的外部路径或源码仓开发用 `.venv`。
 11. 如果本机曾运行开发版，安装版 ASR 依赖配置不应继续指向项目源码目录下的 `asr-service/.venv`；一键配置完成后应指向安装目录下的 managed `deps/asr-service/.venv`。
 12. 使用受管 FFmpeg 完成一次转录后，若 `deps/ffmpeg/current/ffprobe.exe` 存在，不应再提示“无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080”。
 13. 下载 ASR 模型时，「模型状态」区域应显示实际下载源和诊断日志路径；中国大陆镜像模式下应能在日志中看到 `HF_ENDPOINT=https://hf-mirror.com` 与 `HF_HOME=<安装目录>/deps/models/huggingface`。
@@ -115,7 +115,7 @@ git push origin v0.1.0
 
 - FFmpeg 解析顺序：用户配置路径 → 系统 `PATH` → 安装目录 `deps/ffmpeg/current` 下的受管 FFmpeg；缺失时由相关工作流弹出下载确认。
 - Python 解析顺序：用户配置路径 → 系统 Python 3.11（Windows 会尝试 `py -3.11` 等启动器）→ 安装目录 `deps/python311/current` 下的受管 Python 3.11；ASR 配置流程只接受 Python 3.11。
-- ASR venv 位于 `deps/asr-service/.venv`，模型缓存位于 `deps/models/huggingface`，临时归档位于 `deps/downloads`。这些目录都跟随用户选择的安装目录。设置页「存储空间」还会按需计算 `%LOCALAPPDATA%\com.hikaru.sub\cache` 应用缓存占用；清理前需先计算，且只清理当前解析为受管的 `deps/` 目标或上述 `cache/` 目录（可保留当前工作视频相关缓存）。
+- ASR venv 位于 `deps/asr-service/.venv`，模型缓存位于 `deps/models/huggingface`，临时归档位于 `deps/downloads`。这些目录都跟随用户选择的安装目录（portable 则为 exe 同级）。Portable 绿色版在 exe 同级存在 `.portable` 时，配置、工作缓存与 WebView2 分别落在 `<exe>/data`、`<exe>/cache`、`<exe>/webview`；安装版与 `tauri dev` 仍用系统 AppData。便携目录创建或 WebView 数据目录初始化失败时，应弹框提示并退出（不得在失败后仍按便携路径继续跑）。设置页「存储空间」还会按需计算应用缓存占用（安装版 LocalAppData；portable 为 `<exe>/cache`）；清理前需先计算，且只清理当前解析为受管的 `deps/` 目标或上述 `cache/` 目录（可保留当前工作视频相关缓存）。
 - 如果用户把 Hikaru Sub 安装到 `C:\Program Files` 等当前用户不可写目录，准备/清理受管依赖前会先尝试以管理员权限重启；取消 UAC 时会提示重新以管理员身份运行或安装到当前用户可写目录。
 - 内置下载源清单位于 `src-tauri/resources/runtime-dependency-sources.json`，二进制归档以 SHA-256 和大小锁定。中国大陆镜像当前覆盖 FFmpeg、Python 3.11、PyPI、PyTorch wheels 与 Hugging Face endpoint。
 - `hf-mirror.com` 可能按出口 IP 重定向到 Hugging Face 原站。若用户选择中国大陆镜像但模型下载仍失败，应优先查看模型状态显示的诊断日志；必要时切换到官方源，或确保模型下载流量全程走中国大陆出口。
@@ -349,8 +349,8 @@ CSS 兜底仍解析常用 Style 与行内 override 标签，用于 libass 不可
 - **视频会话**：运行时对象，不写入项目元数据文件
 - **转录字幕**：`{视频文件名}.transcribed.ass`（单语原文，与视频同目录）
 - **翻译字幕**：`{视频文件名}.translated.ass`（双语字幕，与视频同目录）
-- **音频缓存**：应用工作缓存 `cache/workspace/` 下的 `audio.wav`（16kHz 单声道 WAV，转录成功后保留；可「重新提取」覆盖）
-- **代理视频缓存**：应用工作缓存目录下的 `cache/transcode/*.mp4`
+- **音频缓存**：应用工作缓存下的 `workspace/.../audio.wav`（16kHz 单声道 WAV，转录成功后保留；可「重新提取」覆盖；安装版在 `%LOCALAPPDATA%\com.hikaru.sub\cache`，portable 在 `<exe>/cache`）
+- **代理视频缓存**：同上工作缓存根下的 `transcode/*.mp4`
 
 ## 核心数据模型
 
@@ -404,11 +404,11 @@ interface SubtitleCue {
 | `load_ass_text` | 加载 ASS 文件内容 |
 | `get_settings` / `set_settings` | 全局配置读写 |
 | `probe_runtime_dependencies` | 探测 FFmpeg、Python 3.11、ASR venv 与模型缓存状态（不含磁盘占用；不含临时下载缓存） |
-| `measure_runtime_dependency_storage` | 按需计算受管依赖目录与 `%LOCALAPPDATA%\com.hikaru.sub\cache` 应用缓存占用（`spawn_blocking`）；可保留当前工作视频相关缓存 |
+| `measure_runtime_dependency_storage` | 按需计算受管依赖目录与应用缓存占用（安装版 LocalAppData；portable 为 `<exe>/cache`；`spawn_blocking`）；可保留当前工作视频相关缓存 |
 | `prepare_runtime_dependency` | 按需下载/安装受管 FFmpeg 或 Python 3.11 |
 | `get_runtime_dependency_progress` | 查询运行时依赖准备进度 |
 | `cancel_runtime_dependency` | 取消运行时依赖准备任务 |
-| `cleanup_runtime_dependency` | 清理安装目录 `deps/` 下的受管依赖/下载缓存，或 `%LOCALAPPDATA%\com.hikaru.sub\cache` 应用缓存（可保留当前工作视频相关缓存；扫盘/删除在 `spawn_blocking` 中执行） |
+| `cleanup_runtime_dependency` | 清理安装目录 `deps/` 下的受管依赖/下载缓存，或应用缓存（安装版 LocalAppData；portable 为 `<exe>/cache`；可保留当前工作视频相关缓存；扫盘/删除在 `spawn_blocking` 中执行） |
 | `allow_asset_path` | 将视频或代理文件路径加入 Tauri asset scope |
 | `detect_video_codec` | 检测视频编码格式 |
 | `start_transcode` | 启动不兼容视频编码的代理视频转码 |

@@ -1,3 +1,4 @@
+mod app_paths;
 mod asr;
 mod asr_setup;
 mod ass;
@@ -23,6 +24,9 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if let Err(error) = app_paths::bootstrap_portable_paths() {
+        app_paths::show_fatal_startup_error_and_exit(&error);
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

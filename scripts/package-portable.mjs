@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,6 +65,8 @@ export function createPortableStaging({
     }
     cpSync(source, target, { recursive: true });
   }
+
+  writeFileSync(join(stageDir, ".portable"), "");
 
   return { archivePath, stageDir };
 }
