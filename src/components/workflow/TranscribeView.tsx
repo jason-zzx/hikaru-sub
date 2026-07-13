@@ -11,8 +11,9 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { IconCheck } from "../layout/NavIcons";
 import { Button } from "../ui/button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Select } from "../ui/select-adapter";
-import { ModelManager } from "./ModelManager";
+import { ModelManager, type ModelManagerHandle } from "./ModelManager";
 import {
   ASR_ENGINE_OPTIONS,
   KOTOBA_FASTER_WHISPER_DESCRIPTION,
@@ -22,7 +23,6 @@ import {
 import {
   cancelAsr,
   checkFfmpeg,
-  deleteCachedAudio,
   extractAudio,
   getAsrProgress,
   getSettings,
@@ -114,6 +114,9 @@ export function TranscribeView() {
   const [engineMsg, setEngineMsg] = useState<string | null>("未检测");
   const [sidecarEngineMissing, setSidecarEngineMissing] = useState(false);
   const [modelCheckTrigger, setModelCheckTrigger] = useState(0);
+  const [confirmDownloadOpen, setConfirmDownloadOpen] = useState(false);
+  const [modelDownloading, setModelDownloading] = useState(false);
+  const [checkingModel, setCheckingModel] = useState(false);
 
   // VAD 语音检测预处理配置（仅当前会话有效，不写入项目/全局设置）
   const [useVad, setUseVad] = useState(false);
@@ -129,6 +132,8 @@ export function TranscribeView() {
   const pollingRef = useRef(false);
   const jobIdRef = useRef<string | null>(null);
   const engineCheckRequestRef = useRef(0);
+  const modelManagerRef = useRef<ModelManagerHandle | null>(null);
+  const confirmDownloadBusyRef = useRef(false);
 
   const refreshFfmpeg = useCallback(async (force = false) => {
     if (force) invalidateFfmpegStatus();
@@ -358,12 +363,6 @@ export function TranscribeView() {
               setActiveSubtitle("transcribed", session.transcribedAssPath);
               markSaved();
               setSavedAssPath(session.transcribedAssPath);
-              try {
-                await deleteCachedAudio(session.audioPath);
-                setAudioReady(false);
-              } catch (deleteErr) {
-                console.warn("删除缓存音轨失败:", deleteErr);
-              }
               if (playResWarning) {
                 setAsrError(playResWarning);
               }
@@ -395,13 +394,7 @@ export function TranscribeView() {
     setTranscribing(false);
   };
 
-  const handleTranscribe = async () => {
-    if (engineSetupRequired) {
-      setAsrError(
-        `${ASR_ENGINE_NOT_INSTALLED_LABEL}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
-      );
-      return;
-    }
+  const runTranscribe = async () => {
     setAsrError(null);
     setResultCount(null);
     setSavedAssPath(null);
@@ -444,6 +437,65 @@ export function TranscribeView() {
     }
   };
 
+  const handleTranscribe = async () => {
+    if (engineSetupRequired) {
+      setAsrError(
+        `${ASR_ENGINE_NOT_INSTALLED_LABEL}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
+      );
+      return;
+    }
+    if (modelDownloading || transcribing || checkingModel) return;
+
+    setCheckingModel(true);
+    setAsrError(null);
+    try {
+      const gate = await modelManagerRef.current?.checkForTranscribe();
+      if (gate == null) {
+        setAsrError("无法检测模型状态，请稍后重试。");
+        return;
+      }
+      if (gate === "aborted") return;
+      if (gate === "check_failed") {
+        setAsrError("模型状态检测失败，请重试。");
+        return;
+      }
+      if (gate === "unavailable") {
+        setAsrError(
+          "当前引擎不可用，无法检测或下载模型。请先在设置中配置引擎依赖。",
+        );
+        return;
+      }
+      if (gate === "needs_download") {
+        setConfirmDownloadOpen(true);
+        return;
+      }
+      await runTranscribe();
+    } finally {
+      setCheckingModel(false);
+    }
+  };
+
+  const handleConfirmDownloadAndTranscribe = async (value: string) => {
+    setConfirmDownloadOpen(false);
+    if (value !== "confirm") return;
+    if (confirmDownloadBusyRef.current || transcribing) return;
+
+    confirmDownloadBusyRef.current = true;
+    setModelDownloading(true);
+    setAsrError(null);
+    try {
+      const result = await modelManagerRef.current?.startDownload();
+      if (result !== "completed") {
+        setAsrError("模型下载失败，已取消转录。");
+        return;
+      }
+      await runTranscribe();
+    } finally {
+      setModelDownloading(false);
+      confirmDownloadBusyRef.current = false;
+    }
+  };
+
   const handleCancel = async () => {
     const jobId = jobIdRef.current;
     // 立即停止轮询并恢复 UI，给出即时反馈
@@ -461,6 +513,8 @@ export function TranscribeView() {
   };
 
   const percent = job ? Math.round(job.progress * 100) : 0;
+  const settingsLocked =
+    transcribing || modelDownloading || checkingModel || confirmDownloadOpen;
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
@@ -541,7 +595,7 @@ export function TranscribeView() {
             <Select
               value={engine}
               onChange={handleEngineChange}
-              disabled={transcribing}
+              disabled={settingsLocked}
               options={ASR_ENGINE_OPTIONS}
             />
           </Labeled>
@@ -549,7 +603,7 @@ export function TranscribeView() {
             <Select
               value={model}
               onChange={setModel}
-              disabled={transcribing}
+              disabled={settingsLocked}
               options={asrModelOptions(engine)}
             />
             {engine === "kotoba-faster-whisper" && (
@@ -572,7 +626,7 @@ export function TranscribeView() {
             <Select
               value={device}
               onChange={setDevice}
-              disabled={transcribing}
+              disabled={settingsLocked}
               options={ASR_DEVICES}
             />
           </Labeled>
@@ -602,7 +656,7 @@ export function TranscribeView() {
             variant="outline"
             type="button"
             onClick={detectEngines}
-            disabled={transcribing}
+            disabled={settingsLocked}
             className="rounded-md px-2.5 py-1 text-xs text-text disabled:cursor-not-allowed disabled:opacity-50"
           >
             检测引擎状态
@@ -614,7 +668,7 @@ export function TranscribeView() {
             <input
               type="checkbox"
               checked={useVad}
-              disabled={transcribing}
+              disabled={settingsLocked}
               onChange={(e) => setUseVad(e.target.checked)}
               className="h-4 w-4 accent-accent"
             />
@@ -629,7 +683,7 @@ export function TranscribeView() {
                   min={0}
                   max={1}
                   step={0.1}
-                  disabled={transcribing}
+                  disabled={settingsLocked}
                   value={vadConfig.threshold ?? DEFAULT_VAD_CONFIG.threshold}
                   onChange={(e) => {
                     const v = parseFloat(e.target.value);
@@ -651,7 +705,7 @@ export function TranscribeView() {
                   min={0}
                   max={2000}
                   step={100}
-                  disabled={transcribing}
+                  disabled={settingsLocked}
                   value={
                     vadConfig.minSpeechDurationMs ??
                     DEFAULT_VAD_CONFIG.minSpeechDurationMs
@@ -676,7 +730,7 @@ export function TranscribeView() {
                   min={100}
                   max={3000}
                   step={100}
-                  disabled={transcribing}
+                  disabled={settingsLocked}
                   value={
                     vadConfig.minSilenceDurationMs ??
                     DEFAULT_VAD_CONFIG.minSilenceDurationMs
@@ -702,7 +756,7 @@ export function TranscribeView() {
                     min={15000}
                     max={35000}
                     step={1000}
-                    disabled={transcribing}
+                    disabled={settingsLocked}
                     value={
                       vadConfig.maxSegmentDurationMs ??
                       DEFAULT_VAD_CONFIG.maxSegmentDurationMs
@@ -726,10 +780,12 @@ export function TranscribeView() {
         </div>
 
         <ModelManager
+          ref={modelManagerRef}
           engine={engine}
           model={model}
           auto={false}
           trigger={modelCheckTrigger}
+          onDownloadingChange={setModelDownloading}
         />
       </StepCard>
 
@@ -790,10 +846,19 @@ export function TranscribeView() {
               variant="default"
               type="button"
               onClick={handleTranscribe}
-              disabled={!audioReady || engineSetupRequired}
+              disabled={
+                !audioReady ||
+                engineSetupRequired ||
+                modelDownloading ||
+                checkingModel
+              }
               className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {resultCount !== null ? "重新转录" : "开始转录"}
+              {checkingModel
+                ? "检测模型…"
+                : resultCount !== null
+                  ? "重新转录"
+                  : "开始转录"}
             </Button>
           )}
           {!audioReady && !transcribing && (
@@ -834,6 +899,18 @@ export function TranscribeView() {
         onConfirm={ffmpegPreparation.confirmPrepare}
         onCancel={() => ffmpegPreparation.setOpen(false)}
         onChangeSource={() => setStep("settings")}
+      />
+
+      <ConfirmDialog
+        open={confirmDownloadOpen}
+        title="模型未下载"
+        description="模型未下载，是否开始下载模型并转录"
+        options={[
+          { label: "取消", value: "cancel" },
+          { label: "确定", value: "confirm", variant: "primary" },
+        ]}
+        escValue="cancel"
+        onSelect={(value) => void handleConfirmDownloadAndTranscribe(value)}
       />
     </div>
   );

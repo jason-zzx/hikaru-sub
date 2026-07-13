@@ -16,7 +16,9 @@ describe("TranscribeView ASR setup guidance", () => {
     expect(source).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
     expect(source).toContain('setStep("settings")');
     expect(source).toContain("前往设置");
-    expect(source).toContain("!audioReady || engineSetupRequired");
+    expect(source).toMatch(
+      /!audioReady\s*\|\|\s*engineSetupRequired\s*\|\|\s*modelDownloading\s*\|\|\s*checkingModel/,
+    );
   });
 
   it("guides users to Settings when sidecar cannot start because engine is not installed", () => {
@@ -41,5 +43,19 @@ describe("TranscribeView ASR setup guidance", () => {
     expect(source).toContain("setModel(defaultAsrModel(nextEngine))");
     expect(source).toContain("engine={engine}");
     expect(source).toContain("model={model}");
+  });
+
+  it("prompts to download the model before transcription when missing", () => {
+    expect(source).toContain("ConfirmDialog");
+    expect(source).toContain("模型未下载，是否开始下载模型并转录");
+    expect(source).toContain("checkForTranscribe");
+    expect(source).toContain("startDownload");
+    expect(source).toContain("modelManagerRef");
+    expect(source).toContain("checkingModel");
+    expect(source).toContain("check_failed");
+    expect(source).toContain("onDownloadingChange");
+    expect(source).toContain(
+      "transcribing || modelDownloading || checkingModel || confirmDownloadOpen",
+    );
   });
 });
