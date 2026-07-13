@@ -495,9 +495,6 @@ export function TranscribeView() {
         title="提取音轨"
         done={audioReady}
       >
-        <p className="truncate font-mono text-xs text-text-muted" title={audioPath}>
-          {audioPath || "（无输出路径）"}
-        </p>
         {extracting && (
           <ProgressBar
             percent={extractPercent}
@@ -521,8 +518,14 @@ export function TranscribeView() {
           >
             {extracting ? "提取中…" : audioReady ? "重新提取" : "提取音轨"}
           </Button>
-          {audioReady && !extracting && (
-            <span className="text-sm text-success">音轨已就绪</span>
+          {!extracting && (
+            <span
+              className={
+                audioReady ? "text-sm text-success" : "text-sm text-text-muted"
+              }
+            >
+              {audioReady ? "音轨已就绪" : "未提取"}
+            </span>
           )}
         </div>
       </StepCard>
