@@ -123,7 +123,7 @@ scripts/                开发、ASR、发布辅助脚本
 
 - `transcribedAssPath`：视频同目录 `{视频文件名}.transcribed.ass`
 - `translatedAssPath`：视频同目录 `{视频文件名}.translated.ass`
-- `audioPath`：应用工作缓存 `cache/workspace/` 中的临时 `audio.wav`（转录成功后保留，便于重新转录；可用「重新提取」覆盖）
+- `audioPath`：应用工作缓存 `workspace/` 中的临时 `audio.wav`（转录成功后保留，便于重新转录；可用「重新提取」覆盖；根目录见下方「应用缓存」/portable 约定）
 - `burnAssPath`：应用工作缓存中的压制输入 ASS
 
 打开视频时优先加载翻译字幕，其次加载转录字幕；都不存在时准备空会话。
@@ -157,7 +157,9 @@ interface SubtitleCue {
 - FFmpeg 解析顺序：用户设置路径 → 系统 `PATH` → 安装目录 `deps/ffmpeg/current` 下的受管 FFmpeg。
 - Python 解析顺序：用户设置路径 → 系统 Python 3.11 → 安装目录 `deps/python311/current` 下的受管 Python 3.11。ASR 配置只接受 Python 3.11。
 - 受管 ASR venv 位于安装目录 `deps/asr-service/.venv`；模型缓存位于 `deps/models/huggingface`；临时归档位于 `deps/downloads`。
-- 设置页进入时只调用 `probe_runtime_dependencies`（状态/路径/版本，不做递归扫盘）；磁盘占用走独立 `measure_runtime_dependency_storage`，由「存储空间 → 计算占用空间」触发。清理按钮只在已计算且占用 > 0、且该项为受管目标时显示；不要把 `dir_size` 重新塞回 probe。「应用缓存」对应 `%LOCALAPPDATA%\com.hikaru.sub\cache`（`work_cache_dir`），只统计/清理其下 `workspace`/`transcode`/`preview`/`clip-frames`，并保留当前工作视频相关缓存；新增工作缓存也放到该 `cache/` 目录下。旧版直接落在 `com.hikaru.sub\` 根下的同名目录不再纳入统计与清理。`measure_runtime_dependency_storage` 与 `cleanup_runtime_dependency` 须保持 async + `spawn_blocking`（清理受管 `deps/` 前仍可在 async 侧做可写性/提权检查），勿在 async worker 上直接递归扫盘或删目录。
+- 设置页进入时只调用 `probe_runtime_dependencies`（状态/路径/版本，不做递归扫盘）；磁盘占用走独立 `measure_runtime_dependency_storage`，由「存储空间 → 计算占用空间」触发。清理按钮只在已计算且占用 > 0、且该项为受管目标时显示；不要把 `dir_size` 重新塞回 probe。「应用缓存」对应安装版 `%LOCALAPPDATA%\com.hikaru.sub\cache` 或 portable `<exe>/cache`（`work_cache_dir`），只统计/清理其下 `workspace`/`transcode`/`preview`/`clip-frames`，并保留当前工作视频相关缓存；新增工作缓存也放到该 `cache/` 目录下。旧版直接落在 `com.hikaru.sub\` 根下的同名目录不再纳入统计与清理。`measure_runtime_dependency_storage` 与 `cleanup_runtime_dependency` 须保持 async + `spawn_blocking`（清理受管 `deps/` 前仍可在 async 侧做可写性/提权检查），勿在 async worker 上直接递归扫盘或删目录。
+- Portable 绿色版：exe 同级存在 `.portable` 时，配置落在 `<exe>/data`，工作缓存落在 `<exe>/cache`，WebView2 落在 `<exe>/webview`（启动时设 `WEBVIEW2_USER_DATA_FOLDER`）；判定与解析统一走 `src-tauri/src/app_paths.rs`，不要再直接用 `app.path().app_config_dir()` / `app_cache_dir()` 定位业务数据。安装版与 `tauri dev`（无标记）仍用系统 AppData。不做旧 AppData 迁移。便携目录创建/初始化失败时须弹框提示并退出，且不得在失败后把 `is_portable` 锁成 true。
+- `tauri-plugin-persisted-scope` 仍硬编码 Tauri `app_data_dir`，portable 下可能在系统 AppData 留下极小的 scope 持久化文件；不要为此改写 `APPDATA`/`LOCALAPPDATA` 环境变量。
 - 不要重新引入 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 作为大型受管依赖目录。
 - 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，设置页仅可选官方源或中国大陆镜像（默认官方源）。旧配置中的 `auto`/`custom` 加载时静默迁移为官方源。
 - 中国大陆镜像会给 sidecar 注入 `HF_ENDPOINT=https://hf-mirror.com`，模型缓存通过 `HF_HOME` 固定到安装目录 `deps/models/huggingface`。模型下载失败时优先查看 `deps/asr-service/asr-debug.log` 中的 `model_download_*` 事件。
@@ -167,7 +169,7 @@ interface SubtitleCue {
 ## 媒体与字幕渲染
 
 - 编辑页视频播放统一走应用内本地 HTTP 媒体服务（`register_media_playback` → `http://127.0.0.1:PORT/media/{token}`），支持 Range 请求与 seek；不要把 Tauri `asset://` 重新作为主播放路径。
-- WebView 不直接支持的编码（如 HEVC/H.265、VP9、AV1）通过 FFmpeg 生成 480p H.264 全关键帧代理视频，写入应用工作缓存目录 `cache/transcode/*.mp4`。
+- WebView 不直接支持的编码（如 HEVC/H.265、VP9、AV1）通过 FFmpeg 生成 480p H.264 全关键帧代理视频，写入工作缓存根下的 `transcode/*.mp4`（安装版 `%LOCALAPPDATA%\com.hikaru.sub\cache`，portable `<exe>/cache`）。
 - 编辑页字幕预览优先走 jASSUB/libass WASM，播放时按 `<video>` 视频帧时间同步；系统字体发现会读取字体 name table 的本地化 family/full/PostScript 名称并注册到 jASSUB `availableFonts`，不要用手写映射猜测用户选择的字体名；当前预览句缺字时通过懒检测 cmap 并插入仅用于预览的 `\fn` fallback 标签，仍保持 libass 渲染。libass 不可用时才回退 CSS 近似预览并在预览区提示，ASS/字体名称映射变化后重新尝试 libass。
 - 预览字体发现走前端单例 `getPreviewFonts`（`src/services/previewFontDiscovery.ts`），不要在多个组件里直接反复 `discoverPreviewFonts`/`discover_preview_fonts`；样式管理等非常驻可见 UI 应用 `usePreviewFontNames(..., { enabled })` 按需订阅。后端 command 须保持 async + `spawn_blocking`，勿改回同步扫描。
 - 压制页不展示字幕预览，只提供导出设置；最终硬字幕输出以 FFmpeg/libass 为准。

@@ -94,6 +94,8 @@ describe("portable package", () => {
     expect(existsSync(join(result.stageDir, "deps"))).toBe(false);
     expect(existsSync(join(result.stageDir, "tauri-generated"))).toBe(false);
     expect(existsSync(join(result.stageDir, "hikaru_sub.pdb"))).toBe(false);
+    expect(existsSync(join(result.stageDir, ".portable"))).toBe(true);
+    expect(statSync(join(result.stageDir, ".portable")).isFile()).toBe(true);
   });
 
   it.skipIf(process.platform !== "win32")(
