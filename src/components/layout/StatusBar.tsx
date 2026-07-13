@@ -1,43 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
 import { useTaskStore } from "../../stores/taskStore";
-import {
-  FFMPEG_STATUS_INVALIDATED_EVENT,
-  checkFfmpeg,
-} from "../../services/tauri";
 
 export function StatusBar() {
   const tasks = useTaskStore((s) => s.tasks);
-  const [ffmpegOk, setFfmpegOk] = useState<boolean | null>(null);
-
   const runningTask = Object.values(tasks).find((t) => t.status === "running");
 
-  const refreshFfmpeg = useCallback((force = false) => {
-    checkFfmpeg({ force })
-      .then((s) => setFfmpegOk(s.available))
-      .catch(() => setFfmpegOk(false));
-  }, []);
-
-  useEffect(() => {
-    refreshFfmpeg();
-    const handleInvalidated = () => refreshFfmpeg();
-    window.addEventListener(FFMPEG_STATUS_INVALIDATED_EVENT, handleInvalidated);
-    return () => {
-      window.removeEventListener(FFMPEG_STATUS_INVALIDATED_EVENT, handleInvalidated);
-    };
-  }, [refreshFfmpeg]);
-
   return (
-    <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-surface-raised px-3 text-xs text-text-muted">
-      <div className="flex items-center gap-4">
-        <span>
-          FFmpeg:{" "}
-          {ffmpegOk === null ? "检测中…" : ffmpegOk ? "就绪" : "未找到"}
-        </span>
-      </div>
+    <footer className="flex h-7 shrink-0 items-center justify-end border-t border-border bg-surface-raised px-3 text-xs text-text-muted">
       <div>
         {runningTask
           ? `${runningTask.label} ${Math.round(runningTask.progress)}%`
-          : "就绪"}
+          : "暂无进行中的任务"}
       </div>
     </footer>
   );

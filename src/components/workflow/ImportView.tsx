@@ -23,12 +23,6 @@ import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependenc
 import { ClipDialog } from "./ClipDialog";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
-const FFMPEG_SOURCE_LABEL: Record<FfmpegStatus["source"], string> = {
-  settings: "自定义路径",
-  managed: "受管下载",
-  system: "系统 PATH",
-};
-
 export function ImportView() {
   const setStep = useUiStore((s) => s.setStep);
   const session = useProjectStore((s) => s.session);
@@ -205,7 +199,7 @@ export function ImportView() {
               onClick={() => setStep("transcribe")}
               disabled={clipBusy}
             >
-              继续转录
+              转录
             </Button>
             <Button
               type="button"
@@ -268,17 +262,10 @@ export function ImportView() {
             {busy ? "处理中…" : "选择视频文件"}
           </span>
           <span className="text-xs text-text-muted">
-            打开视频，可切片或继续转录
+            打开视频，可切片或转录
           </span>
         </button>
       </div>
-
-      {ffmpeg?.available && (
-        <p className="text-xs text-text-muted">
-          FFmpeg 就绪 · 来源：{FFMPEG_SOURCE_LABEL[ffmpeg.source]}
-          {ffmpeg.version ? ` · ${ffmpeg.version}` : ""}
-        </p>
-      )}
 
       {session && (
         <ClipDialog
