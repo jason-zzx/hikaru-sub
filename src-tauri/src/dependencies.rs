@@ -113,7 +113,8 @@ pub struct RuntimeDependencyItem {
     pub source: Option<String>,
     pub version: Option<String>,
     pub managed: bool,
-    pub size_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_download_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -121,6 +122,21 @@ pub struct RuntimeDependencyItem {
 pub struct RuntimeDependencyProbe {
     pub items: Vec<RuntimeDependencyItem>,
     pub source_mode: RuntimeDependencySourceMode,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDependencyStorageItem {
+    pub kind: RuntimeDependencyKind,
+    pub path: Option<String>,
+    pub managed: bool,
+    pub size_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDependencyStorage {
+    pub items: Vec<RuntimeDependencyStorageItem>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1372,6 +1388,13 @@ fn dir_size(path: &Path) -> u64 {
         .sum()
 }
 
+fn dir_nonempty(path: &Path) -> bool {
+    fs::read_dir(path)
+        .ok()
+        .and_then(|mut entries| entries.find_map(Result::ok))
+        .is_some()
+}
+
 fn normalized_components(path: &Path) -> Vec<String> {
     path.components()
         .filter_map(|component| match component {
@@ -1483,14 +1506,11 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         ),
     };
     let ffmpeg_managed_dir = managed_ffmpeg_dir(app).ok();
-    let ffmpeg_size = ffmpeg_managed_dir.as_deref().map_or(0, dir_size).max(
-        source_profile
-            .as_ref()
-            .and_then(|profile| profile.ffmpeg.as_ref())
-            .map(|source| source.size_bytes)
-            .filter(|_| ffmpeg.source == ResolvedFfmpegSource::Missing)
-            .unwrap_or(0),
-    );
+    let ffmpeg_expected = source_profile
+        .as_ref()
+        .and_then(|profile| profile.ffmpeg.as_ref())
+        .map(|source| source.size_bytes)
+        .filter(|_| ffmpeg.source == ResolvedFfmpegSource::Missing);
     let ffmpeg_version = path
         .as_deref()
         .and_then(|program| command_first_line(program, &["-version"]));
@@ -1505,23 +1525,16 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         source,
         version: ffmpeg_version,
         managed,
-        size_bytes: ffmpeg_size,
+        expected_download_bytes: ffmpeg_expected,
     });
 
     let python = resolve_python311(app, &settings);
     let (python_managed_dir, python_venv_exe) = python311_lookup_fallbacks(app, &settings);
-    let python_size = if let Some(venv) = python_venv_exe.as_deref() {
-        dir_size(venv.parent().and_then(|p| p.parent()).unwrap_or(venv))
-    } else {
-        python_managed_dir.as_deref().map_or(0, dir_size).max(
-            source_profile
-                .as_ref()
-                .and_then(|profile| profile.python311.as_ref())
-                .map(|source| source.size_bytes)
-                .filter(|_| python.is_none())
-                .unwrap_or(0),
-        )
-    };
+    let python_expected = source_profile
+        .as_ref()
+        .and_then(|profile| profile.python311.as_ref())
+        .map(|source| source.size_bytes)
+        .filter(|_| python.is_none());
     items.push(RuntimeDependencyItem {
         kind: RuntimeDependencyKind::Python311,
         status: if python.is_some() {
@@ -1545,7 +1558,7 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         source: python.as_ref().map(|value| value.source.clone()),
         version: python.as_ref().map(|value| value.version.clone()),
         managed: python.as_ref().is_some_and(|value| value.managed),
-        size_bytes: python_size,
+        expected_download_bytes: python_expected,
     });
 
     let service = effective_asr_service_dir(app, settings.asr_service_path.as_deref())?;
@@ -1566,14 +1579,13 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         }),
         version: None,
         managed: !source_checkout,
-        size_bytes: dir_size(&service.join(".venv")),
+        expected_download_bytes: None,
     });
 
     let models = managed_model_cache_dir(app)?;
-    let models_size = dir_size(&models);
     items.push(RuntimeDependencyItem {
         kind: RuntimeDependencyKind::AsrModels,
-        status: if models_size > 0 {
+        status: if dir_nonempty(&models) {
             RuntimeDependencyStatus::Available
         } else {
             RuntimeDependencyStatus::Missing
@@ -1582,14 +1594,13 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         source: Some("managed".into()),
         version: None,
         managed: true,
-        size_bytes: models_size,
+        expected_download_bytes: None,
     });
 
     let downloads = downloads_dir(app)?;
-    let downloads_size = dir_size(&downloads);
     items.push(RuntimeDependencyItem {
         kind: RuntimeDependencyKind::Downloads,
-        status: if downloads_size > 0 {
+        status: if dir_nonempty(&downloads) {
             RuntimeDependencyStatus::Available
         } else {
             RuntimeDependencyStatus::Missing
@@ -1598,7 +1609,7 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         source: Some("managed".into()),
         version: None,
         managed: true,
-        size_bytes: downloads_size,
+        expected_download_bytes: None,
     });
 
     Ok(RuntimeDependencyProbe {
@@ -1607,9 +1618,57 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
     })
 }
 
+fn measure_runtime_dependency_storage_inner(
+    app: &AppHandle,
+) -> Result<RuntimeDependencyStorage, String> {
+    let settings = load_settings(app).unwrap_or_default();
+    let kinds = [
+        RuntimeDependencyKind::Ffmpeg,
+        RuntimeDependencyKind::Python311,
+        RuntimeDependencyKind::AsrVenv,
+        RuntimeDependencyKind::AsrModels,
+        RuntimeDependencyKind::Downloads,
+    ];
+    let mut items = Vec::with_capacity(kinds.len());
+    for kind in kinds {
+        let target = cleanup_target_for_kind(app, kind)?;
+        let managed = match kind {
+            RuntimeDependencyKind::Ffmpeg => {
+                resolve_ffmpeg_paths(app, &settings).source == ResolvedFfmpegSource::Managed
+            }
+            RuntimeDependencyKind::Python311 => resolve_python311(app, &settings)
+                .is_some_and(|python| python.managed),
+            RuntimeDependencyKind::AsrVenv => {
+                let service =
+                    effective_asr_service_dir(app, settings.asr_service_path.as_deref())?;
+                !is_source_checkout_asr_service_dir(&service)
+            }
+            RuntimeDependencyKind::AsrModels | RuntimeDependencyKind::Downloads => true,
+        };
+        items.push(RuntimeDependencyStorageItem {
+            kind,
+            path: Some(target.to_string_lossy().into_owned()),
+            managed,
+            size_bytes: dir_size(&target),
+        });
+    }
+    Ok(RuntimeDependencyStorage { items })
+}
+
 #[tauri::command]
 pub async fn probe_runtime_dependencies(app: AppHandle) -> Result<RuntimeDependencyProbe, String> {
-    probe_runtime_dependencies_inner(&app)
+    tauri::async_runtime::spawn_blocking(move || probe_runtime_dependencies_inner(&app))
+        .await
+        .map_err(|e| format!("探测运行时依赖失败：{e}"))?
+}
+
+#[tauri::command]
+pub async fn measure_runtime_dependency_storage(
+    app: AppHandle,
+) -> Result<RuntimeDependencyStorage, String> {
+    tauri::async_runtime::spawn_blocking(move || measure_runtime_dependency_storage_inner(&app))
+        .await
+        .map_err(|e| format!("计算依赖占用失败：{e}"))?
 }
 
 #[tauri::command]
@@ -1780,6 +1839,27 @@ mod tests {
             "C:/tools/ffprobe.exe"
         );
         assert_eq!(peer_ffprobe_path("/opt/bin/ffmpeg"), "/opt/bin/ffprobe");
+    }
+
+    #[test]
+    fn dir_size_sums_nested_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let nested = temp.path().join("a").join("b");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(temp.path().join("root.bin"), [1u8; 10]).unwrap();
+        fs::write(nested.join("leaf.bin"), [1u8; 7]).unwrap();
+
+        assert_eq!(dir_size(temp.path()), 17);
+        assert_eq!(dir_size(&temp.path().join("missing")), 0);
+    }
+
+    #[test]
+    fn dir_nonempty_checks_first_entry_only() {
+        let temp = tempfile::tempdir().unwrap();
+        assert!(!dir_nonempty(temp.path()));
+        fs::write(temp.path().join("marker"), b"x").unwrap();
+        assert!(dir_nonempty(temp.path()));
+        assert!(!dir_nonempty(&temp.path().join("missing")));
     }
 
     #[test]

@@ -3,6 +3,7 @@ import type {
   RuntimeDependencyProbe,
   RuntimeDependencySnapshot,
   RuntimeDependencySourceMode,
+  RuntimeDependencyStorage,
 } from "../../types";
 import { Button } from "../ui/button";
 import { Select } from "../ui/select-adapter";
@@ -20,20 +21,28 @@ const STATUS_LABEL: Record<string, string> = {
 
 interface RuntimeDependenciesPanelProps {
   probe: RuntimeDependencyProbe | null;
+  storage: RuntimeDependencyStorage | null;
+  storageLoading?: boolean;
   onChangeSourceMode: (mode: RuntimeDependencySourceMode) => void;
+  onMeasureStorage: () => void;
   onCleanup: (kind: RuntimeDependencyKind) => void;
   onPrepareDependency?: (kind: RuntimeDependencyKind) => void;
   onConfigureAsr?: () => void;
   preparations?: Partial<Record<RuntimeDependencyKind, RuntimeDependencySnapshot>>;
+  cleanupDisabled?: boolean;
 }
 
 export function RuntimeDependenciesPanel({
   probe,
+  storage,
+  storageLoading = false,
   onChangeSourceMode,
+  onMeasureStorage,
   onCleanup,
   onPrepareDependency,
   onConfigureAsr,
   preparations = {},
+  cleanupDisabled = false,
 }: RuntimeDependenciesPanelProps) {
   const sourceMode = probe?.sourceMode ?? "official";
 
@@ -58,7 +67,7 @@ export function RuntimeDependenciesPanel({
       <div>
         <h3 className="text-sm font-semibold text-text">运行时依赖</h3>
         <p className="mt-0.5 text-xs text-text-muted">
-          下载源、受管依赖状态与安装目录 deps 存储
+          下载源与受管依赖状态；磁盘占用需手动计算
         </p>
       </div>
 
@@ -106,9 +115,6 @@ export function RuntimeDependenciesPanel({
                     </span>
                     <span className="text-xs text-text-muted">
                       {STATUS_LABEL[item.status] ?? item.status}
-                    </span>
-                    <span className="text-xs text-text-muted">
-                      {formatDependencyBytes(item.sizeBytes)}
                     </span>
                   </div>
                   {item.path && (
@@ -186,22 +192,69 @@ export function RuntimeDependenciesPanel({
                       去配置
                     </Button>
                   )}
-                  {item.managed && item.sizeBytes > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => onCleanup(item.kind)}
-                      className="px-3 py-2 text-sm hover:border-danger/50 hover:text-danger"
-                    >
-                      清理
-                    </Button>
-                  )}
                 </div>
               </div>
             );
           })}
           {!probe && <p className="py-3 text-sm text-text-muted">检测运行时依赖中…</p>}
         </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface px-4 py-4">
+        <div className="flex h-8 flex-nowrap items-center justify-between gap-3">
+          <p className="text-sm font-medium leading-none text-text">存储空间</p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onMeasureStorage}
+            disabled={storageLoading}
+            className="h-8 px-3 text-sm"
+          >
+            {storageLoading ? "计算中…" : "计算占用空间"}
+          </Button>
+        </div>
+
+        {storage && (
+          <div className="mt-4 divide-y divide-border">
+            {storage.items.map((item) => (
+              <div
+                key={item.kind}
+                className="grid gap-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-text">
+                      {RUNTIME_DEPENDENCY_LABEL[item.kind]}
+                    </span>
+                    <span className="text-xs text-text-muted">
+                      {formatDependencyBytes(item.sizeBytes)}
+                    </span>
+                  </div>
+                  {item.path && (
+                    <p
+                      className="mt-1 truncate font-mono text-xs text-text-muted"
+                      title={item.path}
+                    >
+                      {item.path}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-start gap-2 md:justify-end">
+                  {item.managed && item.sizeBytes > 0 && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={cleanupDisabled}
+                      onClick={() => onCleanup(item.kind)}
+                    >
+                      清理
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

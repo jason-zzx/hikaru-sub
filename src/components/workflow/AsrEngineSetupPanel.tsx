@@ -83,12 +83,6 @@ export function AsrEngineSetupPanel({
   }, [refreshEnvironment, engine, device, pythonPath, asrServicePath, refreshKey]);
 
   useEffect(() => {
-    probeRuntimeDependencies()
-      .then(setRuntimeProbe)
-      .catch(() => setRuntimeProbe(null));
-  }, [engine, device, pythonPath, asrServicePath]);
-
-  useEffect(() => {
     onRunningChange?.(running);
   }, [onRunningChange, running]);
 
@@ -360,7 +354,7 @@ export function AsrEngineSetupPanel({
         open={dependencyDialogOpen}
         kind="python311"
         reason="ASR 配置需要 Python 3.11。"
-        sizeBytes={pythonItem?.sizeBytes ?? 0}
+        sizeBytes={pythonItem?.expectedDownloadBytes ?? 0}
         targetPath={pythonItem?.path ?? "安装目录/deps/python311/current"}
         sourceLabel={
           runtimeProbe

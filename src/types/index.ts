@@ -248,12 +248,24 @@ export interface RuntimeDependencyItem {
   source?: string | null;
   version?: string | null;
   managed: boolean;
-  sizeBytes: number;
+  /** 缺失时可下载包的预计体积（来自源清单，非磁盘占用）。 */
+  expectedDownloadBytes?: number | null;
 }
 
 export interface RuntimeDependencyProbe {
   items: RuntimeDependencyItem[];
   sourceMode: RuntimeDependencySourceMode;
+}
+
+export interface RuntimeDependencyStorageItem {
+  kind: RuntimeDependencyKind;
+  path?: string | null;
+  managed: boolean;
+  sizeBytes: number;
+}
+
+export interface RuntimeDependencyStorage {
+  items: RuntimeDependencyStorageItem[];
 }
 
 export interface PrepareRuntimeDependencyArgs {

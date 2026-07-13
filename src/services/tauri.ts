@@ -26,6 +26,7 @@ import type {
   RuntimeDependencyKind,
   RuntimeDependencyProbe,
   RuntimeDependencySnapshot,
+  RuntimeDependencyStorage,
   StartAsrArgs,
   StartAsrSetupArgs,
   StartBurnArgs,
@@ -239,9 +240,14 @@ export async function cancelAsrSetup(jobId: string): Promise<void> {
   await invoke("cancel_asr_setup", { jobId });
 }
 
-/** 探测 FFmpeg、Python、ASR 依赖和模型缓存的运行时状态。 */
+/** 探测 FFmpeg、Python、ASR 依赖和模型缓存的运行时状态（不含磁盘占用）。 */
 export async function probeRuntimeDependencies(): Promise<RuntimeDependencyProbe> {
   return invoke<RuntimeDependencyProbe>("probe_runtime_dependencies");
+}
+
+/** 计算受管依赖目录磁盘占用。 */
+export async function measureRuntimeDependencyStorage(): Promise<RuntimeDependencyStorage> {
+  return invoke<RuntimeDependencyStorage>("measure_runtime_dependency_storage");
 }
 
 /** 准备一个缺失的运行时依赖，返回后台任务 jobId。 */
