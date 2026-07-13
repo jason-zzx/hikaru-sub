@@ -123,12 +123,14 @@ scripts/                开发、ASR、发布辅助脚本
 
 - `transcribedAssPath`：视频同目录 `{视频文件名}.transcribed.ass`
 - `translatedAssPath`：视频同目录 `{视频文件名}.translated.ass`
-- `audioPath`：应用缓存工作区中的临时 `audio.wav`，转录保存成功后删除
+- `audioPath`：应用缓存工作区中的临时 `audio.wav`（转录成功后保留，便于重新转录；可用「重新提取」覆盖）
 - `burnAssPath`：应用缓存工作区中的压制输入 ASS
 
 打开视频时优先加载翻译字幕，其次加载转录字幕；都不存在时准备空会话。
 
 下载完成与导入选视频后留在导入页（不自动跳转录）。导入页可「继续转录」或「切片」：切片在 Dialog 内选起止与软/硬切，完成后可选替换为当前工作视频（默认勾选）；替换时仅 `setSession`，不 `loadAssDocument`、不迁移 ASS。切片进行中由 App 层 `useClipJobPoller` 收尾并解除导航锁（勿把完成逻辑只写在 ImportView，否则离开导入页会卡住 busy）。
+
+转录页「开始转录」会先检测模型缓存：已下载则直接启动；未下载则确认后走与「下载模型」相同的进度 UI，完成后再转录。引擎未就绪时禁用开始按钮。
 
 ### SubtitleCue
 

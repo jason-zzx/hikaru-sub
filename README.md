@@ -214,7 +214,7 @@ scripts/
 
 1. **导入视频** → 准备视频运行时会话；可「继续转录」或「切片」
 2. **切片**（可选）→ 在导入页裁出工作片段；默认可替换为当前工作视频（清空内存字幕，不迁移 ASS）
-3. **日语转录** → 提取音轨 → ASR 转录（源语言固定日语）→ 生成 `*.transcribed.ass`
+3. **日语转录** → 提取音轨 →（模型未下载时确认并下载）→ ASR 转录（源语言固定日语）→ 生成 `*.transcribed.ass`
 4. **翻译** → OpenAI 兼容 API 批量翻译 → 生成 `*.translated.ass`
 5. **编辑** → 载入字幕 → 视频/波形辅助校对 → 调整文本与时间轴 → 保存 ASS
 6. **压制** → FFmpeg 硬字幕 MP4 或软字幕 MKV 输出
@@ -263,6 +263,8 @@ scripts/
 - 可选引擎：qwen3-asr（`Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`，2026 年日语 ASR SOTA，自带字级时间戳；CPU float32 / CUDA bfloat16）
 - 模型选择：faster-whisper 为 tiny/base/small/medium/large-v2/large-v3；kotoba-faster-whisper 固定使用 `kotoba-tech/kotoba-whisper-v2.0-faster`
 - 模型状态与引擎状态均为显式检测；进入转录页不会自动启动 ASR sidecar
+- 「开始转录」前会自动检测模型：已下载则直接转录；未下载则确认后在转录设置区显示下载进度，完成后再启动转录
+- 提取的 `audio.wav` 在转录成功后保留，便于重新转录；可手动「重新提取」覆盖
 - 实时进度显示与任务取消
 - Parakeet 优先使用 NeMo char timestamps，并按日语标点、长度和停顿重新切分字幕段
 - Parakeet + VAD/gap backfill 已完成长音频完整性增强，并复用 chunking 共享模块合并去重
@@ -347,7 +349,7 @@ CSS 兜底仍解析常用 Style 与行内 override 标签，用于 libass 不可
 - **视频会话**：运行时对象，不写入项目元数据文件
 - **转录字幕**：`{视频文件名}.transcribed.ass`（单语原文，与视频同目录）
 - **翻译字幕**：`{视频文件名}.translated.ass`（双语字幕，与视频同目录）
-- **音频缓存**：应用缓存工作区下的 `audio.wav`（16kHz 单声道 WAV，转录保存成功后删除）
+- **音频缓存**：应用缓存工作区下的 `audio.wav`（16kHz 单声道 WAV，转录成功后保留；可「重新提取」覆盖）
 - **代理视频缓存**：应用缓存目录下的 `transcode/*.mp4`
 
 ## 核心数据模型
