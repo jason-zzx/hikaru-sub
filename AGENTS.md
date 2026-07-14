@@ -62,10 +62,13 @@ pnpm tauri dev        # Tauri 桌面开发
 pnpm build            # TypeScript + Vite 构建
 pnpm tauri build      # 打包桌面应用
 pnpm release:local    # 准备 ASR 资源并本地打包
+pnpm version:check    # 校验 package、Cargo 与 Tauri 版本配置
+pnpm version:set 0.2.0 # 同步设置应用与 Cargo 版本（不提交、不打 tag）
 pnpm asr:setup        # ASR sidecar（faster-whisper / kotoba-faster-whisper 依赖）
 ```
 
 - 始终使用 `pnpm`，不要用 `npm` 或 `yarn`。
+- 根 `package.json` 是应用版本的唯一人工来源；Tauri 直接读取该文件，Cargo 版本通过 `pnpm version:set <version>` 同步。发布说明写入 `CHANGELOG.md` 中与 tag 完全匹配的版本条目。
 - ASR 默认安装 faster-whisper / kotoba-faster-whisper 依赖。Parakeet / Qwen3-ASR 体积较大，只有用户明确需要时才使用 `./scripts/setup-asr.sh parakeet-cpu|parakeet-cuda|qwen3-cpu|qwen3-cuda`。
 
 ## 测试与验证

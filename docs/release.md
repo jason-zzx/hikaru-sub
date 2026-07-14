@@ -42,6 +42,35 @@ Expected artifacts:
 
 The portable archive name follows `Hikaru Sub_<version>_<arch>-portable.zip`.
 
+## Version and release notes
+
+The root `package.json` is the version source of truth. Tauri reads that file
+directly, while the version helper keeps Cargo metadata in sync:
+
+```bash
+pnpm version:set 0.2.0
+pnpm version:check
+```
+
+`version:set` updates `package.json`, `src-tauri/Cargo.toml`, and the root
+package entry in `src-tauri/Cargo.lock`. It does not create a commit or tag.
+Release versions support `MAJOR.MINOR.PATCH` and optional prerelease suffixes;
+`+build` metadata is intentionally not used for desktop releases.
+
+Record user-visible changes in the matching `CHANGELOG.md` entry before
+tagging. Release headings must use this exact format:
+
+```markdown
+## [0.2.0] - 2026-07-14
+```
+
+Prereleases need their own exact entry, such as `## [0.2.0-rc.1] - 2026-07-14`.
+Preview the extracted GitHub Release body locally with:
+
+```bash
+pnpm release:notes v0.2.0
+```
+
 ## GitHub Release
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`:
@@ -51,7 +80,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The workflow can also be dispatched manually with an existing tag or ref. It installs locked pnpm dependencies, prepares the ASR resource, runs frontend tests, builds the frontend, runs Rust tests, builds the Tauri bundle, creates the portable zip, and uploads both Windows artifacts to a draft GitHub Release.
+The workflow can also be dispatched manually with an existing release tag. It first verifies that the tag, application version, Cargo metadata, and matching `CHANGELOG.md` entry agree. It then installs locked pnpm dependencies, prepares the ASR resource, runs frontend tests, builds the frontend, runs Rust tests, builds the Tauri bundle, creates the portable zip, and uploads both Windows artifacts to a draft GitHub Release. The draft body is the matching changelog entry.
 
 A tag containing `-` is marked as a prerelease. Updater metadata and signatures are not uploaded.
 

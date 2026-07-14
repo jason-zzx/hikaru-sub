@@ -1,7 +1,7 @@
 {
   "name": "hikaru-sub",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "type": "module",
   "packageManager": "pnpm@10.12.1",
   "pnpm": {
@@ -17,6 +17,9 @@
     "bundle": "tauri build",
     "release:local": "pnpm asr:prepare-resource && tauri build && pnpm release:portable",
     "release:portable": "node scripts/package-portable.mjs",
+    "release:notes": "node scripts/release-notes.mjs",
+    "version:set": "node scripts/version.mjs set",
+    "version:check": "node scripts/version.mjs check",
     "runtime:lock-sources": "node scripts/lock-runtime-sources.mjs",
     "asr:prepare-resource": "node scripts/prepare-asr-resource.mjs",
     "asr:setup": "bash scripts/setup-asr.sh"

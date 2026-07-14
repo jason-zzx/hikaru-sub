@@ -122,6 +122,7 @@ pnpm tauri build
 
 - [许可证](LICENSE)：Hikaru Sub 自有源代码采用 Apache License 2.0。
 - [第三方声明](THIRD_PARTY_NOTICES.md)：FFmpeg、Python、ASR 依赖和模型权重的许可证边界与发布要求。
+- [更新日志](CHANGELOG.md)：各版本的用户可见变更与发布注意事项。
 - [领域词汇表](CONTEXT.md)：工作视频、视频会话、字幕条目、双语模式和压制等领域概念的统一含义。
 - [桌面发布手册](docs/release.md)：Windows 打包、GitHub Release 和发布验证。
 - [运行时依赖手册](docs/runtime-dependencies.md)：FFmpeg、Python、ASR 环境、模型、下载源与缓存管理。
