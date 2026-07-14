@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { getCueDisplay } from "@hikaru/ass-core";
+import { getCueDisplay } from "@/lib/ass";
 import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import {
   copyCueRows,

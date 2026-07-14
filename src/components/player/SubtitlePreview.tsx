@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { AssScriptInfo, AssStyle, SubtitleCue } from "@hikaru/ass-core";
+import type { AssScriptInfo, AssStyle, SubtitleCue } from "@/lib/ass";
 import {
   checkPreviewFontGlyphs,
   type FontGlyphCoverageResult,

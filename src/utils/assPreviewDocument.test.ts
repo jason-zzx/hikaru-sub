@@ -5,7 +5,7 @@ import {
   SECONDARY_STYLE,
   type AssStyle,
   type SubtitleCue,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 import { buildPreviewAssText } from "./assPreviewDocument";
 import type { LibassGlyphCoverageMap } from "./libassGlyphFallback";
 

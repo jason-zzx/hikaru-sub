@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { parseAss, serializeAss } from "@hikaru/ass-core";
+import { parseAss, serializeAss } from "@/lib/ass";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";

@@ -1,4 +1,4 @@
-import { SECONDARY_STYLE, type AssStyle, type SubtitleCue } from "@hikaru/ass-core";
+import { SECONDARY_STYLE, type AssStyle, type SubtitleCue } from "@/lib/ass";
 import { normalizeFontLookupName } from "./fontFamilyAliases";
 
 const CJK_SEQUENCE_RE =

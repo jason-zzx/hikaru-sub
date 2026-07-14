@@ -2,7 +2,7 @@ import {
   formatAssTime,
   parseAssTime,
   type SubtitleCue,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 
 export type SubtitlePreviewRendererMode = "auto" | "libass" | "css";
 

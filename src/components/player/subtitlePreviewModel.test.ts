@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SubtitleCue } from "@hikaru/ass-core";
+import type { SubtitleCue } from "@/lib/ass";
 import {
   findPreviewCue,
   getLibassFontKey,

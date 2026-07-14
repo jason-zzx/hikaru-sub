@@ -2,7 +2,7 @@ import {
   parseAssColor,
   rgbaToAssColor,
   type Rgba,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 
 export type RGBA = Rgba;
 
@@ -11,7 +11,7 @@ export function assToRgba(ass: string): RGBA {
   return parseAssColor(ass);
 }
 
-/** RGBA -> ASS `&HAABBGGRR`. Channels and alpha are clamped by ass-core. */
+/** RGBA -> ASS `&HAABBGGRR`. Channels and alpha are clamped by the ASS module. */
 export function rgbaToAss(rgba: RGBA): string {
   return rgbaToAssColor(rgba);
 }

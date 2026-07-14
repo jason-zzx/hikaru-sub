@@ -9,7 +9,7 @@ import {
   type AssScriptInfo,
   type AssStyle,
   type SubtitleCue,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 
 export interface AssViewport {
   width: number;

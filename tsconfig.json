@@ -17,11 +17,9 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@hikaru/ass-core": ["packages/ass-core/src"],
-      "@hikaru/ass-core/*": ["packages/ass-core/src/*"]
+      "@/*": ["src/*"]
     }
   },
-  "include": ["src", "packages/ass-core/src"],
+  "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { parseAss } from "@hikaru/ass-core";
+import { parseAss } from "@/lib/ass";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useClipStore } from "../../stores/clipStore";

@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { serializeAss } from "@hikaru/ass-core";
+import { serializeAss } from "@/lib/ass";
 import { useBurnStore } from "../../stores/burnStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";

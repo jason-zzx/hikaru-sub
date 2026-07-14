@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createDefaultStyles, type AssStyle } from "@hikaru/ass-core";
+import { createDefaultStyles, type AssStyle } from "@/lib/ass";
 import { useProjectStore } from "./projectStore";
 import type { SubtitleCue } from "../types";
 

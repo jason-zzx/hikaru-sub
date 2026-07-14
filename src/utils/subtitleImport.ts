@@ -5,7 +5,7 @@ import {
   parseAss,
   type AssDocument,
   type SubtitleCue,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 
 export interface ExternalSubtitlePlayRes {
   width: number;

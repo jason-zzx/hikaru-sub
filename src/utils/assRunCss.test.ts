@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDefaultScriptInfo, createDefaultStyles } from "@hikaru/ass-core";
+import { createDefaultScriptInfo, createDefaultStyles } from "@/lib/ass";
 import { assInlineToCss } from "./assRunCss";
 
 const viewport = { width: 960, height: 540 };

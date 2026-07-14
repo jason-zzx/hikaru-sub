@@ -3,7 +3,7 @@ import {
   type AssScriptInfo,
   type AssStyle,
   type SubtitleCue,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 import { resolveAssDocumentForSave } from "./assDocument";
 import {
   applyLibassGlyphFallbackToCues,

@@ -4,7 +4,7 @@ import {
   getCueDisplay,
   SECONDARY_STYLE,
   splitInlineCueText,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { usePreviewFontNames } from "../../hooks/usePreviewFontNames";
 import { useProjectStore } from "../../stores/projectStore";
