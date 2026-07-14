@@ -61,7 +61,7 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 | 前端 | React 19 + TypeScript + Vite |
 | UI | Tailwind CSS 4 + shadcn/ui |
 | 状态 | Zustand |
-| 字幕 | `@hikaru/ass-core` + ASS |
+| 字幕 | `src/lib/ass` + ASS |
 | ASR | Python FastAPI sidecar |
 | 音视频 | FFmpeg / ffprobe |
 
@@ -74,7 +74,7 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 - FFmpeg（运行完整媒体工作流时需要，也可由应用按需准备）
 - 可选 NVIDIA CUDA（运行部分 ASR 引擎的 GPU 版本时需要）
 
-始终使用 pnpm 安装 workspace 依赖：
+始终使用 pnpm 安装项目依赖：
 
 ```bash
 pnpm install

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AssStyle } from "@hikaru/ass-core";
+import type { AssStyle } from "@/lib/ass";
 import { ColorPicker } from "./ColorPicker";
 import { Button } from "../ui/button";
 

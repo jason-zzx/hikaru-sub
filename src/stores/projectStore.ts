@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { AssDocument, AssScriptInfo, AssStyle } from "@hikaru/ass-core";
+import type { AssDocument, AssScriptInfo, AssStyle } from "@/lib/ass";
 import type { ActiveSubtitleKind, SubtitleCue, VideoSession } from "../types";
 
 interface HistoryState {

@@ -6,7 +6,7 @@ import {
   type AssInlineOverrides,
   type AssStyle,
   type AssScriptInfo,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 import {
   assFontFamily,
   assFontWeight,

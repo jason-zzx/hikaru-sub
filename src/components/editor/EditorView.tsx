@@ -22,7 +22,7 @@ import {
   pickSubtitleFile,
   saveAssText,
 } from "../../services/tauri";
-import { serializeAss } from "@hikaru/ass-core";
+import { serializeAss } from "@/lib/ass";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
 import { parseExternalSubtitleDocument } from "../../utils/subtitleImport";
 import type { ActiveSubtitleKind, AppSettings } from "../../types";

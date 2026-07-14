@@ -3,7 +3,7 @@ import {
   assColorToCss,
   createDefaultStyles,
   type AssStyle,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 import { usePreviewFontNames } from "../../hooks/usePreviewFontNames";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";

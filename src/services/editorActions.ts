@@ -1,4 +1,4 @@
-import { createId as createAssId } from "@hikaru/ass-core";
+import { createId as createAssId } from "@/lib/ass";
 import { usePlaybackStore } from "../stores/playbackStore";
 import type { SubtitleCue } from "../types";
 
@@ -83,7 +83,7 @@ export type CueMergeMode = "concat" | "keep-first";
 const DEFAULT_INSERT_DURATION_MS = 2000;
 
 /**
- * 在现有 cue 列表中生成不撞车的 id；默认用 ass-core 的 createId，最多重试 3 次。
+ * 在现有 cue 列表中生成不撞车的 id；默认用 ASS 模块的 createId，最多重试 3 次。
  * 3 次仍撞车时返回 null，调用方应放弃新增并提示用户。
  */
 export function createUniqueCueId(

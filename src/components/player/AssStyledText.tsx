@@ -3,7 +3,7 @@ import {
   parseAssTextLines,
   type AssScriptInfo,
   type AssStyle,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 import { findAssStyle } from "../../utils/assStyleCss";
 import { assInlineToCss } from "../../utils/assRunCss";
 import type { AssViewport } from "../../utils/assStyleCss";

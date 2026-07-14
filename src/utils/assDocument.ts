@@ -5,7 +5,7 @@ import {
   type AssScriptInfo,
   type AssStyle,
   type SubtitleCue,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 
 export interface ResolveAssDocumentOptions {
   /** 无已存 Script Info 时，用视频分辨率初始化 PlayRes */

@@ -20,15 +20,7 @@ export interface VideoSession {
   sourceLang: "ja";
 }
 
-export interface SubtitleCue {
-  id: string;
-  startMs: number;
-  endMs: number;
-  primaryText: string;
-  secondaryText?: string;
-  style: string;
-  layer: number;
-}
+export type { SubtitleCue } from "@/lib/ass";
 
 export interface AppSettings {
   ffmpegPath?: string;
@@ -68,7 +60,7 @@ export interface AudioExtractProgress {
   percent: number | null;
 }
 
-/** ASR sidecar 输出的时间片段（与 ass-core AsrSegment 同构）。 */
+/** ASR sidecar 输出的时间片段（与 ASS 模块的 AsrSegment 同构）。 */
 export interface AsrSegment {
   startMs: number;
   endMs: number;

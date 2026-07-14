@@ -4,7 +4,7 @@ import {
   SECONDARY_STYLE,
   type AssStyle,
   type SubtitleCue,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 import type { PreviewFontFile } from "../types";
 import {
   canonicalFontFamilyName,

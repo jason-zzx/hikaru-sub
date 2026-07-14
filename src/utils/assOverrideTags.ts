@@ -1,4 +1,4 @@
-import type { AssStyle } from "@hikaru/ass-core";
+import type { AssStyle } from "@/lib/ass";
 
 export interface ToggleOverrideTag {
   startTag: string;

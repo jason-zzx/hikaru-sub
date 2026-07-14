@@ -5,7 +5,7 @@ import {
   mergeShortCues,
   segmentsToCues,
   serializeAss,
-} from "@hikaru/ass-core";
+} from "@/lib/ass";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";

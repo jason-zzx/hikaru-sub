@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import type { AssScriptInfo, AssStyle, SubtitleCue } from "@hikaru/ass-core";
+import type { AssScriptInfo, AssStyle, SubtitleCue } from "@/lib/ass";
 import { assStyleToCss, resolveAssRenderItems, type AssViewport } from "../../utils/assStyleCss";
 import { AssStyledText } from "./AssStyledText";
 
