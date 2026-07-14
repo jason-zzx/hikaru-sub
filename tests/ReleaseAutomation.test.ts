@@ -214,4 +214,25 @@ describe("project release metadata", () => {
     );
     expect(workflow).not.toContain("Hikaru Sub desktop client release.");
   });
+
+  it("runs Rust tests in the release profile used by Tauri packaging", () => {
+    const workflow = readFileSync(
+      join(projectRoot, ".github", "workflows", "release.yml"),
+      "utf8",
+    );
+
+    expect(workflow).toContain(
+      "run: cargo test --release --lib --manifest-path src-tauri/Cargo.toml",
+    );
+  });
+
+  it("typechecks early without bundling the frontend twice", () => {
+    const workflow = readFileSync(
+      join(projectRoot, ".github", "workflows", "release.yml"),
+      "utf8",
+    );
+
+    expect(workflow).toContain("run: pnpm exec tsc --noEmit");
+    expect(workflow).not.toContain("run: pnpm build");
+  });
 });
