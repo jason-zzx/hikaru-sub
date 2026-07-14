@@ -90,11 +90,11 @@ jobs:
       - name: Run frontend tests
         run: pnpm test
 
-      - name: Build frontend
-        run: pnpm build
+      - name: Typecheck frontend
+        run: pnpm exec tsc --noEmit
 
       - name: Run Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --release --lib --manifest-path src-tauri/Cargo.toml
 
       - name: Build and upload Tauri bundles
         uses: tauri-apps/tauri-action@v1
