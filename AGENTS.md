@@ -193,3 +193,13 @@ interface SubtitleCue {
 - 外部 URL、m3u8 playlist、HTTP headers、字幕文本、文件名和用户选择路径都视为不可信输入；涉及路径解析、临时目录、压制输出、下载合并和 asset scope 时保持校验、归一化与越界防护。
 - 调用 FFmpeg、Python、pip 或系统命令时优先使用结构化参数，避免把未转义的用户输入拼进 shell 字符串。
 - 诊断日志可以记录阶段、错误码、耗时和必要路径，但不要输出完整敏感请求头、密钥或翻译 API 请求正文。
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+This repository uses a single-context domain documentation layout. See `docs/agents/domain.md`.
