@@ -14,7 +14,6 @@
     "bundle": "tauri build",
     "release:local": "pnpm asr:prepare-resource && tauri build && pnpm release:portable",
     "release:portable": "node scripts/package-portable.mjs",
-    "ffmpeg:fetch": "node scripts/fetch-ffmpeg.mjs",
     "runtime:lock-sources": "node scripts/lock-runtime-sources.mjs",
     "asr:prepare-resource": "node scripts/prepare-asr-resource.mjs",
     "asr:setup": "bash scripts/setup-asr.sh"
