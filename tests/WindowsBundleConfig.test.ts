@@ -22,6 +22,10 @@ describe("Windows bundle configuration", () => {
     expect(config.app.windows[0].title).toBe("Hikaru Sub");
   });
 
+  it("reads the application version from the root package metadata", () => {
+    expect(config.version).toBe("../package.json");
+  });
+
   it("only builds the NSIS installer while MSI remains disabled", () => {
     expect(config.bundle.targets).toEqual(["nsis"]);
   });

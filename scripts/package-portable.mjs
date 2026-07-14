@@ -112,7 +112,7 @@ export function createPortableArchive(paths) {
   }
 }
 
-function packageMetadata(root) {
+export function packageMetadata(root) {
   const packageJson = JSON.parse(
     readFileSync(join(root, "package.json"), "utf8"),
   );
@@ -122,7 +122,7 @@ function packageMetadata(root) {
 
   return {
     productName: tauriConfig.productName,
-    version: tauriConfig.version ?? packageJson.version,
+    version: packageJson.version,
   };
 }
 

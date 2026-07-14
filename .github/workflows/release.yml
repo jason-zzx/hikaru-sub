@@ -58,6 +58,17 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: pnpm version:check
+
+      - name: Extract release notes
+        id: release_metadata
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: node scripts/release-notes.mjs --github-output
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -96,17 +107,7 @@ jobs:
           args: ${{ matrix.args }}
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseName: Hikaru Sub ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          releaseBody: |
-            Hikaru Sub desktop client release.
-
-            FFmpeg and Python 3.11 are prepared on demand after installation.
-            The app reuses system dependencies first and downloads managed copies only after user confirmation.
-            ASR engine dependencies and model weights are configured after installation.
-            This workflow currently uploads Windows bundles only.
-            Windows currently ships the NSIS setup package and a portable zip; MSI is disabled until the installer UX is revisited.
-            macOS packages are temporarily disabled pending bundle/resource validation.
-            Linux packages are intentionally deferred until Windows/macOS releases are stable.
-            Windows packages are not code-signed and may show SmartScreen warnings.
+          releaseBody: ${{ steps.release_metadata.outputs.body }}
           releaseDraft: true
           prerelease: ${{ contains(github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name, '-') }}
           uploadUpdaterJson: false

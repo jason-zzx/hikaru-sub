@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createPortableArchive,
   createPortableStaging,
+  packageMetadata,
   portableArchiveName,
   portableStageName,
 } from "../scripts/package-portable.mjs";
@@ -46,6 +47,24 @@ afterEach(async () => {
 });
 
 describe("portable package", () => {
+  it("reads the archive version from the root package metadata", async () => {
+    const { root } = await makeReleaseDir();
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ version: "0.2.0" }),
+    );
+    await mkdir(join(root, "src-tauri"), { recursive: true });
+    await writeFile(
+      join(root, "src-tauri", "tauri.conf.json"),
+      JSON.stringify({ productName: "Hikaru Sub", version: "../package.json" }),
+    );
+
+    expect(packageMetadata(root)).toEqual({
+      productName: "Hikaru Sub",
+      version: "0.2.0",
+    });
+  });
+
   it("uses a Windows x64 portable zip name that matches the NSIS artifact style", () => {
     expect(
       portableArchiveName({
