@@ -13,6 +13,22 @@ Release artifacts include a clean ASR service template and a locked dependency-s
 
 An operation that needs a missing managed dependency asks for confirmation before downloading it. Model weights are prepared separately from ASR engine dependencies.
 
+## Licenses and third-party components
+
+Hikaru Sub's own source code is licensed under Apache License 2.0. Runtime
+dependencies and model weights remain under their respective licenses; the
+application does not relicense them. The release package does not preinstall
+FFmpeg, Python, a Python environment, or model weights, but a managed download
+or a future bundled distribution must preserve the component's required
+license, notices, source materials, and attributions.
+
+See [Third-Party Notices](../THIRD_PARTY_NOTICES.md) for the maintained list
+of major runtime components, model licenses, and the release-maintainer
+checklist. In particular, a managed FFmpeg build with GPL components such as
+`libx264` remains a separately licensed GPL component; record the exact build,
+license output, corresponding source, and build configuration before
+redistributing it.
+
 ## Resolution order
 
 Hikaru Sub resolves FFmpeg in this order:
