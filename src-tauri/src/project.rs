@@ -138,22 +138,23 @@ mod tests {
         fs::write(&video_path, b"video").unwrap();
 
         let session = build_video_session(&video_path, cache.path()).unwrap();
+        let canonical_video_path = video_path.canonicalize().unwrap();
 
         assert_eq!(
             session.video_path,
-            path_to_display_string(&video_path.canonicalize().unwrap())
+            path_to_display_string(&canonical_video_path)
         );
         assert_eq!(
             session.transcribed_ass_path,
-            temp.path()
-                .join("episode.01.transcribed.ass")
-                .to_string_lossy()
+            path_to_display_string(
+                &canonical_video_path.with_file_name("episode.01.transcribed.ass")
+            )
         );
         assert_eq!(
             session.translated_ass_path,
-            temp.path()
-                .join("episode.01.translated.ass")
-                .to_string_lossy()
+            path_to_display_string(
+                &canonical_video_path.with_file_name("episode.01.translated.ass")
+            )
         );
         assert!(session
             .audio_path
@@ -182,15 +183,17 @@ mod tests {
 
         let session_a = build_video_session(&video_a, cache.path()).unwrap();
         let session_b = build_video_session(&video_b, cache.path()).unwrap();
+        let canonical_video_a = video_a.canonicalize().unwrap();
+        let canonical_video_b = video_b.canonicalize().unwrap();
 
         assert_ne!(session_a.workspace_path, session_b.workspace_path);
         assert_eq!(
             session_a.transcribed_ass_path,
-            dir_a.join("episode.transcribed.ass").to_string_lossy()
+            path_to_display_string(&canonical_video_a.with_file_name("episode.transcribed.ass"))
         );
         assert_eq!(
             session_b.transcribed_ass_path,
-            dir_b.join("episode.transcribed.ass").to_string_lossy()
+            path_to_display_string(&canonical_video_b.with_file_name("episode.transcribed.ass"))
         );
     }
 
