@@ -71,16 +71,22 @@ Preview the extracted GitHub Release body locally with:
 pnpm release:notes v0.2.0
 ```
 
+## Continuous integration
+
+Pull requests targeting `main` and pushes to `main` run `.github/workflows/ci.yml` on Windows. The workflow installs locked dependencies, prepares the ASR resource, runs frontend tests and typechecking, and runs Rust library tests in the release profile. Pull requests may restore the shared Rust cache, while only successful `main` runs save it for later releases.
+
 ## GitHub Release
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`:
+Before tagging, push the release commit to `main` and wait for the CI workflow to succeed. Then create the tag from that tested `main` commit and push it:
 
 ```bash
+git push origin main
+# Wait for the main CI run to succeed.
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The workflow can also be dispatched manually with an existing release tag. It first verifies that the tag, application version, Cargo metadata, and matching `CHANGELOG.md` entry agree. It then installs locked pnpm dependencies, prepares the ASR resource, runs frontend tests, builds the frontend, runs Rust tests, builds the Tauri bundle, creates the portable zip, and uploads both Windows artifacts to a draft GitHub Release. The draft body is the matching changelog entry.
+Pushing a `v*` tag runs `.github/workflows/release.yml`. The workflow can also be dispatched manually with an existing release tag. It verifies that the tag, application version, Cargo metadata, and matching `CHANGELOG.md` entry agree, restores the shared Rust cache produced on `main`, installs locked pnpm dependencies, prepares the ASR resource, builds the Tauri bundle, creates the portable zip, and uploads both Windows artifacts to a draft GitHub Release. Tests are not repeated during release packaging. The draft body is the matching changelog entry.
 
 A tag containing `-` is marked as a prerelease. Updater metadata and signatures are not uploaded.
 

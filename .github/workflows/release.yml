@@ -80,21 +80,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          shared-key: windows-release
+          save-if: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Prepare ASR resource
         run: pnpm asr:prepare-resource
-
-      - name: Run frontend tests
-        run: pnpm test
-
-      - name: Typecheck frontend
-        run: pnpm exec tsc --noEmit
-
-      - name: Run Rust tests
-        run: cargo test --release --lib --manifest-path src-tauri/Cargo.toml
 
       - name: Build and upload Tauri bundles
         uses: tauri-apps/tauri-action@v1
