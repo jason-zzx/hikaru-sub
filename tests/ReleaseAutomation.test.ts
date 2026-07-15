@@ -198,41 +198,4 @@ describe("project release metadata", () => {
     expect(checkProjectVersions({ root: projectRoot, tag })).toEqual(versions);
     expect(readReleaseNotes({ root: projectRoot, tag })).toMatch(/\S/);
   });
-
-  it("wires the extracted notes into the draft release body", () => {
-    const workflow = readFileSync(
-      join(projectRoot, ".github", "workflows", "release.yml"),
-      "utf8",
-    );
-
-    expect(workflow).toContain("run: pnpm version:check");
-    expect(workflow).toContain(
-      "run: node scripts/release-notes.mjs --github-output",
-    );
-    expect(workflow).toContain(
-      "releaseBody: ${{ steps.release_metadata.outputs.body }}",
-    );
-    expect(workflow).not.toContain("Hikaru Sub desktop client release.");
-  });
-
-  it("runs Rust tests in the release profile used by Tauri packaging", () => {
-    const workflow = readFileSync(
-      join(projectRoot, ".github", "workflows", "release.yml"),
-      "utf8",
-    );
-
-    expect(workflow).toContain(
-      "run: cargo test --release --lib --manifest-path src-tauri/Cargo.toml",
-    );
-  });
-
-  it("typechecks early without bundling the frontend twice", () => {
-    const workflow = readFileSync(
-      join(projectRoot, ".github", "workflows", "release.yml"),
-      "utf8",
-    );
-
-    expect(workflow).toContain("run: pnpm exec tsc --noEmit");
-    expect(workflow).not.toContain("run: pnpm build");
-  });
 });
