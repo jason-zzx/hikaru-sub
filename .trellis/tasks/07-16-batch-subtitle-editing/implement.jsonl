@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership, pre-development checklist, and physical-row editor contract."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Editor UI behavior, shadcn usage, and mode-agnostic physical-row rules."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Zustand project/playback ownership and undo-history conventions."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Canonical SubtitleCue and physical ASS row constraints."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Required frontend tests, build checks, and minimal-diff rules."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse existing editor actions and ASS tag utilities instead of duplicating transforms."}
+{"file":".trellis/tasks/07-16-batch-subtitle-editing/research/current-editor-formatting-flow.md","reason":"Code-backed selection, formatting, history, focus, and duplicate-commit findings for implementation."}

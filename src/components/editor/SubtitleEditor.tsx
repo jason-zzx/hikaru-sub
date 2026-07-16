@@ -5,7 +5,12 @@ import { usePlaybackStore } from "../../stores/playbackStore";
 import { useUiStore } from "../../stores/uiStore";
 import {
   appendCueAfterWithUniqueId,
+  applySelectedCueAlignment,
+  applySelectedCueAttribute,
+  applySelectedCueStyle,
+  applySelectedCueToggle,
   createCueAtPlayheadWithUniqueId,
+  hasMultipleSelectedCues,
   nextAfterCommit,
   selectCueAfterDelete,
 } from "../../services/editorActions";
@@ -57,17 +62,20 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   const cues = useProjectStore((s) => s.cues);
   const updateCue = useProjectStore((s) => s.updateCue);
   const updateCuePreview = useProjectStore((s) => s.updateCuePreview);
+  const replaceCues = useProjectStore((s) => s.replaceCues);
   const addCue = useProjectStore((s) => s.addCue);
   const deleteCue = useProjectStore((s) => s.deleteCue);
   const assStyles = useProjectStore((s) => s.assStyles);
 
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
+  const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
   const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
   const editorFocusNonce = useUiStore((s) => s.editorFocusNonce);
 
   const selectedCue = cues.find((c) => c.id === selectedCueId);
+  const hasBatchSelection = hasMultipleSelectedCues(cues, selectedCueIds);
 
   const [text, setText] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -231,6 +239,20 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     kind: AttributeOverrideKind,
     startTag: string,
   ) => {
+    if (hasBatchSelection) {
+      const state = useProjectStore.getState();
+      replaceCues(
+        applySelectedCueAttribute(
+          state.cues,
+          selectedCueIds,
+          state.assStyles,
+          kind,
+          startTag,
+        ),
+      );
+      return;
+    }
+
     const textarea = textRef.current;
     if (!textarea) return;
 
@@ -252,6 +274,18 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   };
 
   const applyToggleTag = (startTag: string, endTag: string) => {
+    if (hasBatchSelection) {
+      replaceCues(
+        applySelectedCueToggle(
+          useProjectStore.getState().cues,
+          selectedCueIds,
+          startTag,
+          endTag,
+        ),
+      );
+      return;
+    }
+
     const textarea = textRef.current;
     if (!textarea) return;
 
@@ -273,6 +307,9 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     setQuickFontName(fontName);
     if (fontName) {
       applyAttributeTag("fontName", `{\\fn${fontName}}`);
+      if (hasBatchSelection) {
+        (document.activeElement as HTMLElement | null)?.blur();
+      }
     }
   };
 
@@ -298,6 +335,17 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
 
   const handleInlineAlignment = (alignment: number) => {
     if (!Number.isInteger(alignment) || alignment < 1 || alignment > 9) return;
+    if (hasBatchSelection) {
+      replaceCues(
+        applySelectedCueAlignment(
+          useProjectStore.getState().cues,
+          selectedCueIds,
+          alignment,
+        ),
+      );
+      return;
+    }
+
     const textarea = textRef.current;
     if (!textarea) return;
     const result = applyAlignmentReplace(text, alignment);
@@ -413,6 +461,21 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     setSelectedCueId(newCue.id);
   };
 
+  const handleStyleChange = (style: string) => {
+    if (!selectedCue) return;
+    if (!hasBatchSelection) {
+      updateCue(selectedCue.id, { style });
+      return;
+    }
+    replaceCues(
+      applySelectedCueStyle(
+        useProjectStore.getState().cues,
+        selectedCueIds,
+        style,
+      ),
+    );
+  };
+
   const styleOptions = assStyles.map((style) => ({
     value: style.name,
     label: style.name,
@@ -489,7 +552,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
         <label className="text-xs text-text-muted">样式</label>
         <Select
           value={selectedCue.style}
-          onChange={(value) => updateCue(selectedCue.id, { style: value })}
+          onChange={handleStyleChange}
           options={styleOptions}
           placeholder=""
         />

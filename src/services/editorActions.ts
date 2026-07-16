@@ -1,6 +1,13 @@
-import { createId as createAssId } from "@/lib/ass";
+import { createId as createAssId, type AssStyle } from "@/lib/ass";
 import { usePlaybackStore } from "../stores/playbackStore";
 import type { SubtitleCue } from "../types";
+import {
+  applyAlignmentReplace,
+  applyAttributeOverrideTag,
+  applyToggleOverrideTag,
+  restoreTagForStyle,
+  type AttributeOverrideKind,
+} from "../utils/assOverrideTags";
 
 /** 选中指定 cue 并 seek 到起点；用户主动切换会中断「播放当前句」。 */
 export function selectCueAndSeek(cue: SubtitleCue | null) {
@@ -79,6 +86,82 @@ export interface CueListActionResult {
 
 export type CueInsertPlacement = "before" | "after";
 export type CueMergeMode = "concat" | "keep-first";
+
+export function hasMultipleSelectedCues(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+): boolean {
+  return cueIndexesById(cues, selectedIds).length > 1;
+}
+
+function mapSelectedCueText(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+  transform: (cue: SubtitleCue) => string,
+): SubtitleCue[] {
+  const selected = new Set(selectedIds);
+  return cues.map((cue) => {
+    if (!selected.has(cue.id)) return cue;
+    const primaryText = transform(cue);
+    return primaryText === cue.primaryText ? cue : { ...cue, primaryText };
+  });
+}
+
+export function applySelectedCueStyle(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+  style: string,
+): SubtitleCue[] {
+  const selected = new Set(selectedIds);
+  return cues.map((cue) =>
+    selected.has(cue.id) && cue.style !== style ? { ...cue, style } : cue,
+  );
+}
+
+export function applySelectedCueAttribute(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+  styles: AssStyle[],
+  kind: AttributeOverrideKind,
+  startTag: string,
+): SubtitleCue[] {
+  const stylesByName = new Map(styles.map((style) => [style.name, style]));
+  return mapSelectedCueText(cues, selectedIds, (cue) =>
+    applyAttributeOverrideTag(cue.primaryText, 0, cue.primaryText.length, {
+      startTag,
+      restoreTag: restoreTagForStyle(kind, stylesByName.get(cue.style)),
+    }).text,
+  );
+}
+
+export function applySelectedCueToggle(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+  startTag: string,
+  endTag: string,
+): SubtitleCue[] {
+  return mapSelectedCueText(
+    cues,
+    selectedIds,
+    (cue) =>
+      applyToggleOverrideTag(cue.primaryText, 0, cue.primaryText.length, {
+        startTag,
+        endTag,
+      }).text,
+  );
+}
+
+export function applySelectedCueAlignment(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+  alignment: number,
+): SubtitleCue[] {
+  return mapSelectedCueText(
+    cues,
+    selectedIds,
+    (cue) => applyAlignmentReplace(cue.primaryText, alignment).text,
+  );
+}
 
 const DEFAULT_INSERT_DURATION_MS = 2000;
 

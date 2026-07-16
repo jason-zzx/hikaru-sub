@@ -158,10 +158,7 @@ export function FontComboBox({
                     optionRefs.current[index] = node;
                   }}
                   type="button"
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    commit(fontName);
-                  }}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => commit(fontName)}
                   className={`w-full px-3 py-2 text-left text-sm ${
                     highlighted

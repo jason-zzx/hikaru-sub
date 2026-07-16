@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Check frontend ownership and physical-row editor compliance."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check right-panel interaction consistency and active-row boundaries."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify each batch is one undoable Zustand history transition."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify SubtitleCue fields and ASS physical-row semantics remain intact."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply required test/build and minimal-diff quality gates."}
+{"file":".trellis/tasks/07-16-batch-subtitle-editing/research/current-editor-formatting-flow.md","reason":"Validate selection targets, focus behavior, and single-commit risks against inspected code."}

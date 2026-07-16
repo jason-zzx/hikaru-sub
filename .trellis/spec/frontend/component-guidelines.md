@@ -35,6 +35,7 @@ Examples: `ImportView`, `TranscribeView`, `TranslateView`, `BurnView`, `Settings
 ### Editor / player
 
 - Mode-agnostic physical rows: list and selected-row editor show `cue.primaryText` with one generic 字幕 field; do not branch on `subtitleMergeMode` or show dual original/translation fields.
+- Multi-row formatting: when more than one valid `selectedCueIds` entry exists, right-panel style and ASS override controls apply to every selected physical row's complete `primaryText`. Ignore stale IDs when deciding whether the operation is multi-row. With one valid row, preserve textarea selection/caret behavior; timing, subtitle text, new-row, and right-panel delete remain active-row operations.
 - Preview/save/burn serialize physical cues (prefer `preserveOrder: true` where row order must match the store); do not re-merge by settings.
 - Playback uses local HTTP media URLs from `registerMediaPlayback` — not `asset://` as the primary path.
 - Libass WASM preview is preferred; CSS fallback only when libass is unavailable (`LibassFallbackNotice`).
