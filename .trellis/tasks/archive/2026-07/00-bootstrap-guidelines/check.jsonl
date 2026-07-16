@@ -1,0 +1,10 @@
+{"file": "AGENTS.md", "reason": "Verify specs reference not contradict global rules"}
+{"file": ".trellis/tasks/00-bootstrap-guidelines/prd.md", "reason": "Acceptance criteria for placeholder-free specs"}
+{"file": ".trellis/tasks/00-bootstrap-guidelines/design.md", "reason": "File inventory completeness"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend index links and AGENTS pointer"}
+{"file": ".trellis/spec/tauri/index.md", "reason": "Tauri layer present with checklist"}
+{"file": ".trellis/spec/asr/index.md", "reason": "ASR layer present with checklist"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Hikaru cross-layer ownership"}
+{"file": "src/services/tauri.ts", "reason": "Spot-check cited frontend bridge"}
+{"file": "src-tauri/src/app_paths.rs", "reason": "Spot-check cited path helpers"}
+{"file": "asr-service/engines/registry.py", "reason": "Spot-check cited engine registry"}
