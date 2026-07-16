@@ -70,3 +70,36 @@ Editor cues map 1:1 to Dialogue events; subtitleMergeMode stays translation-only
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Batch subtitle editing
+
+**Date**: 2026-07-16
+**Task**: Batch subtitle editing
+**Branch**: `dev`
+
+### Summary
+
+Added batch right-panel formatting for multi-selected physical subtitle rows, preserved single-row caret behavior and one-step undo/redo, fixed duplicate font commits, and covered the flow with focused and full frontend checks.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2b4efef` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
