@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { selectLibassPreviewFonts } from "../../services/libassFontSelection";
 import { useVideoDisplayRect } from "../../hooks/useVideoDisplayRect";
 import { getPreviewFonts } from "../../services/previewFontDiscovery";
@@ -42,14 +41,12 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const cues = useProjectStore((s) => s.cues);
   const assStyles = useProjectStore((s) => s.assStyles);
   const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
-  const mergeMode = useSubtitleMergeMode();
   const previewFontSelection = useMemo(
     () =>
       selectLibassPreviewFonts(previewFonts, assStyles, {
         cues,
-        mergeMode,
       }),
-    [assStyles, cues, mergeMode, previewFonts],
+    [assStyles, cues, previewFonts],
   );
 
   const videoDisplayRect = useVideoDisplayRect(
@@ -462,7 +459,6 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
               activeCueId={isPlaying ? null : selectedCueId}
               styles={assStyles}
               scriptInfo={assScriptInfo}
-              mergeMode={mergeMode}
               currentTimeMs={currentTimeMs}
               videoElement={videoElement}
               followVideoFrames={isPlaying}

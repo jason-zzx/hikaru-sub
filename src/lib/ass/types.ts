@@ -100,4 +100,6 @@ export interface ParseOptions extends Partial<BilingualOptions> {
 export interface SerializeOptions extends Partial<BilingualOptions> {
   /** 字幕合并模式：inline = 单行拼接（译文 / 原文），separate = 分离双行 */
   mergeMode?: "inline" | "separate";
+  /** 保留 cue 数组顺序（编辑器）；默认按时间排序 */
+  preserveOrder?: boolean;
 }

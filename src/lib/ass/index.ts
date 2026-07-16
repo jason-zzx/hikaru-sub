@@ -46,6 +46,10 @@ export type { CueDisplay } from "./bilingual";
 
 export { parseAss } from "./parse";
 export { serializeAss } from "./serialize";
+export {
+  formatDialogueEventLine,
+  parseDialogueEventLine,
+} from "./eventLine";
 
 export {
   type AsrSegment,

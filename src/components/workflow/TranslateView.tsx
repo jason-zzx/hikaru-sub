@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { parseAss, serializeAss } from "@/lib/ass";
+import { parseAss, serializeAss, type SubtitleCue } from "@/lib/ass";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
@@ -29,7 +29,6 @@ const TARGET_LANGS = [
 export function TranslateView() {
   const setStep = useUiStore((s) => s.setStep);
   const session = useProjectStore((s) => s.session);
-  const cues = useProjectStore((s) => s.cues);
   const setCues = useProjectStore((s) => s.setCues);
   const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
   const setActiveSubtitle = useProjectStore((s) => s.setActiveSubtitle);
@@ -44,9 +43,13 @@ export function TranslateView() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // 检查前置条件
+  // Page-owned logical source (transcribed ASS), not projectStore editor rows.
+  const [sourceCues, setSourceCues] = useState<SubtitleCue[]>([]);
+  const [sourceLoading, setSourceLoading] = useState(true);
   const [hasAss, setHasAss] = useState(false);
-  const [checkingAss, setCheckingAss] = useState(true);
+  const [logicalResultCues, setLogicalResultCues] = useState<SubtitleCue[] | null>(
+    null,
+  );
 
   useEffect(() => {
     getSettings()
@@ -55,28 +58,50 @@ export function TranslateView() {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
-    setTargetLang(settings?.defaultTargetLang || "zh-CN");
-
-    // 检查字幕文件或内存中的 cues
-    if (cues.length > 0) {
-      setHasAss(true);
-      setCheckingAss(false);
-    } else {
-      pathExists(session.transcribedAssPath)
-        .then((exists) => {
-          setHasAss(exists);
-          setCheckingAss(false);
-        })
-        .catch(() => {
-          setHasAss(false);
-          setCheckingAss(false);
-        });
+    if (!session) {
+      setSourceCues([]);
+      setHasAss(false);
+      setSourceLoading(false);
+      return;
     }
-  }, [session, settings?.defaultTargetLang, cues.length]);
+    setTargetLang(settings?.defaultTargetLang || "zh-CN");
+    setSourceLoading(true);
+    setSuccess(false);
+    setLogicalResultCues(null);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const exists = await pathExists(session.transcribedAssPath);
+        if (cancelled) return;
+        if (!exists) {
+          setHasAss(false);
+          setSourceCues([]);
+          return;
+        }
+        const text = await loadAssText(session.transcribedAssPath);
+        if (cancelled) return;
+        const doc = parseAss(text, { mergeBilingual: false });
+        setHasAss(true);
+        // Page-owned source only — do not overwrite editor styles/scriptInfo on enter.
+        setSourceCues(doc.cues);
+      } catch {
+        if (!cancelled) {
+          setHasAss(false);
+          setSourceCues([]);
+        }
+      } finally {
+        if (!cancelled) setSourceLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, settings?.defaultTargetLang]);
 
   const handleTranslate = useCallback(async () => {
-    if (!session || !settings || cues.length === 0) return;
+    if (!session || !settings || sourceCues.length === 0) return;
 
     setError(null);
     setSuccess(false);
@@ -98,10 +123,9 @@ export function TranslateView() {
         temperature: 0.3,
       });
 
-      // 解析术语表
       const glossary: Record<string, string> = {};
       if (settings.translationGlossary) {
-        const lines = settings.translationGlossary.split('\n');
+        const lines = settings.translationGlossary.split("\n");
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) continue;
@@ -113,7 +137,7 @@ export function TranslateView() {
       }
 
       const result = await provider.translateBatch(
-        cues,
+        sourceCues,
         {
           sourceLang: "ja",
           targetLang: targetLang,
@@ -131,38 +155,39 @@ export function TranslateView() {
         },
       );
 
-      // 更新 cues
-      setCues(result.cues);
+      setLogicalResultCues(result.cues);
 
-      // 保存翻译后的 ASS 文件
+      // Bilingual boundary: serialize logical result, re-parse as physical rows.
+      const { assScriptInfo, assStyles } = useProjectStore.getState();
+      let baseDoc;
+      if (assScriptInfo && assStyles.length > 0) {
+        baseDoc = {
+          scriptInfo: assScriptInfo,
+          styles: assStyles,
+          cues: result.cues,
+        };
+      } else {
+        const originalAssText = await loadAssText(session.transcribedAssPath);
+        baseDoc = parseAss(originalAssText, { mergeBilingual: false });
+        baseDoc.cues = result.cues;
+        setAssMetadata(baseDoc.scriptInfo, baseDoc.styles);
+      }
+
+      const serialized = serializeAss(baseDoc, {
+        mergeMode: settings.subtitleMergeMode,
+      });
+      const physicalDoc = parseAss(serialized, { mergeBilingual: false });
+      setCues(physicalDoc.cues);
+      setAssMetadata(physicalDoc.scriptInfo, physicalDoc.styles);
+
       try {
-        const { assScriptInfo, assStyles } = useProjectStore.getState();
-        let doc;
-        if (assScriptInfo && assStyles.length > 0) {
-          // 沿用转录阶段写入的 PlayRes 与样式
-          doc = {
-            scriptInfo: assScriptInfo,
-            styles: assStyles,
-            cues: result.cues,
-          };
-        } else {
-          const originalAssText = await loadAssText(session.transcribedAssPath);
-          doc = parseAss(originalAssText);
-          doc.cues = result.cues;
-          setAssMetadata(doc.scriptInfo, doc.styles);
-        }
-
-        await saveAssText(
-          session.translatedAssPath,
-          serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
-        );
-
-        setAssMetadata(doc.scriptInfo, doc.styles);
+        await saveAssText(session.translatedAssPath, serialized);
         setActiveSubtitle("translated", session.translatedAssPath);
         markSaved();
-
         console.log(`翻译后的字幕已保存到: ${session.translatedAssPath}`);
       } catch (saveErr) {
+        // Keep physical rows in memory as unsaved translated content.
+        setActiveSubtitle("translated", null);
         console.warn("保存翻译后的字幕失败:", saveErr);
       }
 
@@ -181,9 +206,10 @@ export function TranslateView() {
   }, [
     session,
     settings,
-    cues,
+    sourceCues,
     targetLang,
     setCues,
+    setAssMetadata,
     setActiveSubtitle,
     markSaved,
     upsertTask,
@@ -192,11 +218,15 @@ export function TranslateView() {
 
   const canTranslate =
     !translating &&
-    cues.length > 0 &&
+    !sourceLoading &&
+    sourceCues.length > 0 &&
     settings?.translationBaseUrl &&
     settings?.translationModel;
 
-  const hasTranslation = cues.some((c) => c.secondaryText);
+  const statsCues = logicalResultCues ?? sourceCues;
+  const hasTranslation = Boolean(
+    logicalResultCues?.some((c) => c.secondaryText),
+  );
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -207,8 +237,7 @@ export function TranslateView() {
         </p>
       </header>
 
-      {/* 前置条件检查 */}
-      {!checkingAss && !hasAss && (
+      {!sourceLoading && !hasAss && (
         <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-700 dark:text-yellow-200">
           <p className="flex items-center gap-2 font-medium">
             <IconAlertTriangle className="h-4 w-4" />
@@ -220,7 +249,7 @@ export function TranslateView() {
         </div>
       )}
 
-      {cues.length === 0 && (
+      {!sourceLoading && hasAss && sourceCues.length === 0 && (
         <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-700 dark:text-yellow-200">
           <p className="flex items-center gap-2 font-medium">
             <IconAlertTriangle className="h-4 w-4" />
@@ -232,12 +261,10 @@ export function TranslateView() {
         </div>
       )}
 
-      {/* 配置区 */}
       <section className="rounded-xl border border-border bg-surface-raised p-5">
         <h3 className="mb-4 font-medium">翻译配置</h3>
 
         <div className="space-y-4">
-          {/* 源语言（只读） */}
           <div className="flex items-center gap-4">
             <label className="w-24 text-sm text-text-muted">源语言</label>
             <div className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-muted">
@@ -245,7 +272,6 @@ export function TranslateView() {
             </div>
           </div>
 
-          {/* 目标语言 */}
           <div className="flex items-center gap-4">
             <label className="w-24 text-sm text-text-muted">目标语言</label>
             <Select
@@ -256,7 +282,6 @@ export function TranslateView() {
             />
           </div>
 
-          {/* API 配置提示 */}
           {settings && !settings.translationBaseUrl && (
             <div className="flex items-center gap-2 rounded-md border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
               <IconAlertTriangle className="h-4 w-4" />
@@ -279,7 +304,6 @@ export function TranslateView() {
         </div>
       </section>
 
-      {/* 翻译状态 */}
       {(translating || progress || success || error) && (
         <section className="rounded-xl border border-border bg-surface-raised p-5">
           <h3 className="mb-4 font-medium">翻译状态</h3>
@@ -325,26 +349,25 @@ export function TranslateView() {
         </section>
       )}
 
-      {/* 字幕统计 */}
-      {cues.length > 0 && (
+      {statsCues.length > 0 && (
         <section className="rounded-xl border border-border bg-surface-raised p-5">
           <h3 className="mb-4 font-medium">字幕统计</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-2xl font-semibold text-primary">
-                {cues.length}
+                {statsCues.length}
               </div>
               <div className="mt-1 text-xs text-text-muted">总条数</div>
             </div>
             <div>
               <div className="text-2xl font-semibold text-primary">
-                {cues.filter((c) => c.secondaryText).length}
+                {statsCues.filter((c) => c.secondaryText).length}
               </div>
               <div className="mt-1 text-xs text-text-muted">已翻译</div>
             </div>
             <div>
               <div className="text-2xl font-semibold text-primary">
-                {cues.filter((c) => !c.secondaryText).length}
+                {statsCues.filter((c) => !c.secondaryText).length}
               </div>
               <div className="mt-1 text-xs text-text-muted">未翻译</div>
             </div>
@@ -352,7 +375,6 @@ export function TranslateView() {
         </section>
       )}
 
-      {/* 操作按钮 */}
       <footer className="flex items-center justify-between">
         <Button
           onClick={() => setStep("transcribe")}

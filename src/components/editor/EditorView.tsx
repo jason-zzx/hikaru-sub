@@ -14,7 +14,6 @@ import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
 import { StyleManager } from "./StyleManager";
 import { Button } from "../ui/button";
 import {
-  getSettings,
   getVideoInfo,
   loadAssText,
   pathExists,
@@ -25,7 +24,7 @@ import {
 import { serializeAss } from "@/lib/ass";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
 import { parseExternalSubtitleDocument } from "../../utils/subtitleImport";
-import type { ActiveSubtitleKind, AppSettings } from "../../types";
+import type { ActiveSubtitleKind } from "../../types";
 
 export function EditorView() {
   const session = useProjectStore((s) => s.session);
@@ -108,7 +107,6 @@ export function EditorView() {
     savePath: string,
     saveKind: ActiveSubtitleKind,
   ) => {
-    const settings: AppSettings = await getSettings();
     const doc = resolveAssDocumentForSave(cues, assScriptInfo, assStyles, {
       title: "Hikaru Sub",
     });
@@ -116,7 +114,7 @@ export function EditorView() {
 
     await saveAssText(
       savePath,
-      serializeAss(doc, { mergeMode: settings.subtitleMergeMode }),
+      serializeAss(doc, { preserveOrder: true }),
     );
     setActiveSubtitle(saveKind, savePath);
     setSubtitleFileExists(true);

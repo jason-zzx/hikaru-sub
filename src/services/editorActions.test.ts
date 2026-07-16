@@ -15,7 +15,6 @@ import {
   mergeSelectedCues,
   nextAfterCommit,
   normalizeBoundaryDrag,
-  pasteCueRows,
   selectCueAfterDelete,
   selectCueAndSeek,
   selectCueByOffset,
@@ -456,26 +455,5 @@ describe("cue row clipboard helpers", () => {
       "a",
       "b",
     ]);
-  });
-
-  it("pastes clipboard rows after a target with fresh ids", () => {
-    const ids = ["a2", "b2"];
-    const clipboard = copyCueRows(CUES, ["a", "b"]);
-
-    const result = pasteCueRows(CUES, clipboard, "b", () => ids.shift()!);
-
-    expect(result?.cues.map((item) => item.id)).toEqual([
-      "a",
-      "b",
-      "a2",
-      "b2",
-      "c",
-    ]);
-    expect(result?.cues[2]).toMatchObject({
-      startMs: 0,
-      endMs: 1000,
-      primaryText: "a",
-    });
-    expect(result?.selectedCueIds).toEqual(["a2", "b2"]);
   });
 });

@@ -58,15 +58,15 @@ describe("SubtitleList 时间显示", () => {
   });
 
   it("支持整条字幕复制、剪切、粘贴并走 undoable 批量替换", () => {
-    expect(source).toContain("copyCueRows");
-    expect(source).toContain("pasteCueRows");
-    expect(source).toContain("setCueRowClipboard");
-    expect(source).toContain("getCueRowClipboard");
-    expect(source).toContain("hasCueRowClipboard");
+    expect(source).toContain("copyCuesToSystemClipboard");
+    expect(source).toContain("cutCuesToSystemClipboard");
+    expect(source).toContain("pasteCuesFromSystemClipboard");
     expect(source).toContain("replaceCues");
     expect(source).toContain("复制行");
     expect(source).toContain("剪切行");
     expect(source).toContain("粘贴行");
+    expect(source).not.toContain("hasCueRowClipboard");
+    expect(source).not.toContain("useSubtitleMergeMode");
   });
 
   it("右键菜单项悬停时有明确高亮样式", () => {

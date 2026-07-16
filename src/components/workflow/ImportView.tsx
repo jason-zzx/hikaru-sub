@@ -86,7 +86,7 @@ export function ImportView() {
       let loaded = false;
       if (await pathExists(translatedPath)) {
         try {
-          loadAssDocument(parseAss(await loadAssText(translatedPath)), {
+          loadAssDocument(parseAss(await loadAssText(translatedPath), { mergeBilingual: false }), {
             kind: "translated",
             path: translatedPath,
           });
@@ -97,7 +97,7 @@ export function ImportView() {
       }
       if (!loaded && await pathExists(transcribedPath)) {
         try {
-          loadAssDocument(parseAss(await loadAssText(transcribedPath)), {
+          loadAssDocument(parseAss(await loadAssText(transcribedPath), { mergeBilingual: false }), {
             kind: "transcribed",
             path: transcribedPath,
           });
