@@ -24,39 +24,43 @@ _Avoid_: Segment, HLS Segment
 The complete subtitle artifact, including subtitle timing and text, script metadata, and styles. It is the durable subtitle exchange format used throughout the workflow.
 _Avoid_: Project File, Cue List
 
+**Physical Dialogue Row**:
+One ASS `Dialogue:` event. After Translation writes ASS, and whenever the editor, preview, save, or Burn path loads that ASS, each Physical Dialogue Row becomes one independent Subtitle Cue. The editor does not re-pair or re-merge rows by bilingual mode.
+_Avoid_: Logical Bilingual Pair (as the editor unit)
+
 **Subtitle Cue**:
-The editable subtitle unit for one time range, with Source Text, optional Translation Text, a style, and a layer. Multiple cues may overlap in time.
-_Avoid_: Line, ASR Segment
+The editable unit in the editor and project store: one Physical Dialogue Row with timing, a single body text field, a style, and a layer. Multiple cues may overlap in time. During Translation's in-memory logical pass only, a cue may temporarily carry both Source Text and Translation Text before bilingual expansion into Physical Dialogue Rows.
+_Avoid_: Line, ASR Segment, paired original/translation editor fields
 
 **Source Text**:
-The Japanese transcription carried by a Subtitle Cue. Translation retains this text rather than replacing it.
-_Avoid_: Original Text, Primary Text
+The Japanese transcription text. On logical translation cues it is the source side; after Inline Merge expansion it is embedded in the combined Physical Dialogue Row text; after Separate Lines expansion it remains on its own Primary-style row.
+_Avoid_: Original Text as a separate editor field after physical expansion
 
 **Translation Text**:
-The optional target-language translation attached to the same Subtitle Cue as its Source Text.
-_Avoid_: Secondary Text, Translated Source
+Target-language text produced by Translation. It exists on logical translation cues, then becomes either the leading half of an Inline Merge row or its own Secondary-style Physical Dialogue Row.
+_Avoid_: Secondary Text as a permanent paired field on every editor cue
 
 **Transcribed Subtitles**:
-An ASS Document produced by Transcription and containing Source Text without requiring Translation Text.
+An ASS Document produced by Transcription and containing Source Text without requiring Translation Text. Entering the Translation page always reloads this document as the translation source.
 _Avoid_: Source Subtitles, Raw Subtitles
 
 **Translated Subtitles**:
-An ASS Document produced by Translation and containing both Source Text and Translation Text where translation succeeded.
+An ASS Document produced by Translation after bilingual expansion into Physical Dialogue Rows (inline combined text and/or separate Primary/Secondary dialogues). Merely opening the Translation page does not rewrite or delete this file.
 _Avoid_: Translation-only Subtitles, Target Subtitles
 
 **Active Subtitles**:
-The ASS Document currently loaded for review, editing, saving, and Burn. Translated Subtitles take precedence over Transcribed Subtitles when both are available for a Working Video.
+The ASS Document currently loaded for review, editing, saving, and Burn, as Physical Dialogue Rows. Translated Subtitles take precedence over Transcribed Subtitles when both are available for a Working Video.
 _Avoid_: Current File, Open Subtitle
 
 ### Bilingual presentation
 
 **Inline Merge**:
-A bilingual presentation in which Translation Text and Source Text share one dialogue as `translation / source`. It changes presentation, not the meaning of the two text fields.
-_Avoid_: Mixed Text, Single-language Mode
+A Translation-time expansion that writes Source Text and Translation Text into one Physical Dialogue Row as `translation / source`. Applied only when generating Translated Subtitles; the editor then treats that row as ordinary single-field text.
+_Avoid_: Mixed Text, Single-language Mode, editor dual-field mode
 
 **Separate Lines**:
-A bilingual presentation in which Source Text and Translation Text become separate dialogues with the same time range. It changes presentation, not the underlying Subtitle Cue.
-_Avoid_: Split Cue, Dual Cue
+A Translation-time expansion that writes Source Text and Translation Text as two Physical Dialogue Rows with the same time range (Primary and Secondary styles). After expansion they are independently editable rows, not one paired cue.
+_Avoid_: Split Cue as a single editor identity, Dual Cue pairing in the editor
 
 ### Workflow operations
 
@@ -65,8 +69,8 @@ The conversion of Japanese speech in the Working Video into timed Subtitle Cues 
 _Avoid_: Translation, Caption Import
 
 **Translation**:
-The addition of target-language Translation Text to existing Subtitle Cues while preserving their Source Text and timing.
-_Avoid_: Transcription, Source Replacement
+Reading Transcribed Subtitles as source, adding Translation Text in a page-owned logical pass, then expanding with Inline Merge or Separate Lines into Physical Dialogue Rows written as Translated Subtitles for the editor and Burn.
+_Avoid_: Transcription, Source Replacement, translating already expanded physical editor rows as source
 
 **Soft Clip**:
 A Clip whose boundaries may align to nearby keyframes in exchange for avoiding video re-encoding.

@@ -141,16 +141,18 @@ interface SubtitleCue {
   id: string
   startMs: number
   endMs: number
-  primaryText: string
-  secondaryText?: string
+  primaryText: string      // 物理行正文；编辑器只编辑此字段
+  secondaryText?: string   // 翻译页逻辑结果用；物理编辑行一般不带
   style: string
   layer: number
 }
 ```
 
 - 产品面向日语转录与翻译，新建视频会话固定 `sourceLang: "ja"`；不要重新在转录/设置页暴露源语言选择。
-- 双语 ASS 默认使用行内合并：`译文 / 原文` 写入一条 Dialogue。用户可在设置中切换为分离双行：`Primary` 原文 + `Secondary` 译文，同时间轴两条 Dialogue。
-- 编辑页列表、预览与编辑框通过 `getCueDisplay` 按 `subtitleMergeMode` 展示，与序列化规则保持一致。
+- **`subtitleMergeMode` 只在翻译生成 ASS 时生效**：`inline` 写出一条 `译文 / 原文` Dialogue；`separate` 写出同时间轴的 Primary + Secondary 两条 Dialogue。
+- **编辑器 / 预览 / 压制 / 保存** 按物理 ASS 行：一条 `Dialogue:` ↔ 一个 cue（`primaryText`），加载用 `parseAss(..., { mergeBilingual: false })`，保存/压制用 `serializeAss(..., { preserveOrder: true })`，**不再**读 `subtitleMergeMode` 或经 `getCueDisplay` 做双语展示分支。
+- 翻译页进入时加载 **转录 ASS** 作页内源，不把已展开的物理译稿当翻译源；仅再点翻译时才写 `*.translated.ass`，进入页面本身不覆盖/删除该文件。
+- 编辑器整行复制/剪切/粘贴走系统剪贴板（`subtitleClipboard` + Tauri clipboard-manager，ASS `Dialogue:` 行；非 ASS 文本按选中行后 2s fallback）；聚焦 `input`/`textarea` 时不拦截，保留原生文本编辑。
 - 转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。
 
 ## 运行时依赖与 ASR
