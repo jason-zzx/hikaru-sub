@@ -1,0 +1,10 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership and pre-development checklist for editor, ASS, stores, and Tauri plugin usage."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Canonical SubtitleCue and existing bilingual ASS contracts affected by the physical-row editor boundary."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Project-store ASS state and undo/history rules for consolidated paste and translation/editor transitions."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Current editor/list/preview composition conventions; this task intentionally revises the merge-mode portion."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Service placement and typed native boundary conventions for clipboard integration."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Frontend verification commands and minimal-diff expectations."}
+{"file":".trellis/spec/tauri/index.md","reason":"Tauri layer ownership and capability checklist for official plugin registration."}
+{"file":".trellis/spec/tauri/directory-structure.md","reason":"Locations of lib.rs, Cargo.toml, and main-window capability files."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"React/Tauri capability boundary and ASS data-flow checks."}
+{"file":".trellis/tasks/07-16-aegisub-system-clipboard/research/aegisub-and-tauri-clipboard.md","reason":"Evidence for Aegisub line behavior and official Tauri clipboard plugin API, permissions, and errors."}

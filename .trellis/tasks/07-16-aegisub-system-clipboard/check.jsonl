@@ -1,0 +1,10 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Check frontend ownership, ASS reuse, and relevant quality pointers."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check the physical-row editor boundary against the canonical SubtitleCue contract."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Check undo/history and translation/editor store transitions."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check editor UI consistency while recognizing the task-approved merge-mode contract change."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Check native clipboard access is isolated behind the intended frontend service boundary."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Run and assess required frontend tests and build."}
+{"file":".trellis/spec/tauri/index.md","reason":"Check official plugin registration and explicit capability updates."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Run Rust verification and review permission/security consistency."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check translation to physical ASS to editor/burn data flow across the frontend/native boundary."}
+{"file":".trellis/tasks/07-16-aegisub-system-clipboard/research/aegisub-and-tauri-clipboard.md","reason":"Validate implementation behavior and permissions against researched upstream evidence."}

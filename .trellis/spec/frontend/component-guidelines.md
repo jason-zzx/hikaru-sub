@@ -34,9 +34,16 @@ Examples: `ImportView`, `TranscribeView`, `TranslateView`, `BurnView`, `Settings
 
 ### Editor / player
 
-- List, editor, and preview share `getCueDisplay(cue, mergeMode)` so UI matches serialize rules (`subtitleMergeMode`).
+- Mode-agnostic physical rows: list and selected-row editor show `cue.primaryText` with one generic 字幕 field; do not branch on `subtitleMergeMode` or show dual original/translation fields.
+- Preview/save/burn serialize physical cues (prefer `preserveOrder: true` where row order must match the store); do not re-merge by settings.
 - Playback uses local HTTP media URLs from `registerMediaPlayback` — not `asset://` as the primary path.
 - Libass WASM preview is preferred; CSS fallback only when libass is unavailable (`LibassFallbackNotice`).
+
+### Translation view
+
+- Page-owned source loads from **transcribed** ASS on enter; do not treat current `projectStore` physical rows as translation source.
+- Entering the page must not write or delete the existing translated ASS file.
+- On successful translation: serialize logical result with `settings.subtitleMergeMode`, re-parse with `mergeBilingual: false`, then load physical cues into the store for editor/burn.
 
 ## Anti-Patterns
 

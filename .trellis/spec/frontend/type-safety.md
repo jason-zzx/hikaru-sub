@@ -23,12 +23,16 @@ interface SubtitleCue {
 }
 ```
 
-Bilingual ASS may serialize as:
+Bilingual **generation** (translation page only) may serialize as:
 
 - **inline**: one Dialogue with `译文 / 原文` (`mergeMode: "inline"`)
 - **separate**: Primary + Secondary Dialogue lines (`mergeMode: "separate"`)
 
-Display helpers: `getCueDisplay` in `src/lib/ass/bilingual.ts`. List, editor, preview, and save paths must agree with `settings.subtitleMergeMode`.
+After generation, ASS is re-parsed with `mergeBilingual: false` so the editor holds **physical rows**: one `SubtitleCue` per `Dialogue:` event, text in `primaryText`, no paired `secondaryText` editing.
+
+`getCueDisplay` in `src/lib/ass/bilingual.ts` remains for translation/logical display helpers. Editor list, selected-row form, preview, burn, and editor save operate on physical `primaryText` and must **not** re-apply `settings.subtitleMergeMode`.
+
+Clipboard codec: `formatDialogueEventLine` / `parseDialogueEventLine` in `src/lib/ass/eventLine.ts` for strict single-event lines (do not use full-document `parseAss` as the sole paste validity check).
 
 ## Tauri Payload Shapes
 
