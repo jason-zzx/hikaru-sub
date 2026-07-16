@@ -12,7 +12,6 @@ describe("editor style visual editing integration", () => {
     const source = readSource("src/components/editor/SubtitleEditor.tsx");
 
     expect(source).toContain("assStyles");
-    expect(source).toContain("updateCue(selectedCue.id, { style:");
     expect(source).toContain("applyAttributeTag");
     expect(source).toContain("applyToggleOverrideTag");
     expect(source).toContain("FontComboBox");

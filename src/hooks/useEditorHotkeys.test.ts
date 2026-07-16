@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildEditorActions } from "./useEditorHotkeys";
+import { applySelectedCueToggle } from "../services/editorActions";
 import { useProjectStore } from "../stores/projectStore";
 import { usePlaybackStore } from "../stores/playbackStore";
 import { useUiStore } from "../stores/uiStore";
@@ -264,6 +265,34 @@ describe("系统动作", () => {
     expect(useProjectStore.getState().cues.find((c) => c.id === "a")?.primaryText).toBe("a");
     actions["redo"]!();
     expect(useProjectStore.getState().cues.find((c) => c.id === "a")?.primaryText).toBe("changed");
+  });
+
+  it("undo/redo restores a multi-row formatting replacement as one action", () => {
+    usePlaybackStore.setState({
+      selectedCueId: "c",
+      selectedCueIds: ["a", "c"],
+    });
+    const original = useProjectStore.getState().cues;
+    const formatted = applySelectedCueToggle(
+      original,
+      ["a", "c"],
+      "{\\b1}",
+      "{\\b0}",
+    );
+    useProjectStore.getState().replaceCues(formatted);
+
+    expect(useProjectStore.getState().history.past).toHaveLength(1);
+    expect(useProjectStore.getState().cues).toBe(formatted);
+
+    const actions = make_actions();
+    actions["undo"]!();
+    expect(useProjectStore.getState().cues).toBe(original);
+    expect(usePlaybackStore.getState().selectedCueIds).toEqual(["a", "c"]);
+
+    actions["redo"]!();
+    expect(useProjectStore.getState().cues).toBe(formatted);
+    expect(useProjectStore.getState().history.past).toHaveLength(1);
+    expect(usePlaybackStore.getState().selectedCueIds).toEqual(["a", "c"]);
   });
 });
 

@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { createDefaultStyles } from "@/lib/ass";
 import {
   assignCueLanes,
   appendCueAfter,
   appendCueAfterWithUniqueId,
+  applySelectedCueAlignment,
+  applySelectedCueAttribute,
+  applySelectedCueStyle,
+  applySelectedCueToggle,
   copyCueRows,
   createCueAtPlayhead,
   createCueAtPlayheadWithUniqueId,
@@ -11,6 +16,7 @@ import {
   duplicateCues,
   findSubtitleBoundary,
   frameStepTarget,
+  hasMultipleSelectedCues,
   insertCueRelative,
   mergeSelectedCues,
   nextAfterCommit,
@@ -446,6 +452,70 @@ describe("subtitle row operations", () => {
       cues: [{ ...cues[0], startMs: 0, endMs: 3000 }, cues[2]],
       selectedCueIds: ["a"],
     });
+  });
+});
+
+describe("selected cue formatting", () => {
+  it("ignores stale IDs when deciding between single-row and batch semantics", () => {
+    expect(hasMultipleSelectedCues(CUES, ["a", "missing"])).toBe(false);
+    expect(hasMultipleSelectedCues(CUES, ["a", "missing", "c"])).toBe(true);
+  });
+
+  it("applies style only to selected rows and preserves no-op references", () => {
+    const cues = CUES.map((item) => ({ ...item, layer: 2 }));
+    const changed = applySelectedCueStyle(cues, ["a", "missing", "c"], "Secondary");
+
+    expect(changed.map((item) => item.style)).toEqual([
+      "Secondary",
+      "Primary",
+      "Secondary",
+    ]);
+    expect(changed[0]).toMatchObject({ startMs: 0, endMs: 1000, layer: 2 });
+    expect(changed[1]).toBe(cues[1]);
+    const unchanged = applySelectedCueStyle(changed, ["a", "c"], "Secondary");
+    expect(unchanged.every((item, index) => item === changed[index])).toBe(true);
+  });
+
+  it("applies full-text attributes with each row's own style restore tag", () => {
+    const styles = createDefaultStyles();
+    const cues = [
+      { ...CUES[0], primaryText: "one" },
+      { ...CUES[1], primaryText: "outside" },
+      { ...CUES[2], primaryText: "two", style: "Secondary" },
+    ];
+
+    const changed = applySelectedCueAttribute(
+      cues,
+      ["a", "c"],
+      styles,
+      "fontSize",
+      "{\\fs60}",
+    );
+
+    expect(changed.map((item) => item.primaryText)).toEqual([
+      "{\\fs60}one{\\fs54}",
+      "outside",
+      "{\\fs60}two{\\fs44}",
+    ]);
+    expect(changed[1]).toBe(cues[1]);
+    expect(changed[0]).toMatchObject({ startMs: 0, endMs: 1000, layer: 0 });
+  });
+
+  it("applies full-text toggle and alignment transforms without reordering rows", () => {
+    const toggled = applySelectedCueToggle(CUES, ["a", "c"], "{\\b1}", "{\\b0}");
+    expect(toggled.map((item) => [item.id, item.primaryText])).toEqual([
+      ["a", "{\\b1}a{\\b0}"],
+      ["b", "b"],
+      ["c", "{\\b1}c{\\b0}"],
+    ]);
+    expect(toggled[1]).toBe(CUES[1]);
+
+    const aligned = applySelectedCueAlignment(toggled, ["a", "c"], 8);
+    expect(aligned.map((item) => item.primaryText)).toEqual([
+      "{\\an8}{\\b1}a{\\b0}",
+      "b",
+      "{\\an8}{\\b1}c{\\b0}",
+    ]);
   });
 });
 

@@ -35,6 +35,8 @@ When a clip finishes and becomes the working video, call `setSession(next)` only
 
 `projectStore` keeps cue undo/redo (max depth 50). Prefer `updateCue` / `replaceCues` / `setCues` APIs over mutating arrays outside the store.
 
+Batch cue edits must build one transformed cue list and call `replaceCues` once, not call `updateCue` per row. Preserve unchanged cue references so a no-op replacement creates no history entry; do not modify `playbackStore` selection while applying or undoing the batch.
+
 ## Anti-Patterns
 
 - Reintroducing a hidden on-disk project metadata directory

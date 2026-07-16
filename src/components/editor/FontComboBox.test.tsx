@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { findMatchingFontIndex, fontOptionsWithCurrent } from "./FontComboBox";
+// @vitest-environment jsdom
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import {
+  FontComboBox,
+  findMatchingFontIndex,
+  fontOptionsWithCurrent,
+} from "./FontComboBox";
 
 describe("findMatchingFontIndex", () => {
   const fonts = ["Arial", "Noto Sans SC", "Microsoft YaHei", "Yu Gothic"];
@@ -15,6 +22,20 @@ describe("findMatchingFontIndex", () => {
   it("returns -1 when there is no usable query or match", () => {
     expect(findMatchingFontIndex(fonts, "")).toBe(-1);
     expect(findMatchingFontIndex(fonts, "missing")).toBe(-1);
+  });
+});
+
+describe("FontComboBox", () => {
+  it("commits a clicked option once", async () => {
+    const onCommit = vi.fn();
+    const user = userEvent.setup();
+    render(<FontComboBox value="" options={["Arial"]} onCommit={onCommit} />);
+
+    await user.click(screen.getByPlaceholderText("字体"));
+    await user.click(screen.getByRole("button", { name: "Arial" }));
+
+    expect(onCommit).toHaveBeenCalledOnce();
+    expect(onCommit).toHaveBeenCalledWith("Arial");
   });
 });
 
