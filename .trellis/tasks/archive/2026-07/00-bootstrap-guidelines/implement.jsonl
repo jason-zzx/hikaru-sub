@@ -1,0 +1,11 @@
+{"file": "AGENTS.md", "reason": "Global hard rules referenced by all layers"}
+{"file": ".trellis/tasks/00-bootstrap-guidelines/design.md", "reason": "Target spec inventory and layer boundaries"}
+{"file": ".trellis/tasks/00-bootstrap-guidelines/implement.md", "reason": "Ordered bootstrap checklist"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Guide customized for Hikaru boundaries"}
+{"file": "src/services/tauri.ts", "reason": "Frontend Tauri bridge patterns"}
+{"file": "src/stores/projectStore.ts", "reason": "VideoSession and ASS state patterns"}
+{"file": "src/lib/ass/types.ts", "reason": "SubtitleCue / ASS domain contract"}
+{"file": "src-tauri/src/lib.rs", "reason": "Command registration and lifecycle"}
+{"file": "src-tauri/src/app_paths.rs", "reason": "Portable and work_cache_dir patterns"}
+{"file": "asr-service/server.py", "reason": "ASR HTTP API surface"}
+{"file": "asr-service/engines/registry.py", "reason": "Engine plugin registry"}
