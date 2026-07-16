@@ -96,9 +96,9 @@ For each boundary, pin:
 
 ### Mistake 3: ASS contract drift
 
-**Bad**: List shows one bilingual layout while `serializeAss` writes another.
+**Bad**: Editor list/preview re-apply `subtitleMergeMode` after translation already expanded physical rows; or save merges/splits rows that the store holds 1:1 with Dialogue events.
 
-**Good**: All surfaces use `getCueDisplay` + `settings.subtitleMergeMode` (`src/lib/ass/bilingual.ts`).
+**Good**: Translation page applies `settings.subtitleMergeMode` once when generating ASS, then loads physical rows (`mergeBilingual: false`). Editor list/form/preview/burn use one cue per Dialogue (`primaryText`). Clipboard whole-row I/O uses `formatDialogueEventLine` / `parseDialogueEventLine`.
 
 ### Mistake 4: VideoSession / clip semantics
 
@@ -132,7 +132,7 @@ Before implementation:
 
 - [ ] Mapped the complete data flow across React / Tauri / ASR (as needed)
 - [ ] Chose the owning layer for each step
-- [ ] Defined file paths (`VideoSession`, work cache) and ASS merge mode behavior
+- [ ] Defined file paths (`VideoSession`, work cache) and where `subtitleMergeMode` applies (translation generation only vs physical editor rows)
 - [ ] Planned cancel + progress polling ownership
 
 After implementation:

@@ -42,7 +42,8 @@ Before coding in this layer:
 - [ ] Confirm logic belongs in frontend (UI / ASS / translation), not Rust or Python
 - [ ] Check existing stores, hooks, and `services/tauri.ts` before adding new wrappers
 - [ ] For UI controls, prefer `src/components/ui/` (shadcn) over raw HTML elements
-- [ ] For ASS text, use `src/lib/ass/` (`getCueDisplay`, parse/serialize) — do not invent parallel models
+- [ ] For ASS text, use `src/lib/ass/` (parse/serialize, `eventLine` for single Dialogue clipboard lines) — do not invent parallel models
+- [ ] `subtitleMergeMode` is translation-generation only; editor/preview/burn consume physical Dialogue rows
 
 ---
 

@@ -29,7 +29,10 @@ Full chain (must stay intact): **Rust impl → `lib.rs` `generate_handler!` → 
 | `previewFontDiscovery.ts` | Singleton cache over `discoverPreviewFonts` |
 | `libassPreview.ts` / `libassFontSelection.ts` / `fontCoverage.ts` | Preview rendering / glyph fallback |
 | `translation/` | LLM translation (HTTP from frontend; not Tauri) |
-| `editorActions.ts` | Editor action orchestration on top of stores |
+| `editorActions.ts` | Pure editor list actions (split/merge/timing/delete) on cue arrays |
+| `subtitleClipboard.ts` | Whole-row ASS event copy/cut/paste via `@tauri-apps/plugin-clipboard-manager` + `eventLine` codec |
+
+Official Tauri plugins (e.g. clipboard-manager) are called from a focused domain service (`subtitleClipboard.ts`), not from React components and not via a custom Rust command / `tauri.ts` invoke. Still register the plugin in `lib.rs` and grant only needed capabilities (`clipboard-manager:allow-read-text`, `allow-write-text`).
 
 ## Patterns to Preserve
 

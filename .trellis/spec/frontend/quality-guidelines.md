@@ -31,6 +31,7 @@ Always use **pnpm** (never npm/yarn).
 
 - [ ] Types compile (`pnpm build` when signatures changed)
 - [ ] Relevant tests pass
-- [ ] ASS display/serialize still share `getCueDisplay` / `subtitleMergeMode`
-- [ ] New Tauri surface has a `tauri.ts` wrapper + types
+- [ ] Translation generation still honors `subtitleMergeMode`; editor/player/burn stay physical-row / mode-agnostic
+- [ ] Whole-row clipboard goes through `subtitleClipboard` (not in-memory cue arrays)
+- [ ] New product Tauri commands have a `tauri.ts` wrapper + types (official plugins may use their typed JS API instead of a custom command)
 - [ ] No placeholder / TODO-left-in-spec style comments in product code for unfinished features you claimed done

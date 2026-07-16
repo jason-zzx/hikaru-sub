@@ -25,11 +25,19 @@ Rules observed in code:
 
 ## Subtitle Merge Mode
 
-`useSubtitleMergeMode` loads `settings.subtitleMergeMode` (`inline` | `separate`). Editor list, editor pane, and player preview must all use `getCueDisplay` with this mode.
+`settings.subtitleMergeMode` (`inline` | `separate`) is **translation-generation only**. Do not reintroduce `useSubtitleMergeMode` or read merge mode in the editor list, selected-row form, preview, burn, or save paths.
 
-## Editor Hotkeys
+Physical editor cues are one row per ASS `Dialogue:` event (`primaryText` only). Translation applies merge mode when serializing logical results, then re-parses with `mergeBilingual: false` before writing `projectStore`.
 
-`useEditorHotkeys` + `components/editor/hotkeys.ts` own keyboard bindings. Keep hotkey definitions centralized; test via `useEditorHotkeys.test.ts` / `hotkeys.test.ts`.
+## Editor Hotkeys and Row Clipboard
+
+`useEditorHotkeys` + `components/editor/hotkeys.ts` own keyboard bindings. Whole-row copy/cut/paste use `src/services/subtitleClipboard.ts` (Tauri clipboard-manager plugin), not an in-memory cue array.
+
+- Outside focused text inputs: copy/cut write canonical `Dialogue:` lines; paste is line-by-line ASS or plain-text fallback after the selected row.
+- Inside `input` / `textarea` / `contentEditable`: do not intercept — keep native browser/WebView text editing.
+- Cut deletes selected rows only after a successful clipboard write.
+
+Keep hotkey definitions centralized; test via `useEditorHotkeys.test.ts` / `subtitleClipboard.test.ts`.
 
 ## Runtime Dependency Preparation
 
@@ -40,3 +48,4 @@ Rules observed in code:
 - Putting clip/burn finalize logic only in `ImportView` / `BurnView` effects
 - Re-discovering system fonts on every StyleManager open without `enabled` gating
 - New pollers that ignore cancel (`jobId` cleared) and still mutate session
+- Branching editor/player/burn UI on `subtitleMergeMode` or restoring in-memory cue-row clipboard modules
