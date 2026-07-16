@@ -14,7 +14,6 @@ interface BuildPreviewAssTextArgs {
   cues: SubtitleCue[];
   styles: AssStyle[];
   scriptInfo: AssScriptInfo | null;
-  mergeMode: "inline" | "separate";
   libassFallbackFontName?: string;
   libassGlyphCoverage?: LibassGlyphCoverageMap;
 }
@@ -23,7 +22,6 @@ export function buildPreviewAssText({
   cues,
   styles,
   scriptInfo,
-  mergeMode,
   libassFallbackFontName,
   libassGlyphCoverage,
 }: BuildPreviewAssTextArgs): string {
@@ -31,7 +29,8 @@ export function buildPreviewAssText({
   const fallbackCues = applyLibassGlyphFallbackToCues({
     cues: doc.cues,
     styles: doc.styles,
-    mergeMode,
+    // Physical rows have no secondaryText; inline is a no-op default for the glyph helper.
+    mergeMode: "inline",
     fallbackFontName: libassFallbackFontName,
     glyphCoverage: libassGlyphCoverage,
   });
@@ -40,6 +39,6 @@ export function buildPreviewAssText({
       ...doc,
       cues: fallbackCues,
     },
-    { mergeMode },
+    { preserveOrder: true },
   );
 }

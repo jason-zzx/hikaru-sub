@@ -36,7 +36,6 @@ interface SubtitlePreviewProps {
   activeCueId: string | null;
   styles: AssStyle[];
   scriptInfo: AssScriptInfo | null;
-  mergeMode: "inline" | "separate";
   currentTimeMs: number;
   displayRect: SubtitlePreviewDisplayRect;
   videoElement?: HTMLVideoElement | null;
@@ -80,7 +79,6 @@ export function SubtitlePreview({
   activeCueId,
   styles,
   scriptInfo,
-  mergeMode,
   currentTimeMs,
   displayRect,
   videoElement,
@@ -114,7 +112,6 @@ export function SubtitlePreview({
         cues,
         styles,
         scriptInfo,
-        mergeMode,
         libassFallbackFontName: glyphFallbackFont ?? defaultFont,
         libassGlyphCoverage: glyphCoverage,
       }),
@@ -122,7 +119,6 @@ export function SubtitlePreview({
       cues,
       styles,
       scriptInfo,
-      mergeMode,
       defaultFont,
       glyphCoverage,
       glyphFallbackFont,
@@ -133,10 +129,10 @@ export function SubtitlePreview({
       collectLibassGlyphFontChecks({
         cues: glyphCheckCues,
         styles,
-        mergeMode,
+        mergeMode: "inline",
         fallbackFontName: glyphFallbackFont ?? defaultFont,
       }),
-    [defaultFont, glyphCheckCues, glyphFallbackFont, mergeMode, styles],
+    [defaultFont, glyphCheckCues, glyphFallbackFont, styles],
   );
   const fontKey = useMemo(
     () =>
@@ -244,7 +240,7 @@ export function SubtitlePreview({
           cue={activeCue}
           styles={styles}
           scriptInfo={scriptInfo}
-          mergeMode={mergeMode}
+          mergeMode="inline"
           style={overlayStyle}
         />
       )}

@@ -116,7 +116,7 @@ export function parseExternalSubtitleDocument({
 }: ParseExternalSubtitleDocumentArgs): AssDocument {
   const ext = extensionOf(path);
   if (ext === "ass") {
-    return withVideoPlayRes(parseAss(text), playRes);
+    return withVideoPlayRes(parseAss(text, { mergeBilingual: false }), playRes);
   }
   if (ext === "srt") {
     return parseSrtDocument(text, playRes);

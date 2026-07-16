@@ -1,11 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  formatInlineCueText,
-  getCueDisplay,
-  SECONDARY_STYLE,
-  splitInlineCueText,
-} from "@/lib/ass";
-import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import { usePreviewFontNames } from "../../hooks/usePreviewFontNames";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
@@ -48,8 +41,6 @@ const QUICK_FONT_OPTIONS = [
   "Yu Gothic",
 ];
 
-type EditableTextField = "inline" | "primary" | "secondary";
-
 type TextEditBaseline = {
   cue: SubtitleCue;
   wasDirty: boolean;
@@ -69,7 +60,6 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   const addCue = useProjectStore((s) => s.addCue);
   const deleteCue = useProjectStore((s) => s.deleteCue);
   const assStyles = useProjectStore((s) => s.assStyles);
-  const mergeMode = useSubtitleMergeMode();
 
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
@@ -79,98 +69,39 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
 
   const selectedCue = cues.find((c) => c.id === selectedCueId);
 
-  const [inlineText, setInlineText] = useState("");
-  const [primaryText, setPrimaryText] = useState("");
-  const [secondaryText, setSecondaryText] = useState("");
+  const [text, setText] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [quickFontName, setQuickFontName] = useState("");
   const [quickFontSize, setQuickFontSize] = useState("48");
-  const [activeTextField, setActiveTextField] =
-    useState<EditableTextField>("primary");
-  const [inlineEditorCueId, setInlineEditorCueId] = useState<string | null>(
-    null,
-  );
 
-  /** Esc 放弃草稿时置位，跳过随后 blur 触发的提交 */
   const escapingRef = useRef(false);
-  const activeTextFieldRef = useRef<EditableTextField>("primary");
   const textEditBaselineRef = useRef<TextEditBaseline | null>(null);
-  const inlineTextRef = useRef<HTMLTextAreaElement>(null);
-  const primaryTextRef = useRef<HTMLTextAreaElement>(null);
-  const secondaryTextRef = useRef<HTMLTextAreaElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   const startTimeRef = useRef<HTMLInputElement>(null);
   const endTimeRef = useRef<HTMLInputElement>(null);
 
-  const selectedCueStartsInline =
-    mergeMode === "inline" &&
-    !!selectedCue &&
-    !!formatInlineCueText(selectedCue);
-  const useInlineEditor =
-    mergeMode === "inline" &&
-    !!selectedCue &&
-    (inlineEditorCueId === selectedCue.id || selectedCueStartsInline);
   const fontNames = usePreviewFontNames([
     ...QUICK_FONT_OPTIONS,
     ...assStyles.map((style) => style.fontName),
   ]);
 
   useEffect(() => {
-    setInlineEditorCueId(
-      selectedCueStartsInline && selectedCue ? selectedCue.id : null,
-    );
     textEditBaselineRef.current = null;
-    // 只在切换字幕/合并模式时锁定编辑器形态，避免实时预览把行内编辑框切走。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCue?.id, mergeMode]);
+  }, [selectedCue?.id]);
 
-  // 文本草稿：仅在切换字幕或 store 文本变化（提交/撤销/翻译）时重置。
-  // 打点只改时间不触发本 effect，正在输入的草稿不丢。
   useEffect(() => {
     if (!selectedCue) return;
-
-    const display = getCueDisplay(selectedCue, mergeMode);
-    if (display.mode === "single") {
-      setInlineText(display.text);
-      setPrimaryText(selectedCue.primaryText);
-      setSecondaryText(selectedCue.secondaryText || "");
-    } else {
-      setInlineText("");
-      setPrimaryText(display.primaryText);
-      setSecondaryText(display.secondaryText);
-    }
+    setText(selectedCue.primaryText);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedCue?.id,
-    selectedCue?.primaryText,
-    selectedCue?.secondaryText,
-    mergeMode,
-  ]);
+  }, [selectedCue?.id, selectedCue?.primaryText]);
 
-  // 时间字段：实时跟随 store（Ctrl+3/4 打点后即时刷新）。
   useEffect(() => {
     if (!selectedCue) return;
     setStartTime(formatTimeInput(selectedCue.startMs));
     setEndTime(formatTimeInput(selectedCue.endMs));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCue?.id, selectedCue?.startMs, selectedCue?.endMs]);
-
-  const textUpdatesFor = (
-    field: EditableTextField,
-    nextText: string,
-  ): Pick<Partial<SubtitleCue>, "primaryText" | "secondaryText"> => {
-    if (field === "inline") {
-      const split = splitInlineCueText(nextText);
-      return {
-        primaryText: split?.primaryText ?? nextText,
-        secondaryText: split?.secondaryText,
-      };
-    }
-    if (field === "secondary") {
-      return { secondaryText: nextText || undefined };
-    }
-    return { primaryText: nextText };
-  };
 
   const rememberTextEditBaseline = () => {
     if (!selectedCue) return;
@@ -181,26 +112,20 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     };
   };
 
-  const handleTextFocus = (field: EditableTextField) => {
-    activeTextFieldRef.current = field;
-    setActiveTextField(field);
+  const handleTextFocus = () => {
     rememberTextEditBaseline();
   };
 
-  const handleTextChange = (field: EditableTextField, nextText: string) => {
-    if (field === "inline") setInlineText(nextText);
-    if (field === "primary") setPrimaryText(nextText);
-    if (field === "secondary") setSecondaryText(nextText);
-
+  const handleTextChange = (nextText: string) => {
+    setText(nextText);
     if (!selectedCue) return;
     rememberTextEditBaseline();
-    updateCuePreview(selectedCue.id, textUpdatesFor(field, nextText));
+    updateCuePreview(selectedCue.id, { primaryText: nextText });
   };
 
-  // Insert 新建字幕后的聚焦请求
   useEffect(() => {
     if (editorFocusNonce > 0) {
-      (useInlineEditor ? inlineTextRef.current : primaryTextRef.current)?.focus();
+      textRef.current?.focus();
     }
   }, [editorFocusNonce]);
 
@@ -220,19 +145,9 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     });
   };
 
-  const buildCurrentTextUpdates = () => {
-    if (useInlineEditor) {
-      return textUpdatesFor("inline", inlineText);
-    }
-    return {
-      ...textUpdatesFor("primary", primaryText),
-      ...textUpdatesFor("secondary", secondaryText),
-    };
-  };
-
   const commitTextDraft = () => {
     if (!selectedCue) return false;
-    updateCue(selectedCue.id, buildCurrentTextUpdates());
+    updateCue(selectedCue.id, { primaryText: text });
     textEditBaselineRef.current = null;
     return true;
   };
@@ -256,7 +171,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     setStartTime(result.startText);
     setEndTime(result.endText);
     updateCue(selectedCue.id, {
-      ...buildCurrentTextUpdates(),
+      primaryText: text,
       startMs: result.startMs,
       endMs: result.endMs,
     });
@@ -278,7 +193,6 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     commitTimeDraft(field);
   };
 
-  /** Enter：提交并跳下一条；最后一条时追加新行（继承样式，起点接结束时间）。 */
   const commitAndNext = () => {
     if (!selectedCue) return;
     if (!commitDraft()) return;
@@ -304,96 +218,54 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     addCue(appended);
     setSelectedCueId(appended.id);
     setCurrentTime(appended.startMs);
-    // 焦点保持在 textarea（元素不卸载），草稿经 id 变化的 effect 重置为空文本
   };
 
-  const getActiveTextTarget = () => {
-    const field = activeTextFieldRef.current;
-    return (
-      field === "secondary" && secondaryTextRef.current
-        ? {
-            field: "secondary" as const,
-            textarea: secondaryTextRef.current,
-            text: secondaryText,
-          }
-        : useInlineEditor && inlineTextRef.current
-          ? {
-              field: "inline" as const,
-              textarea: inlineTextRef.current,
-              text: inlineText,
-            }
-          : primaryTextRef.current
-            ? {
-                field: "primary" as const,
-                textarea: primaryTextRef.current,
-                text: primaryText,
-              }
-            : null
-    );
-  };
-
-  const activeTarget = getActiveTextTarget();
-  const styleForTextField = (field: EditableTextField | undefined) => {
-    const styleName =
-      field === "secondary" ? SECONDARY_STYLE : selectedCue?.style;
-    return styleName
-      ? assStyles.find((style) => style.name === styleName)
-      : undefined;
-  };
-
-  const currentStyle = activeTarget
-    ? styleForTextField(activeTarget.field)
-    : styleForTextField(activeTextField);
-  const effectiveAlignment = activeTarget
-    ? findEffectiveAlignment(activeTarget.text, currentStyle?.alignment)
+  const currentStyle = selectedCue
+    ? assStyles.find((style) => style.name === selectedCue.style)
+    : undefined;
+  const effectiveAlignment = textRef.current
+    ? findEffectiveAlignment(text, currentStyle?.alignment)
     : currentStyle?.alignment;
 
   const applyAttributeTag = (
     kind: AttributeOverrideKind,
     startTag: string,
   ) => {
-    const target = getActiveTextTarget();
-    if (!target) return;
-    const targetStyle = styleForTextField(target.field);
+    const textarea = textRef.current;
+    if (!textarea) return;
 
     const result = applyAttributeOverrideTag(
-      target.text,
-      target.textarea.selectionStart,
-      target.textarea.selectionEnd,
+      text,
+      textarea.selectionStart,
+      textarea.selectionEnd,
       {
         startTag,
-        restoreTag: restoreTagForStyle(kind, targetStyle),
+        restoreTag: restoreTagForStyle(kind, currentStyle),
       },
     );
 
-    handleTextChange(target.field, result.text);
+    handleTextChange(result.text);
     window.setTimeout(() => {
-      target.textarea.focus();
-      target.textarea.setSelectionRange(
-        result.selectionStart,
-        result.selectionEnd,
-      );
+      textarea.focus();
+      textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
     }, 0);
   };
 
   const applyToggleTag = (startTag: string, endTag: string) => {
-    const target = getActiveTextTarget();
-    if (!target) return;
+    const textarea = textRef.current;
+    if (!textarea) return;
 
     const result = applyToggleOverrideTag(
-      target.text,
-      target.textarea.selectionStart,
-      target.textarea.selectionEnd,
+      text,
+      textarea.selectionStart,
+      textarea.selectionEnd,
       { startTag, endTag },
     );
 
-    handleTextChange(target.field, result.text);
+    handleTextChange(result.text);
     window.setTimeout(() => {
-      target.textarea.focus();
-      target.textarea.setSelectionRange(
-        result.selectionStart,
-        result.selectionEnd,
-      );
+      textarea.focus();
+      textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
     }, 0);
   };
 
@@ -426,37 +298,19 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
 
   const handleInlineAlignment = (alignment: number) => {
     if (!Number.isInteger(alignment) || alignment < 1 || alignment > 9) return;
-    const target = getActiveTextTarget();
-    if (!target) return;
-    // Alignment is a paragraph-level property: replace any existing \an and
-    // force the new tag to the front instead of wrapping the selection.
-    const result = applyAlignmentReplace(target.text, alignment);
-    handleTextChange(target.field, result.text);
+    const textarea = textRef.current;
+    if (!textarea) return;
+    const result = applyAlignmentReplace(text, alignment);
+    handleTextChange(result.text);
     window.setTimeout(() => {
-      target.textarea.focus();
-      target.textarea.setSelectionRange(
-        result.selectionStart,
-        result.selectionEnd,
-      );
+      textarea.focus();
+      textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
     }, 0);
-  };
-
-  const resetTextDraftsFromCue = (cue: SubtitleCue) => {
-    const display = getCueDisplay(cue, mergeMode);
-    if (display.mode === "single") {
-      setInlineText(display.text);
-      setPrimaryText(cue.primaryText);
-      setSecondaryText(cue.secondaryText || "");
-    } else {
-      setInlineText("");
-      setPrimaryText(display.primaryText);
-      setSecondaryText(display.secondaryText);
-    }
   };
 
   const resetDraftsFromStore = () => {
     if (!selectedCue) return;
-    resetTextDraftsFromCue(selectedCue);
+    setText(selectedCue.primaryText);
     setStartTime(formatTimeInput(selectedCue.startMs));
     setEndTime(formatTimeInput(selectedCue.endMs));
   };
@@ -470,12 +324,11 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
 
     updateCuePreview(selectedCue.id, {
       primaryText: baseline.cue.primaryText,
-      secondaryText: baseline.cue.secondaryText,
     });
     if (!baseline.wasDirty) {
       useProjectStore.getState().markSaved();
     }
-    resetTextDraftsFromCue(baseline.cue);
+    setText(baseline.cue.primaryText);
     textEditBaselineRef.current = null;
   };
 
@@ -501,7 +354,6 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
       e.preventDefault();
       commitAndNext();
     }
-    // Shift+Enter 走 textarea 默认换行
   };
 
   const handleTimeKeyDown =
@@ -602,7 +454,6 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
         </div>
       </div>
 
-      {/* 时间轴编辑 */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="mb-1 block text-xs text-text-muted">开始时间</label>
@@ -718,65 +569,19 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
         </div>
       </div>
 
-      {/* 字幕编辑 */}
-      {useInlineEditor ? (
-        <div>
-          <label className="mb-1 block text-xs text-text-muted">字幕</label>
-          <textarea
-            ref={inlineTextRef}
-            value={inlineText}
-            onChange={(e) => handleTextChange("inline", e.target.value)}
-            onBlur={handleBlur}
-            onFocus={() => handleTextFocus("inline")}
-            onKeyDown={handleTextKeyDown}
-            className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-            rows={5}
-          />
-        </div>
-      ) : secondaryText ? (
-        <>
-          <div>
-            <label className="mb-1 block text-xs text-text-muted">译文</label>
-            <textarea
-              ref={secondaryTextRef}
-              value={secondaryText}
-              onChange={(e) => handleTextChange("secondary", e.target.value)}
-              onBlur={handleBlur}
-              onFocus={() => handleTextFocus("secondary")}
-              onKeyDown={handleTextKeyDown}
-              className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-              rows={2}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-text-muted">原文</label>
-            <textarea
-              ref={primaryTextRef}
-              value={primaryText}
-              onChange={(e) => handleTextChange("primary", e.target.value)}
-              onBlur={handleBlur}
-              onFocus={() => handleTextFocus("primary")}
-              onKeyDown={handleTextKeyDown}
-              className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-              rows={3}
-            />
-          </div>
-        </>
-      ) : (
-        <div>
-          <label className="mb-1 block text-xs text-text-muted">字幕</label>
-          <textarea
-            ref={primaryTextRef}
-            value={primaryText}
-            onChange={(e) => handleTextChange("primary", e.target.value)}
-            onBlur={handleBlur}
-            onFocus={() => handleTextFocus("primary")}
-            onKeyDown={handleTextKeyDown}
-            className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-            rows={5}
-          />
-        </div>
-      )}
+      <div>
+        <label className="mb-1 block text-xs text-text-muted">字幕</label>
+        <textarea
+          ref={textRef}
+          value={text}
+          onChange={(e) => handleTextChange(e.target.value)}
+          onBlur={handleBlur}
+          onFocus={handleTextFocus}
+          onKeyDown={handleTextKeyDown}
+          className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+          rows={5}
+        />
+      </div>
     </div>
   );
 }

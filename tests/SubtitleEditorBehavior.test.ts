@@ -70,12 +70,13 @@ describe("SubtitleEditor 快捷键行为约束", () => {
     expect(source).toContain("findEffectiveAlignment");
   });
 
-  it("resolves restore style from the active text field", () => {
-    expect(source).toContain("SECONDARY_STYLE");
-    expect(source).toContain("setActiveTextField");
-    expect(source).toContain("styleForTextField");
-    expect(source).toContain('field === "secondary" ? SECONDARY_STYLE');
-    expect(source).toContain("restoreTagForStyle(kind, targetStyle)");
+  it("uses a single generic subtitle text field without merge-mode dual editors", () => {
+    expect(source).toContain('text-xs text-text-muted">字幕');
+    expect(source).toContain("primaryText: text");
+    expect(source).toContain("restoreTagForStyle(kind, currentStyle)");
+    expect(source).not.toContain("useSubtitleMergeMode");
+    expect(source).not.toContain("setActiveTextField");
+    expect(source).not.toContain("SECONDARY_STYLE");
   });
 
   it("commits quick font size through blur only on Enter", () => {

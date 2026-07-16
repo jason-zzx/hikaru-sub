@@ -24,7 +24,8 @@ describe("editor style visual editing integration", () => {
     expect(source).toContain("{\\\\i");
     expect(source).toContain("{\\\\u1}");
     expect(source).toContain("{\\\\s1}");
-    expect(source).toContain("activeTextFieldRef");
+    expect(source).toContain("textRef");
+    expect(source).not.toContain("activeTextFieldRef");
     expect(source).toContain("快速样式标签");
   });
 

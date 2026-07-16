@@ -24,14 +24,13 @@ describe("buildPreviewAssText", () => {
     },
   };
 
-  it("serializes the current in-memory ASS document for inline preview", () => {
+  it("serializes physical rows one-to-one without bilingual reinterpretation", () => {
     const cues: SubtitleCue[] = [
       {
         id: "cue-1",
         startMs: 1000,
         endMs: 2500,
-        primaryText: "原文",
-        secondaryText: "译文",
+        primaryText: "译文 / 原文",
         style: "Primary",
         layer: 0,
       },
@@ -41,7 +40,6 @@ describe("buildPreviewAssText", () => {
       cues,
       styles: createDefaultStyles(),
       scriptInfo: createDefaultScriptInfo("Preview", 1280, 720),
-      mergeMode: "inline",
     });
 
     expect(text).toContain("PlayResX: 1280");
@@ -67,7 +65,6 @@ describe("buildPreviewAssText", () => {
       cues,
       styles,
       scriptInfo: createDefaultScriptInfo("Preview", 1280, 720),
-      mergeMode: "inline",
       libassFallbackFontName: "Microsoft YaHei",
       libassGlyphCoverage: arialMissingChineseCoverage,
     });
@@ -81,7 +78,7 @@ describe("buildPreviewAssText", () => {
     );
   });
 
-  it("adds render-only fallback tags to the secondary style text in separate mode", () => {
+  it("serializes separate physical primary/secondary rows independently", () => {
     const styles = stylesWithFonts({
       Primary: "Arial",
       [SECONDARY_STYLE]: "Arial",
@@ -92,8 +89,15 @@ describe("buildPreviewAssText", () => {
         startMs: 1000,
         endMs: 2500,
         primaryText: "English line",
-        secondaryText: "中文译文",
         style: "Primary",
+        layer: 0,
+      },
+      {
+        id: "cue-2",
+        startMs: 1000,
+        endMs: 2500,
+        primaryText: "中文译文",
+        style: SECONDARY_STYLE,
         layer: 0,
       },
     ];
@@ -102,7 +106,6 @@ describe("buildPreviewAssText", () => {
       cues,
       styles,
       scriptInfo: createDefaultScriptInfo("Preview", 1280, 720),
-      mergeMode: "separate",
       libassFallbackFontName: "Microsoft YaHei",
       libassGlyphCoverage: arialMissingChineseCoverage,
     });
@@ -131,7 +134,6 @@ describe("buildPreviewAssText", () => {
       cues,
       styles,
       scriptInfo: createDefaultScriptInfo("Preview", 1280, 720),
-      mergeMode: "inline",
       libassFallbackFontName: "Microsoft YaHei",
       libassGlyphCoverage: {
         microsoftyahei: {
@@ -163,7 +165,6 @@ describe("buildPreviewAssText", () => {
       cues,
       styles,
       scriptInfo: createDefaultScriptInfo("Preview", 1280, 720),
-      mergeMode: "inline",
       libassFallbackFontName: "Microsoft YaHei",
     });
 
@@ -188,7 +189,6 @@ describe("buildPreviewAssText", () => {
       cues,
       styles,
       scriptInfo: createDefaultScriptInfo("Preview", 1280, 720),
-      mergeMode: "inline",
     });
 
     expect(text).toContain("Style: Primary,.苹方-简");

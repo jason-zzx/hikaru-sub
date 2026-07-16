@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { getCueDisplay } from "@/lib/ass";
-import { useSubtitleMergeMode } from "../../hooks/useSubtitleMergeMode";
 import {
-  copyCueRows,
   deleteCuesById,
   duplicateCues,
-  getCueRowClipboard,
-  hasCueRowClipboard,
   insertCueRelative,
   mergeSelectedCues,
-  pasteCueRows,
-  setCueRowClipboard,
   splitCueAtTime,
   swapSelectedCues,
   type CueListActionResult,
 } from "../../services/editorActions";
+import {
+  copyCuesToSystemClipboard,
+  cutCuesToSystemClipboard,
+  pasteCuesFromSystemClipboard,
+} from "../../services/subtitleClipboard";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import type { SubtitleCue } from "../../types";
@@ -37,7 +35,6 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
   const cues = useProjectStore((s) => s.cues);
   const replaceCues = useProjectStore((s) => s.replaceCues);
   const assStyles = useProjectStore((s) => s.assStyles);
-  const mergeMode = useSubtitleMergeMode();
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
   const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
@@ -52,7 +49,6 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
 
-  // 自动滚动到选中项
   useEffect(() => {
     if (selectedRef.current && listRef.current) {
       const list = listRef.current;
@@ -175,24 +171,44 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
     if (!action()) onNotify?.("error", failureText);
   };
 
-  const copySelectedRows = (): boolean => {
-    const copied = copyCueRows(cues, getActionSelectionIds());
-    if (copied.length === 0) return false;
-    setCueRowClipboard(copied);
-    onNotify?.("info", `已复制 ${copied.length} 行字幕`);
+  const runAsyncMenuAction = (
+    action: () => Promise<boolean>,
+    failureText: string,
+  ) => {
+    setContextMenu(null);
+    void action().then((ok) => {
+      if (!ok) onNotify?.("error", failureText);
+    });
+  };
+
+  const copySelectedRows = async (): Promise<boolean> => {
+    const result = await copyCuesToSystemClipboard(cues, getActionSelectionIds());
+    if (!result.ok) {
+      onNotify?.("error", result.error);
+      return false;
+    }
+    onNotify?.("info", `已复制 ${result.count} 行字幕`);
     return true;
   };
 
-  const cutSelectedRows = (): boolean => {
+  const cutSelectedRows = async (): Promise<boolean> => {
     const selectionIds = getActionSelectionIds();
-    const copied = copyCueRows(cues, selectionIds);
-    if (copied.length === 0) return false;
-    setCueRowClipboard(copied);
-    return applyCueListResult(deleteCuesById(cues, selectionIds));
+    const result = await cutCuesToSystemClipboard(cues, selectionIds);
+    if (!result.ok) {
+      onNotify?.("error", result.error);
+      return false;
+    }
+    return applyCueListResult(result.listResult);
   };
 
-  const pasteRows = (): boolean =>
-    applyCueListResult(pasteCueRows(cues, getCueRowClipboard(), getActionTargetId()));
+  const pasteRows = async (): Promise<boolean> => {
+    const result = await pasteCuesFromSystemClipboard(cues, getActionTargetId());
+    if (!result.ok) {
+      if (result.error) onNotify?.("error", result.error);
+      return false;
+    }
+    return applyCueListResult(result.listResult);
+  };
 
   const targetCue = cues.find((cue) => cue.id === getActionTargetId()) ?? null;
   const canSplitTarget =
@@ -213,7 +229,6 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
     <div ref={listRef} className="h-full overflow-auto select-none">
       <div className="space-y-1 p-2">
         {cues.map((cue, index) => {
-          const display = getCueDisplay(cue, mergeMode);
           const isSelected =
             selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
           const styleMissing =
@@ -249,16 +264,7 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
                 </span>
               </div>
               <div className="space-y-1 text-sm">
-                {display.mode === "single" ? (
-                  <div className="text-text">{display.text}</div>
-                ) : (
-                  <>
-                    <div className="font-medium text-primary">
-                      {display.secondaryText}
-                    </div>
-                    <div className="text-text">{display.primaryText}</div>
-                  </>
-                )}
+                <div className="text-text">{cue.primaryText}</div>
               </div>
             </div>
           );
@@ -343,21 +349,20 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
 
           <MenuButton
             onClick={() =>
-              runMenuAction(copySelectedRows, "没有可复制的字幕行")
+              runAsyncMenuAction(copySelectedRows, "没有可复制的字幕行")
             }
           >
             复制行
           </MenuButton>
           <MenuButton
             onClick={() =>
-              runMenuAction(cutSelectedRows, "没有可剪切的字幕行")
+              runAsyncMenuAction(cutSelectedRows, "没有可剪切的字幕行")
             }
           >
             剪切行
           </MenuButton>
           <MenuButton
-            disabled={!hasCueRowClipboard()}
-            onClick={() => runMenuAction(pasteRows, "没有可粘贴的字幕行")}
+            onClick={() => runAsyncMenuAction(pasteRows, "没有可粘贴的字幕行")}
           >
             粘贴行
           </MenuButton>

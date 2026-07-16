@@ -4,17 +4,18 @@ import { usePlaybackStore } from "../stores/playbackStore";
 import { useUiStore } from "../stores/uiStore";
 import { findHotkey, type EditorActionId } from "../components/editor/hotkeys";
 import {
-  copyCueRows,
   createCueAtPlayheadWithUniqueId,
   deleteCuesById,
   findSubtitleBoundary,
   frameStepTarget,
-  getCueRowClipboard,
-  pasteCueRows,
   selectCueAndSeek,
   selectCueByOffset,
-  setCueRowClipboard,
 } from "../services/editorActions";
+import {
+  copyCuesToSystemClipboard,
+  cutCuesToSystemClipboard,
+  pasteCuesFromSystemClipboard,
+} from "../services/subtitleClipboard";
 import type { SubtitleCue } from "../types";
 
 const FAST_JUMP_FRAMES = 10;
@@ -114,32 +115,46 @@ export function buildEditorActions(
   };
 
   const copyCues = () => {
-    const selectedIds = selectedIdsOrActive();
-    if (selectedIds.length === 0) return;
-    const copied = copyCueRows(useProjectStore.getState().cues, selectedIds);
-    if (copied.length > 0) setCueRowClipboard(copied);
+    void (async () => {
+      const selectedIds = selectedIdsOrActive();
+      if (selectedIds.length === 0) return;
+      const result = await copyCuesToSystemClipboard(
+        useProjectStore.getState().cues,
+        selectedIds,
+      );
+      if (!result.ok) options.onNotify?.("error", result.error);
+    })();
   };
 
   const cutCues = () => {
-    const selectedIds = selectedIdsOrActive();
-    if (selectedIds.length === 0) return;
-    const cues = useProjectStore.getState().cues;
-    const copied = copyCueRows(cues, selectedIds);
-    if (copied.length === 0) return;
-    setCueRowClipboard(copied);
-    applyCueListResult(deleteCuesById(cues, selectedIds));
+    void (async () => {
+      const selectedIds = selectedIdsOrActive();
+      if (selectedIds.length === 0) return;
+      const result = await cutCuesToSystemClipboard(
+        useProjectStore.getState().cues,
+        selectedIds,
+      );
+      if (!result.ok) {
+        options.onNotify?.("error", result.error);
+        return;
+      }
+      applyCueListResult(result.listResult);
+    })();
   };
 
   const pasteCues = () => {
-    const pb = usePlaybackStore.getState();
-    const result = pasteCueRows(
-      useProjectStore.getState().cues,
-      getCueRowClipboard(),
-      pb.selectedCueId,
-    );
-    if (!applyCueListResult(result)) {
-      options.onNotify?.("info", "没有可粘贴的字幕行");
-    }
+    void (async () => {
+      const pb = usePlaybackStore.getState();
+      const result = await pasteCuesFromSystemClipboard(
+        useProjectStore.getState().cues,
+        pb.selectedCueId,
+      );
+      if (!result.ok) {
+        if (result.error) options.onNotify?.("error", result.error);
+        return;
+      }
+      applyCueListResult(result.listResult);
+    })();
   };
 
   const selectAllCues = () => {

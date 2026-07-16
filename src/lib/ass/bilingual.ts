@@ -109,15 +109,15 @@ export function cueToEvents(
   return events;
 }
 
-/** 多条 cue 展开为事件列表（按时间排序后输出）。 */
+/** 多条 cue 展开为事件列表（默认按时间排序；preserveOrder 时保留数组顺序）。 */
 export function cuesToEvents(
   cues: SubtitleCue[],
   options: Partial<import("./types").SerializeOptions> = {},
 ): AssEvent[] {
-  const sorted = [...cues].sort(
-    (a, b) => a.startMs - b.startMs || a.endMs - b.endMs,
-  );
-  return sorted.flatMap((cue) => cueToEvents(cue, options));
+  const ordered = options.preserveOrder
+    ? cues
+    : [...cues].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+  return ordered.flatMap((cue) => cueToEvents(cue, options));
 }
 
 /**

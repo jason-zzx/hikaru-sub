@@ -317,48 +317,6 @@ export function copyCueRows(
   return cues.filter((cue) => selectedSet.has(cue.id)).map((cue) => ({ ...cue }));
 }
 
-export function pasteCueRows(
-  cues: SubtitleCue[],
-  clipboardCues: SubtitleCue[],
-  targetId: string | null,
-  createIdFn?: CreateIdFn,
-): CueListActionResult | null {
-  if (clipboardCues.length === 0) return null;
-  const targetIndex = targetId
-    ? cues.findIndex((cue) => cue.id === targetId)
-    : cues.length - 1;
-  const insertIndex = targetIndex >= 0 ? targetIndex + 1 : cues.length;
-  const existingAndCreated = [...cues];
-  const pasted: SubtitleCue[] = [];
-
-  for (const cue of clipboardCues) {
-    const id = createUniqueCueId(existingAndCreated, createIdFn);
-    if (!id) return null;
-    const nextCue = cloneCueWithId(cue, id);
-    existingAndCreated.push(nextCue);
-    pasted.push(nextCue);
-  }
-
-  return {
-    cues: [...cues.slice(0, insertIndex), ...pasted, ...cues.slice(insertIndex)],
-    selectedCueIds: pasted.map((cue) => cue.id),
-  };
-}
-
-let cueRowClipboard: SubtitleCue[] = [];
-
-export function setCueRowClipboard(cues: SubtitleCue[]): void {
-  cueRowClipboard = cues.map((cue) => ({ ...cue }));
-}
-
-export function getCueRowClipboard(): SubtitleCue[] {
-  return cueRowClipboard.map((cue) => ({ ...cue }));
-}
-
-export function hasCueRowClipboard(): boolean {
-  return cueRowClipboard.length > 0;
-}
-
 function buildAppendedCue(cue: SubtitleCue, id: string): SubtitleCue {
   return {
     id,

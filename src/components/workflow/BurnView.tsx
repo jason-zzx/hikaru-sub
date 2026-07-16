@@ -8,7 +8,6 @@ import { useUiStore } from "../../stores/uiStore";
 import {
   cancelBurn,
   checkFfmpeg,
-  getSettings,
   invalidateFfmpegStatus,
   pickDirectory,
   probeBurnVideo,
@@ -307,13 +306,10 @@ export function BurnView() {
     });
 
     try {
-      const settings = await getSettings();
       const doc = resolveAssDocumentForSave(cues, assScriptInfo, assStyles, {
         title: "Hikaru Sub",
       });
-      const assText = serializeAss(doc, {
-        mergeMode: settings.subtitleMergeMode,
-      });
+      const assText = serializeAss(doc, { preserveOrder: true });
       await saveAssText(session.burnAssPath, assText);
 
       const id = await startBurnSubtitles({
