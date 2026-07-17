@@ -15,7 +15,7 @@ describe("editor style visual editing integration", () => {
     expect(source).toContain("applyAttributeTag");
     expect(source).toContain("applyToggleOverrideTag");
     expect(source).toContain("FontComboBox");
-    expect(source).toContain("updateCuePreview");
+    expect(source).toContain("applyTextEdit");
     expect(source).toContain("handleTextChange");
     expect(source).toContain("{\\\\fn");
     expect(source).toContain("{\\\\fs");

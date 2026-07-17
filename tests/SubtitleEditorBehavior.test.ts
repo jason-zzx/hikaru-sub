@@ -72,7 +72,7 @@ describe("SubtitleEditor 快捷键行为约束", () => {
 
   it("uses a single generic subtitle text field without merge-mode dual editors", () => {
     expect(source).toContain('text-xs text-text-muted">字幕');
-    expect(source).toContain("primaryText: text");
+    expect(source).toContain('const text = selectedCue?.primaryText ?? ""');
     expect(source).toContain("restoreTagForStyle(kind, currentStyle)");
     expect(source).not.toContain("useSubtitleMergeMode");
     expect(source).not.toContain("setActiveTextField");

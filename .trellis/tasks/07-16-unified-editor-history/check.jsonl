@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend scope and quality gate for final verification."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify bounded history, atomic batch operations, revisions, and cross-store selection behavior."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Verify centralized hotkey routing and the approved marked-input exception."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Verify physical-row and single/batch editor behavior remains intact."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Required focused tests, full test suite, build, and minimal-diff checks."}
+{"file":".trellis/tasks/07-16-unified-editor-history/research/aegisub-text-undo-grouping.md","reason":"Verify implementation matches the approved operation-based grouping evidence."}

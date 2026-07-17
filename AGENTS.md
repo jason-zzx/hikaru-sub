@@ -152,7 +152,8 @@ interface SubtitleCue {
 - **`subtitleMergeMode` 只在翻译生成 ASS 时生效**：`inline` 写出一条 `译文 / 原文` Dialogue；`separate` 写出同时间轴的 Primary + Secondary 两条 Dialogue。
 - **编辑器 / 预览 / 压制 / 保存** 按物理 ASS 行：一条 `Dialogue:` ↔ 一个 cue（`primaryText`），加载用 `parseAss(..., { mergeBilingual: false })`，保存/压制用 `serializeAss(..., { preserveOrder: true })`，**不再**读 `subtitleMergeMode` 或经 `getCueDisplay` 做双语展示分支。
 - 翻译页进入时加载 **转录 ASS** 作页内源，不把已展开的物理译稿当翻译源；仅再点翻译时才写 `*.translated.ass`，进入页面本身不覆盖/删除该文件。
-- 编辑器整行复制/剪切/粘贴走系统剪贴板（`subtitleClipboard` + Tauri clipboard-manager，ASS `Dialogue:` 行；非 ASS 文本按选中行后 2s fallback）；聚焦 `input`/`textarea` 时不拦截，保留原生文本编辑。
+- 编辑器整行复制/剪切/粘贴走系统剪贴板（`subtitleClipboard` + Tauri clipboard-manager，ASS `Dialogue:` 行；非 ASS 文本按选中行后 2s fallback）；聚焦 `input`/`textarea` 时不拦截整行剪贴板快捷键，保留原生文本剪贴。
+- 所有持久 `SubtitleCue` 修改共享 `projectStore` 的同一条撤销/重做历史。字幕正文与开始/结束时间输入用 `data-history-command` 明确接管项目撤销/重做；字体搜索、快速格式参数、行内颜色/数值、筛选器与 `StyleManager` 等未标记的瞬态输入仍保留浏览器/WebView 原生撤销/重做。文本连续插入、Backspace 与 Delete 按 Aegisub 式连续性分组，IME 中间态只更新预览，提交后才进入历史。
 - 转录完成时经 `get_video_info` 将视频分辨率写入 ASS `PlayResX/Y` 与默认双语 Style；翻译、编辑保存沿用该 Script Info，不重新探测视频覆盖分辨率。
 
 ## 运行时依赖与 ASR

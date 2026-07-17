@@ -54,7 +54,7 @@ describe("file-centered transcription and translation", () => {
   it("uses strict session subtitle paths", () => {
     expect(transcribeSource).toContain("session.transcribedAssPath");
     expect(transcribeSource).not.toContain("deleteCachedAudio");
-    expect(transcribeSource).toContain("markSaved();");
+    expect(transcribeSource).toMatch(/markSaved\(/);
     expect(translateSource).toContain("session.translatedAssPath");
     expect(translateSource).not.toContain("replace(/\\.ass$/i");
   });

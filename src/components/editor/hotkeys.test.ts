@@ -64,11 +64,18 @@ describe("findHotkey", () => {
     expect(findHotkey(ev({ key: "s", metaKey: true, target: BODY }))?.action).toBe("save");
   });
 
-  it("Ctrl+Z 框内不匹配（放行原生文本撤销），框外匹配 undo", () => {
+  it("Ctrl+Z 在框外与标记的持久控件内匹配 project undo；未标记框内放行原生撤销", () => {
+    const marked = {
+      tagName: "TEXTAREA",
+      getAttribute: (name: string) =>
+        name === "data-history-command" ? "true" : null,
+    };
     expect(findHotkey(ev({ key: "z", ctrlKey: true, target: TEXTAREA }))).toBeNull();
+    expect(findHotkey(ev({ key: "z", ctrlKey: true, target: marked }))?.action).toBe("undo");
     expect(findHotkey(ev({ key: "z", ctrlKey: true, target: BODY }))?.action).toBe("undo");
     expect(findHotkey(ev({ key: "z", ctrlKey: true, shiftKey: true, target: BODY }))?.action).toBe("redo");
     expect(findHotkey(ev({ key: "y", ctrlKey: true, target: BODY }))?.action).toBe("redo");
+    expect(findHotkey(ev({ key: "y", ctrlKey: true, target: marked }))?.action).toBe("redo");
   });
 
   it("Ctrl/Cmd+C/X/V match whole-row clipboard actions only outside text inputs", () => {
