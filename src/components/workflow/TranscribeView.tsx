@@ -358,10 +358,16 @@ export function TranscribeView() {
               const doc = createDefaultDocument("Hikaru Sub", resX, resY);
               doc.cues = cues;
               setAssMetadata(doc.scriptInfo, doc.styles);
-              const assText = serializeAss(doc);
+              // Capture paired snapshot after metadata, serialize immediately before write.
+              const snap = useProjectStore.getState().captureSaveSnapshot();
+              const assText = serializeAss({
+                scriptInfo: snap.scriptInfo ?? doc.scriptInfo,
+                styles: snap.styles.length > 0 ? snap.styles : doc.styles,
+                cues: snap.cues,
+              });
               await saveAssText(session.transcribedAssPath, assText);
               setActiveSubtitle("transcribed", session.transcribedAssPath);
-              markSaved();
+              markSaved(snap.token);
               setSavedAssPath(session.transcribedAssPath);
               if (playResWarning) {
                 setAsrError(playResWarning);

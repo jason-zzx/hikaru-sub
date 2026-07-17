@@ -24,6 +24,8 @@ const PAGE_JUMP_CUES = 10;
 export interface EditorHotkeyOptions {
   onSave: () => void;
   onToggleHelp: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onNotify?: (variant: "success" | "error" | "info", text: string) => void;
   enabled?: boolean;
 }
@@ -199,10 +201,10 @@ export function buildEditorActions(
     "cut-cues": cutCues,
     "paste-cues": pasteCues,
     "select-all-cues": selectAllCues,
-    save: () => options.onSave(),
-    undo: () => useProjectStore.getState().undo(),
-    redo: () => useProjectStore.getState().redo(),
-    "toggle-help": () => options.onToggleHelp(),
+    save: options.onSave,
+    undo: options.onUndo,
+    redo: options.onRedo,
+    "toggle-help": options.onToggleHelp,
   };
 }
 
@@ -215,6 +217,8 @@ export function useEditorHotkeys(options: EditorHotkeyOptions) {
     const actions = buildEditorActions({
       onSave: () => optionsRef.current.onSave(),
       onToggleHelp: () => optionsRef.current.onToggleHelp(),
+      onUndo: () => optionsRef.current.onUndo(),
+      onRedo: () => optionsRef.current.onRedo(),
       onNotify: (variant, text) => optionsRef.current.onNotify?.(variant, text),
     });
     const onKeyDown = (e: KeyboardEvent) => {

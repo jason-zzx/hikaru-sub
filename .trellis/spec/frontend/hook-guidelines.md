@@ -33,11 +33,25 @@ Physical editor cues are one row per ASS `Dialogue:` event (`primaryText` only).
 
 `useEditorHotkeys` + `components/editor/hotkeys.ts` own keyboard bindings. Whole-row copy/cut/paste use `src/services/subtitleClipboard.ts` (Tauri clipboard-manager plugin), not an in-memory cue array.
 
+### Scopes
+
+- **outside-input** (default for most editor actions): match only when focus is not inside `input` / `textarea` / `contentEditable`.
+- **history-command**: match outside editable controls **or** inside an editable control marked with `data-history-command` (subtitle text textarea and start/end time inputs only).
+- Copy/cut/paste and other text-editing shortcuts still do **not** intercept focused unmarked inputs — keep native browser/WebView text editing there.
+- Keep the existing composition (`isComposing`) guard so IME in progress never routes project undo/redo.
+
+### Undo / redo routing
+
+- Keyboard undo/redo and playback-control undo/redo buttons must share the same `EditorView` wrappers, not call `projectStore.undo/redo` with divergent side effects.
+- Pending changed start/end-time drafts: Undo commits the draft synchronously then undoes; Redo is a prevented no-op that does **not** flush the draft (button disabled parity).
+- Unmarked transient inputs (font search, quick format parameters, inline color/number popovers, filters, StyleManager fields) retain native undo/redo until their value is applied as a cue edit (one discrete project-history item).
+
+### Row clipboard
+
 - Outside focused text inputs: copy/cut write canonical `Dialogue:` lines; paste is line-by-line ASS or plain-text fallback after the selected row.
-- Inside `input` / `textarea` / `contentEditable`: do not intercept — keep native browser/WebView text editing.
 - Cut deletes selected rows only after a successful clipboard write.
 
-Keep hotkey definitions centralized; test via `useEditorHotkeys.test.ts` / `subtitleClipboard.test.ts`.
+Keep hotkey definitions centralized; test via `useEditorHotkeys.test.ts` / `hotkeys.test.ts` / `subtitleClipboard.test.ts`.
 
 ## Runtime Dependency Preparation
 
@@ -49,3 +63,5 @@ Keep hotkey definitions centralized; test via `useEditorHotkeys.test.ts` / `subt
 - Re-discovering system fonts on every StyleManager open without `enabled` gating
 - New pollers that ignore cancel (`jobId` cleared) and still mutate session
 - Branching editor/player/burn UI on `subtitleMergeMode` or restoring in-memory cue-row clipboard modules
+- Wiring keyboard undo/redo to `projectStore` while playback buttons use a different flush/availability path
+- Intercepting undo/redo inside unmarked transient inputs, or leaving marked subtitle text/time inputs on native-only undo

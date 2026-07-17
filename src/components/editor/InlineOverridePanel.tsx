@@ -59,6 +59,8 @@ export function InlineOverridePanel({
   const [shadowDraft, setShadowDraft] = useState(() =>
     draftForNumber(currentStyle?.shadow, 1),
   );
+  const outlineBaselineRef = useRef(outlineDraft);
+  const shadowBaselineRef = useRef(shadowDraft);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,14 +106,27 @@ export function InlineOverridePanel({
   );
 
   const commitNumber = (kind: "outline" | "shadow", draft: string) => {
+    const baseline =
+      kind === "outline"
+        ? outlineBaselineRef.current
+        : shadowBaselineRef.current;
     const normalized = normalizePanelNumber(draft);
     if (normalized === null) {
       if (kind === "outline") setOutlineDraft(draftForNumber(currentStyle?.outline, 2));
       else setShadowDraft(draftForNumber(currentStyle?.shadow, 1));
       return;
     }
-    if (kind === "outline") setOutlineDraft(String(normalized));
-    else setShadowDraft(String(normalized));
+    const next = String(normalized);
+    if (kind === "outline") setOutlineDraft(next);
+    else setShadowDraft(next);
+    // Changed-only: focus/blur without edit adds no cue history.
+    if (next === baseline || draft === baseline) {
+      if (kind === "outline") outlineBaselineRef.current = next;
+      else shadowBaselineRef.current = next;
+      return;
+    }
+    if (kind === "outline") outlineBaselineRef.current = next;
+    else shadowBaselineRef.current = next;
     onApplyNumber(kind, normalized);
   };
 
@@ -185,6 +200,9 @@ export function InlineOverridePanel({
                   max="100"
                   step="0.5"
                   value={outlineDraft}
+                  onFocus={() => {
+                    outlineBaselineRef.current = outlineDraft;
+                  }}
                   onChange={(event) => setOutlineDraft(event.target.value)}
                   onBlur={() => commitNumber("outline", outlineDraft)}
                   onKeyDown={(event) => {
@@ -207,6 +225,9 @@ export function InlineOverridePanel({
                   max="100"
                   step="0.5"
                   value={shadowDraft}
+                  onFocus={() => {
+                    shadowBaselineRef.current = shadowDraft;
+                  }}
                   onChange={(event) => setShadowDraft(event.target.value)}
                   onBlur={() => commitNumber("shadow", shadowDraft)}
                   onKeyDown={(event) => {

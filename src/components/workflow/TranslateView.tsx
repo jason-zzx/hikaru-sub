@@ -177,13 +177,15 @@ export function TranslateView() {
         mergeMode: settings.subtitleMergeMode,
       });
       const physicalDoc = parseAss(serialized, { mergeBilingual: false });
+      // Pair immutable serialized output with physical doc/token before write await.
       setCues(physicalDoc.cues);
       setAssMetadata(physicalDoc.scriptInfo, physicalDoc.styles);
+      const snap = useProjectStore.getState().captureSaveSnapshot();
 
       try {
         await saveAssText(session.translatedAssPath, serialized);
         setActiveSubtitle("translated", session.translatedAssPath);
-        markSaved();
+        markSaved(snap.token);
         console.log(`翻译后的字幕已保存到: ${session.translatedAssPath}`);
       } catch (saveErr) {
         // Keep physical rows in memory as unsaved translated content.

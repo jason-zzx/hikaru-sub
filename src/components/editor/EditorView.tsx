@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { selectCueAndSeek } from "../../services/editorActions";
 import { useProjectStore } from "../../stores/projectStore";
+import { usePlaybackStore } from "../../stores/playbackStore";
 import { useUiStore } from "../../stores/uiStore";
 import { VideoPlayer } from "../player/VideoPlayer";
 import { PlaybackControls } from "../player/PlaybackControls";
 import { SubtitleList } from "./SubtitleList";
-import { SubtitleEditor } from "./SubtitleEditor";
+import {
+  SubtitleEditor,
+  type SubtitleEditorHistoryHandle,
+} from "./SubtitleEditor";
 import { EditorToast, type EditorToastMessage, type EditorToastVariant } from "./EditorToast";
 import { Timeline } from "./Timeline";
 import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
@@ -31,18 +35,19 @@ export function EditorView() {
   const activeSubtitlePath = useProjectStore((s) => s.activeSubtitlePath);
   const activeSubtitleKind = useProjectStore((s) => s.activeSubtitleKind);
   const cues = useProjectStore((s) => s.cues);
-  const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
-  const assStyles = useProjectStore((s) => s.assStyles);
+  const isDirty = useProjectStore((s) => s.isDirty);
+  // Subscribe to stack lengths so undo/redo buttons re-render.
+  const pastLen = useProjectStore((s) => s.history.past.length);
+  const futureLen = useProjectStore((s) => s.history.future.length);
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
+  const markDirty = useProjectStore((s) => s.markDirty);
+  const markSaved = useProjectStore((s) => s.markSaved);
+  const captureSaveSnapshot = useProjectStore((s) => s.captureSaveSnapshot);
   const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
   const setActiveSubtitle = useProjectStore((s) => s.setActiveSubtitle);
   const loadAssDocument = useProjectStore((s) => s.loadAssDocument);
-  const isDirty = useProjectStore((s) => s.isDirty);
-  const undo = useProjectStore((s) => s.undo);
-  const redo = useProjectStore((s) => s.redo);
-  const canUndo = useProjectStore((s) => s.canUndo);
-  const canRedo = useProjectStore((s) => s.canRedo);
-  const markDirty = useProjectStore((s) => s.markDirty);
-  const markSaved = useProjectStore((s) => s.markSaved);
+  const acceptTextSession = useProjectStore((s) => s.acceptTextSession);
   const setStep = useUiStore((s) => s.setStep);
   const styleManagerOpen = useUiStore((s) => s.styleManagerOpen);
   const toggleStyleManager = useUiStore((s) => s.toggleStyleManager);
@@ -52,7 +57,10 @@ export function EditorView() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<EditorToastMessage | null>(null);
   const [subtitleFileExists, setSubtitleFileExists] = useState(false);
+  const [hasPendingTimeDraft, setHasPendingTimeDraft] = useState(false);
   const toastIdRef = useRef(0);
+  const editorRef = useRef<SubtitleEditorHistoryHandle>(null);
+
   const currentSubtitlePath =
     activeSubtitlePath ??
     (activeSubtitleKind === "translated"
@@ -103,25 +111,29 @@ export function EditorView() {
     }
   }, []);
 
-  const writeSubtitleFile = async (
-    savePath: string,
-    saveKind: ActiveSubtitleKind,
-  ) => {
-    const doc = resolveAssDocumentForSave(cues, assScriptInfo, assStyles, {
-      title: "Hikaru Sub",
+  // Accept text session/group whenever the active cue changes.
+  useEffect(() => {
+    let prev = usePlaybackStore.getState().selectedCueId;
+    return usePlaybackStore.subscribe((state) => {
+      if (state.selectedCueId !== prev) {
+        prev = state.selectedCueId;
+        acceptTextSession();
+      }
     });
-    setAssMetadata(doc.scriptInfo, doc.styles);
+  }, [acceptTextSession]);
 
-    await saveAssText(
-      savePath,
-      serializeAss(doc, { preserveOrder: true }),
-    );
-    setActiveSubtitle(saveKind, savePath);
-    setSubtitleFileExists(true);
-    markSaved();
-    setSaveError(null);
-    return savePath;
-  };
+  const runUndo = useCallback(() => {
+    editorRef.current?.commitPendingTimeDraft();
+    undo();
+  }, [undo]);
+
+  const runRedo = useCallback(() => {
+    if (hasPendingTimeDraft) return;
+    redo();
+  }, [hasPendingTimeDraft, redo]);
+
+  const canUndo = pastLen > 0 || hasPendingTimeDraft;
+  const canRedo = futureLen > 0 && !hasPendingTimeDraft;
 
   const handleSave = async () => {
     if (saving || !session) return;
@@ -132,6 +144,7 @@ export function EditorView() {
     try {
       let savePath = activeSubtitlePath;
       const saveKind: ActiveSubtitleKind = activeSubtitleKind ?? "transcribed";
+      // Path selection first — cancel leaves drafts untouched.
       if (!savePath) {
         if (saveKind === "translated") {
           savePath = await pickSaveAssFile(session.translatedAssPath);
@@ -140,7 +153,32 @@ export function EditorView() {
           savePath = session.transcribedAssPath;
         }
       }
-      await writeSubtitleFile(savePath, saveKind);
+
+      // After a path exists: flush time draft, resolve metadata, capture snapshot.
+      editorRef.current?.commitPendingTimeDraft();
+      const live = useProjectStore.getState();
+      const doc = resolveAssDocumentForSave(
+        live.cues,
+        live.assScriptInfo,
+        live.assStyles,
+        { title: "Hikaru Sub" },
+      );
+      setAssMetadata(doc.scriptInfo, doc.styles);
+      const snap = captureSaveSnapshot();
+      const assText = serializeAss(
+        {
+          scriptInfo: snap.scriptInfo ?? doc.scriptInfo,
+          styles: snap.styles.length > 0 ? snap.styles : doc.styles,
+          cues: snap.cues,
+        },
+        { preserveOrder: true },
+      );
+
+      await saveAssText(savePath, assText);
+      setActiveSubtitle(saveKind, savePath);
+      setSubtitleFileExists(true);
+      markSaved(snap.token);
+      setSaveError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setSaveError(message);
@@ -196,6 +234,8 @@ export function EditorView() {
   useEditorHotkeys({
     onSave: handleSave,
     onToggleHelp: () => setHelpOpen((v) => !v),
+    onUndo: runUndo,
+    onRedo: runRedo,
     onNotify: notify,
     enabled: !helpOpen,
   });
@@ -291,7 +331,7 @@ export function EditorView() {
         {/* 编辑面板 */}
         <div className="col-start-3 row-span-2 flex min-h-0 flex-col overflow-hidden bg-surface-raised">
           <div className="min-h-0 flex-1">
-            <SubtitleEditor onNotify={notify} />
+            <SubtitleEditor ref={editorRef} onNotify={notify} onPendingTimeDraftChange={setHasPendingTimeDraft} />
           </div>
         </div>
 
@@ -303,10 +343,10 @@ export function EditorView() {
 
       {/* 播放控制栏 */}
       <PlaybackControls
-        canUndo={canUndo()}
-        canRedo={canRedo()}
-        onUndo={undo}
-        onRedo={redo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={runUndo}
+        onRedo={runRedo}
       />
 
       {/* 编辑页局部反馈 */}

@@ -20,10 +20,15 @@ function cue(id: string, startMs: number, endMs: number): SubtitleCue {
 
 const CUES = [cue("a", 0, 1000), cue("b", 2000, 3000), cue("c", 5000, 6000)];
 
-function make_actions(onNotify = vi.fn()) {
+function make_actions(
+  onNotify = vi.fn(),
+  extra: { onUndo?: () => void; onRedo?: () => void } = {},
+) {
   return buildEditorActions({
     onSave: vi.fn(),
     onToggleHelp: vi.fn(),
+    onUndo: extra.onUndo ?? (() => useProjectStore.getState().undo()),
+    onRedo: extra.onRedo ?? (() => useProjectStore.getState().redo()),
     onNotify,
   });
 }
@@ -34,9 +39,8 @@ beforeEach(() => {
   writeMock.mockResolvedValue(undefined);
   readMock.mockResolvedValue("");
   useProjectStore.setState({
+    ...useProjectStore.getInitialState(),
     cues: CUES,
-    isDirty: false,
-    history: { past: [], future: [] },
   });
   usePlaybackStore.setState({
     currentTimeMs: 0,
@@ -254,7 +258,12 @@ describe("系统动作", () => {
   it("save / toggle-help 走回调；undo/redo 走 projectStore", () => {
     const onSave = vi.fn();
     const onToggleHelp = vi.fn();
-    const actions = buildEditorActions({ onSave, onToggleHelp });
+    const actions = buildEditorActions({
+      onSave,
+      onToggleHelp,
+      onUndo: () => useProjectStore.getState().undo(),
+      onRedo: () => useProjectStore.getState().redo(),
+    });
     actions["save"]!();
     expect(onSave).toHaveBeenCalledOnce();
     actions["toggle-help"]!();
@@ -299,7 +308,27 @@ describe("系统动作", () => {
 describe("Phase 2B source guards", () => {
   it("buildEditorActions exposes onNotify as an option", () => {
     const onNotify = vi.fn();
-    buildEditorActions({ onSave: vi.fn(), onToggleHelp: vi.fn(), onNotify });
+    buildEditorActions({
+      onSave: vi.fn(),
+      onToggleHelp: vi.fn(),
+      onUndo: vi.fn(),
+      onRedo: vi.fn(),
+      onNotify,
+    });
     expect(onNotify).not.toHaveBeenCalled();
+  });
+});
+
+describe("undo/redo callback routing", () => {
+  it("uses injected onUndo/onRedo instead of store when provided", () => {
+    const onUndo = vi.fn();
+    const onRedo = vi.fn();
+    const actions = make_actions(vi.fn(), { onUndo, onRedo });
+    actions.undo?.();
+    actions.redo?.();
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(onRedo).toHaveBeenCalledOnce();
+    // Store history untouched by wrappers that no-op / only call callbacks
+    expect(useProjectStore.getState().history.past).toHaveLength(0);
   });
 });

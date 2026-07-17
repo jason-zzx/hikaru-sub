@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership, pre-development checklist, and quality commands for the editor-only change."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Existing projectStore/playbackStore history, selection, and atomic batch-edit contracts."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Central editor hotkey ownership and current focused-input behavior that this approved task intentionally updates."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Physical ASS row editor behavior and single-row versus multi-row formatting constraints."}
+{"file":".trellis/tasks/07-16-unified-editor-history/research/current-history-flow.md","reason":"Evidence for the current split preview/project history and existing mutation seams."}
+{"file":".trellis/tasks/07-16-unified-editor-history/research/aegisub-text-undo-grouping.md","reason":"Source-backed Aegisub/Scintilla grouping and editing-context behavior to reproduce."}

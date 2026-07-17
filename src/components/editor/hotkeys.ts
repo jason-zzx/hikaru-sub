@@ -1,4 +1,12 @@
-export type HotkeyScope = "global" | "outside-input" | "inside-input";
+export type HotkeyScope =
+  | "global"
+  | "outside-input"
+  | "inside-input"
+  /** Project undo/redo: outside inputs, or inside marked persistent cue-edit controls. */
+  | "history-command";
+
+/** data-attribute marking persistent cue-edit controls that consume project history. */
+export const HISTORY_COMMAND_ATTR = "data-history-command";
 
 export type EditorActionId =
   | "select-prev"
@@ -82,9 +90,9 @@ export const EDITOR_HOTKEYS: HotkeyDef[] = [
   { key: "a", ctrl: true, scope: "outside-input", action: "select-all-cues", label: "Ctrl+A", description: "全选字幕行", category: "编辑" },
   // 系统
   { key: "s", ctrl: true, scope: "global", action: "save", label: "Ctrl+S", description: "保存", category: "系统" },
-  { key: "z", ctrl: true, scope: "outside-input", action: "undo", label: "Ctrl+Z", description: "撤销（编辑框内为文本撤销）", category: "系统" },
-  { key: "y", ctrl: true, scope: "outside-input", action: "redo", label: "Ctrl+Y", description: "重做", category: "系统" },
-  { key: "z", ctrl: true, shift: true, scope: "outside-input", action: "redo", label: "Ctrl+Shift+Z", description: "重做", category: "系统" },
+  { key: "z", ctrl: true, scope: "history-command", action: "undo", label: "Ctrl+Z", description: "撤销", category: "系统" },
+  { key: "y", ctrl: true, scope: "history-command", action: "redo", label: "Ctrl+Y", description: "重做", category: "系统" },
+  { key: "z", ctrl: true, shift: true, scope: "history-command", action: "redo", label: "Ctrl+Shift+Z", description: "重做", category: "系统" },
   { key: "?", shift: true, scope: "outside-input", action: "toggle-help", label: "?", description: "键位速查", category: "系统" },
 ];
 
@@ -111,6 +119,15 @@ export function isEditableTarget(target: unknown): boolean {
     el.tagName === "INPUT" ||
     el.isContentEditable === true
   );
+}
+
+/** True when the editable event target consumes project history commands. */
+export function isHistoryCommandTarget(target: unknown): boolean {
+  const el = target as
+    | { getAttribute?: (name: string) => string | null }
+    | null
+    | undefined;
+  return el?.getAttribute?.(HISTORY_COMMAND_ATTR) === "true";
 }
 
 function normalizeKey(key: string): string {
@@ -140,6 +157,10 @@ export function findHotkey(
     if (!!def.shift !== e.shiftKey) continue;
     if (def.scope === "outside-input" && inEditable) continue;
     if (def.scope === "inside-input" && !inEditable) continue;
+    if (def.scope === "history-command") {
+      // Outside editable: always; inside: only marked persistent cue controls.
+      if (inEditable && !isHistoryCommandTarget(e.target)) continue;
+    }
     return def;
   }
   return null;

@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { usePreviewFontNames } from "../../hooks/usePreviewFontNames";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
@@ -14,6 +20,7 @@ import {
   nextAfterCommit,
   selectCueAfterDelete,
 } from "../../services/editorActions";
+import { makeTextOp } from "../../services/editorTextHistory";
 import {
   applyAlignmentReplace,
   applyAttributeOverrideTag,
@@ -35,6 +42,7 @@ import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
 import { FontComboBox } from "./FontComboBox";
 import { InlineOverridePanel } from "./InlineOverridePanel";
+import { HISTORY_COMMAND_ATTR } from "./hotkeys";
 import type { SubtitleCue } from "../../types";
 
 const QUICK_FONT_OPTIONS = [
@@ -46,26 +54,51 @@ const QUICK_FONT_OPTIONS = [
   "Yu Gothic",
 ];
 
-type TextEditBaseline = {
-  cue: SubtitleCue;
-  wasDirty: boolean;
-};
-
 type EditorNotify = (variant: "success" | "error" | "info", text: string) => void;
 type TimeField = "start" | "end";
 
-interface SubtitleEditorProps {
-  onNotify?: EditorNotify;
+export interface SubtitleEditorHistoryHandle {
+  commitPendingTimeDraft(): boolean;
 }
 
-export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
+interface SubtitleEditorProps {
+  onNotify?: EditorNotify;
+  onPendingTimeDraftChange?: (hasPending: boolean) => void;
+}
+
+type ExpectedCompositionEvent = {
+  cueId: string;
+  text: string;
+  start: number;
+  end: number;
+};
+
+export const SubtitleEditor = forwardRef<
+  SubtitleEditorHistoryHandle,
+  SubtitleEditorProps
+>(function SubtitleEditor({ onNotify, onPendingTimeDraftChange }, ref) {
   const cues = useProjectStore((s) => s.cues);
   const updateCue = useProjectStore((s) => s.updateCue);
-  const updateCuePreview = useProjectStore((s) => s.updateCuePreview);
   const replaceCues = useProjectStore((s) => s.replaceCues);
   const addCue = useProjectStore((s) => s.addCue);
   const deleteCue = useProjectStore((s) => s.deleteCue);
   const assStyles = useProjectStore((s) => s.assStyles);
+  const applyTextEdit = useProjectStore((s) => s.applyTextEdit);
+  const acceptTextSession = useProjectStore((s) => s.acceptTextSession);
+  const rollbackTextSession = useProjectStore((s) => s.rollbackTextSession);
+  const setTextSelection = useProjectStore((s) => s.setTextSelection);
+  const beginComposition = useProjectStore((s) => s.beginComposition);
+  const updateCompositionPreview = useProjectStore(
+    (s) => s.updateCompositionPreview,
+  );
+  const endComposition = useProjectStore((s) => s.endComposition);
+  const pendingCaretRestore = useProjectStore(
+    (s) => s.history.pendingCaretRestore,
+  );
+  const documentEpoch = useProjectStore((s) => s.documentEpoch);
+  const consumePendingCaretRestore = useProjectStore(
+    (s) => s.consumePendingCaretRestore,
+  );
 
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
@@ -75,34 +108,79 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   const editorFocusNonce = useUiStore((s) => s.editorFocusNonce);
 
   const selectedCue = cues.find((c) => c.id === selectedCueId);
+  const text = selectedCue?.primaryText ?? "";
   const hasBatchSelection = hasMultipleSelectedCues(cues, selectedCueIds);
 
-  const [text, setText] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [quickFontName, setQuickFontName] = useState("");
   const [quickFontSize, setQuickFontSize] = useState("48");
+  const quickFontSizeBaselineRef = useRef("48");
 
   const escapingRef = useRef(false);
-  const textEditBaselineRef = useRef<TextEditBaseline | null>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const startTimeRef = useRef<HTMLInputElement>(null);
   const endTimeRef = useRef<HTMLInputElement>(null);
+  const beforeInputRef = useRef<{
+    inputType: string | null;
+    start: number;
+    end: number;
+  } | null>(null);
+  const textSelectionRef = useRef<{ start: number; end: number } | null>(null);
+  const expectedCompositionEventRef = useRef<ExpectedCompositionEvent | null>(
+    null,
+  );
+  const composingRef = useRef(false);
+  const pendingTimeFieldRef = useRef<TimeField>("end");
 
   const fontNames = usePreviewFontNames([
     ...QUICK_FONT_OPTIONS,
     ...assStyles.map((style) => style.fontName),
   ]);
 
-  useEffect(() => {
-    textEditBaselineRef.current = null;
-  }, [selectedCue?.id]);
+  const pendingTime = selectedCue
+    ? normalizeTimeRange(startTime, endTime, pendingTimeFieldRef.current)
+    : null;
+  const hasPendingTimeDraft =
+    pendingTime !== null &&
+    (pendingTime.startMs !== selectedCue?.startMs ||
+      pendingTime.endMs !== selectedCue?.endMs);
+
+  const commitTimeDraft = (field: TimeField = "end") => {
+    if (!selectedCue) return false;
+    const result = normalizeTimeRange(startTime, endTime, field);
+    const changed =
+      result.startMs !== selectedCue.startMs ||
+      result.endMs !== selectedCue.endMs;
+    setStartTime(result.startText);
+    setEndTime(result.endText);
+    updateCue(selectedCue.id, {
+      startMs: result.startMs,
+      endMs: result.endMs,
+    });
+    return changed;
+  };
 
   useEffect(() => {
-    if (!selectedCue) return;
-    setText(selectedCue.primaryText);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCue?.id, selectedCue?.primaryText]);
+    onPendingTimeDraftChange?.(hasPendingTimeDraft);
+  }, [hasPendingTimeDraft, onPendingTimeDraftChange]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      commitPendingTimeDraft: () =>
+        commitTimeDraft(pendingTimeFieldRef.current),
+    }),
+    [selectedCue, startTime, endTime, updateCue],
+  );
+
+  useEffect(() => {
+    // Clear local input state on cue or document/session lifecycle changes.
+    expectedCompositionEventRef.current = null;
+    composingRef.current = false;
+    beforeInputRef.current = null;
+    textSelectionRef.current = null;
+  }, [selectedCue?.id, documentEpoch]);
 
   useEffect(() => {
     if (!selectedCue) return;
@@ -111,25 +189,35 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCue?.id, selectedCue?.startMs, selectedCue?.endMs]);
 
-  const rememberTextEditBaseline = () => {
-    if (!selectedCue) return;
-    if (textEditBaselineRef.current?.cue.id === selectedCue.id) return;
-    textEditBaselineRef.current = {
-      cue: selectedCue,
-      wasDirty: useProjectStore.getState().isDirty,
-    };
-  };
-
-  const handleTextFocus = () => {
-    rememberTextEditBaseline();
-  };
-
-  const handleTextChange = (nextText: string) => {
-    setText(nextText);
-    if (!selectedCue) return;
-    rememberTextEditBaseline();
-    updateCuePreview(selectedCue.id, { primaryText: nextText });
-  };
+  // Restore caret after undo/redo once controlled text has rendered.
+  useEffect(() => {
+    if (!pendingCaretRestore || !selectedCue) return;
+    if (
+      pendingCaretRestore.selection &&
+      pendingCaretRestore.selection.cueId !== selectedCue.id
+    ) {
+      return;
+    }
+    const textarea = textRef.current;
+    if (!textarea) {
+      consumePendingCaretRestore(pendingCaretRestore.nonce);
+      return;
+    }
+    const sel = pendingCaretRestore.selection;
+    if (sel && sel.cueId === selectedCue.id) {
+      const max = textarea.value.length;
+      const start = Math.min(sel.start, max);
+      const end = Math.min(sel.end, max);
+      textarea.focus();
+      textarea.setSelectionRange(start, end, sel.direction);
+    }
+    consumePendingCaretRestore(pendingCaretRestore.nonce);
+  }, [
+    pendingCaretRestore,
+    selectedCue?.id,
+    text,
+    consumePendingCaretRestore,
+  ]);
 
   useEffect(() => {
     if (editorFocusNonce > 0) {
@@ -138,6 +226,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   }, [editorFocusNonce]);
 
   const setTimeValue = (field: TimeField, value: string) => {
+    pendingTimeFieldRef.current = field;
     if (field === "start") setStartTime(value);
     else setEndTime(value);
   };
@@ -153,43 +242,32 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     });
   };
 
-  const commitTextDraft = () => {
-    if (!selectedCue) return false;
-    updateCue(selectedCue.id, { primaryText: text });
-    textEditBaselineRef.current = null;
-    return true;
-  };
-
-  const commitTimeDraft = (field: TimeField = "end") => {
-    if (!selectedCue) return false;
-    const result = normalizeTimeRange(startTime, endTime, field);
-    setStartTime(result.startText);
-    setEndTime(result.endText);
-    updateCue(selectedCue.id, {
-      startMs: result.startMs,
-      endMs: result.endMs,
+  const syncSelectionFromTextarea = () => {
+    const textarea = textRef.current;
+    if (!textarea || !selectedCue) return;
+    textSelectionRef.current = {
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+    };
+    setTextSelection({
+      cueId: selectedCue.id,
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+      direction:
+        (textarea.selectionDirection as "forward" | "backward" | "none") ??
+        "none",
     });
-    return true;
   };
 
   const commitDraft = () => {
     if (!selectedCue) return false;
-
-    const result = normalizeTimeRange(startTime, endTime, "end");
-    setStartTime(result.startText);
-    setEndTime(result.endText);
-    updateCue(selectedCue.id, {
-      primaryText: text,
-      startMs: result.startMs,
-      endMs: result.endMs,
-    });
-    textEditBaselineRef.current = null;
+    commitTimeDraft("end");
     return true;
   };
 
   const handleBlur = () => {
     if (escapingRef.current) return;
-    commitTextDraft();
+    acceptTextSession();
   };
 
   const handleTimeBlur = (field: TimeField) => {
@@ -235,6 +313,28 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     ? findEffectiveAlignment(text, currentStyle?.alignment)
     : currentStyle?.alignment;
 
+  const applyDiscreteTextUpdate = (
+    nextText: string,
+    selectionStart: number,
+    selectionEnd: number,
+  ) => {
+    if (!selectedCue) return;
+    // updateCue also accepts the active text session on a formatting no-op.
+    updateCue(selectedCue.id, { primaryText: nextText });
+    setTextSelection({
+      cueId: selectedCue.id,
+      start: selectionStart,
+      end: selectionEnd,
+      direction: "none",
+    });
+    window.setTimeout(() => {
+      const textarea = textRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+    }, 0);
+  };
+
   const applyAttributeTag = (
     kind: AttributeOverrideKind,
     startTag: string,
@@ -266,11 +366,11 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
       },
     );
 
-    handleTextChange(result.text);
-    window.setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
-    }, 0);
+    applyDiscreteTextUpdate(
+      result.text,
+      result.selectionStart,
+      result.selectionEnd,
+    );
   };
 
   const applyToggleTag = (startTag: string, endTag: string) => {
@@ -296,11 +396,11 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
       { startTag, endTag },
     );
 
-    handleTextChange(result.text);
-    window.setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
-    }, 0);
+    applyDiscreteTextUpdate(
+      result.text,
+      result.selectionStart,
+      result.selectionEnd,
+    );
   };
 
   const handleFontChange = (fontName: string) => {
@@ -314,9 +414,12 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
   };
 
   const handleFontSizeCommit = () => {
+    // Only commit when the draft actually changed from focus baseline.
+    if (quickFontSize === quickFontSizeBaselineRef.current) return;
     const parsed = Number(quickFontSize);
     if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 200) {
       applyAttributeTag("fontSize", `{\\fs${Math.round(parsed)}}`);
+      quickFontSizeBaselineRef.current = quickFontSize;
     }
   };
 
@@ -349,49 +452,136 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
     const textarea = textRef.current;
     if (!textarea) return;
     const result = applyAlignmentReplace(text, alignment);
-    handleTextChange(result.text);
-    window.setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
-    }, 0);
+    applyDiscreteTextUpdate(
+      result.text,
+      result.selectionStart,
+      result.selectionEnd,
+    );
   };
 
   const resetDraftsFromStore = () => {
     if (!selectedCue) return;
-    setText(selectedCue.primaryText);
     setStartTime(formatTimeInput(selectedCue.startMs));
     setEndTime(formatTimeInput(selectedCue.endMs));
   };
 
-  const discardTextDraft = () => {
-    const baseline = textEditBaselineRef.current;
-    if (!baseline || !selectedCue || baseline.cue.id !== selectedCue.id) {
-      resetDraftsFromStore();
-      return;
-    }
-
-    updateCuePreview(selectedCue.id, {
-      primaryText: baseline.cue.primaryText,
-    });
-    if (!baseline.wasDirty) {
-      useProjectStore.getState().markSaved();
-    }
-    setText(baseline.cue.primaryText);
-    textEditBaselineRef.current = null;
-  };
-
   const discardAndBlur = (el: HTMLElement) => {
     escapingRef.current = true;
-    if (el instanceof HTMLTextAreaElement) {
-      discardTextDraft();
-    } else {
-      resetDraftsFromStore();
-    }
+    if (el instanceof HTMLTextAreaElement) rollbackTextSession();
+    else resetDraftsFromStore();
     el.blur();
     escapingRef.current = false;
   };
 
+  const handleBeforeInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
+    const ne = e.nativeEvent as InputEvent;
+    const target = e.currentTarget;
+    beforeInputRef.current = {
+      inputType: ne.inputType ?? null,
+      start: target.selectionStart,
+      end: target.selectionEnd,
+    };
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const nextText = e.target.value;
+    const afterStart = e.target.selectionStart;
+    const afterEnd = e.target.selectionEnd;
+    if (!selectedCue) return;
+
+    // Suppress the immediately expected post-composition duplicate input.
+    const expected = expectedCompositionEventRef.current;
+    if (
+      expected &&
+      expected.cueId === selectedCue.id &&
+      expected.text === nextText &&
+      expected.start === afterStart &&
+      expected.end === afterEnd
+    ) {
+      expectedCompositionEventRef.current = null;
+      beforeInputRef.current = null;
+      return;
+    }
+
+    if (composingRef.current) {
+      updateCompositionPreview(selectedCue.id, nextText);
+      return;
+    }
+
+    const before = beforeInputRef.current;
+    beforeInputRef.current = null;
+    // React/WebView2 may omit beforeinput for deletion, while input still has inputType.
+    const op = makeTextOp({
+      cueId: selectedCue.id,
+      before: before ?? textSelectionRef.current ?? {
+        start: afterStart,
+        end: afterEnd,
+      },
+      after: { start: afterStart, end: afterEnd },
+      inputType:
+        before?.inputType ??
+        (e.nativeEvent as InputEvent).inputType ??
+        null,
+      timestampMs: Date.now(),
+    });
+    textSelectionRef.current = { start: afterStart, end: afterEnd };
+    applyTextEdit({ cueId: selectedCue.id, text: nextText, op });
+  };
+
+  const handleCompositionStart = () => {
+    composingRef.current = true;
+    const textarea = textRef.current;
+    beginComposition(
+      selectedCue && textarea
+        ? {
+            cueId: selectedCue.id,
+            start: textarea.selectionStart,
+            end: textarea.selectionEnd,
+            direction:
+              (textarea.selectionDirection as
+                | "forward"
+                | "backward"
+                | "none") ?? "none",
+          }
+        : null,
+    );
+  };
+
+  const handleCompositionEnd = (
+    e: React.CompositionEvent<HTMLTextAreaElement>,
+  ) => {
+    composingRef.current = false;
+    beforeInputRef.current = null;
+    if (!selectedCue) return;
+    const target = e.currentTarget;
+    const finalText = target.value;
+    const selection = {
+      start: target.selectionStart,
+      end: target.selectionEnd,
+    };
+    endComposition({
+      cueId: selectedCue.id,
+      text: finalText,
+      selection,
+      timestampMs: Date.now(),
+    });
+    expectedCompositionEventRef.current = {
+      cueId: selectedCue.id,
+      text: finalText,
+      start: selection.start,
+      end: selection.end,
+    };
+    // Expire in next microtask so only the immediately following matching event is consumed.
+    queueMicrotask(() => {
+      expectedCompositionEventRef.current = null;
+    });
+  };
+
   const handleTextKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    textSelectionRef.current = {
+      start: e.currentTarget.selectionStart,
+      end: e.currentTarget.selectionEnd,
+    };
     if (e.nativeEvent.isComposing) return;
     if (e.key === "Escape") {
       e.preventDefault();
@@ -414,7 +604,8 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        if (commitTimeDraft(field)) e.currentTarget.blur();
+        commitTimeDraft(field);
+        e.currentTarget.blur();
         return;
       }
 
@@ -454,6 +645,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
       useProjectStore.getState().cues,
     );
     if (!newCue) {
+      acceptTextSession();
       onNotify?.("error", "新建字幕失败：无法生成唯一 ID");
       return;
     }
@@ -529,6 +721,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
             onKeyDown={handleTimeKeyDown("start")}
             placeholder="00:00:00.00"
             inputMode="numeric"
+            {...{ [HISTORY_COMMAND_ATTR]: "true" }}
             className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
@@ -543,6 +736,7 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
             onKeyDown={handleTimeKeyDown("end")}
             placeholder="00:00:00.00"
             inputMode="numeric"
+            {...{ [HISTORY_COMMAND_ATTR]: "true" }}
             className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
@@ -573,6 +767,9 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
               min="1"
               max="200"
               value={quickFontSize}
+              onFocus={() => {
+                quickFontSizeBaselineRef.current = quickFontSize;
+              }}
               onChange={(event) => setQuickFontSize(event.target.value)}
               onBlur={handleFontSizeCommit}
               onKeyDown={(event) => {
@@ -637,14 +834,18 @@ export function SubtitleEditor({ onNotify }: SubtitleEditorProps) {
         <textarea
           ref={textRef}
           value={text}
-          onChange={(e) => handleTextChange(e.target.value)}
+          onChange={handleTextChange}
+          onBeforeInput={handleBeforeInput}
           onBlur={handleBlur}
-          onFocus={handleTextFocus}
+          onSelect={syncSelectionFromTextarea}
           onKeyDown={handleTextKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          {...{ [HISTORY_COMMAND_ATTR]: "true" }}
           className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
           rows={5}
         />
       </div>
     </div>
   );
-}
+});

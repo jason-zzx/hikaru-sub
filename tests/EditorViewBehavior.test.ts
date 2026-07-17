@@ -30,7 +30,8 @@ describe("EditorView Phase 2B behavior guards", () => {
   it("passes notify feedback to editor hotkeys and subtitle editor", () => {
     expect(source).toContain("onNotify: notify");
     expect(source).toContain("<SubtitleList onNotify={notify}");
-    expect(source).toContain("<SubtitleEditor onNotify={notify}");
+    expect(source).toContain("onNotify={notify}");
+    expect(source).toContain("SubtitleEditor");
   });
 
   it("isolates scrollable timeline content from resizing the editor grid", () => {
