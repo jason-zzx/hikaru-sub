@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { selectCueAndSeek } from "../../services/editorActions";
@@ -29,6 +35,25 @@ import { serializeAss } from "@/lib/ass";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
 import { parseExternalSubtitleDocument } from "../../utils/subtitleImport";
 import type { ActiveSubtitleKind } from "../../types";
+import {
+  DEFAULT_EDITOR_PANE_LAYOUT,
+  EDITOR_LEFT_PANE_MIN_PX,
+  EDITOR_LIST_PANE_MIN_PX,
+  EDITOR_PANE_SEPARATOR_SIZE_PX,
+  EDITOR_RIGHT_PANE_MIN_PX,
+  EDITOR_SUBTITLE_PANE_MIN_PX,
+  constrainPanePercent,
+  readEditorPaneLayout,
+  writeEditorPaneLayout,
+  type EditorPaneLayout,
+} from "./editorPaneLayout";
+
+type EditorPaneBoundary = "vertical" | "horizontal";
+
+interface EditorPaneDrag {
+  boundary: EditorPaneBoundary;
+  pointerId: number;
+}
 
 export function EditorView() {
   const session = useProjectStore((s) => s.session);
@@ -60,6 +85,13 @@ export function EditorView() {
   const [hasPendingTimeDraft, setHasPendingTimeDraft] = useState(false);
   const toastIdRef = useRef(0);
   const editorRef = useRef<SubtitleEditorHistoryHandle>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const paneDragRef = useRef<EditorPaneDrag | null>(null);
+  const [preferredPaneLayout, setPreferredPaneLayout] =
+    useState<EditorPaneLayout>(() => readEditorPaneLayout());
+  const preferredPaneLayoutRef = useRef(preferredPaneLayout);
+  const [draggingBoundary, setDraggingBoundary] =
+    useState<EditorPaneBoundary | null>(null);
 
   const currentSubtitlePath =
     activeSubtitlePath ??
@@ -67,6 +99,11 @@ export function EditorView() {
       ? null
       : session?.transcribedAssPath ?? null);
   const needsSaveTarget = activeSubtitleKind === "translated" && !activeSubtitlePath;
+
+  const applyPreferredPaneLayout = useCallback((layout: EditorPaneLayout) => {
+    preferredPaneLayoutRef.current = layout;
+    setPreferredPaneLayout(layout);
+  }, []);
 
   const notify = (variant: EditorToastVariant, text: string) => {
     toastIdRef.current += 1;
@@ -231,6 +268,98 @@ export function EditorView() {
     }
   };
 
+  const startPaneDrag = (
+    boundary: EditorPaneBoundary,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (!event.isPrimary || event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    paneDragRef.current = { boundary, pointerId: event.pointerId };
+    setDraggingBoundary(boundary);
+  };
+
+  const movePaneBoundary = (
+    boundary: EditorPaneBoundary,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const drag = paneDragRef.current;
+    const workspace = workspaceRef.current;
+    if (
+      !drag ||
+      drag.boundary !== boundary ||
+      drag.pointerId !== event.pointerId ||
+      !workspace
+    ) {
+      return;
+    }
+
+    const rect = workspace.getBoundingClientRect();
+    const current = preferredPaneLayoutRef.current;
+    if (boundary === "vertical") {
+      const availableWidth = rect.width - EDITOR_PANE_SEPARATOR_SIZE_PX;
+      if (availableWidth <= 0) return;
+      const desiredPercent =
+        ((event.clientX - rect.left - EDITOR_PANE_SEPARATOR_SIZE_PX / 2) /
+          availableWidth) *
+        100;
+      applyPreferredPaneLayout({
+        ...current,
+        leftPercent: constrainPanePercent(
+          desiredPercent,
+          rect.width,
+          EDITOR_LEFT_PANE_MIN_PX,
+          EDITOR_RIGHT_PANE_MIN_PX,
+        ),
+      });
+      return;
+    }
+
+    const availableHeight = rect.height - EDITOR_PANE_SEPARATOR_SIZE_PX;
+    if (availableHeight <= 0) return;
+    const desiredPercent =
+      ((event.clientY - rect.top - EDITOR_PANE_SEPARATOR_SIZE_PX / 2) /
+        availableHeight) *
+      100;
+    applyPreferredPaneLayout({
+      ...current,
+      listPercent: constrainPanePercent(
+        desiredPercent,
+        rect.height,
+        EDITOR_LIST_PANE_MIN_PX,
+        EDITOR_SUBTITLE_PANE_MIN_PX,
+      ),
+    });
+  };
+
+  const finishPaneDrag = (
+    boundary: EditorPaneBoundary,
+    event: ReactPointerEvent<HTMLDivElement>,
+    persist: boolean,
+  ) => {
+    const drag = paneDragRef.current;
+    if (
+      !drag ||
+      drag.boundary !== boundary ||
+      drag.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    paneDragRef.current = null;
+    setDraggingBoundary(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (persist) writeEditorPaneLayout(preferredPaneLayoutRef.current);
+  };
+
+  const resetPaneLayout = () => {
+    const defaults = { ...DEFAULT_EDITOR_PANE_LAYOUT };
+    applyPreferredPaneLayout(defaults);
+    writeEditorPaneLayout(defaults);
+  };
+
   useEditorHotkeys({
     onSave: handleSave,
     onToggleHelp: () => setHelpOpen((v) => !v),
@@ -308,9 +437,15 @@ export function EditorView() {
       </div>
 
       {/* 主编辑区：左视频+时间轴 / 右列表+编辑器 */}
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.4fr)_minmax(360px,1fr)] gap-px overflow-hidden bg-border">
+      <div
+        ref={workspaceRef}
+        className="grid min-h-0 flex-1 overflow-hidden bg-border"
+        style={{
+          gridTemplateColumns: `minmax(${EDITOR_LEFT_PANE_MIN_PX}px, ${preferredPaneLayout.leftPercent}fr) ${EDITOR_PANE_SEPARATOR_SIZE_PX}px minmax(${EDITOR_RIGHT_PANE_MIN_PX}px, ${100 - preferredPaneLayout.leftPercent}fr)`,
+        }}
+      >
         {/* 左侧：视频 + 时间轴 */}
-        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_226px] gap-px overflow-hidden">
+        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_226px] gap-px overflow-hidden bg-border">
           <div className="min-h-0 overflow-hidden bg-muted">
             <VideoPlayer videoPath={session.videoPath} />
           </div>
@@ -319,8 +454,39 @@ export function EditorView() {
           </div>
         </div>
 
+        <div
+          role="separator"
+          aria-label="调整视频与字幕区域宽度，双击恢复默认布局"
+          aria-orientation="vertical"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(preferredPaneLayout.leftPercent)}
+          title="拖动调整宽度；双击恢复默认布局"
+          onPointerDown={(event) => startPaneDrag("vertical", event)}
+          onPointerMove={(event) => movePaneBoundary("vertical", event)}
+          onPointerUp={(event) => finishPaneDrag("vertical", event, true)}
+          onPointerCancel={(event) =>
+            finishPaneDrag("vertical", event, false)
+          }
+          onLostPointerCapture={(event) =>
+            finishPaneDrag("vertical", event, false)
+          }
+          onDoubleClick={resetPaneLayout}
+          className={`group relative z-10 flex cursor-col-resize touch-none select-none justify-center bg-surface-raised transition-colors hover:bg-accent/10 ${draggingBoundary === "vertical" ? "bg-accent/10" : ""}`}
+        >
+          <span
+            aria-hidden="true"
+            className={`w-px transition-colors ${draggingBoundary === "vertical" ? "bg-accent" : "bg-border group-hover:bg-accent"}`}
+          />
+        </div>
+
         {/* 右侧：字幕列表 + 编辑面板 */}
-        <div className="grid min-h-0 grid-rows-[minmax(0,1.1fr)_minmax(200px,0.9fr)] gap-px overflow-hidden">
+        <div
+          className="grid min-h-0 overflow-hidden"
+          style={{
+            gridTemplateRows: `minmax(${EDITOR_LIST_PANE_MIN_PX}px, ${preferredPaneLayout.listPercent}fr) ${EDITOR_PANE_SEPARATOR_SIZE_PX}px minmax(${EDITOR_SUBTITLE_PANE_MIN_PX}px, ${100 - preferredPaneLayout.listPercent}fr)`,
+          }}
+        >
           <div className="min-h-0 overflow-hidden bg-surface-raised">
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-border px-3 py-2">
@@ -333,6 +499,33 @@ export function EditorView() {
               </div>
             </div>
           </div>
+
+          <div
+            role="separator"
+            aria-label="调整字幕列表与字幕编辑区域高度，双击恢复默认布局"
+            aria-orientation="horizontal"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(preferredPaneLayout.listPercent)}
+            title="拖动调整高度；双击恢复默认布局"
+            onPointerDown={(event) => startPaneDrag("horizontal", event)}
+            onPointerMove={(event) => movePaneBoundary("horizontal", event)}
+            onPointerUp={(event) => finishPaneDrag("horizontal", event, true)}
+            onPointerCancel={(event) =>
+              finishPaneDrag("horizontal", event, false)
+            }
+            onLostPointerCapture={(event) =>
+              finishPaneDrag("horizontal", event, false)
+            }
+            onDoubleClick={resetPaneLayout}
+            className={`group relative z-10 flex cursor-row-resize touch-none select-none items-center bg-surface-raised transition-colors hover:bg-accent/10 ${draggingBoundary === "horizontal" ? "bg-accent/10" : ""}`}
+          >
+            <span
+              aria-hidden="true"
+              className={`h-px w-full transition-colors ${draggingBoundary === "horizontal" ? "bg-accent" : "bg-border group-hover:bg-accent"}`}
+            />
+          </div>
+
           <div className="flex min-h-0 flex-col overflow-hidden bg-surface-raised">
             <SubtitleEditor
               ref={editorRef}
