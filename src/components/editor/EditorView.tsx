@@ -307,37 +307,39 @@ export function EditorView() {
         </div>
       </div>
 
-      {/* 主编辑区 */}
-      <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr_320px] grid-rows-[minmax(0,1fr)_226px] gap-px overflow-hidden bg-border">
-        {/* 字幕列表 */}
-        <div className="col-start-1 row-span-2 min-h-0 overflow-hidden bg-surface-raised">
-          <div className="flex h-full flex-col">
-            <div className="border-b border-border px-3 py-2">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-                字幕列表 ({cues.length})
-              </h3>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <SubtitleList onNotify={notify} />
-            </div>
+      {/* 主编辑区：左视频+时间轴 / 右列表+编辑器 */}
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.4fr)_minmax(360px,1fr)] gap-px overflow-hidden bg-border">
+        {/* 左侧：视频 + 时间轴 */}
+        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_226px] gap-px overflow-hidden">
+          <div className="min-h-0 overflow-hidden bg-muted">
+            <VideoPlayer videoPath={session.videoPath} />
+          </div>
+          <div className="min-h-0 overflow-hidden bg-surface">
+            <Timeline />
           </div>
         </div>
 
-        {/* 视频播放器 */}
-        <div className="col-start-2 row-start-1 min-h-0 overflow-hidden bg-muted">
-          <VideoPlayer videoPath={session.videoPath} />
-        </div>
-
-        {/* 编辑面板 */}
-        <div className="col-start-3 row-span-2 flex min-h-0 flex-col overflow-hidden bg-surface-raised">
-          <div className="min-h-0 flex-1">
-            <SubtitleEditor ref={editorRef} onNotify={notify} onPendingTimeDraftChange={setHasPendingTimeDraft} />
+        {/* 右侧：字幕列表 + 编辑面板 */}
+        <div className="grid min-h-0 grid-rows-[minmax(0,1.1fr)_minmax(200px,0.9fr)] gap-px overflow-hidden">
+          <div className="min-h-0 overflow-hidden bg-surface-raised">
+            <div className="flex h-full flex-col">
+              <div className="shrink-0 border-b border-border px-3 py-2">
+                <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
+                  字幕列表 ({cues.length})
+                </h3>
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <SubtitleList onNotify={notify} />
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* 时间轴 */}
-        <div className="col-start-2 row-start-2 min-h-0 overflow-hidden bg-surface">
-          <Timeline />
+          <div className="flex min-h-0 flex-col overflow-hidden bg-surface-raised">
+            <SubtitleEditor
+              ref={editorRef}
+              onNotify={notify}
+              onPendingTimeDraftChange={setHasPendingTimeDraft}
+            />
+          </div>
         </div>
       </div>
 

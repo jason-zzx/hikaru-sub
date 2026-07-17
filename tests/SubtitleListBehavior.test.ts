@@ -10,22 +10,19 @@ const source = readFileSync(
 );
 
 describe("SubtitleList 时间显示", () => {
-  it("开始/结束时间使用 10ms 精度显示", () => {
-    expect(source).toContain("formatTime(cue.startMs)");
-    expect(source).toContain("formatTime(cue.endMs)");
-    expect(source).toContain("function formatTime");
+  it("开始/结束时间使用 ASS H:MM:SS.cc（10ms）并紧凑列宽", () => {
+    expect(source).toContain("formatAssTime(cue.startMs)");
+    expect(source).toContain("formatAssTime(cue.endMs)");
     expect(source).not.toContain("formatPlaybackTime(cue.startMs, true)");
     expect(source).not.toContain("formatPlaybackTime(cue.endMs, true)");
   });
 
-  it("在序号旁以紧凑标签显示每条字幕的样式名", () => {
+  it("以对齐列显示样式名，缺失样式时高亮警告", () => {
     expect(source).toContain("assStyles");
     expect(source).toContain("cue.style");
     expect(source).toContain("knownStyleNames");
     expect(source).toContain("styleMissing");
-    expect(source).toContain("border-warning/50 bg-warning/10 text-warning");
-    expect(source).toContain("title={cue.style}");
-    expect(source).toContain("max-w-[6.5rem] truncate");
+    expect(source).toContain("text-warning");
   });
 
   it("支持多选和 Aegisub 风格右键行操作", () => {

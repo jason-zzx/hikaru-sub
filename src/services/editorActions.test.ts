@@ -31,7 +31,14 @@ import { usePlaybackStore } from "../stores/playbackStore";
 import type { SubtitleCue } from "../types";
 
 function cue(id: string, startMs: number, endMs: number): SubtitleCue {
-  return { id, startMs, endMs, primaryText: id, style: "Primary", layer: 0 };
+  return {
+    id,
+    startMs,
+    endMs,
+    primaryText: id,
+    style: "Primary",
+    layer: 0,
+  };
 }
 
 const CUES = [cue("a", 0, 1000), cue("b", 2000, 3000), cue("c", 5000, 6000)];
@@ -137,6 +144,8 @@ describe("appendCueAfter", () => {
       secondaryText: "译",
       style: "Secondary",
       layer: 2,
+      name: "Actor",
+      marginL: 1,
     };
     const appended = appendCueAfter(base);
     expect(appended.id).toBeTruthy();
@@ -147,6 +156,8 @@ describe("appendCueAfter", () => {
     expect(appended.secondaryText).toBeUndefined();
     expect(appended.style).toBe("Secondary");
     expect(appended.layer).toBe(2);
+    expect(appended.name).toBe("Actor");
+    expect(appended.marginL).toBe(1);
   });
 });
 

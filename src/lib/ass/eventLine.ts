@@ -22,7 +22,7 @@ function parseStrictInt(input: string): number | null {
 
 /**
  * Serialize one physical cue to a canonical Dialogue event line.
- * Name/margins/effect are always blank/zero (editor model has no such fields).
+ * Preserves Name / MarginL / MarginR / MarginV / Effect from the cue model.
  */
 export function formatDialogueEventLine(cue: SubtitleCue): string {
   const fields = [
@@ -30,11 +30,11 @@ export function formatDialogueEventLine(cue: SubtitleCue): string {
     formatAssTime(cue.startMs),
     formatAssTime(cue.endMs),
     cue.style || "Default",
-    "",
-    0,
-    0,
-    0,
-    "",
+    cue.name ?? "",
+    cue.marginL ?? 0,
+    cue.marginR ?? 0,
+    cue.marginV ?? 0,
+    cue.effect ?? "",
     toAssText(cue.primaryText),
   ];
   return `Dialogue: ${fields.join(",")}`;
@@ -43,7 +43,7 @@ export function formatDialogueEventLine(cue: SubtitleCue): string {
 /**
  * Strictly parse one complete `Dialogue:` line into a physical cue.
  * Rejects Comment lines, missing fields, non-numeric layer/margins, invalid times.
- * Unsupported Name/margins/Effect are accepted but not stored on the cue.
+ * Stores Name / margins / Effect on the cue.
  */
 export function parseDialogueEventLine(
   line: string,
@@ -65,12 +65,16 @@ export function parseDialogueEventLine(
   const endMs = parseStrictAssTime(head[2] ?? "");
   const style = head[3];
   if (style === undefined || style === "") return null;
-  // Name/margins/Effect accepted for field count but not stored on the cue.
+  const marginL = parseStrictInt(head[5] ?? "");
+  const marginR = parseStrictInt(head[6] ?? "");
+  const marginV = parseStrictInt(head[7] ?? "");
   if (
     layer === null ||
     startMs === null ||
     endMs === null ||
-    ![head[5], head[6], head[7]].every((m) => /^-?\d+$/.test(m ?? ""))
+    marginL === null ||
+    marginR === null ||
+    marginV === null
   ) {
     return null;
   }
@@ -82,5 +86,10 @@ export function parseDialogueEventLine(
     primaryText: fromAssText(text),
     style,
     layer,
+    name: head[4] ?? "",
+    marginL,
+    marginR,
+    marginV,
+    effect: head[8] ?? "",
   };
 }

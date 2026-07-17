@@ -308,10 +308,10 @@ describe("SubtitleEditor text history", () => {
     const ref = createRef<SubtitleEditorHistoryHandle>();
     const first = render(<SubtitleEditor ref={ref} />);
     const startInput = document.querySelector<HTMLInputElement>(
-      'input[placeholder="00:00:00.00"]',
+      'input[placeholder="0:00:00.00"]',
     );
 
-    fireEvent.change(startInput!, { target: { value: "00:00:03.00" } });
+    fireEvent.change(startInput!, { target: { value: "0:00:03.00" } });
     expect(ref.current?.commitPendingTimeDraft()).toBe(true);
     expect(useProjectStore.getState().cues[0]).toMatchObject({
       startMs: 2000,
@@ -322,9 +322,9 @@ describe("SubtitleEditor text history", () => {
     reset([{ ...cue("a", "ab"), startMs: 1000, endMs: 2000 }]);
     render(<SubtitleEditor ref={ref} />);
     const [, endInput] = document.querySelectorAll<HTMLInputElement>(
-      'input[placeholder="00:00:00.00"]',
+      'input[placeholder="0:00:00.00"]',
     );
-    fireEvent.change(endInput!, { target: { value: "00:00:00.50" } });
+    fireEvent.change(endInput!, { target: { value: "0:00:00.50" } });
     expect(ref.current?.commitPendingTimeDraft()).toBe(true);
     expect(useProjectStore.getState().cues[0]).toMatchObject({
       startMs: 1000,
@@ -337,10 +337,10 @@ describe("SubtitleEditor text history", () => {
     const ref = createRef<SubtitleEditorHistoryHandle>();
     render(<SubtitleEditor ref={ref} />);
     const startInput = document.querySelector<HTMLInputElement>(
-      'input[placeholder="00:00:00.00"]',
+      'input[placeholder="0:00:00.00"]',
     );
 
-    fireEvent.change(startInput!, { target: { value: "00:00:03.00" } });
+    fireEvent.change(startInput!, { target: { value: "0:00:03.00" } });
     expect(ref.current?.commitPendingTimeDraft()).toBe(false);
     expect(useProjectStore.getState().history.past).toHaveLength(0);
   });

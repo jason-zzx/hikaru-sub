@@ -207,6 +207,11 @@ export function parseAss(input: string, options: ParseOptions = {}): AssDocument
           primaryText: fromAssText(e.text),
           style: e.style,
           layer: e.layer,
+          name: e.name,
+          marginL: e.marginL,
+          marginR: e.marginR,
+          marginV: e.marginV,
+          effect: e.effect,
         }));
 
   return { scriptInfo, styles, cues };

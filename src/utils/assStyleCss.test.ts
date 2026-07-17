@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createDefaultScriptInfo, createDefaultStyles } from "@/lib/ass";
+import {
+  createDefaultScriptInfo,
+  createDefaultStyles,
+} from "@/lib/ass";
 import type { AssStyle, SubtitleCue } from "@/lib/ass";
 import {
   assFontWeight,

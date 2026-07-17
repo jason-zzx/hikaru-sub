@@ -20,8 +20,15 @@ interface SubtitleCue {
   secondaryText?: string   // translation
   style: string
   layer: number
+  name?: string       // ASS Dialogue Name; absent means ""
+  marginL?: number    // absent means 0
+  marginR?: number
+  marginV?: number
+  effect?: string     // absent means ""
 }
 ```
+
+Physical ASS parse paths populate the optional Dialogue fields. Synthetic cues may omit them; list/serialize boundaries must normalize with `?? ""` / `?? 0`. Operations that clone or inherit a physical cue must preserve any present values. Do not export a shared defaults object solely to make every synthetic cue/test fixture spell out empty fields.
 
 Bilingual **generation** (translation page only) may serialize as:
 
