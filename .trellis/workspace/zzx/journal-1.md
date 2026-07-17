@@ -19,7 +19,9 @@ Filled frontend/tauri/asr Trellis specs from real Hikaru Sub sources; referenced
 
 ### Main Changes
 
-- Detailed change bullets were not supplied; see the summary above.
+- Unified all persistent `SubtitleCue` edits into one project undo/redo history.
+- Added Aegisub-style text grouping, IME-safe preview/commit handling, caret restoration, and pending-time coordination.
+- Paired save payloads with revision checkpoints and synchronized frontend specs, Agent guidance, and user documentation.
 
 ### Git Commits
 
@@ -27,7 +29,9 @@ Filled frontend/tauri/asr Trellis specs from real Hikaru Sub sources; referenced
 
 ### Testing
 
-- Validation was not recorded for this session.
+- `pnpm test`: 68 files, 462 tests passed.
+- `pnpm build`: passed.
+- Manual editor validation completed by the user.
 
 ### Status
 
@@ -91,6 +95,39 @@ Added batch right-panel formatting for multi-selected physical subtitle rows, pr
 | Hash | Message |
 |------|---------|
 | `2b4efef` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 4: Unified subtitle editor undo/redo history
+
+**Date**: 2026-07-17
+**Task**: Unified subtitle editor undo/redo history
+**Branch**: `dev`
+
+### Summary
+
+Unified all persistent subtitle edits under one project-level undo/redo history, added Aegisub-style text grouping, coordinated IME and pending time drafts, paired saves with revision checkpoints, and synchronized tests and documentation.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7c7afe1` | (see git log) |
 
 ### Testing
 
