@@ -140,3 +140,36 @@ Unified all persistent subtitle edits under one project-level undo/redo history,
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Editor layout redesign
+
+**Date**: 2026-07-17
+**Task**: Editor layout redesign
+**Branch**: `dev`
+
+### Summary
+
+Redesigned the subtitle editor workspace, added aligned optional ASS Dialogue columns with field round-trip preservation, reflowed editing controls, and standardized compact H:MM:SS.cc time inputs.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `14b332c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
