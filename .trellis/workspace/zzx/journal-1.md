@@ -173,3 +173,36 @@ Redesigned the subtitle editor workspace, added aligned optional ASS Dialogue co
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Resizable editor panes
+
+**Date**: 2026-07-17
+**Task**: Resizable editor panes
+**Branch**: `dev`
+
+### Summary
+
+Added pointer-resizable editor pane splitters with global persistence, minimum-size constraints, double-click reset, preserved editor arrow-key behavior, and simplified the implementation with native CSS Grid minmax.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f873178` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
