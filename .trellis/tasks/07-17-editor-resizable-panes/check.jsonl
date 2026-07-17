@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend quality entry point and relevant validation commands."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Verify editor composition, accessibility styling, semantic tokens, and unchanged editor behavior."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify pane layout state does not enter subtitle project/session history."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify minimal diffs, targeted/full tests, and build requirements."}

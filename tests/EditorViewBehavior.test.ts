@@ -38,6 +38,39 @@ describe("EditorView Phase 2B behavior guards", () => {
     expect(source).toContain("overflow-hidden");
   });
 
+  it("exposes two pointer-only pane separators without intercepting arrow keys", () => {
+    expect(source.split('role="separator"')).toHaveLength(3);
+    expect(source).toContain('aria-orientation="vertical"');
+    expect(source).toContain('aria-orientation="horizontal"');
+    expect(source).toContain("onPointerDown");
+    expect(source).toContain("onPointerMove");
+    expect(source).not.toContain("onKeyDown=");
+    expect(source).not.toContain("tabIndex=");
+    expect(source).toContain("useEditorHotkeys({");
+  });
+
+  it("resets and persists both pane ratios from either separator", () => {
+    expect(source.split("onDoubleClick={resetPaneLayout}")).toHaveLength(3);
+    expect(source).toContain("writeEditorPaneLayout(defaults)");
+  });
+
+  it("uses native minimum-constrained grid tracks", () => {
+    expect(source).toContain(
+      "minmax(${EDITOR_LEFT_PANE_MIN_PX}px, ${preferredPaneLayout.leftPercent}fr)",
+    );
+    expect(source).toContain(
+      "minmax(${EDITOR_RIGHT_PANE_MIN_PX}px, ${100 - preferredPaneLayout.leftPercent}fr)",
+    );
+    expect(source).toContain(
+      "minmax(${EDITOR_LIST_PANE_MIN_PX}px, ${preferredPaneLayout.listPercent}fr)",
+    );
+    expect(source).toContain(
+      "minmax(${EDITOR_SUBTITLE_PANE_MIN_PX}px, ${100 - preferredPaneLayout.listPercent}fr)",
+    );
+    expect(source).not.toContain("ResizeObserver");
+    expect(source).not.toContain("workspaceSize");
+  });
+
   it("saves back to the active visible subtitle file", () => {
     const oldHiddenSubtitlePath = "/.hi" + "karu/sub" + "titles.ass";
     const oldProjectAssPath = "project." + "assPath";

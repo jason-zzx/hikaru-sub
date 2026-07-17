@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership, pre-development checklist, and package quality entry point."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Editor composition, semantic UI tokens, Chinese copy, and no-regression component rules."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Keeps pane preferences out of subtitle project history and clarifies frontend state boundaries."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Required minimal-diff, test, and build expectations for frontend changes."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Confirms no existing splitter pattern and prevents a speculative general-purpose abstraction."}
