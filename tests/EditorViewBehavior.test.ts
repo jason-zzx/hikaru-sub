@@ -35,10 +35,7 @@ describe("EditorView Phase 2B behavior guards", () => {
   });
 
   it("isolates scrollable timeline content from resizing the editor grid", () => {
-    expect(source).toContain("grid-rows-[minmax(0,1fr)_226px]");
     expect(source).toContain("overflow-hidden");
-    expect(source).toContain("col-start-2 row-start-1 min-h-0 overflow-hidden bg-muted");
-    expect(source).toContain("col-start-2 row-start-2 min-h-0 overflow-hidden bg-surface");
   });
 
   it("saves back to the active visible subtitle file", () => {

@@ -13,6 +13,16 @@ export interface SubtitleCue {
   /** 原文所用 ASS Style 名 */
   style: string;
   layer: number;
+  /** ASS Dialogue Name；缺省 "" */
+  name?: string;
+  /** ASS Dialogue MarginL；缺省 0 */
+  marginL?: number;
+  /** ASS Dialogue MarginR；缺省 0 */
+  marginR?: number;
+  /** ASS Dialogue MarginV；缺省 0 */
+  marginV?: number;
+  /** ASS Dialogue Effect；缺省 "" */
+  effect?: string;
 }
 
 /**

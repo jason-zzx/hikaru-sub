@@ -15,7 +15,14 @@ vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
 }));
 
 function cue(id: string, startMs: number, endMs: number): SubtitleCue {
-  return { id, startMs, endMs, primaryText: id, style: "Primary", layer: 0 };
+  return {
+    id,
+    startMs,
+    endMs,
+    primaryText: id,
+    style: "Primary",
+    layer: 0,
+  };
 }
 
 const CUES = [cue("a", 0, 1000), cue("b", 2000, 3000), cue("c", 5000, 6000)];

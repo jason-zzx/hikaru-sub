@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { AssStyle, SubtitleCue } from "@/lib/ass";
+import {
+  type AssStyle,
+  type SubtitleCue,
+} from "@/lib/ass";
 import type { PreviewFontFile } from "../types";
 import {
   findBestPreviewFontFile,

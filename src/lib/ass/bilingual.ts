@@ -69,11 +69,11 @@ function makeEvent(
     startMs: cue.startMs,
     endMs: cue.endMs,
     style,
-    name: "",
-    marginL: 0,
-    marginR: 0,
-    marginV: 0,
-    effect: "",
+    name: cue.name ?? "",
+    marginL: cue.marginL ?? 0,
+    marginR: cue.marginR ?? 0,
+    marginV: cue.marginV ?? 0,
+    effect: cue.effect ?? "",
     text: toAssText(text),
   };
 }
@@ -162,6 +162,11 @@ export function eventsToCues(
         secondaryText: fromAssText(secondary.text),
         style: primary.style,
         layer: primary.layer,
+        name: primary.name,
+        marginL: primary.marginL,
+        marginR: primary.marginR,
+        marginV: primary.marginV,
+        effect: primary.effect,
       });
       continue;
     }
@@ -175,6 +180,11 @@ export function eventsToCues(
         primaryText: fromAssText(ev.text),
         style: ev.style,
         layer: ev.layer,
+        name: ev.name,
+        marginL: ev.marginL,
+        marginR: ev.marginR,
+        marginV: ev.marginV,
+        effect: ev.effect,
       });
     }
   }

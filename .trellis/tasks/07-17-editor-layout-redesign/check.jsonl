@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend quality pointers and ASS ownership boundaries"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verification commands and minimal-diff expectations"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Check SubtitleCue field consistency across ASS paths"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "UI string and shadcn conventions for list/editor chrome"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify parse/serialize/clipboard still agree after cue field changes"}
+{"file": ".trellis/tasks/07-17-editor-layout-redesign/prd.md", "reason": "Acceptance criteria checklist"}
+{"file": ".trellis/tasks/07-17-editor-layout-redesign/design.md", "reason": "Design contracts to verify against"}
+{"file": ".trellis/tasks/07-17-editor-layout-redesign/implement.md", "reason": "Expected validation steps and rollback points"}

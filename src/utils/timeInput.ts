@@ -1,7 +1,5 @@
-export const TIME_INPUT_TEMPLATE = "00:00:00.00";
-export const TIME_INPUT_DIGIT_INDEXES = [0, 1, 3, 4, 6, 7, 9, 10] as const;
-
-type TimeDigitIndex = (typeof TIME_INPUT_DIGIT_INDEXES)[number];
+/** Default placeholder / empty display: ASS-style `H:MM:SS.cc` with unpadded hours. */
+export const TIME_INPUT_TEMPLATE = "0:00:00.00";
 
 export type TimeInputEditResult = {
   value: string;
@@ -22,59 +20,47 @@ export type TimeRangeNormalized = {
 };
 
 const LAST_TIME_MS = 99 * 3_600_000 + 59 * 60_000 + 59 * 1000 + 990;
-const DIGIT_INDEX_SET = new Set<number>(TIME_INPUT_DIGIT_INDEXES);
 
-function clampPosition(position: number): number {
-  if (!Number.isFinite(position)) return 0;
-  return Math.max(0, Math.min(TIME_INPUT_TEMPLATE.length, Math.round(position)));
-}
-
-function isDigitKey(key: string): boolean {
-  return /^[0-9]$/.test(key);
-}
-
-function digitAtOrAfter(position: number): TimeDigitIndex {
-  const pos = clampPosition(position);
-  return (
-    TIME_INPUT_DIGIT_INDEXES.find((idx) => idx >= pos) ??
-    TIME_INPUT_DIGIT_INDEXES[TIME_INPUT_DIGIT_INDEXES.length - 1]
-  );
-}
-
-function digitAfter(position: number): number {
-  const pos = clampPosition(position);
-  return (
-    TIME_INPUT_DIGIT_INDEXES.find((idx) => idx > pos) ??
-    TIME_INPUT_TEMPLATE.length
-  );
-}
-
-function digitBefore(position: number): number {
-  const pos = clampPosition(position);
-  for (let i = TIME_INPUT_DIGIT_INDEXES.length - 1; i >= 0; i -= 1) {
-    const idx = TIME_INPUT_DIGIT_INDEXES[i];
-    if (idx < pos) return idx;
+function digitIndexes(value: string): number[] {
+  const indexes: number[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (/\d/.test(value[index])) indexes.push(index);
   }
-  return 0;
+  return indexes;
 }
 
-export function snapTimeInputCaret(position: number): number {
-  const pos = clampPosition(position);
-  if (pos === TIME_INPUT_TEMPLATE.length || DIGIT_INDEX_SET.has(pos)) return pos;
-
-  const next = TIME_INPUT_DIGIT_INDEXES.find((idx) => idx > pos);
-  const prev = [...TIME_INPUT_DIGIT_INDEXES]
-    .reverse()
-    .find((idx) => idx < pos);
-
-  if (next === undefined) return TIME_INPUT_TEMPLATE.length;
-  if (prev === undefined) return 0;
-  return next - pos <= pos - prev ? next : prev;
+function clampPosition(position: number, length: number): number {
+  if (!Number.isFinite(position)) return 0;
+  return Math.max(0, Math.min(length, Math.round(position)));
 }
 
 export function normalizeTimeInputValue(value: string): string {
+  // Preserve field boundaries when the value already has H:MM:SS.cc structure.
+  const structured = value.trim().match(/^(\d{1,2}):(\d{2}):(\d{2})\.(\d{2})$/);
+  if (structured) {
+    return `${Math.min(99, Number(structured[1]))}:${structured[2]}:${structured[3]}.${structured[4]}`;
+  }
+
   const digits = value.replace(/\D/g, "").padEnd(8, "0").slice(0, 8);
-  return `${digits.slice(0, 2)}:${digits.slice(2, 4)}:${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
+  return `${Math.min(99, Number(digits.slice(0, 2)))}:${digits.slice(2, 4)}:${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
+}
+
+export function snapTimeInputCaret(position: number, value = TIME_INPUT_TEMPLATE): number {
+  const normalized = normalizeTimeInputValue(value);
+  const pos = clampPosition(position, normalized.length);
+  const indexes = digitIndexes(normalized);
+
+  if (pos === normalized.length || indexes.includes(pos)) return pos;
+
+  const next = indexes.find((index) => index > pos);
+  let previous = indexes[0] ?? 0;
+  for (const index of indexes) {
+    if (index >= pos) break;
+    previous = index;
+  }
+
+  if (next === undefined) return normalized.length;
+  return next - pos <= pos - previous ? next : previous;
 }
 
 export function applyTimeInputKey(
@@ -84,13 +70,17 @@ export function applyTimeInputKey(
   key: string,
 ): TimeInputEditResult {
   const normalized = normalizeTimeInputValue(value);
-  const start = clampPosition(selectionStart);
+  const indexes = digitIndexes(normalized);
+  const start = clampPosition(selectionStart, normalized.length);
+  let ordinal = indexes.findIndex((index) => index >= start);
+  if (ordinal < 0) ordinal = indexes.length - 1;
 
-  if (isDigitKey(key)) {
-    const target = digitAtOrAfter(start);
-    const nextValue =
-      normalized.slice(0, target) + key + normalized.slice(target + 1);
-    const nextCaret = digitAfter(target);
+  if (/^[0-9]$/.test(key)) {
+    const target = indexes[ordinal];
+    const nextValue = normalizeTimeInputValue(
+      normalized.slice(0, target) + key + normalized.slice(target + 1),
+    );
+    const nextCaret = digitIndexes(nextValue)[ordinal + 1] ?? nextValue.length;
     return {
       value: nextValue,
       selectionStart: nextCaret,
@@ -100,17 +90,21 @@ export function applyTimeInputKey(
   }
 
   if (key === "Backspace") {
-    const nextCaret = digitBefore(start);
+    let previous = indexes[0] ?? 0;
+    for (const index of indexes) {
+      if (index >= start) break;
+      previous = index;
+    }
     return {
       value: normalized,
-      selectionStart: nextCaret,
-      selectionEnd: nextCaret,
+      selectionStart: previous,
+      selectionEnd: previous,
       handled: true,
     };
   }
 
   if (key === "Delete") {
-    const nextCaret = digitAfter(start);
+    const nextCaret = indexes[ordinal + 1] ?? normalized.length;
     return {
       value: normalized,
       selectionStart: nextCaret,
@@ -122,7 +116,7 @@ export function applyTimeInputKey(
   return {
     value: normalized,
     selectionStart: start,
-    selectionEnd: clampPosition(selectionEnd),
+    selectionEnd: clampPosition(selectionEnd, normalized.length),
     handled: false,
   };
 }
@@ -135,12 +129,12 @@ export function formatTimeInput(ms: number): string {
   const seconds = totalSeconds % 60;
   const centiseconds = Math.floor((bounded % 1000) / 10);
 
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${centiseconds.toString().padStart(2, "0")}`;
+  return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${centiseconds.toString().padStart(2, "0")}`;
 }
 
 export function parseTimeInput(input: string): TimeParseResult {
   const normalized = normalizeTimeInputValue(input);
-  const match = normalized.match(/^(\d{2}):(\d{2}):(\d{2})\.(\d{2})$/);
+  const match = normalized.match(/^(\d+):(\d{2}):(\d{2})\.(\d{2})$/);
   if (!match) return { ok: false, message: "时间格式无效" };
 
   const hours = Number(match[1]);

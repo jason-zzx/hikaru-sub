@@ -15,8 +15,14 @@ import {
 } from "../../services/subtitleClipboard";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
+import { formatAssTime } from "@/lib/ass";
 import type { SubtitleCue } from "../../types";
 import type { EditorToastVariant } from "./EditorToast";
+import {
+  CUE_LIST_COLUMN_LABELS,
+  getCueListColumnVisibility,
+  type CueListColumn,
+} from "./cueListColumns";
 
 type SubtitleListNotify = (variant: EditorToastVariant, text: string) => void;
 
@@ -31,6 +37,43 @@ interface ContextMenuState {
   selectedCueIds: string[];
 }
 
+function renderCellValue(column: CueListColumn, cue: SubtitleCue, index: number): string {
+  switch (column) {
+    case "index":
+      return String(index + 1);
+    case "layer":
+      return String(cue.layer);
+    case "start":
+      return formatAssTime(cue.startMs);
+    case "end":
+      return formatAssTime(cue.endMs);
+    case "style":
+      return cue.style;
+    case "name":
+      return cue.name ?? "";
+    case "marginL":
+      return String(cue.marginL ?? 0);
+    case "marginR":
+      return String(cue.marginR ?? 0);
+    case "marginV":
+      return String(cue.marginV ?? 0);
+    case "effect":
+      return cue.effect ?? "";
+    case "text":
+      return cue.primaryText.replace(/\n/g, " ");
+  }
+}
+
+function isNumericColumn(column: CueListColumn): boolean {
+  return (
+    column === "index" ||
+    column === "layer" ||
+    column === "start" ||
+    column === "end" ||
+    column.startsWith("margin")
+  );
+}
+
 export function SubtitleList({ onNotify }: SubtitleListProps) {
   const cues = useProjectStore((s) => s.cues);
   const replaceCues = useProjectStore((s) => s.replaceCues);
@@ -43,6 +86,7 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
   const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
   const knownStyleNames = new Set(assStyles.map((style) => style.name));
+  const columnVisibility = getCueListColumnVisibility(cues);
 
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -225,9 +269,26 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
     );
   }
 
+  const { columns, gridTemplate } = columnVisibility;
+
   return (
-    <div ref={listRef} className="h-full overflow-auto select-none">
-      <div className="space-y-1 p-2">
+    <div ref={listRef} className="h-full overflow-auto select-none px-2">
+      {/* One shared grid so max-content / fit-content tracks align header + rows. */}
+      <div className="grid gap-x-2" style={{ gridTemplateColumns: gridTemplate }}>
+        {/* Full-span sticky bar so gap-x does not let body content bleed through. */}
+        <div className="sticky top-0 z-10 col-span-full grid grid-cols-subgrid border-b border-border bg-surface-raised">
+          {columns.map((column) => (
+            <div
+              key={`header-${column}`}
+              className={`py-1.5 text-[11px] font-medium uppercase tracking-wide text-text-muted ${
+                isNumericColumn(column) ? "truncate text-center" : "truncate"
+              }`}
+            >
+              {CUE_LIST_COLUMN_LABELS[column]}
+            </div>
+          ))}
+        </div>
+
         {cues.map((cue, index) => {
           const isSelected =
             selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
@@ -239,33 +300,47 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
               ref={cue.id === selectedCueId ? selectedRef : null}
               onClick={(event) => handleCueClick(cue, event)}
               onContextMenu={(event) => handleCueContextMenu(cue, event)}
-              className={`cursor-pointer rounded border px-3 py-2 transition-colors ${
+              className={`col-span-full grid cursor-pointer grid-cols-subgrid items-center rounded py-1 text-sm transition-colors ${
                 isSelected
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:bg-surface-overlay"
+                  ? "bg-primary/10 ring-1 ring-inset ring-primary/40"
+                  : "hover:bg-surface-overlay"
               }`}
             >
-              <div className="mb-1 flex items-center justify-between gap-2 text-xs text-text-muted">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="shrink-0">#{index + 1}</span>
-                  <span
-                    title={cue.style}
-                    className={`max-w-[6.5rem] truncate rounded-full border px-1.5 py-px text-[10px] leading-tight ${
-                      styleMissing
-                        ? "border-warning/50 bg-warning/10 text-warning"
-                        : "border-border bg-muted text-text-muted"
+              {columns.map((column) => {
+                const value = renderCellValue(column, cue, index);
+                const mono =
+                  column === "start" ||
+                  column === "end" ||
+                  column === "index" ||
+                  column === "layer" ||
+                  column.startsWith("margin");
+                const warnStyle = column === "style" && styleMissing;
+                return (
+                  <div
+                    key={column}
+                    title={value.trim() === "" ? undefined : value}
+                    className={`min-w-0 truncate whitespace-nowrap ${
+                      mono ? "font-mono text-xs text-text-muted" : ""
+                    } ${
+                      column === "index" ||
+                      column === "layer" ||
+                      column.startsWith("margin")
+                        ? "text-center"
+                        : ""
+                    } ${
+                      warnStyle
+                        ? "text-warning"
+                        : column === "text"
+                          ? "text-text"
+                          : column === "style"
+                            ? "text-text-muted"
+                            : ""
                     }`}
                   >
-                    {cue.style}
-                  </span>
-                </div>
-                <span className="shrink-0">
-                  {formatTime(cue.startMs)} → {formatTime(cue.endMs)}
-                </span>
-              </div>
-              <div className="space-y-1 text-sm">
-                <div className="text-text">{cue.primaryText}</div>
-              </div>
+                    {value || (column === "text" ? "" : "\u00A0")}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -436,12 +511,4 @@ function MenuButton({ children, disabled = false, onClick }: MenuButtonProps) {
 
 function MenuSeparator() {
   return <div className="my-1 border-t border-border" />;
-}
-
-function formatTime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  const centiseconds = Math.floor((ms % 1000) / 10);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}.${centiseconds.toString().padStart(2, "0")}`;
 }

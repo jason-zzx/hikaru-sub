@@ -19,6 +19,7 @@ import {
   normalizeTimeInputValue,
   parseTimeInput,
   snapTimeInputCaret,
+  TIME_INPUT_TEMPLATE,
 } from "../../utils/timeInput";
 import { Button } from "../ui/button";
 import {
@@ -309,8 +310,12 @@ export function ClipDialog({
 
   const handleTimeChange =
     (field: TimeField) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      const caret = snapTimeInputCaret(event.currentTarget.selectionStart ?? 0);
-      setTimeValue(field, normalizeTimeInputValue(event.currentTarget.value));
+      const normalized = normalizeTimeInputValue(event.currentTarget.value);
+      const caret = snapTimeInputCaret(
+        event.currentTarget.selectionStart ?? 0,
+        normalized,
+      );
+      setTimeValue(field, normalized);
       scheduleTimeCaret(field, caret);
     };
 
@@ -420,7 +425,7 @@ export function ClipDialog({
                 onChange={handleTimeChange("start")}
                 onKeyDown={handleTimeKeyDown("start")}
                 onBlur={() => handleTimeBlur("start")}
-                placeholder="00:00:00.00"
+                placeholder={TIME_INPUT_TEMPLATE}
                 inputMode="numeric"
                 className="font-mono"
                 aria-invalid={Boolean(rangeError)}
@@ -435,7 +440,7 @@ export function ClipDialog({
                 onChange={handleTimeChange("end")}
                 onKeyDown={handleTimeKeyDown("end")}
                 onBlur={() => handleTimeBlur("end")}
-                placeholder="00:00:00.00"
+                placeholder={TIME_INPUT_TEMPLATE}
                 inputMode="numeric"
                 className="font-mono"
                 aria-invalid={Boolean(rangeError)}

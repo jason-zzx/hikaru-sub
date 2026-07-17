@@ -1,4 +1,7 @@
-import { createId as createAssId, type AssStyle } from "@/lib/ass";
+import {
+  createId as createAssId,
+  type AssStyle,
+} from "@/lib/ass";
 import { usePlaybackStore } from "../stores/playbackStore";
 import type { SubtitleCue } from "../types";
 import {
@@ -236,6 +239,15 @@ function makeInheritedEmptyCue(
   id: string,
   placement: CueInsertPlacement,
 ): SubtitleCue {
+  const inherited = {
+    style: base.style,
+    layer: base.layer,
+    name: base.name,
+    marginL: base.marginL,
+    marginR: base.marginR,
+    marginV: base.marginV,
+    effect: base.effect,
+  };
   if (placement === "before") {
     return {
       id,
@@ -243,8 +255,7 @@ function makeInheritedEmptyCue(
       endMs: base.startMs,
       primaryText: "",
       secondaryText: undefined,
-      style: base.style,
-      layer: base.layer,
+      ...inherited,
     };
   }
   return {
@@ -253,8 +264,7 @@ function makeInheritedEmptyCue(
     endMs: base.endMs + DEFAULT_INSERT_DURATION_MS,
     primaryText: "",
     secondaryText: undefined,
-    style: base.style,
-    layer: base.layer,
+    ...inherited,
   };
 }
 
@@ -409,6 +419,11 @@ function buildAppendedCue(cue: SubtitleCue, id: string): SubtitleCue {
     secondaryText: undefined,
     style: cue.style,
     layer: cue.layer,
+    name: cue.name,
+    marginL: cue.marginL,
+    marginR: cue.marginR,
+    marginV: cue.marginV,
+    effect: cue.effect,
   };
 }
 

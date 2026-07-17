@@ -60,6 +60,11 @@ export function buildPasteFromClipboardText(
       primaryText: line,
       style: baseCue.style,
       layer: baseCue.layer,
+      name: baseCue.name,
+      marginL: baseCue.marginL,
+      marginR: baseCue.marginR,
+      marginV: baseCue.marginV,
+      effect: baseCue.effect,
     };
     fallbackCursorMs = fallback.endMs;
     existingAndCreated.push(fallback);

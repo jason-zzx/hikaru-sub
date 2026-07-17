@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { formatDialogueEventLine, type SubtitleCue } from "@/lib/ass";
+import {
+  formatDialogueEventLine,
+  type SubtitleCue,
+} from "@/lib/ass";
 import {
   buildPasteFromClipboardText,
   copyCuesToSystemClipboard,
@@ -21,7 +24,14 @@ function cue(
   endMs: number,
   text = id,
 ): SubtitleCue {
-  return { id, startMs, endMs, primaryText: text, style: "Primary", layer: 0 };
+  return {
+    id,
+    startMs,
+    endMs,
+    primaryText: text,
+    style: "Primary",
+    layer: 0,
+  };
 }
 
 const CUES = [cue("a", 0, 1000), cue("b", 2000, 3000), cue("c", 5000, 6000)];

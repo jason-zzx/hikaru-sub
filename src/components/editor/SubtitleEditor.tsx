@@ -37,6 +37,7 @@ import {
   normalizeTimeInputValue,
   normalizeTimeRange,
   snapTimeInputCaret,
+  TIME_INPUT_TEMPLATE,
 } from "../../utils/timeInput";
 import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
@@ -624,8 +625,12 @@ export const SubtitleEditor = forwardRef<
 
   const handleTimeChange =
     (field: TimeField) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      const caret = snapTimeInputCaret(e.currentTarget.selectionStart ?? 0);
-      setTimeValue(field, normalizeTimeInputValue(e.currentTarget.value));
+      const normalized = normalizeTimeInputValue(e.currentTarget.value);
+      const caret = snapTimeInputCaret(
+        e.currentTarget.selectionStart ?? 0,
+        normalized,
+      );
+      setTimeValue(field, normalized);
       scheduleTimeCaret(field, caret);
     };
 
@@ -685,10 +690,39 @@ export const SubtitleEditor = forwardRef<
   }
 
   return (
-    <div className="flex h-full flex-col gap-3 p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">编辑字幕</h3>
-        <div className="flex gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-2 p-3">
+      <div className="flex shrink-0 flex-wrap items-end gap-2">
+        <div className="min-w-[7.5rem] flex-1">
+          <label className="mb-1 block text-xs text-text-muted">开始时间</label>
+          <input
+            ref={startTimeRef}
+            type="text"
+            value={startTime}
+            onChange={handleTimeChange("start")}
+            onBlur={() => handleTimeBlur("start")}
+            onKeyDown={handleTimeKeyDown("start")}
+            placeholder={TIME_INPUT_TEMPLATE}
+            inputMode="numeric"
+            {...{ [HISTORY_COMMAND_ATTR]: "true" }}
+            className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+          />
+        </div>
+        <div className="min-w-[7.5rem] flex-1">
+          <label className="mb-1 block text-xs text-text-muted">结束时间</label>
+          <input
+            ref={endTimeRef}
+            type="text"
+            value={endTime}
+            onChange={handleTimeChange("end")}
+            onBlur={() => handleTimeBlur("end")}
+            onKeyDown={handleTimeKeyDown("end")}
+            placeholder={TIME_INPUT_TEMPLATE}
+            inputMode="numeric"
+            {...{ [HISTORY_COMMAND_ATTR]: "true" }}
+            className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+          />
+        </div>
+        <div className="flex gap-2 pb-px">
           <Button
             variant="outline"
             size="sm"
@@ -709,85 +743,52 @@ export const SubtitleEditor = forwardRef<
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="mb-1 block text-xs text-text-muted">开始时间</label>
-          <input
-            ref={startTimeRef}
-            type="text"
-            value={startTime}
-            onChange={handleTimeChange("start")}
-            onBlur={() => handleTimeBlur("start")}
-            onKeyDown={handleTimeKeyDown("start")}
-            placeholder="00:00:00.00"
-            inputMode="numeric"
-            {...{ [HISTORY_COMMAND_ATTR]: "true" }}
-            className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+      <div className="flex shrink-0 flex-wrap items-end gap-2">
+        <div className="min-w-[8rem] flex-1">
+          <label className="mb-1 block text-xs text-text-muted">样式</label>
+          <Select
+            value={selectedCue.style}
+            onChange={handleStyleChange}
+            options={styleOptions}
+            placeholder=""
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs text-text-muted">结束时间</label>
-          <input
-            ref={endTimeRef}
-            type="text"
-            value={endTime}
-            onChange={handleTimeChange("end")}
-            onBlur={() => handleTimeBlur("end")}
-            onKeyDown={handleTimeKeyDown("end")}
-            placeholder="00:00:00.00"
-            inputMode="numeric"
-            {...{ [HISTORY_COMMAND_ATTR]: "true" }}
-            className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+        <div className="min-w-[8rem] flex-[1.2]">
+          <label className="mb-1 block text-xs text-text-muted">字体</label>
+          <FontComboBox
+            value={quickFontName}
+            onCommit={handleFontChange}
+            options={fontNames}
+            placeholder={fontNames.length > 0 ? "字体" : "字体（加载中）"}
           />
         </div>
-      </div>
-
-      <div className="flex flex-col gap-2 rounded border border-border bg-surface/40 p-3">
-        <label className="text-xs text-text-muted">样式</label>
-        <Select
-          value={selectedCue.style}
-          onChange={handleStyleChange}
-          options={styleOptions}
-          placeholder=""
-        />
-        <div className="grid grid-cols-[minmax(0,1fr)_72px] items-end gap-2">
-          <div>
-            <label className="mb-1 block text-xs text-text-muted">字体</label>
-            <FontComboBox
-              value={quickFontName}
-              onCommit={handleFontChange}
-              options={fontNames}
-              placeholder={fontNames.length > 0 ? "字体" : "字体（加载中）"}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-text-muted">字号</label>
-            <input
-              type="number"
-              min="1"
-              max="200"
-              value={quickFontSize}
-              onFocus={() => {
-                quickFontSizeBaselineRef.current = quickFontSize;
-              }}
-              onChange={(event) => setQuickFontSize(event.target.value)}
-              onBlur={handleFontSizeCommit}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  event.currentTarget.blur();
-                }
-              }}
-              className="h-9 w-full rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-            />
-          </div>
+        <div className="w-[4.5rem] shrink-0">
+          <label className="mb-1 block text-xs text-text-muted">字号</label>
+          <input
+            type="number"
+            min="1"
+            max="200"
+            value={quickFontSize}
+            onFocus={() => {
+              quickFontSizeBaselineRef.current = quickFontSize;
+            }}
+            onChange={(event) => setQuickFontSize(event.target.value)}
+            onBlur={handleFontSizeCommit}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            className="h-9 w-full rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+          />
         </div>
-        <div className="flex flex-wrap gap-2" aria-label="快速样式标签">
+        <div className="flex flex-wrap gap-1.5 pb-px" aria-label="快速样式标签">
           <Button
             type="button"
             variant="outline"
             onClick={() => applyToggleTag("{\\b1}", "{\\b0}")}
-            className="h-9 flex-1 font-bold"
+            className="h-9 w-9 px-0 font-bold"
             title="插入粗体标签"
           >
             B
@@ -796,7 +797,7 @@ export const SubtitleEditor = forwardRef<
             type="button"
             variant="outline"
             onClick={() => applyToggleTag("{\\i1}", "{\\i0}")}
-            className="h-9 flex-1 italic"
+            className="h-9 w-9 px-0 italic"
             title="插入斜体标签"
           >
             I
@@ -805,7 +806,7 @@ export const SubtitleEditor = forwardRef<
             type="button"
             variant="outline"
             onClick={() => applyToggleTag("{\\u1}", "{\\u0}")}
-            className="h-9 flex-1 underline"
+            className="h-9 w-9 px-0 underline"
             title="插入下划线标签"
           >
             U
@@ -814,7 +815,7 @@ export const SubtitleEditor = forwardRef<
             type="button"
             variant="outline"
             onClick={() => applyToggleTag("{\\s1}", "{\\s0}")}
-            className="h-9 flex-1 line-through"
+            className="h-9 w-9 px-0 line-through"
             title="插入删除线标签"
           >
             S
@@ -829,8 +830,8 @@ export const SubtitleEditor = forwardRef<
         </div>
       </div>
 
-      <div>
-        <label className="mb-1 block text-xs text-text-muted">字幕</label>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <label className="mb-1 shrink-0 text-xs text-text-muted">字幕</label>
         <textarea
           ref={textRef}
           value={text}
@@ -842,8 +843,7 @@ export const SubtitleEditor = forwardRef<
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           {...{ [HISTORY_COMMAND_ATTR]: "true" }}
-          className="w-full rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-          rows={5}
+          className="h-full min-h-0 w-full flex-1 resize-none rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
         />
       </div>
     </div>

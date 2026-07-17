@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend layer overview and pre-dev checklist for editor/ASS UI work"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "shadcn-first UI, Chinese copy, layout component conventions"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "SubtitleCue is the ASS domain model; field extensions must stay single-sourced"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "test/build expectations for frontend changes"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "New cue fields touch multiple constructors; search-before-extend"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "SubtitleCue/parse/serialize changes affect editor, clipboard, and ASS I/O"}
+{"file": ".trellis/tasks/07-17-editor-layout-redesign/prd.md", "reason": "Accepted requirements and acceptance criteria"}
+{"file": ".trellis/tasks/07-17-editor-layout-redesign/design.md", "reason": "Layout, list columns, model, and testing design"}
+{"file": ".trellis/tasks/07-17-editor-layout-redesign/implement.md", "reason": "Ordered implementation checklist and validation commands"}
