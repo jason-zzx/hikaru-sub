@@ -9,7 +9,11 @@ export type WorkflowStep =
   | "settings";
 
 /** Settings page left-nav category (deep-linkable via uiStore.openSettings). */
-export type SettingsCategory = "runtime" | "transcription" | "translation";
+export type SettingsCategory =
+  | "runtime"
+  | "transcription"
+  | "providers"
+  | "translation";
 
 export type ActiveSubtitleKind = "transcribed" | "translated";
 
@@ -25,6 +29,22 @@ export interface VideoSession {
 
 export type { SubtitleCue } from "@/lib/ass";
 
+export type TranslationApiType =
+  | "openai-compatible"
+  | "gemini"
+  | "anthropic";
+
+export interface TranslationProviderSettings {
+  id: string;
+  name: string;
+  apiType: TranslationApiType;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  maxConcurrency: number;
+  requestsPerMinute: number;
+}
+
 export interface AppSettings {
   ffmpegPath?: string;
   pythonPath?: string;
@@ -32,9 +52,8 @@ export interface AppSettings {
   asrEngine: string;
   asrModel: string;
   asrDevice: string;
-  translationBaseUrl: string;
-  translationModel: string;
-  translationApiKey?: string;
+  translationProviders: TranslationProviderSettings[];
+  defaultTranslationProviderId?: string;
   defaultSourceLang: string;
   defaultTargetLang: string;
   translationBatchSize: number;

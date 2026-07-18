@@ -26,37 +26,9 @@ export function SettingsTranslationPanel({
   return (
     <div className="flex flex-col gap-8">
       <SettingsSection
-        title="翻译（OpenAI 兼容）"
-        desc="API Key 仅保存在本机配置文件中，不会写入字幕文件或源码"
+        title="翻译行为"
+        desc="供应商连接、认证与模型在「供应商」分类中管理"
       >
-        <SettingsField label="Base URL">
-          <input
-            className={settingsInputClass}
-            value={settings.translationBaseUrl}
-            placeholder="https://api.openai.com/v1"
-            onChange={(e) => update("translationBaseUrl", e.target.value)}
-          />
-        </SettingsField>
-        <SettingsField label="模型">
-          <input
-            className={settingsInputClass}
-            value={settings.translationModel}
-            placeholder="gpt-4o-mini"
-            onChange={(e) => update("translationModel", e.target.value)}
-          />
-        </SettingsField>
-        <SettingsField label="API Key">
-          <input
-            className={settingsInputClass}
-            type="password"
-            value={settings.translationApiKey ?? ""}
-            placeholder="sk-..."
-            autoComplete="off"
-            onChange={(e) =>
-              update("translationApiKey", e.target.value || undefined)
-            }
-          />
-        </SettingsField>
         <SettingsField label="每批翻译条数">
           <input
             className={settingsInputClass}

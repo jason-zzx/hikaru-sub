@@ -1,0 +1,9 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Check frontend ownership and required validation commands."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check Settings and Translation view behavior, Chinese UI copy, and shadcn usage."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check Rust/TypeScript AppSettings parity and translation type placement."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Check that provider HTTP stays in frontend and no incomplete Tauri command chain is introduced."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check tests, build, minimal diffs, and secret handling."}
+{"file":".trellis/spec/tauri/index.md","reason":"Check Rust changes remain limited to the settings persistence boundary."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Check Rust tests, untrusted settings normalization, and secret-safe diagnostics."}
+{"file":".trellis/tasks/07-18-translation-providers/research/existing-translation-flow.md","reason":"Check compatibility against the traced legacy flow and identified risks."}
+{"file":".trellis/tasks/07-18-translation-providers/research/provider-api-contracts.md","reason":"Check adapter requests and model discovery against official contracts."}

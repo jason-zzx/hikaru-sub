@@ -3,6 +3,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
+const DEFAULT_PROVIDER_ID: &str = "default-provider";
+const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_MODEL: &str = "gpt-4o-mini";
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum RuntimeDependencySourceMode {
@@ -27,6 +31,43 @@ impl<'de> Deserialize<'de> for RuntimeDependencySourceMode {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum TranslationApiType {
+    #[default]
+    OpenaiCompatible,
+    Gemini,
+    Anthropic,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TranslationProviderSettings {
+    pub id: String,
+    pub name: String,
+    pub api_type: TranslationApiType,
+    pub base_url: String,
+    pub api_key: String,
+    pub model: String,
+    pub max_concurrency: i64,
+    pub requests_per_minute: i64,
+}
+
+impl Default for TranslationProviderSettings {
+    fn default() -> Self {
+        Self {
+            id: DEFAULT_PROVIDER_ID.into(),
+            name: "OpenAI".into(),
+            api_type: TranslationApiType::OpenaiCompatible,
+            base_url: DEFAULT_OPENAI_BASE_URL.into(),
+            api_key: String::new(),
+            model: DEFAULT_OPENAI_MODEL.into(),
+            max_concurrency: 1,
+            requests_per_minute: 10,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppSettings {
@@ -36,9 +77,9 @@ pub struct AppSettings {
     pub asr_engine: String,
     pub asr_model: String,
     pub asr_device: String,
-    pub translation_base_url: String,
-    pub translation_model: String,
-    pub translation_api_key: Option<String>,
+    pub translation_providers: Vec<TranslationProviderSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_translation_provider_id: Option<String>,
     pub default_source_lang: String,
     pub default_target_lang: String,
     pub translation_batch_size: u32,
@@ -58,9 +99,8 @@ impl Default for AppSettings {
             asr_engine: "faster-whisper".into(),
             asr_model: "large-v3".into(),
             asr_device: "auto".into(),
-            translation_base_url: "https://api.openai.com/v1".into(),
-            translation_model: "gpt-4o-mini".into(),
-            translation_api_key: None,
+            translation_providers: vec![TranslationProviderSettings::default()],
+            default_translation_provider_id: Some(DEFAULT_PROVIDER_ID.into()),
             default_source_lang: "ja".into(),
             default_target_lang: "zh-CN".into(),
             translation_batch_size: 25,
@@ -85,7 +125,7 @@ pub fn load_settings(app: &AppHandle) -> Result<AppSettings, String> {
         return Ok(AppSettings::default());
     }
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut settings: AppSettings = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut settings = parse_settings_json(&content)?;
     let app_data_dir = crate::app_paths::app_data_dir(app).ok();
     sanitize_settings_for_runtime(
         &mut settings,
@@ -97,7 +137,9 @@ pub fn load_settings(app: &AppHandle) -> Result<AppSettings, String> {
 
 pub fn save_settings(app: &AppHandle, settings: &AppSettings) -> Result<(), String> {
     let path = settings_path(app)?;
-    let content = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
+    let mut normalized = settings.clone();
+    normalize_translation_providers(&mut normalized);
+    let content = serde_json::to_string_pretty(&normalized).map_err(|e| e.to_string())?;
     fs::write(path, content).map_err(|e| e.to_string())
 }
 
@@ -109,6 +151,103 @@ pub fn get_settings(app: AppHandle) -> Result<AppSettings, String> {
 #[tauri::command]
 pub fn set_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
     save_settings(&app, &settings)
+}
+
+fn parse_settings_json(content: &str) -> Result<AppSettings, String> {
+    let mut value: serde_json::Value = serde_json::from_str(content).map_err(|e| e.to_string())?;
+    migrate_legacy_translation_settings(&mut value);
+    let mut settings: AppSettings = serde_json::from_value(value).map_err(|e| e.to_string())?;
+    normalize_translation_providers(&mut settings);
+    Ok(settings)
+}
+
+fn migrate_legacy_translation_settings(value: &mut serde_json::Value) {
+    let Some(object) = value.as_object_mut() else {
+        return;
+    };
+    if object.contains_key("translationProviders") {
+        return;
+    }
+
+    let has_legacy_connection = object.contains_key("translationBaseUrl")
+        || object.contains_key("translationModel")
+        || object.contains_key("translationApiKey");
+    if !has_legacy_connection {
+        return;
+    }
+
+    let base_url = object
+        .get("translationBaseUrl")
+        .and_then(|value| value.as_str())
+        .unwrap_or(DEFAULT_OPENAI_BASE_URL)
+        .to_owned();
+    let model = object
+        .get("translationModel")
+        .and_then(|value| value.as_str())
+        .unwrap_or(DEFAULT_OPENAI_MODEL)
+        .to_owned();
+    let api_key = object
+        .get("translationApiKey")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_default()
+        .to_owned();
+    let name = if base_url == DEFAULT_OPENAI_BASE_URL
+        && model == DEFAULT_OPENAI_MODEL
+        && api_key.is_empty()
+    {
+        "OpenAI"
+    } else {
+        "默认供应商"
+    };
+
+    let provider = serde_json::json!({
+        "id": DEFAULT_PROVIDER_ID,
+        "name": name,
+        "apiType": "openai-compatible",
+        "baseUrl": base_url,
+        "apiKey": api_key,
+        "model": model,
+        "maxConcurrency": 1,
+        "requestsPerMinute": 10,
+    });
+    object.insert(
+        "translationProviders".into(),
+        serde_json::Value::Array(vec![provider]),
+    );
+    object.insert(
+        "defaultTranslationProviderId".into(),
+        serde_json::Value::String(DEFAULT_PROVIDER_ID.into()),
+    );
+}
+
+fn normalize_translation_providers(settings: &mut AppSettings) {
+    for provider in &mut settings.translation_providers {
+        provider.max_concurrency = provider.max_concurrency.clamp(1, 50);
+        provider.requests_per_minute = provider.requests_per_minute.clamp(1, 100);
+        if provider.api_key.trim().is_empty() {
+            provider.api_key.clear();
+        }
+    }
+
+    if settings.translation_providers.is_empty() {
+        settings.default_translation_provider_id = None;
+        return;
+    }
+
+    let default_exists = settings
+        .default_translation_provider_id
+        .as_deref()
+        .is_some_and(|default_id| {
+            settings
+                .translation_providers
+                .iter()
+                .any(|provider| provider.id == default_id)
+        });
+    if !default_exists {
+        settings.default_translation_provider_id =
+            Some(settings.translation_providers[0].id.clone());
+    }
 }
 
 fn sanitize_settings_for_runtime(
@@ -243,6 +382,139 @@ mod tests {
             settings.runtime_source_mode,
             RuntimeDependencySourceMode::Official
         );
+    }
+
+    #[test]
+    fn default_translation_provider_is_openai_compatible() {
+        let settings = AppSettings::default();
+        assert_eq!(
+            settings.default_translation_provider_id.as_deref(),
+            Some("default-provider")
+        );
+        assert_eq!(
+            settings.translation_providers,
+            vec![TranslationProviderSettings::default()]
+        );
+        let serialized = serde_json::to_value(settings).unwrap();
+        assert_eq!(serialized["translationProviders"][0]["apiKey"], "");
+        assert_eq!(
+            serialized["defaultTranslationProviderId"],
+            serde_json::Value::String(DEFAULT_PROVIDER_ID.into())
+        );
+    }
+
+    #[test]
+    fn migrates_untouched_keyless_legacy_translation_settings() {
+        let settings = parse_settings_json(
+            r#"{"translationBaseUrl":"https://api.openai.com/v1","translationModel":"gpt-4o-mini"}"#,
+        )
+        .unwrap();
+        let provider = &settings.translation_providers[0];
+
+        assert_eq!(provider.name, "OpenAI");
+        assert_eq!(provider.api_type, TranslationApiType::OpenaiCompatible);
+        assert_eq!(provider.base_url, DEFAULT_OPENAI_BASE_URL);
+        assert_eq!(provider.model, DEFAULT_OPENAI_MODEL);
+        assert_eq!(provider.api_key, "");
+        assert_eq!(provider.max_concurrency, 1);
+        assert_eq!(provider.requests_per_minute, 10);
+        assert_eq!(
+            settings.default_translation_provider_id.as_deref(),
+            Some(DEFAULT_PROVIDER_ID)
+        );
+    }
+
+    #[test]
+    fn migrates_customized_legacy_translation_settings_without_losing_secret() {
+        let settings = parse_settings_json(
+            r#"{"translationBaseUrl":"https://proxy.example.invalid/api","translationModel":"synthetic-model","translationApiKey":"synthetic-test-key"}"#,
+        )
+        .unwrap();
+        let provider = &settings.translation_providers[0];
+
+        assert_eq!(provider.name, "默认供应商");
+        assert_eq!(provider.base_url, "https://proxy.example.invalid/api");
+        assert_eq!(provider.model, "synthetic-model");
+        assert_eq!(provider.api_key, "synthetic-test-key");
+    }
+
+    #[test]
+    fn custom_keyless_legacy_translation_settings_use_generic_name() {
+        let settings = parse_settings_json(
+            r#"{"translationBaseUrl":"http://localhost:11434/v1","translationModel":"synthetic-local-model"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(settings.translation_providers[0].name, "默认供应商");
+        assert_eq!(settings.translation_providers[0].api_key, "");
+    }
+
+    #[test]
+    fn present_new_provider_array_wins_over_stale_legacy_fields() {
+        let settings = parse_settings_json(
+            r#"{
+                "translationProviders": [],
+                "defaultTranslationProviderId": "stale",
+                "translationBaseUrl": "https://legacy.example.invalid/v1",
+                "translationModel": "legacy-model",
+                "translationApiKey": "synthetic-legacy-key"
+            }"#,
+        )
+        .unwrap();
+
+        assert!(settings.translation_providers.is_empty());
+        assert_eq!(settings.default_translation_provider_id, None);
+        let serialized = serde_json::to_value(&settings).unwrap();
+        assert!(serialized.get("translationBaseUrl").is_none());
+        assert!(serialized.get("translationModel").is_none());
+        assert!(serialized.get("translationApiKey").is_none());
+        assert!(serialized.get("defaultTranslationProviderId").is_none());
+    }
+
+    #[test]
+    fn normalizes_provider_limits_keys_and_default_id() {
+        let settings = parse_settings_json(
+            r#"{
+                "translationProviders": [
+                    {
+                        "id": "first",
+                        "name": "",
+                        "apiType": "gemini",
+                        "baseUrl": "",
+                        "apiKey": "  ",
+                        "model": "",
+                        "maxConcurrency": -9,
+                        "requestsPerMinute": 999
+                    }
+                ],
+                "defaultTranslationProviderId": "missing"
+            }"#,
+        )
+        .unwrap();
+        let provider = &settings.translation_providers[0];
+
+        assert_eq!(provider.max_concurrency, 1);
+        assert_eq!(provider.requests_per_minute, 100);
+        assert_eq!(provider.api_key, "");
+        assert_eq!(
+            settings.default_translation_provider_id.as_deref(),
+            Some("first")
+        );
+        assert_eq!(provider.name, "");
+        assert_eq!(provider.base_url, "");
+        assert_eq!(provider.model, "");
+    }
+
+    #[test]
+    fn new_format_round_trip_does_not_remigrate() {
+        let mut original = AppSettings::default();
+        original.translation_providers[0].name = "Synthetic Provider".into();
+        original.translation_providers[0].model = "synthetic-model".into();
+        let json = serde_json::to_string(&original).unwrap();
+        let loaded = parse_settings_json(&json).unwrap();
+
+        assert_eq!(loaded.translation_providers[0].name, "Synthetic Provider");
+        assert_eq!(loaded.translation_providers[0].model, "synthetic-model");
     }
 
     #[test]

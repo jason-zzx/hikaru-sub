@@ -1,23 +1,20 @@
+import { AnthropicTranslationProvider } from "./anthropic";
+import { GeminiTranslationProvider } from "./gemini";
 import { OpenAITranslationProvider } from "./openai";
-import type { TranslationProviderConfig } from "./types";
 import type { TranslationProvider } from "./base";
+import type { TranslationProviderConfig } from "./types";
 
-export { TranslationProvider } from "./base";
-export { OpenAITranslationProvider } from "./openai";
-export type {
-  TranslationBatch,
-  TranslationOptions,
-  TranslationProgress,
-  TranslationProviderConfig,
-  TranslationResult,
-} from "./types";
+export type { TranslationProgress } from "./types";
 
-/**
- * 创建翻译提供商实例
- */
 export function createTranslationProvider(
   config: TranslationProviderConfig,
 ): TranslationProvider {
-  // 首期仅支持 OpenAI 兼容 API，后续可扩展其他提供商
-  return new OpenAITranslationProvider(config);
+  switch (config.apiType) {
+    case "gemini":
+      return new GeminiTranslationProvider(config);
+    case "anthropic":
+      return new AnthropicTranslationProvider(config);
+    case "openai-compatible":
+      return new OpenAITranslationProvider(config);
+  }
 }

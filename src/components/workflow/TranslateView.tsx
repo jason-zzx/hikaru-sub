@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { parseAss, serializeAss, type SubtitleCue } from "@/lib/ass";
+import { isTranslationProviderReady } from "@/constants/translationProviders";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
@@ -38,6 +39,8 @@ export function TranslateView() {
   const updateTask = useTaskStore((s) => s.updateTask);
 
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [selectedProviderId, setSelectedProviderId] = useState("");
   const [targetLang, setTargetLang] = useState("zh-CN");
   const [translating, setTranslating] = useState(false);
   const [progress, setProgress] = useState<TranslationProgress | null>(null);
@@ -54,8 +57,14 @@ export function TranslateView() {
 
   useEffect(() => {
     getSettings()
-      .then(setSettings)
-      .catch(() => setSettings(null));
+      .then((nextSettings) => {
+        setSettings(nextSettings);
+        setSelectedProviderId(
+          nextSettings.defaultTranslationProviderId ?? "",
+        );
+      })
+      .catch(() => setSettings(null))
+      .finally(() => setSettingsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -101,8 +110,25 @@ export function TranslateView() {
     };
   }, [session, settings?.defaultTargetLang]);
 
+  const providerOptions =
+    settings?.translationProviders.map((provider) => ({
+      value: provider.id,
+      label: provider.name.trim() || "未命名供应商",
+    })) ?? [];
+  const activeProvider = settings?.translationProviders.find(
+    (provider) => provider.id === selectedProviderId,
+  );
+  const activeProviderReady = isTranslationProviderReady(activeProvider);
+
   const handleTranslate = useCallback(async () => {
-    if (!session || !settings || sourceCues.length === 0) return;
+    if (
+      !session ||
+      !settings ||
+      !activeProviderReady ||
+      sourceCues.length === 0
+    ) {
+      return;
+    }
 
     setError(null);
     setSuccess(false);
@@ -118,9 +144,12 @@ export function TranslateView() {
 
     try {
       const provider = createTranslationProvider({
-        baseUrl: settings.translationBaseUrl,
-        apiKey: settings.translationApiKey,
-        model: settings.translationModel,
+        apiType: activeProvider.apiType,
+        baseUrl: activeProvider.baseUrl,
+        apiKey: activeProvider.apiKey,
+        model: activeProvider.model,
+        maxConcurrency: activeProvider.maxConcurrency,
+        requestsPerMinute: activeProvider.requestsPerMinute,
         temperature: 0.3,
       });
 
@@ -176,6 +205,7 @@ export function TranslateView() {
 
       const serialized = serializeAss(baseDoc, {
         mergeMode: settings.subtitleMergeMode,
+        preserveOrder: true,
       });
       const physicalDoc = parseAss(serialized, { mergeBilingual: false });
       // Pair immutable serialized output with physical doc/token before write await.
@@ -198,7 +228,7 @@ export function TranslateView() {
       updateTask("translate", { status: "success", progress: 100 });
 
       if (result.errors.length > 0) {
-        console.warn("翻译警告：", result.errors);
+        console.warn(`翻译完成，但有 ${result.errors.length} 个请求发生错误`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -209,6 +239,8 @@ export function TranslateView() {
   }, [
     session,
     settings,
+    activeProvider,
+    activeProviderReady,
     sourceCues,
     targetLang,
     setCues,
@@ -223,8 +255,7 @@ export function TranslateView() {
     !translating &&
     !sourceLoading &&
     sourceCues.length > 0 &&
-    settings?.translationBaseUrl &&
-    settings?.translationModel;
+    activeProviderReady;
 
   const statsCues = logicalResultCues ?? sourceCues;
   const hasTranslation = Boolean(
@@ -285,30 +316,41 @@ export function TranslateView() {
             />
           </div>
 
-          {settings && !settings.translationBaseUrl && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
+          <div className="flex items-center gap-4">
+            <label className="w-24 text-sm text-text-muted">供应商</label>
+            <Select
+              value={selectedProviderId}
+              onChange={setSelectedProviderId}
+              options={providerOptions}
+              disabled={translating || settingsLoading}
+              placeholder="选择供应商"
+            />
+          </div>
+
+          {!settingsLoading && !activeProviderReady && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-700 dark:text-yellow-200">
               <IconAlertTriangle className="h-4 w-4 shrink-0" />
-              <span>未配置翻译 API，请前往「设置」页面配置</span>
+              <span>所选供应商配置不完整，请前往「设置」页面配置</span>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => openSettings("translation")}
-                className="rounded-md border border-yellow-600/50 px-2.5 py-1 text-xs font-medium text-yellow-200 hover:bg-yellow-500/20"
+                onClick={() => openSettings("providers")}
+                className="border-yellow-600/50 px-2.5 text-xs text-yellow-700 hover:bg-yellow-500/20 dark:text-yellow-200"
               >
                 前往设置
               </Button>
             </div>
           )}
 
-          {settings && settings.translationBaseUrl && (
+          {activeProvider && (
             <div className="space-y-2 rounded-md border border-border bg-surface p-3 text-xs text-text-muted">
               <div>
-                <span className="text-text-dimmed">API：</span>{" "}
-                {settings.translationBaseUrl}
+                <span className="text-text-dimmed">供应商：</span>{" "}
+                {activeProvider.name.trim() || "未填写"}
               </div>
               <div>
                 <span className="text-text-dimmed">模型：</span>{" "}
-                {settings.translationModel}
+                {activeProvider.model.trim() || "未填写"}
               </div>
             </div>
           )}
