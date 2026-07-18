@@ -239,3 +239,36 @@ Split Settings into left category nav (runtime/transcription/translation) with s
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Expand translation provider management
+
+**Date**: 2026-07-19
+**Task**: Expand translation provider management
+**Branch**: `dev`
+
+### Summary
+
+Implemented multi-provider translation settings with OpenAI-compatible, Gemini, and Anthropic protocols, provider CRUD and model discovery, per-provider concurrency/RPM scheduling, legacy settings migration, session-local provider selection, and ASS/order-safe translation fallback. Added focused and full frontend/Rust tests, built successfully, reviewed and simplified the translation service, then committed the work as a8311aa.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a8311aa` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
