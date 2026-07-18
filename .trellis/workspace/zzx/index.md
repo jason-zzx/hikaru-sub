@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
-- **Last Active**: 2026-07-17
+- **Total Sessions**: 7
+- **Last Active**: 2026-07-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~208 | Active |
+| `journal-1.md` | ~241 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-07-18 | Settings category navigation | `9f07dc8` | `dev` |
 | 6 | 2026-07-17 | Resizable editor panes | `f873178` | `dev` |
 | 5 | 2026-07-17 | Editor layout redesign | `14b332c` | `dev` |
 | 4 | 2026-07-17 | Unified subtitle editor undo/redo history | `7c7afe1` | `dev` |

@@ -206,3 +206,36 @@ Added pointer-resizable editor pane splitters with global persistence, minimum-s
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Settings category navigation
+
+**Date**: 2026-07-18
+**Task**: Settings category navigation
+**Branch**: `dev`
+
+### Summary
+
+Split Settings into left category nav (runtime/transcription/translation) with shell + panels, added uiStore.openSettings deep links from Transcribe/Translate/runtime dialogs, and updated frontend specs/tests.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9f07dc8` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
