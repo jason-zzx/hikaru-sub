@@ -89,6 +89,7 @@ function formatMs(ms: number): string {
 
 export function TranscribeView() {
   const setStep = useUiStore((s) => s.setStep);
+  const openSettings = useUiStore((s) => s.openSettings);
   const session = useProjectStore((s) => s.session);
   const setCues = useProjectStore((s) => s.setCues);
   const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
@@ -652,7 +653,7 @@ export function TranscribeView() {
             <Button
               variant="outline"
               type="button"
-              onClick={() => setStep("settings")}
+              onClick={() => openSettings("transcription")}
               className="rounded-md border border-warning/50 px-2.5 py-1 text-xs font-medium text-warning hover:bg-warning/20"
             >
               前往设置
@@ -904,7 +905,7 @@ export function TranscribeView() {
         error={ffmpegPreparation.error}
         onConfirm={ffmpegPreparation.confirmPrepare}
         onCancel={() => ffmpegPreparation.setOpen(false)}
-        onChangeSource={() => setStep("settings")}
+        onChangeSource={() => openSettings("runtime")}
       />
 
       <ConfirmDialog

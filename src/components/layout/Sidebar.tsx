@@ -42,6 +42,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed }: SidebarProps) {
   const currentStep = useUiStore((s) => s.currentStep);
   const setStep = useUiStore((s) => s.setStep);
+  const openSettings = useUiStore((s) => s.openSettings);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const session = useProjectStore((s) => s.session);
 
@@ -52,7 +53,11 @@ export function Sidebar({ collapsed }: SidebarProps) {
         key={item.step}
         type="button"
         onClick={(event) => {
-          setStep(item.step);
+          if (item.step === "settings") {
+            openSettings("runtime");
+          } else {
+            setStep(item.step);
+          }
           event.currentTarget.blur();
         }}
         title={item.label}

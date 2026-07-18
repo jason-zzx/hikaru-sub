@@ -375,7 +375,7 @@ export function AsrEngineSetupPanel({
         error={dependencyError}
         onConfirm={handlePreparePython}
         onCancel={() => setDependencyDialogOpen(false)}
-        onChangeSource={() => setSetupError("请在设置页的运行时依赖区域更改下载源")}
+        onChangeSource={() => setSetupError("请在设置 → 运行依赖 中更改下载源")}
       />
     </div>
   );

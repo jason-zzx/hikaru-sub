@@ -8,6 +8,9 @@ export type WorkflowStep =
   | "burn"
   | "settings";
 
+/** Settings page left-nav category (deep-linkable via uiStore.openSettings). */
+export type SettingsCategory = "runtime" | "transcription" | "translation";
+
 export type ActiveSubtitleKind = "transcribed" | "translated";
 
 export interface VideoSession {

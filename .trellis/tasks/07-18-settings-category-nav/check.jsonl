@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend layer overview for settings UI quality review"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Verify shadcn/Chinese-copy conventions on the redesigned settings shell"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify test/build expectations were met"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Ensure panels reuse existing RuntimeDependenciesPanel / Section patterns instead of duplicating"}
+{"file": ".trellis/tasks/07-18-settings-category-nav/prd.md", "reason": "Acceptance criteria for check"}
+{"file": ".trellis/tasks/07-18-settings-category-nav/design.md", "reason": "Design contracts to verify against implementation"}
+{"file": ".trellis/tasks/07-18-settings-category-nav/implement.md", "reason": "Implementation checklist completeness"}
