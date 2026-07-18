@@ -14,7 +14,7 @@ function expandToPhysicalRows(
 ): SubtitleCue[] {
   const serialized = serializeAss(
     { ...base, cues: logical },
-    { mergeMode },
+    { mergeMode, preserveOrder: true },
   );
   return parseAss(serialized, { mergeBilingual: false }).cues;
 }
@@ -65,5 +65,18 @@ describe("translation physical boundary", () => {
     expect(physical.map((c) => c.style)).toEqual(["Primary", "Secondary"]);
     expect(physical.map((c) => c.primaryText)).toEqual(["源文", "译文"]);
     expect(physical.every((c) => c.secondaryText === undefined)).toBe(true);
+  });
+
+  it("preserves source cue order while expanding bilingual output", () => {
+    const reordered = [
+      { ...logical[0], id: "later", startMs: 5000, endMs: 6000, primaryText: "后文" },
+      { ...logical[0], id: "earlier", startMs: 0, endMs: 1000, primaryText: "前文" },
+    ];
+    const physical = expandToPhysicalRows(reordered, base, "inline");
+
+    expect(physical.map((cue) => cue.primaryText)).toEqual([
+      "译文 / 后文",
+      "译文 / 前文",
+    ]);
   });
 });

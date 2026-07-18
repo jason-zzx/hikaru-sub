@@ -32,7 +32,7 @@ Examples: `ImportView`, `TranscribeView`, `TranslateView`, `BurnView`, `Settings
 - Call `services/tauri.ts` (and translation services) for side effects
 - Must not own long-running job finalization that must survive leaving the page (clip/burn pollers belong at App layer)
 
-`SettingsView` uses a left category nav (`runtime` / `transcription` / `translation`) and a right content pane. Cross-page jumps into Settings should use `uiStore.openSettings(category)` rather than bare `setStep("settings")`.
+`SettingsView` uses a left category nav (`runtime` / `transcription` / `providers` / `translation`) and a right content pane. Provider connection/auth/model/limits live under `providers`; translation behavior remains under `translation`. Cross-page jumps into Settings should use `uiStore.openSettings(category)` rather than bare `setStep("settings")`.
 
 ### Editor / player
 
@@ -48,6 +48,7 @@ Examples: `ImportView`, `TranscribeView`, `TranslateView`, `BurnView`, `Settings
 
 ### Translation view
 
+- Initialize a page-local provider selection from `defaultTranslationProviderId`. The Translation view dropdown changes only that mounted view's selection; it must not persist settings or change the configured default. Missing/incomplete selections, including an empty API key, deep-link to `openSettings("providers")`.
 - Page-owned source loads from **transcribed** ASS on enter; do not treat current `projectStore` physical rows as translation source.
 - Entering the page must not write or delete the existing translated ASS file.
 - On successful translation: serialize logical result with `settings.subtitleMergeMode`, re-parse with `mergeBilingual: false`, then load physical cues into the store for editor/burn.

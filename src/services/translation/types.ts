@@ -1,14 +1,7 @@
-import type { SubtitleCue } from "../../types";
-
-/** 翻译批次（用于 API 调用） */
-export interface TranslationBatch {
-  /** 待翻译的 cue 列表 */
-  cues: SubtitleCue[];
-  /** 前文上下文（用于术语一致性） */
-  contextBefore: SubtitleCue[];
-  /** 后文上下文（用于术语一致性） */
-  contextAfter: SubtitleCue[];
-}
+import type {
+  SubtitleCue,
+  TranslationApiType,
+} from "../../types";
 
 /** 翻译选项 */
 export interface TranslationOptions {
@@ -28,9 +21,12 @@ export interface TranslationOptions {
 
 /** 翻译提供商配置 */
 export interface TranslationProviderConfig {
+  apiType: TranslationApiType;
   baseUrl: string;
-  apiKey?: string;
+  apiKey: string;
   model: string;
+  maxConcurrency: number;
+  requestsPerMinute: number;
   temperature?: number;
 }
 

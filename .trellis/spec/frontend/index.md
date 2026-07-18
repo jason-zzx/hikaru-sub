@@ -12,7 +12,7 @@ The frontend owns:
 
 - All UI (workflow pages, editor, player overlays, settings)
 - ASS parse / edit / serialize (`src/lib/ass/`)
-- OpenAI-compatible translation API calls (`src/services/translation/`)
+- OpenAI-compatible, Gemini, and Anthropic translation API calls (`src/services/translation/`)
 - Zustand session and task state (`src/stores/`)
 - Typed Tauri invoke wrappers (`src/services/tauri.ts`) and job pollers
 

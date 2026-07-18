@@ -9,13 +9,13 @@ Zustand stores under `src/stores/`. Session subtitle edits use Immer (`produce`)
 | Store | File | Owns |
 |-------|------|------|
 | Project / session | `projectStore.ts` | `VideoSession`, active subtitle kind/path, cues, ASS script info/styles, dirty + undo history |
-| UI navigation | `uiStore.ts` | Current workflow step, sidebar collapse, busy/nav locks as used by gates; `openSettings(category?)` deep-links Settings categories (`runtime` / `transcription` / `translation`) |
+| UI navigation | `uiStore.ts` | Current workflow step, sidebar collapse, busy/nav locks as used by gates; `openSettings(category?)` deep-links Settings categories (`runtime` / `transcription` / `providers` / `translation`) |
 | Tasks (status bar) | `taskStore.ts` | Lightweight `Record` of task id → status/progress/message |
 | Playback | `playbackStore.ts` | Player timing / selection coupling |
 | Clip job | `clipStore.ts` | Clip `jobId`, snapshot, options (`useAsWorkingVideo`), success/error messages |
 | Burn job | `burnStore.ts` | Burn job lifecycle mirroring clip |
 
-Settings (`AppSettings`) are loaded/saved via Tauri (`getSettings` / `setSettings`), not mirrored as a full Zustand store by default. Transient VAD config is **session-only** and must not be written to project or global settings (see `/AGENTS.md`).
+Settings (`AppSettings`) are loaded/saved via Tauri (`getSettings` / `setSettings`), not mirrored as a full Zustand store by default. The Translation view's temporary provider selection stays in component state, initializes from `defaultTranslationProviderId`, and must not write back to settings. Transient VAD config is **session-only** and must not be written to project or global settings (see `/AGENTS.md`).
 
 ## VideoSession vs ASS Document
 

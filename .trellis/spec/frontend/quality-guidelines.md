@@ -16,7 +16,7 @@ Always use **pnpm** (never npm/yarn).
 - **Match existing style**: `@/` imports, Zustand patterns, Chinese UI strings
 - **Icons**: SVG via `NavIcons` / `lucide-react` — never emoji icons
 - **shadcn**: prefer existing UI primitives; add via CLI
-- **No secrets** in source, tests, or logs (API keys stay in settings/keychain)
+- **No secrets** in source, fixtures, or logs (translation API keys stay only in the approved local `AppSettings` / `settings.json` flow; tests use synthetic values)
 
 ## Forbidden Patterns
 

@@ -52,7 +52,7 @@ Frontend types mirror camelCase JSON from Tauri and the ASR sidecar (e.g. `durat
 
 ## Translation Types
 
-OpenAI-compatible adapters live under `src/services/translation/` with their own `types.ts`. Keep batching / glossary options aligned with `AppSettings` fields.
+OpenAI-compatible, Gemini, and Anthropic adapters live under `src/services/translation/` with shared batching, fallback, scheduling, and `types.ts`. Persist provider records in `AppSettings.translationProviders`; every provider carries an `apiKey: string`, where an empty/whitespace-only value is persisted but fails readiness. `defaultTranslationProviderId` initializes the Translation view's page-local provider selection; changing that selection does not update settings.
 
 ## Anti-Patterns
 

@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { RuntimeDependenciesPanel } from "./RuntimeDependenciesPanel";
+import { SettingsProvidersPanel } from "./SettingsProvidersPanel";
 import { SettingsTranscriptionPanel } from "./SettingsTranscriptionPanel";
 import { SettingsTranslationPanel } from "./SettingsTranslationPanel";
 import type {
@@ -55,9 +56,14 @@ const SETTINGS_CATEGORIES: { id: SettingsCategory; label: string; subtitle: stri
     subtitle: "日语 ASR 引擎、模型与设备默认配置",
   },
   {
+    id: "providers",
+    label: "供应商",
+    subtitle: "管理翻译 API、认证、模型与请求限制",
+  },
+  {
     id: "translation",
     label: "翻译",
-    subtitle: "翻译 API、批处理参数与默认目标语言",
+    subtitle: "管理批处理、提示词与默认目标语言",
   },
 ];
 
@@ -135,6 +141,23 @@ export function SettingsView() {
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setLocal((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setDirty(true);
+    setMessage(null);
+  };
+
+  const updateProviders = (
+    translationProviders: AppSettings["translationProviders"],
+    defaultTranslationProviderId?: string,
+  ) => {
+    setLocal((prev) =>
+      prev
+        ? {
+            ...prev,
+            translationProviders,
+            defaultTranslationProviderId,
+          }
+        : prev,
+    );
     setDirty(true);
     setMessage(null);
   };
@@ -364,6 +387,14 @@ export function SettingsView() {
                 }}
                 onAsrSetupRunningChange={setAsrSetupRunning}
                 onAsrSetupComplete={refreshSettingsAfterAsrSetup}
+              />
+            ) : null}
+
+            {activeCategory === "providers" ? (
+              <SettingsProvidersPanel
+                providers={settings.translationProviders}
+                defaultProviderId={settings.defaultTranslationProviderId}
+                onChange={updateProviders}
               />
             ) : null}
 

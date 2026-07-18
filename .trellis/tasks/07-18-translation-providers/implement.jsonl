@@ -1,0 +1,9 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership boundaries and pre-development checklist for settings UI and translation services."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Settings category composition, shadcn controls, Chinese product copy, and Translation view ASS boundary."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Keep AppSettings in the existing Tauri-backed local draft rather than introducing a Zustand store."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Cross-layer AppSettings types and translation-domain type placement."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Translation HTTP remains in frontend services and settings IPC stays on the existing typed bridge."}
+{"file":".trellis/spec/tauri/index.md","reason":"Rust ownership is limited to persisted settings and migration."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Settings input normalization and secret-safe logging requirements."}
+{"file":".trellis/tasks/07-18-translation-providers/research/existing-translation-flow.md","reason":"Exact existing settings, migration, adapter, concurrency, UI, and test evidence."}
+{"file":".trellis/tasks/07-18-translation-providers/research/provider-api-contracts.md","reason":"Official OpenAI-compatible, Gemini, and Anthropic REST and model-list contracts."}
