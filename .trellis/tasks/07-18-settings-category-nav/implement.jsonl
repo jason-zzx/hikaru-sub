@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend layer overview and pre-dev checklist for settings UI work"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Workflow views live under components/workflow/; placement for new settings panels"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "shadcn-first UI, Chinese copy, SettingsView as workflow view pattern"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "pnpm test / pnpm build expectations for frontend changes"}
+{"file": ".trellis/tasks/07-18-settings-category-nav/prd.md", "reason": "Accepted requirements and acceptance criteria"}
+{"file": ".trellis/tasks/07-18-settings-category-nav/design.md", "reason": "Shell + panels architecture, data flow, and testing design"}
+{"file": ".trellis/tasks/07-18-settings-category-nav/implement.md", "reason": "Ordered implementation checklist and validation commands"}

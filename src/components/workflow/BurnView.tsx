@@ -129,7 +129,7 @@ export function BurnView() {
   const assStyles = useProjectStore((s) => s.assStyles);
   const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
   const isDirty = useProjectStore((s) => s.isDirty);
-  const setStep = useUiStore((s) => s.setStep);
+  const openSettings = useUiStore((s) => s.openSettings);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
@@ -656,7 +656,7 @@ export function BurnView() {
         error={ffmpegPreparation.error}
         onConfirm={ffmpegPreparation.confirmPrepare}
         onCancel={() => ffmpegPreparation.setOpen(false)}
-        onChangeSource={() => setStep("settings")}
+        onChangeSource={() => openSettings("runtime")}
       />
     </div>
   );

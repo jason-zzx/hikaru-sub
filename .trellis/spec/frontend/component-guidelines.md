@@ -32,6 +32,8 @@ Examples: `ImportView`, `TranscribeView`, `TranslateView`, `BurnView`, `Settings
 - Call `services/tauri.ts` (and translation services) for side effects
 - Must not own long-running job finalization that must survive leaving the page (clip/burn pollers belong at App layer)
 
+`SettingsView` uses a left category nav (`runtime` / `transcription` / `translation`) and a right content pane. Cross-page jumps into Settings should use `uiStore.openSettings(category)` rather than bare `setStep("settings")`.
+
 ### Editor / player
 
 - Editor workspace layout stays left video+timeline / upper-right list / lower-right editor. The two outer pane ratios are pointer-resizable and persist globally through `editorPaneLayout.ts`; use CSS Grid `minmax(<px>, <ratio>fr)` tracks for window-size constraints so no resize observer overwrites the preferred value. Keep the video/timeline boundary fixed, keep layout state out of project history/per-video metadata, do not intercept editor arrow keys for pane resizing, retain separator semantics, and retain double-click reset to defaults.

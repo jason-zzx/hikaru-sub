@@ -28,6 +28,7 @@ const TARGET_LANGS = [
 
 export function TranslateView() {
   const setStep = useUiStore((s) => s.setStep);
+  const openSettings = useUiStore((s) => s.openSettings);
   const session = useProjectStore((s) => s.session);
   const setCues = useProjectStore((s) => s.setCues);
   const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
@@ -285,9 +286,17 @@ export function TranslateView() {
           </div>
 
           {settings && !settings.translationBaseUrl && (
-            <div className="flex items-center gap-2 rounded-md border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
-              <IconAlertTriangle className="h-4 w-4" />
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
+              <IconAlertTriangle className="h-4 w-4 shrink-0" />
               <span>未配置翻译 API，请前往「设置」页面配置</span>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => openSettings("translation")}
+                className="rounded-md border border-yellow-600/50 px-2.5 py-1 text-xs font-medium text-yellow-200 hover:bg-yellow-500/20"
+              >
+                前往设置
+              </Button>
             </div>
           )}
 

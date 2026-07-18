@@ -8,6 +8,15 @@ const settingsSource = readFileSync(
   ),
   "utf8",
 );
+const transcriptionPanelSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../src/components/workflow/SettingsTranscriptionPanel.tsx",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 const panelSource = readFileSync(
   fileURLToPath(
     new URL(
@@ -20,8 +29,9 @@ const panelSource = readFileSync(
 
 describe("SettingsView ASR setup", () => {
   it("mounts the ASR setup panel near ASR defaults", () => {
-    expect(settingsSource).toContain("AsrEngineSetupPanel");
-    expect(settingsSource).toContain("日语转录（ASR）默认");
+    expect(transcriptionPanelSource).toContain("AsrEngineSetupPanel");
+    expect(transcriptionPanelSource).toContain("日语转录（ASR）默认");
+    expect(settingsSource).toContain("SettingsTranscriptionPanel");
   });
 
   it("reloads backend settings after setup updates managed ASR paths", () => {
@@ -64,35 +74,36 @@ describe("SettingsView ASR setup", () => {
     expect(settingsSource).toContain("getRuntimeDependencyProgress");
     expect(settingsSource).toContain("runtimePreparationSnapshots");
     expect(settingsSource).toContain("handleConfigureAsrFromRuntimePanel");
-    expect(settingsSource).toContain("asrSectionRef");
-    expect(settingsSource).toContain("scrollIntoView");
+    expect(settingsSource).toContain('setActiveCategory("transcription")');
+    expect(settingsSource).not.toContain("asrSectionRef");
+    expect(settingsSource).not.toContain("scrollIntoView");
     expect(settingsSource).not.toContain("下载中${progress");
   });
 
   it("refreshes ASR setup environment after managed Python changes", () => {
     expect(settingsSource).toContain("setAsrSetupRefreshKey");
-    expect(settingsSource).toContain("refreshKey={asrSetupRefreshKey}");
+    expect(transcriptionPanelSource).toContain("refreshKey={asrSetupRefreshKey}");
     expect(panelSource).toContain("refreshKey = 0");
     expect(panelSource).toContain("asrServicePath, refreshKey]");
   });
 
   it("keeps runtime dependency status out of the settings header", () => {
     expect(settingsSource).not.toContain("{message && (");
-    expect(settingsSource).not.toContain("setMessage({ kind: \"ok\"");
+    expect(settingsSource).not.toContain('setMessage({ kind: "ok"');
   });
 
   it("shows the approved Kotoba description in default ASR settings", () => {
-    expect(settingsSource).toContain("KOTOBA_FASTER_WHISPER_DESCRIPTION");
-    expect(settingsSource).toContain(
+    expect(transcriptionPanelSource).toContain("KOTOBA_FASTER_WHISPER_DESCRIPTION");
+    expect(transcriptionPanelSource).toContain(
       'settings.asrEngine === "kotoba-faster-whisper"',
     );
   });
 
   it("resets the default model for engine changes and wires ModelManager", () => {
-    expect(settingsSource).toContain(
+    expect(transcriptionPanelSource).toContain(
       'update("asrModel", defaultAsrModel(engine))',
     );
-    expect(settingsSource).toContain("engine={settings.asrEngine}");
-    expect(settingsSource).toContain("model={settings.asrModel}");
+    expect(transcriptionPanelSource).toContain("engine={settings.asrEngine}");
+    expect(transcriptionPanelSource).toContain("model={settings.asrModel}");
   });
 });

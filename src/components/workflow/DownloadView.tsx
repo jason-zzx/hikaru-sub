@@ -39,6 +39,7 @@ function formatMs(ms: number): string {
 
 export function DownloadView() {
   const setStep = useUiStore((s) => s.setStep);
+  const openSettings = useUiStore((s) => s.openSettings);
   const setSession = useProjectStore((s) => s.setSession);
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -447,7 +448,7 @@ export function DownloadView() {
         error={ffmpegPreparation.error}
         onConfirm={ffmpegPreparation.confirmPrepare}
         onCancel={() => ffmpegPreparation.setOpen(false)}
-        onChangeSource={() => setStep("settings")}
+        onChangeSource={() => openSettings("runtime")}
       />
     </div>
   );

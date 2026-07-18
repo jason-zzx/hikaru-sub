@@ -25,6 +25,7 @@ import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
 export function ImportView() {
   const setStep = useUiStore((s) => s.setStep);
+  const openSettings = useUiStore((s) => s.openSettings);
   const session = useProjectStore((s) => s.session);
   const setSession = useProjectStore((s) => s.setSession);
 
@@ -326,7 +327,7 @@ export function ImportView() {
         error={ffmpegPreparation.error}
         onConfirm={ffmpegPreparation.confirmPrepare}
         onCancel={() => ffmpegPreparation.setOpen(false)}
-        onChangeSource={() => setStep("settings")}
+        onChangeSource={() => openSettings("runtime")}
       />
     </div>
   );
