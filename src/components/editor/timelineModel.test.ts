@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { clipVisibleCueRect, hitTestTimelineCue } from "./timelineModel";
+import {
+  clipVisibleCueRect,
+  hitTestTimelineCue,
+  revealTimelineTime,
+} from "./timelineModel";
 import type { SubtitleCue } from "../../types";
 
 const cue: SubtitleCue = {
@@ -73,6 +77,14 @@ describe("hitTestTimelineCue", () => {
       kind: "body",
       cue,
     });
+  });
+});
+
+describe("revealTimelineTime", () => {
+  it("keeps visible targets in place and centers targets outside the viewport", () => {
+    expect(revealTimelineTime(1000, 800, 10, 5000)).toBe(1000);
+    expect(revealTimelineTime(1000, 800, 10, 12000)).toBe(8000);
+    expect(revealTimelineTime(5000, 800, 10, 500)).toBe(0);
   });
 });
 

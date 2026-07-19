@@ -22,6 +22,20 @@ export interface ClippedCueRect {
   showEndHandle: boolean;
 }
 
+/** Return a centered view start when a target time falls outside the viewport. */
+export function revealTimelineTime(
+  viewStartMs: number,
+  viewportWidth: number,
+  msPerPixel: number,
+  targetTimeMs: number,
+): number {
+  const viewEndMs = viewStartMs + viewportWidth * msPerPixel;
+  if (targetTimeMs >= viewStartMs && targetTimeMs <= viewEndMs) {
+    return viewStartMs;
+  }
+  return Math.max(0, targetTimeMs - (viewportWidth * msPerPixel) / 2);
+}
+
 /** Clip a cue rect to the visible viewport so scrolled-off start/end shrink width. */
 export function clipVisibleCueRect(
   rect: { x: number; width: number },
