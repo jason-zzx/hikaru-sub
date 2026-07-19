@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend quality gate and pre-development requirements for the final review."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check Settings UI for shadcn usage, accessibility, icons, and Chinese UI conventions."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Frontend test and build requirements for final verification."}
+{"file":".trellis/spec/tauri/index.md","reason":"Cross-layer ownership and Tauri settings boundary checks."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Rust test and quality gate requirements."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review the complete TypeScript/Rust settings contract and fallback behavior."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Review for duplicated shortcut matching, label formatting, or persistence logic."}

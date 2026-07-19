@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend layer checklist and quality requirements for Settings and editor changes."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Existing UI component, shadcn, accessibility, and Simplified Chinese copy conventions."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Guidance for keeping persisted application settings in the existing SettingsView flow."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Typed AppSettings and existing Tauri get/set settings boundary."}
+{"file":".trellis/spec/tauri/index.md","reason":"Tauri layer boundary and settings persistence quality checklist."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Rust test and validation expectations for the settings schema change."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Required React-to-Tauri contract and compatibility checks for this cross-layer settings feature."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse guidance for extending the existing shortcut registry and settings patterns."}
