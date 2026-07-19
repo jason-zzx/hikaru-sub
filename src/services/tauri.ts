@@ -16,6 +16,7 @@ import type {
   ExtractVideoFrameArgs,
   ExtractVideoFrameResult,
   FfmpegStatus,
+  LatestGithubRelease,
   ModelDownloadSnapshot,
   ProbeDownloadMediaArgs,
   ProbeAsrSetupEnvironmentArgs,
@@ -402,4 +403,9 @@ export async function extractVideoFrame(
   args: ExtractVideoFrameArgs,
 ): Promise<ExtractVideoFrameResult> {
   return invoke<ExtractVideoFrameResult>("extract_video_frame", { args });
+}
+
+/** 通过 GitHub /releases/latest 重定向解析最新正式版。 */
+export async function fetchLatestGithubRelease(): Promise<LatestGithubRelease> {
+  return invoke<LatestGithubRelease>("fetch_latest_github_release");
 }

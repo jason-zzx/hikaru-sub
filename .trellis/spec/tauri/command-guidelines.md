@@ -17,7 +17,7 @@ Skipping the frontend wrapper leaves a dead backend surface. Skipping capabiliti
 - Keep argument structs aligned with frontend camelCase JSON where serde attributes already establish that contract.
 - Long jobs return a `jobId` quickly; progress via `get_*_progress` poll commands (ASR, download, burn, clip, setup, runtime prepare).
 
-Registered command families today (see `lib.rs`): settings, runtime dependencies, ffmpeg, fonts, project session, ASR + ASR setup, ASS text I/O, media playback, transcode, download, burn, clip/frame extract.
+Registered command families today (see `lib.rs`): settings, runtime dependencies, ffmpeg, fonts, project session, ASR + ASR setup, ASS text I/O, media playback, transcode, download, burn, clip/frame extract, GitHub latest-release probe (`fetch_latest_github_release`).
 
 ## State and Lifecycle
 

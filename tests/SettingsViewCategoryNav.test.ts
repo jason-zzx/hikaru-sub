@@ -43,13 +43,19 @@ describe("SettingsView category navigation", () => {
     expect(settingsSource).toContain('label: "转录"');
     expect(settingsSource).toContain('label: "供应商"');
     expect(settingsSource).toContain('label: "翻译"');
+    expect(settingsSource).toContain('label: "快捷键"');
+    expect(settingsSource).toContain('label: "关于"');
     expect(settingsSource.indexOf('id: "providers"')).toBeLessThan(
       settingsSource.indexOf('id: "translation"'),
+    );
+    expect(settingsSource.indexOf('id: "shortcuts"')).toBeLessThan(
+      settingsSource.indexOf('id: "about"'),
     );
     expect(settingsSource).toContain("RuntimeDependenciesPanel");
     expect(settingsSource).toContain("SettingsTranscriptionPanel");
     expect(settingsSource).toContain("SettingsProvidersPanel");
     expect(settingsSource).toContain("SettingsTranslationPanel");
+    expect(settingsSource).toContain("SettingsAboutPanel");
     expect(settingsSource).not.toContain("SettingsRuntimePanel");
   });
 
