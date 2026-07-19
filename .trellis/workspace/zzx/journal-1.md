@@ -272,3 +272,36 @@ Implemented multi-provider translation settings with OpenAI-compatible, Gemini, 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Manage subtitle editor shortcuts
+
+**Date**: 2026-07-19
+**Task**: Manage subtitle editor shortcuts
+**Branch**: `dev`
+
+### Summary
+
+Added persisted subtitle editor shortcut management in Settings, including per-shortcut recording, conflict validation, restore-all and per-shortcut reset actions, effective bindings across editor consumers, compatibility handling, tests, and frontend/Tauri verification.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3ccd1f0` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
