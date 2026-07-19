@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { RuntimeDependenciesPanel } from "./RuntimeDependenciesPanel";
+import { SettingsAboutPanel } from "./SettingsAboutPanel";
 import { SettingsProvidersPanel } from "./SettingsProvidersPanel";
 import { SettingsShortcutsPanel } from "./SettingsShortcutsPanel";
 import { findHotkeyConflicts } from "../editor/hotkeys";
@@ -71,6 +72,11 @@ const SETTINGS_CATEGORIES: { id: SettingsCategory; label: string; subtitle: stri
     id: "shortcuts",
     label: "快捷键",
     subtitle: "管理字幕编辑器快捷键",
+  },
+  {
+    id: "about",
+    label: "关于",
+    subtitle: "产品信息、版本与开源许可证",
   },
 ];
 
@@ -318,16 +324,18 @@ export function SettingsView() {
           <h2 className="text-xl font-semibold">设置</h2>
           <p className="mt-1 text-sm text-text-muted">{activeMeta.subtitle}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !dirty || asrSetupRunning || !shortcutsValid}
-            className="px-4 py-2"
-          >
-            {saving ? "保存中…" : "保存"}
-          </Button>
-        </div>
+        {activeCategory !== "about" ? (
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || !dirty || asrSetupRunning || !shortcutsValid}
+              className="px-4 py-2"
+            >
+              {saving ? "保存中…" : "保存"}
+            </Button>
+          </div>
+        ) : null}
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -417,6 +425,8 @@ export function SettingsView() {
                 onChange={(editorHotkeys) => update("editorHotkeys", editorHotkeys)}
               />
             ) : null}
+
+            {activeCategory === "about" ? <SettingsAboutPanel /> : null}
           </div>
         </div>
       </div>

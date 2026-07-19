@@ -19,6 +19,7 @@ mod process;
 mod project;
 mod settings;
 mod transcode;
+mod update;
 
 use tauri::Manager;
 
@@ -87,6 +88,7 @@ pub fn run() {
             clip::get_video_clip_progress,
             clip::cancel_video_clip,
             clip::extract_video_frame,
+            update::fetch_latest_github_release,
         ])
         .setup(|app| {
             if let Err(error) = dependencies::ensure_runtime_deps_writable_or_elevate(app.handle())

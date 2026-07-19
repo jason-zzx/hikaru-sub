@@ -14,7 +14,14 @@ export type SettingsCategory =
   | "transcription"
   | "providers"
   | "translation"
-  | "shortcuts";
+  | "shortcuts"
+  | "about";
+
+/** Latest non-prerelease GitHub release resolved via /releases/latest redirect. */
+export interface LatestGithubRelease {
+  version: string;
+  htmlUrl: string;
+}
 
 export type ActiveSubtitleKind = "transcribed" | "translated";
 

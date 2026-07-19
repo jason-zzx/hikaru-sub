@@ -32,7 +32,7 @@ Examples: `ImportView`, `TranscribeView`, `TranslateView`, `BurnView`, `Settings
 - Call `services/tauri.ts` (and translation services) for side effects
 - Must not own long-running job finalization that must survive leaving the page (clip/burn pollers belong at App layer)
 
-`SettingsView` uses a left category nav (`runtime` / `transcription` / `providers` / `translation`) and a right content pane. Provider connection/auth/model/limits live under `providers`; translation behavior remains under `translation`. Cross-page jumps into Settings should use `uiStore.openSettings(category)` rather than bare `setStep("settings")`.
+`SettingsView` uses a left category nav (`runtime` / `transcription` / `providers` / `translation` / `shortcuts` / `about`) and a right content pane. Provider connection/auth/model/limits live under `providers`; translation behavior remains under `translation`; product identity / version / GitHub / license live under `about` (no Save button). Cross-page jumps into Settings should use `uiStore.openSettings(category)` rather than bare `setStep("settings")`.
 
 ### Editor / player
 
