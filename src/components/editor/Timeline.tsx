@@ -10,6 +10,7 @@ import {
 import {
   clipVisibleCueRect,
   hitTestTimelineCue,
+  revealTimelineTime,
   type TimelineCueRect,
 } from "./timelineModel";
 import { resolveTimelineColors, type TimelineColors } from "./timelineColors";
@@ -44,6 +45,8 @@ export function Timeline() {
   const cueRectsRef = useRef<TimelineCueRect[]>([]);
   const dragStateRef = useRef<DragState | null>(null);
   const dragPreviewRef = useRef<DragPreview | null>(null);
+  const previousTimeMsRef = useRef(0);
+  const previousSelectedCueIdRef = useRef<string | null>(null);
 
   const [waveform, setWaveform] = useState<number[]>([]);
   const [viewStartMs, setViewStartMs] = useState(0);
@@ -82,17 +85,26 @@ export function Timeline() {
   }, []);
 
   useEffect(() => {
-    if (!isPlaying) return;
-
     const container = containerRef.current;
     if (!container) return;
-    const width = container.getBoundingClientRect().width;
-    const viewEndMs = viewStartMs + width * msPerPixel;
 
-    if (currentTimeMs < viewStartMs || currentTimeMs > viewEndMs) {
-      setViewStartMs(Math.max(0, currentTimeMs - (width * msPerPixel) / 2));
-    }
-  }, [currentTimeMs, viewStartMs, msPerPixel, isPlaying]);
+    const timeChanged = previousTimeMsRef.current !== currentTimeMs;
+    const cueChanged =
+      selectedCueId !== null &&
+      previousSelectedCueIdRef.current !== selectedCueId;
+    previousTimeMsRef.current = currentTimeMs;
+    previousSelectedCueIdRef.current = selectedCueId;
+    if (!isPlaying && !timeChanged && !cueChanged) return;
+
+    const width = container.getBoundingClientRect().width;
+    const nextViewStartMs = revealTimelineTime(
+      viewStartMs,
+      width,
+      msPerPixel,
+      currentTimeMs,
+    );
+    if (nextViewStartMs !== viewStartMs) setViewStartMs(nextViewStartMs);
+  }, [currentTimeMs, viewStartMs, msPerPixel, isPlaying, selectedCueId]);
 
   useEffect(() => {
     const fixedCanvas = fixedCanvasRef.current;
