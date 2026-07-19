@@ -13,7 +13,8 @@ export type SettingsCategory =
   | "runtime"
   | "transcription"
   | "providers"
-  | "translation";
+  | "translation"
+  | "shortcuts";
 
 export type ActiveSubtitleKind = "transcribed" | "translated";
 
@@ -45,6 +46,14 @@ export interface TranslationProviderSettings {
   requestsPerMinute: number;
 }
 
+export interface EditorHotkeyOverride {
+  id: string;
+  key: string;
+  ctrl: boolean;
+  alt: boolean;
+  shift: boolean;
+}
+
 export interface AppSettings {
   ffmpegPath?: string;
   pythonPath?: string;
@@ -62,6 +71,7 @@ export interface AppSettings {
   translationGlossary?: string;
   subtitleMergeMode: "inline" | "separate";
   runtimeSourceMode?: RuntimeDependencySourceMode;
+  editorHotkeys: EditorHotkeyOverride[];
 }
 
 export type FfmpegSource = "settings" | "managed" | "system";

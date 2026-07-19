@@ -1,5 +1,10 @@
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { formatPlaybackTime } from "../../utils/formatTime";
+import {
+  EDITOR_HOTKEYS,
+  formatActionShortcutTitle,
+  type HotkeyDef,
+} from "../editor/hotkeys";
 import { Button } from "../ui/button";
 
 interface PlaybackControlsProps {
@@ -7,6 +12,7 @@ interface PlaybackControlsProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  hotkeys?: readonly HotkeyDef[];
 }
 
 export function PlaybackControls({
@@ -14,6 +20,7 @@ export function PlaybackControls({
   canRedo,
   onUndo,
   onRedo,
+  hotkeys = EDITOR_HOTKEYS,
 }: PlaybackControlsProps) {
   const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
   const durationMs = usePlaybackStore((s) => s.durationMs);
@@ -48,7 +55,11 @@ export function PlaybackControls({
         variant="ghost"
         onClick={() => setPlaying(!isPlaying)}
         className="p-1"
-        title={isPlaying ? "暂停（空格）" : "播放（空格）"}
+        title={formatActionShortcutTitle(
+          isPlaying ? "暂停" : "播放",
+          "toggle-play",
+          hotkeys,
+        )}
       >
         {isPlaying ? (
           <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
@@ -94,7 +105,7 @@ export function PlaybackControls({
           onClick={onUndo}
           disabled={!canUndo}
           className="p-1 disabled:opacity-30"
-          title="撤销（Ctrl+Z）"
+          title={formatActionShortcutTitle("撤销", "undo", hotkeys)}
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -106,7 +117,7 @@ export function PlaybackControls({
           onClick={onRedo}
           disabled={!canRedo}
           className="p-1 disabled:opacity-30"
-          title="重做（Ctrl+Y / Ctrl+Shift+Z）"
+          title={formatActionShortcutTitle("重做", "redo", hotkeys)}
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
