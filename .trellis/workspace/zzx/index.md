@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
-- **Last Active**: 2026-07-19
+- **Total Sessions**: 10
+- **Last Active**: 2026-07-20
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~307 | Active |
+| `journal-1.md` | ~340 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-07-20 | Persistent Subtitle Style Library | `2bbf2c2` | `dev` |
 | 9 | 2026-07-19 | Manage subtitle editor shortcuts | `3ccd1f0` | `dev` |
 | 8 | 2026-07-19 | Expand translation provider management | `a8311aa` | `dev` |
 | 7 | 2026-07-18 | Settings category navigation | `9f07dc8` | `dev` |

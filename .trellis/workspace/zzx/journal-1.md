@@ -305,3 +305,36 @@ Added persisted subtitle editor shortcut management in Settings, including per-s
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Persistent Subtitle Style Library
+
+**Date**: 2026-07-20
+**Task**: Persistent Subtitle Style Library
+**Branch**: `dev`
+
+### Summary
+
+Implemented a persistent application-level ASS style library with installed/portable fixed-path storage, first-run defaults, live-save editing, detached document/library copies, overwrite and deletion confirmations, atomic writes, concurrent-save protection, and regression coverage including document-style switch warning flicker.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2bbf2c2` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
