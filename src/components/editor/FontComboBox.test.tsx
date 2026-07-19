@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FontComboBox,
   findMatchingFontIndex,
   fontOptionsWithCurrent,
 } from "./FontComboBox";
+
+afterEach(() => cleanup());
 
 describe("findMatchingFontIndex", () => {
   const fonts = ["Arial", "Noto Sans SC", "Microsoft YaHei", "Yu Gothic"];
@@ -36,6 +38,31 @@ describe("FontComboBox", () => {
 
     expect(onCommit).toHaveBeenCalledOnce();
     expect(onCommit).toHaveBeenCalledWith("Arial");
+  });
+
+  it("closes the options and disables input while disabled", async () => {
+    const onCommit = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <FontComboBox value="" options={["Arial"]} onCommit={onCommit} />,
+    );
+
+    await user.click(screen.getByPlaceholderText("字体"));
+    expect(screen.getByRole("button", { name: "Arial" })).toBeTruthy();
+
+    rerender(
+      <FontComboBox
+        value=""
+        options={["Arial"]}
+        onCommit={onCommit}
+        disabled
+      />,
+    );
+
+    expect((screen.getByPlaceholderText("字体") as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect(screen.queryByRole("button", { name: "Arial" })).toBeNull();
   });
 });
 

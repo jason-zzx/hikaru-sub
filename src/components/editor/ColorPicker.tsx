@@ -7,6 +7,7 @@ interface ColorPickerProps {
   onChange: (ass: string) => void;
   label?: string;
   deferChange?: boolean;
+  disabled?: boolean;
 }
 
 const CHECKERBOARD_STYLE = {
@@ -78,6 +79,7 @@ export function ColorPicker({
   onChange,
   label,
   deferChange = false,
+  disabled = false,
 }: ColorPickerProps) {
   const [open, setOpen] = useState(false);
   const [rgba, setRgba] = useState<RGBA>(() => assToRgba(value));
@@ -103,6 +105,10 @@ export function ColorPicker({
     syncDrafts(next);
     setPendingAss(null);
   }, [open, syncDrafts, value]);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   const closePicker = useCallback(() => {
     if (deferChange && pendingAss !== null) {
@@ -194,14 +200,16 @@ export function ColorPicker({
       {label && <span className="text-xs text-text-muted">{label}</span>}
       <button
         type="button"
+        disabled={disabled}
         onClick={() => {
+          if (disabled) return;
           if (open) {
             closePicker();
             return;
           }
           setOpen(true);
         }}
-        className="relative h-8 w-14 overflow-hidden rounded border border-border shadow-inner hover:border-accent/60 focus:border-accent/60 focus:outline-none"
+        className="relative h-8 w-14 overflow-hidden rounded border border-border shadow-inner hover:border-accent/60 focus:border-accent/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         style={CHECKERBOARD_STYLE}
         title={currentAss}
         aria-label={label ? `选择${label}` : "选择颜色"}
@@ -212,7 +220,7 @@ export function ColorPicker({
           style={{ backgroundColor: rgbaCss(rgba) }}
         />
       </button>
-      {open && (
+      {open && !disabled && (
         <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-border bg-surface-raised p-3 shadow-xl">
           <div className="subtitle-color-picker">
             <RgbaColorPicker color={rgba} onChange={handleChange} />

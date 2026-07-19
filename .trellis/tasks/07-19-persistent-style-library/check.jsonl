@@ -1,0 +1,13 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership and quality pointers for the editor and service changes."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review tabbed drawer behavior, shared controls, Chinese copy, and shadcn usage."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify document styles, library drafts, dirty state, and undo ownership remain separated."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify AssStyle remains canonical and no duplicate cross-layer model is introduced."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Verify complete typed command wiring and absence of raw invoke calls in components."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Frontend test, build, minimal-diff, icon, and user-visible flow quality gate."}
+{"file":".trellis/spec/tauri/index.md","reason":"Tauri ownership and portable-path quality pointers."}
+{"file":".trellis/spec/tauri/command-guidelines.md","reason":"Verify module registration, wrappers, errors, and capability decisions."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Verify fixed business data uses app_paths in installed and portable modes."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Rust tests, path safety, blocking-I/O judgment, and logging checks."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review the complete UI-service-invoke-Rust-file data flow and failure matrix."}
+{"file":".trellis/tasks/07-19-persistent-style-library/research/persistence-options.md","reason":"Approved persistence and product decisions to check against the implementation."}
+{"file":".trellis/tasks/07-19-persistent-style-library/research/architecture-review.md","reason":"Codebase-backed architecture, risk limits, failure behavior, and test seams."}

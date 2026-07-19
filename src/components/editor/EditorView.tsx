@@ -81,7 +81,6 @@ export function EditorView() {
   const loadAssDocument = useProjectStore((s) => s.loadAssDocument);
   const acceptTextSession = useProjectStore((s) => s.acceptTextSession);
   const setStep = useUiStore((s) => s.setStep);
-  const styleManagerOpen = useUiStore((s) => s.styleManagerOpen);
   const toggleStyleManager = useUiStore((s) => s.toggleStyleManager);
 
   const [helpOpen, setHelpOpen] = useState(false);
@@ -456,7 +455,7 @@ export function EditorView() {
             onClick={toggleStyleManager}
             className="px-3 py-1.5 text-sm hover:border-accent/50"
           >
-            {styleManagerOpen ? "关闭样式库" : "样式管理"}
+            样式管理
           </Button>
         </div>
       </div>

@@ -92,9 +92,9 @@ describe("editor style visual editing integration", () => {
     const source = readSource("src/components/editor/StyleManager.tsx");
 
     expect(source).toContain("renameStyle");
-    expect(source).toContain("pendingRename");
-    expect(source).toContain("commitNameEdit");
-    expect(source).toContain("resolveRename");
+    expect(source).toContain("doc-rename");
+    expect(source).toContain("commitDocNameEdit");
+    expect(source).toContain("resolveDialog");
     expect(source).toContain("ConfirmDialog");
     expect(source).toContain("同步更新这些字幕的样式引用");
     expect(source).toContain('"yes"');
