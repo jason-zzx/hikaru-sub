@@ -68,6 +68,31 @@ impl Default for TranslationProviderSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorHotkeyOverride {
+    pub id: String,
+    pub key: String,
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+}
+
+fn deserialize_editor_hotkeys<'de, D>(
+    deserializer: D,
+) -> Result<Vec<EditorHotkeyOverride>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let serde_json::Value::Array(items) = serde_json::Value::deserialize(deserializer)? else {
+        return Ok(Vec::new());
+    };
+    Ok(items
+        .into_iter()
+        .filter_map(|item| serde_json::from_value(item).ok())
+        .collect())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppSettings {
@@ -88,6 +113,8 @@ pub struct AppSettings {
     pub translation_glossary: Option<String>,
     pub subtitle_merge_mode: String,
     pub runtime_source_mode: RuntimeDependencySourceMode,
+    #[serde(default, deserialize_with = "deserialize_editor_hotkeys")]
+    pub editor_hotkeys: Vec<EditorHotkeyOverride>,
 }
 
 impl Default for AppSettings {
@@ -109,6 +136,7 @@ impl Default for AppSettings {
             translation_glossary: None,
             subtitle_merge_mode: "inline".into(),
             runtime_source_mode: RuntimeDependencySourceMode::Official,
+            editor_hotkeys: Vec::new(),
         }
     }
 }
@@ -381,6 +409,40 @@ mod tests {
         assert_eq!(
             settings.runtime_source_mode,
             RuntimeDependencySourceMode::Official
+        );
+    }
+
+    #[test]
+    fn editor_hotkeys_default_empty_and_legacy_settings_deserialize() {
+        let settings = parse_settings_json(r#"{"asrEngine":"faster-whisper"}"#).unwrap();
+        assert!(settings.editor_hotkeys.is_empty());
+
+        let settings = parse_settings_json(
+            r#"{"editorHotkeys":[{"id":"save","key":"k"},"malformed",{"id":"future","key":"q","ctrl":false,"alt":false,"shift":false}]}"#,
+        )
+        .unwrap();
+        assert_eq!(settings.editor_hotkeys.len(), 1);
+        assert_eq!(settings.editor_hotkeys[0].id, "future");
+
+        let serialized = serde_json::to_value(AppSettings::default()).unwrap();
+        assert_eq!(serialized["editorHotkeys"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn editor_hotkey_overrides_round_trip() {
+        let settings = parse_settings_json(
+            r#"{"editorHotkeys":[{"id":"save","key":"k","ctrl":true,"alt":false,"shift":true}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            settings.editor_hotkeys,
+            vec![EditorHotkeyOverride {
+                id: "save".into(),
+                key: "k".into(),
+                ctrl: true,
+                alt: false,
+                shift: true,
+            }]
         );
     }
 

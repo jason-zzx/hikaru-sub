@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   EDITOR_HOTKEYS,
+  applyEditorHotkeyOverrides,
   findHotkey,
+  findHotkeyConflicts,
+  formatHotkeyLabel,
   isEditableTarget,
   type HotkeyEventLike,
 } from "./hotkeys";
@@ -136,5 +139,43 @@ describe("findHotkey", () => {
   it("未定义组合不匹配", () => {
     expect(findHotkey(ev({ key: "q", target: BODY }))).toBeNull();
     expect(findHotkey(ev({ key: "r", ctrlKey: true, target: BODY }))).toBeNull();
+  });
+
+  it("uses customized global and local bindings", () => {
+    const defs = applyEditorHotkeyOverrides([
+      { id: "save", key: "k", ctrl: true, alt: false, shift: false },
+      { id: "commit-and-next", key: "Tab", ctrl: false, alt: false, shift: false },
+    ]);
+
+    expect(findHotkey(ev({ key: "k", ctrlKey: true, target: BODY }), defs)?.action).toBe(
+      "save",
+    );
+    expect(findHotkey(ev({ key: "s", ctrlKey: true, target: BODY }), defs)).toBeNull();
+    expect(
+      findHotkey(ev({ key: "Tab", target: TEXTAREA }), defs, { local: true })?.action,
+    ).toBe("commit-and-next");
+  });
+});
+
+describe("shortcut configuration", () => {
+  it("ignores unknown overrides and reports effective conflicts", () => {
+    const defs = applyEditorHotkeyOverrides([
+      { id: "unknown", key: "q", ctrl: false, alt: false, shift: false },
+      { id: "save", key: "z", ctrl: true, alt: false, shift: false },
+    ]);
+
+    expect(defs.find((def) => def.id === "unknown")).toBeUndefined();
+    expect(defs.find((def) => def.id === "save")?.key).toBe("z");
+    expect(findHotkeyConflicts([
+      { id: "save", key: "z", ctrl: true, alt: false, shift: false },
+    ])).toEqual([
+      { label: "Ctrl+Z", ids: ["save", "undo"] },
+    ]);
+  });
+
+  it("formats modifier labels from the effective binding", () => {
+    expect(formatHotkeyLabel({ key: "k", ctrl: true, alt: false, shift: true })).toBe(
+      "Ctrl+Shift+K",
+    );
   });
 });

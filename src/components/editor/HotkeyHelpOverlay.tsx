@@ -1,29 +1,23 @@
 import { useEffect } from "react";
-import { EDITOR_HOTKEYS, type HotkeyDef } from "./hotkeys";
+import {
+  EDITOR_HOTKEYS,
+  formatHotkeyLabel,
+  groupHotkeysByCategory,
+  type HotkeyDef,
+} from "./hotkeys";
 import { Button } from "../ui/button";
-
-/** 按 category 分组，保持键位表内出现顺序。 */
-export function groupHotkeysByCategory(
-  defs: HotkeyDef[],
-): Map<string, HotkeyDef[]> {
-  const groups = new Map<string, HotkeyDef[]>();
-  for (const def of defs) {
-    const list = groups.get(def.category);
-    if (list) {
-      list.push(def);
-    } else {
-      groups.set(def.category, [def]);
-    }
-  }
-  return groups;
-}
 
 interface HotkeyHelpOverlayProps {
   open: boolean;
   onClose: () => void;
+  hotkeys?: readonly HotkeyDef[];
 }
 
-export function HotkeyHelpOverlay({ open, onClose }: HotkeyHelpOverlayProps) {
+export function HotkeyHelpOverlay({
+  open,
+  onClose,
+  hotkeys = EDITOR_HOTKEYS,
+}: HotkeyHelpOverlayProps) {
   // 浮层打开时 Esc 关闭（编辑框外的 Esc 不在键位表内，此处局部处理）
   useEffect(() => {
     if (!open) return;
@@ -39,7 +33,7 @@ export function HotkeyHelpOverlay({ open, onClose }: HotkeyHelpOverlayProps) {
 
   if (!open) return null;
 
-  const groups = groupHotkeysByCategory(EDITOR_HOTKEYS);
+  const groups = groupHotkeysByCategory(hotkeys);
 
   return (
     <div
@@ -81,12 +75,12 @@ export function HotkeyHelpOverlay({ open, onClose }: HotkeyHelpOverlayProps) {
             <div className="space-y-1">
               {defs.map((def) => (
                 <div
-                  key={`${def.label}-${def.action}`}
+                  key={def.id}
                   className="flex items-center justify-between gap-4 text-sm"
                 >
                   <span className="text-text">{def.description}</span>
                   <kbd className="shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-xs text-text-muted">
-                    {def.label}
+                    {formatHotkeyLabel(def)}
                   </kbd>
                 </div>
               ))}

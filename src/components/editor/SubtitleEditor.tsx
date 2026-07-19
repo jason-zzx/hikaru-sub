@@ -43,7 +43,13 @@ import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
 import { FontComboBox } from "./FontComboBox";
 import { InlineOverridePanel } from "./InlineOverridePanel";
-import { HISTORY_COMMAND_ATTR } from "./hotkeys";
+import {
+  EDITOR_HOTKEYS,
+  findHotkey,
+  formatActionShortcutTitle,
+  HISTORY_COMMAND_ATTR,
+  type HotkeyDef,
+} from "./hotkeys";
 import type { SubtitleCue } from "../../types";
 
 const QUICK_FONT_OPTIONS = [
@@ -65,6 +71,7 @@ export interface SubtitleEditorHistoryHandle {
 interface SubtitleEditorProps {
   onNotify?: EditorNotify;
   onPendingTimeDraftChange?: (hasPending: boolean) => void;
+  hotkeys?: readonly HotkeyDef[];
 }
 
 type ExpectedCompositionEvent = {
@@ -77,7 +84,14 @@ type ExpectedCompositionEvent = {
 export const SubtitleEditor = forwardRef<
   SubtitleEditorHistoryHandle,
   SubtitleEditorProps
->(function SubtitleEditor({ onNotify, onPendingTimeDraftChange }, ref) {
+>(function SubtitleEditor(
+  {
+    onNotify,
+    onPendingTimeDraftChange,
+    hotkeys = EDITOR_HOTKEYS,
+  },
+  ref,
+) {
   const cues = useProjectStore((s) => s.cues);
   const updateCue = useProjectStore((s) => s.updateCue);
   const replaceCues = useProjectStore((s) => s.replaceCues);
@@ -578,37 +592,73 @@ export const SubtitleEditor = forwardRef<
     });
   };
 
+  const insertNewline = (target: HTMLTextAreaElement) => {
+    if (!selectedCue) return;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const nextText = `${text.slice(0, start)}\n${text.slice(end)}`;
+    const selection = { start: start + 1, end: start + 1 };
+    applyTextEdit({
+      cueId: selectedCue.id,
+      text: nextText,
+      op: makeTextOp({
+        cueId: selectedCue.id,
+        before: { start, end },
+        after: selection,
+        inputType: "insertLineBreak",
+        timestampMs: Date.now(),
+      }),
+    });
+    textSelectionRef.current = selection;
+    setTextSelection({ cueId: selectedCue.id, ...selection, direction: "none" });
+    window.setTimeout(() => {
+      textRef.current?.focus();
+      textRef.current?.setSelectionRange(selection.start, selection.end);
+    }, 0);
+  };
+
   const handleTextKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     textSelectionRef.current = {
       start: e.currentTarget.selectionStart,
       end: e.currentTarget.selectionEnd,
     };
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === "Escape") {
+    const localDef = findHotkey(e.nativeEvent, hotkeys, { local: true });
+    if (!localDef) return;
+    if (localDef.action === "discard-draft") {
       e.preventDefault();
       discardAndBlur(e.currentTarget);
       return;
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (localDef.action === "commit-and-next") {
       e.preventDefault();
       commitAndNext();
+      return;
+    }
+    if (localDef.action === "insert-newline") {
+      e.preventDefault();
+      insertNewline(e.currentTarget);
     }
   };
 
   const handleTimeKeyDown =
     (field: TimeField) => (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.nativeEvent.isComposing) return;
-      if (e.key === "Escape") {
+      const localDef = findHotkey(e.nativeEvent, hotkeys, { local: true });
+      if (localDef?.action === "discard-draft") {
         e.preventDefault();
         discardAndBlur(e.currentTarget);
         return;
       }
-      if (e.key === "Enter") {
+      if (
+        localDef?.action === "commit-and-next" ||
+        localDef?.action === "insert-newline"
+      ) {
         e.preventDefault();
         commitTimeDraft(field);
         e.currentTarget.blur();
         return;
       }
+
+      if (e.nativeEvent.isComposing) return;
 
       const result = applyTimeInputKey(
         e.currentTarget.value,
@@ -641,7 +691,7 @@ export const SubtitleEditor = forwardRef<
     deleteCue(selectedCue.id);
     setSelectedCueId(next ? next.id : null);
     setPlayUntil(null);
-    onNotify?.("info", "已删除字幕，可按 Ctrl+Z 撤销");
+    onNotify?.("info", "已删除字幕，可撤销");
   };
 
   const handleAdd = () => {
@@ -677,7 +727,6 @@ export const SubtitleEditor = forwardRef<
     value: style.name,
     label: style.name,
   }));
-
   if (!selectedCue) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
@@ -727,7 +776,7 @@ export const SubtitleEditor = forwardRef<
             variant="outline"
             size="sm"
             onClick={handleAdd}
-            title="新建字幕（Insert）"
+            title={formatActionShortcutTitle("新建字幕", "new-cue", hotkeys)}
           >
             新建
           </Button>
@@ -736,7 +785,7 @@ export const SubtitleEditor = forwardRef<
             size="sm"
             onClick={handleDelete}
             className="border-destructive/50 text-destructive hover:bg-destructive/10"
-            title="删除字幕（Delete）"
+            title={formatActionShortcutTitle("删除字幕", "delete-cue", hotkeys)}
           >
             删除
           </Button>

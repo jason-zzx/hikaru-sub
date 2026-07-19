@@ -2,7 +2,11 @@ import { useEffect, useRef } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { usePlaybackStore } from "../stores/playbackStore";
 import { useUiStore } from "../stores/uiStore";
-import { findHotkey, type EditorActionId } from "../components/editor/hotkeys";
+import {
+  findHotkey,
+  type EditorActionId,
+  type HotkeyDef,
+} from "../components/editor/hotkeys";
 import {
   createCueAtPlayheadWithUniqueId,
   deleteCuesById,
@@ -27,6 +31,7 @@ export interface EditorHotkeyOptions {
   onUndo: () => void;
   onRedo: () => void;
   onNotify?: (variant: "success" | "error" | "info", text: string) => void;
+  hotkeys?: readonly HotkeyDef[];
   enabled?: boolean;
 }
 
@@ -172,7 +177,7 @@ export function buildEditorActions(
     if (selectedIds.length === 0) return;
     const result = deleteCuesById(useProjectStore.getState().cues, selectedIds);
     applyCueListResult(result);
-    options.onNotify?.("info", "已删除字幕，可按 Ctrl+Z 撤销");
+    options.onNotify?.("info", "已删除字幕，可撤销");
   };
 
   return {
@@ -223,7 +228,7 @@ export function useEditorHotkeys(options: EditorHotkeyOptions) {
     });
     const onKeyDown = (e: KeyboardEvent) => {
       if (optionsRef.current.enabled === false) return;
-      const def = findHotkey(e);
+      const def = findHotkey(e, optionsRef.current.hotkeys);
       if (!def) return;
       e.preventDefault();
       actions[def.action]?.();

@@ -1,10 +1,13 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildEditorActions } from "./useEditorHotkeys";
+import { fireEvent, renderHook } from "@testing-library/react";
+import { useEditorHotkeys, buildEditorActions } from "./useEditorHotkeys";
 import { applySelectedCueToggle } from "../services/editorActions";
 import { useProjectStore } from "../stores/projectStore";
 import { usePlaybackStore } from "../stores/playbackStore";
 import { useUiStore } from "../stores/uiStore";
 import type { SubtitleCue } from "../types";
+import { applyEditorHotkeyOverrides } from "../components/editor/hotkeys";
 
 const writeMock = vi.fn();
 const readMock = vi.fn();
@@ -166,7 +169,7 @@ describe("编辑动作", () => {
     expect(useProjectStore.getState().cues.map((c) => c.id)).toEqual(["a", "c"]);
     expect(usePlaybackStore.getState().selectedCueId).toBe("c");
     expect(usePlaybackStore.getState().playUntilMs).toBeNull();
-    expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可按 Ctrl+Z 撤销");
+    expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可撤销");
   });
 
   it("delete-cue 删除选中并顺延选中下一条（按原索引）", () => {
@@ -231,7 +234,7 @@ describe("编辑动作", () => {
     expect(useProjectStore.getState().cues.map((cue) => cue.id)).toEqual(["a"]);
     expect(usePlaybackStore.getState().selectedCueIds).toEqual(["a"]);
     expect(usePlaybackStore.getState().playUntilMs).toBeNull();
-    expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可按 Ctrl+Z 撤销");
+    expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可撤销");
   });
 
   it("select-all-cues 选中全部字幕行，并以最后一条为活动项", () => {
@@ -337,5 +340,27 @@ describe("undo/redo callback routing", () => {
     expect(onRedo).toHaveBeenCalledOnce();
     // Store history untouched by wrappers that no-op / only call callbacks
     expect(useProjectStore.getState().history.past).toHaveLength(0);
+  });
+
+  it("dispatches customized global bindings", () => {
+    const onSave = vi.fn();
+    const hotkeys = applyEditorHotkeyOverrides([
+      { id: "save", key: "k", ctrl: true, alt: false, shift: false },
+    ]);
+    const { unmount } = renderHook(() =>
+      useEditorHotkeys({
+        onSave,
+        onToggleHelp: vi.fn(),
+        onUndo: vi.fn(),
+        onRedo: vi.fn(),
+        hotkeys,
+      }),
+    );
+
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(onSave).toHaveBeenCalledOnce();
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    expect(onSave).toHaveBeenCalledOnce();
+    unmount();
   });
 });

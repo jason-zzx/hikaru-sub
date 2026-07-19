@@ -21,6 +21,8 @@ import {
 } from "../ui/dialog";
 import { RuntimeDependenciesPanel } from "./RuntimeDependenciesPanel";
 import { SettingsProvidersPanel } from "./SettingsProvidersPanel";
+import { SettingsShortcutsPanel } from "./SettingsShortcutsPanel";
+import { findHotkeyConflicts } from "../editor/hotkeys";
 import { SettingsTranscriptionPanel } from "./SettingsTranscriptionPanel";
 import { SettingsTranslationPanel } from "./SettingsTranslationPanel";
 import type {
@@ -64,6 +66,11 @@ const SETTINGS_CATEGORIES: { id: SettingsCategory; label: string; subtitle: stri
     id: "translation",
     label: "翻译",
     subtitle: "管理批处理、提示词与默认目标语言",
+  },
+  {
+    id: "shortcuts",
+    label: "快捷键",
+    subtitle: "管理字幕编辑器快捷键",
   },
 ];
 
@@ -163,7 +170,7 @@ export function SettingsView() {
   };
 
   const handleSave = async () => {
-    if (!settings) return;
+    if (!settings || !shortcutsValid) return;
     setSaving(true);
     setMessage(null);
     try {
@@ -293,6 +300,8 @@ export function SettingsView() {
   const activeMeta =
     SETTINGS_CATEGORIES.find((item) => item.id === activeCategory) ??
     SETTINGS_CATEGORIES[0];
+  const shortcutsValid =
+    !settings || findHotkeyConflicts(settings.editorHotkeys).length === 0;
 
   if (!settings) {
     return (
@@ -313,7 +322,7 @@ export function SettingsView() {
           <Button
             type="button"
             onClick={handleSave}
-            disabled={saving || !dirty || asrSetupRunning}
+            disabled={saving || !dirty || asrSetupRunning || !shortcutsValid}
             className="px-4 py-2"
           >
             {saving ? "保存中…" : "保存"}
@@ -400,6 +409,13 @@ export function SettingsView() {
 
             {activeCategory === "translation" ? (
               <SettingsTranslationPanel settings={settings} update={update} />
+            ) : null}
+
+            {activeCategory === "shortcuts" ? (
+              <SettingsShortcutsPanel
+                overrides={settings.editorHotkeys}
+                onChange={(editorHotkeys) => update("editorHotkeys", editorHotkeys)}
+              />
             ) : null}
           </div>
         </div>

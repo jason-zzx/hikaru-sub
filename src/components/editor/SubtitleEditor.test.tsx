@@ -11,6 +11,7 @@ import {
   type SubtitleEditorHistoryHandle,
 } from "./SubtitleEditor";
 import type { SubtitleCue } from "../../types";
+import { applyEditorHotkeyOverrides } from "./hotkeys";
 
 vi.mock("../../hooks/usePreviewFontNames", () => ({
   usePreviewFontNames: () => ["Arial"],
@@ -276,6 +277,32 @@ describe("SubtitleEditor text history", () => {
     await user.keyboard("{Escape}");
     expect(useProjectStore.getState().cues[0].primaryText).toBe("one");
     expect(useProjectStore.getState().history.future.length).toBeGreaterThan(0);
+  });
+
+  it("uses customized local commit, newline, and discard bindings", async () => {
+    reset([cue("a", "ab"), cue("b", "next")]);
+    const hotkeys = applyEditorHotkeyOverrides([
+      { id: "commit-and-next", key: "Tab", ctrl: false, alt: false, shift: false },
+      { id: "insert-newline", key: "n", ctrl: true, alt: false, shift: false },
+      { id: "discard-draft", key: "d", ctrl: true, alt: false, shift: false },
+    ]);
+    const user = userEvent.setup();
+    render(<SubtitleEditor hotkeys={hotkeys} />);
+    const ta = subtitleTextarea();
+    await user.click(ta);
+    ta.setSelectionRange(2, 2);
+
+    fireEvent.keyDown(ta, { key: "n", ctrlKey: true });
+    expect(useProjectStore.getState().cues[0].primaryText).toBe("ab\n");
+
+    ta.setSelectionRange(0, ta.value.length);
+    fireEvent.select(ta);
+    await user.type(ta, "changed");
+    fireEvent.keyDown(ta, { key: "d", ctrlKey: true });
+    expect(useProjectStore.getState().cues[0].primaryText).toBe("ab");
+
+    fireEvent.keyDown(ta, { key: "Tab" });
+    expect(usePlaybackStore.getState().selectedCueId).toBe("b");
   });
 
   it("blur without edit does not mark dirty or add history", async () => {

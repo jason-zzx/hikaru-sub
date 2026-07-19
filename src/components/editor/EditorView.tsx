@@ -22,8 +22,15 @@ import { EditorToast, type EditorToastMessage, type EditorToastVariant } from ".
 import { Timeline } from "./Timeline";
 import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
 import { StyleManager } from "./StyleManager";
+import {
+  EDITOR_HOTKEYS,
+  applyEditorHotkeyOverrides,
+  formatActionShortcutTitle,
+  type HotkeyDef,
+} from "./hotkeys";
 import { Button } from "../ui/button";
 import {
+  getSettings,
   getVideoInfo,
   loadAssText,
   pathExists,
@@ -78,6 +85,9 @@ export function EditorView() {
   const toggleStyleManager = useUiStore((s) => s.toggleStyleManager);
 
   const [helpOpen, setHelpOpen] = useState(false);
+  const [editorHotkeys, setEditorHotkeys] = useState<readonly HotkeyDef[]>(
+    EDITOR_HOTKEYS,
+  );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<EditorToastMessage | null>(null);
@@ -119,6 +129,20 @@ export function EditorView() {
         : isDirty
           ? { label: "未保存", className: "border-warning/50 text-warning" }
           : { label: "已保存", className: "border-success/50 text-success" };
+
+  useEffect(() => {
+    let cancelled = false;
+    getSettings()
+      .then((settings) => {
+        if (!cancelled) {
+          setEditorHotkeys(applyEditorHotkeyOverrides(settings.editorHotkeys));
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentSubtitlePath) {
@@ -366,6 +390,7 @@ export function EditorView() {
     onUndo: runUndo,
     onRedo: runRedo,
     onNotify: notify,
+    hotkeys: editorHotkeys,
     enabled: !helpOpen,
   });
 
@@ -403,7 +428,7 @@ export function EditorView() {
             onClick={handleSave}
             disabled={saving || !session}
             className="px-3 py-1.5 text-sm hover:border-accent/50"
-            title="保存 (Ctrl+S)"
+            title={formatActionShortcutTitle("保存", "save", editorHotkeys)}
           >
             {saving ? "保存中…" : "保存"}
           </Button>
@@ -531,6 +556,7 @@ export function EditorView() {
               ref={editorRef}
               onNotify={notify}
               onPendingTimeDraftChange={setHasPendingTimeDraft}
+              hotkeys={editorHotkeys}
             />
           </div>
         </div>
@@ -542,6 +568,7 @@ export function EditorView() {
         canRedo={canRedo}
         onUndo={runUndo}
         onRedo={runRedo}
+        hotkeys={editorHotkeys}
       />
 
       {/* 编辑页局部反馈 */}
@@ -550,7 +577,11 @@ export function EditorView() {
       <StyleManager />
 
       {/* 键位速查浮层（? 呼出） */}
-      <HotkeyHelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <HotkeyHelpOverlay
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        hotkeys={editorHotkeys}
+      />
     </div>
   );
 }
