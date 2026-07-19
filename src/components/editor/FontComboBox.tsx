@@ -40,11 +40,13 @@ export function FontComboBox({
   options,
   onCommit,
   placeholder = "字体",
+  disabled = false,
 }: {
   value: string;
   options: string[];
   onCommit: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -60,6 +62,10 @@ export function FontComboBox({
   useEffect(() => {
     if (!open) setDraft(value);
   }, [open, value]);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   const cancel = () => {
     setDraft(value);
@@ -96,7 +102,7 @@ export function FontComboBox({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.nativeEvent.isComposing) return;
+    if (disabled || event.nativeEvent.isComposing) return;
     if (event.key === "Escape") {
       event.preventDefault();
       cancel();
@@ -130,7 +136,10 @@ export function FontComboBox({
       <input
         value={draft}
         placeholder={placeholder}
-        onFocus={() => setOpen(true)}
+        disabled={disabled}
+        onFocus={() => {
+          if (!disabled) setOpen(true);
+        }}
         onBlur={() => {
           window.setTimeout(() => {
             if (!rootRef.current?.contains(document.activeElement)) {
@@ -139,13 +148,14 @@ export function FontComboBox({
           }, 0);
         }}
         onChange={(event) => {
+          if (disabled) return;
           setDraft(event.target.value);
           setOpen(true);
         }}
         onKeyDown={handleKeyDown}
-        className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60"
       />
-      {open && (
+      {open && !disabled && (
         <div className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-lg border border-border bg-surface-raised shadow-lg">
           <div className="max-h-60 overflow-y-auto py-1">
             {fontOptions.map((fontName, index) => {

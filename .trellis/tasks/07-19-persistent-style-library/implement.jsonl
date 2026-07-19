@@ -1,0 +1,11 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership and pre-development checklist for editor UI, ASS domain code, stores, and Tauri wrappers."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Required shadcn-first editor UI patterns, Chinese copy, and existing StyleManager composition constraints."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Defines projectStore document-style ownership, dirty/history behavior, and when not to add a global store."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Keeps AssStyle canonical in src/lib/ass and IPC contracts typed at the Tauri boundary."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Defines the complete Rust-to-tauri.ts command wiring and wrapper ownership."}
+{"file":".trellis/spec/tauri/index.md","reason":"Tauri ownership and pre-development checklist for fixed-path application file I/O."}
+{"file":".trellis/spec/tauri/command-guidelines.md","reason":"Required command registration, wrapper, error, and capability checks."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Requires portable-aware business paths through app_paths instead of raw Tauri path APIs."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Cross-layer contract guide for the React service, invoke bridge, Rust I/O, and failure boundaries."}
+{"file":".trellis/tasks/07-19-persistent-style-library/research/persistence-options.md","reason":"Records the approved separate-file persistence choice and confirmed product interaction decisions."}
+{"file":".trellis/tasks/07-19-persistent-style-library/research/architecture-review.md","reason":"Codebase-backed minimum architecture, data flow, close-guard seam, failure matrix, and test seams."}

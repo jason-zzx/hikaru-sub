@@ -18,6 +18,7 @@ mod preview;
 mod process;
 mod project;
 mod settings;
+mod style_library;
 mod transcode;
 mod update;
 
@@ -41,6 +42,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
             settings::set_settings,
+            style_library::load_style_library,
+            style_library::save_style_library,
             dependencies::probe_runtime_dependencies,
             dependencies::measure_runtime_dependency_storage,
             dependencies::prepare_runtime_dependency,

@@ -304,6 +304,16 @@ export async function loadAssText(assPath: string): Promise<string> {
   return invoke<string>("load_ass_text", { assPath });
 }
 
+/** 读取应用级样式库原始 JSON；`null` 表示文件不存在。 */
+export async function loadStyleLibraryText(): Promise<string | null> {
+  return invoke<string | null>("load_style_library");
+}
+
+/** 写入应用级样式库原始 JSON。 */
+export async function saveStyleLibraryText(content: string): Promise<void> {
+  return invoke("save_style_library", { content });
+}
+
 /** 获取视频信息（分辨率、时长）。 */
 export async function getVideoInfo(videoPath: string): Promise<import("../types").VideoInfo> {
   return invoke<import("../types").VideoInfo>("get_video_info", { videoPath });
