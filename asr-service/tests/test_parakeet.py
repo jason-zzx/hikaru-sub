@@ -153,14 +153,16 @@ class ParakeetDownloadTests(unittest.TestCase):
         with patch(
             "engines.hf_download.snapshot_download_repo",
             return_value="/cache/model",
-        ) as snapshot, patch("os.walk", return_value=[]):
+        ) as snapshot:
             ParakeetEngine.download_model(
                 "nvidia/parakeet-tdt_ctc-0.6b-ja",
                 progress=progress,
             )
 
-        snapshot.assert_called_once_with("nvidia/parakeet-tdt_ctc-0.6b-ja")
-        progress.assert_called_once_with(0, 0)
+        snapshot.assert_called_once_with(
+            "nvidia/parakeet-tdt_ctc-0.6b-ja",
+            progress=progress,
+        )
 
 
 class ParakeetSegmentTests(unittest.TestCase):

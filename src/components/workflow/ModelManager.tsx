@@ -194,9 +194,11 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
 
     const percent =
       progress && progress.total > 0
-        ? Math.min(progress.done / progress.total, 1)
+        ? Math.min(
+            progress.done / progress.total,
+            downloadDiagnostics?.status === "completed" ? 1 : 0.99,
+          )
         : null;
-
     const engineNotInstalled =
       (!!checkError && isAsrEngineNotInstalledError(checkError)) ||
       (!!status && !status.available);
