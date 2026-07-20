@@ -51,25 +51,24 @@ class IsModelDownloadedTests(unittest.TestCase):
 class DownloadModelTests(unittest.TestCase):
     def test_downloads_both_repos_and_reports_progress(self):
         seen_repos = []
-        def fake_snapshot(repo):
+
+        def fake_snapshot(repo, *, progress=None):
             seen_repos.append(repo)
+            if progress is not None:
+                progress(25, 100)
+                progress(100, 100)
             return f"/fake/{repo}"
+
         progress_calls = []
-        def track(done, total):
-            progress_calls.append((done, total))
 
         with patch(
             "engines.hf_download.snapshot_download_repo",
             side_effect=fake_snapshot,
         ):
-            with patch("os.walk", return_value=[("/fake", [], ["f.bin"])]):
-                with patch("os.path.getsize", return_value=100):
-                    Qwen3AsrEngine.download_model(MODEL_ID, progress=track)
+            Qwen3AsrEngine.download_model(MODEL_ID, progress=lambda done, total: progress_calls.append((done, total)))
 
         self.assertEqual(seen_repos, [MODEL_ID, ALIGNER_MODEL_ID])
-        # 至少有一次进度上报，末次 total>0
-        self.assertTrue(len(progress_calls) >= 1)
-        self.assertGreater(progress_calls[-1][1], 0)
+        self.assertEqual(progress_calls[-1], (200, 200))
 
     def test_raises_asr_error_on_download_failure(self):
         with patch(

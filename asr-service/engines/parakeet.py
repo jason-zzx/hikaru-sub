@@ -688,16 +688,7 @@ class ParakeetEngine(AsrEngine):
 
         repo = model or MODEL_ID
         try:
-            path = snapshot_download_repo(repo)
-            if progress is not None:
-                total = 0
-                for root, _, files in os.walk(path):
-                    for file in files:
-                        try:
-                            total += os.path.getsize(os.path.join(root, file))
-                        except OSError:
-                            pass
-                progress(total, total)
+            snapshot_download_repo(repo, progress=progress)
         except Exception as exc:  # noqa: BLE001
             raise AsrError(f"下载 Parakeet 模型失败（{repo}）：{exc}") from exc
 

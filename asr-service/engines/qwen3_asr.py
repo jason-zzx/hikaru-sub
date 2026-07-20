@@ -170,23 +170,21 @@ class Qwen3AsrEngine(AsrEngine):
         asr_repo = model or MODEL_ID
         repos = [asr_repo, ALIGNER_MODEL_ID]
         try:
-            total_done = 0
-            total_total = 0
+            completed_bytes = 0
             for repo in repos:
-                path = snapshot_download_repo(repo)
-                if progress is not None:
-                    repo_size = 0
-                    for root, _, files in os.walk(path):
-                        for file in files:
-                            try:
-                                repo_size += os.path.getsize(os.path.join(root, file))
-                            except OSError:
-                                pass
-                    total_total += repo_size
-                    total_done += repo_size
-                    progress(total_done, total_total)
-            if progress is not None:
-                progress(total_total, total_total)
+                repo_total = 0
+
+                def report_repo(done: int, total: int) -> None:
+                    nonlocal repo_total
+                    repo_total = max(repo_total, total)
+                    if progress is not None:
+                        progress(completed_bytes + done, completed_bytes + total)
+
+                snapshot_download_repo(
+                    repo,
+                    progress=report_repo if progress is not None else None,
+                )
+                completed_bytes += repo_total
         except Exception as exc:  # noqa: BLE001
             raise AsrError(f"下载 Qwen3-ASR 模型失败（{asr_repo} / {ALIGNER_MODEL_ID}）：{exc}") from exc
 
