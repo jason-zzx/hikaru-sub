@@ -58,7 +58,10 @@ class DownloadModelTests(unittest.TestCase):
         def track(done, total):
             progress_calls.append((done, total))
 
-        with patch("huggingface_hub.snapshot_download", side_effect=fake_snapshot):
+        with patch(
+            "engines.hf_download.snapshot_download_repo",
+            side_effect=fake_snapshot,
+        ):
             with patch("os.walk", return_value=[("/fake", [], ["f.bin"])]):
                 with patch("os.path.getsize", return_value=100):
                     Qwen3AsrEngine.download_model(MODEL_ID, progress=track)
@@ -69,7 +72,10 @@ class DownloadModelTests(unittest.TestCase):
         self.assertGreater(progress_calls[-1][1], 0)
 
     def test_raises_asr_error_on_download_failure(self):
-        with patch("huggingface_hub.snapshot_download", side_effect=RuntimeError("network")):
+        with patch(
+            "engines.hf_download.snapshot_download_repo",
+            side_effect=RuntimeError("network"),
+        ):
             with self.assertRaises(AsrError):
                 Qwen3AsrEngine.download_model(MODEL_ID)
 

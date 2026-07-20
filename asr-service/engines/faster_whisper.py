@@ -7,11 +7,11 @@
 from __future__ import annotations
 
 import os
-import threading
 from pathlib import Path
 from typing import Callable, Iterator, Optional
 
 from .base import AsrEngine, AsrError, AsrSegment, Transcription
+from .hf_download import snapshot_download_repo
 
 # faster-whisper 模型默认下载所需的文件（与官方 download_model 保持一致）。
 _ALLOW_PATTERNS = [
@@ -54,46 +54,6 @@ def _model_repo(model: str) -> str:
     if "/" in model:
         return model
     return f"Systran/faster-whisper-{model}"
-
-
-def _make_progress_tqdm(report: Callable[[int, int], None]):
-    """构造聚合所有文件下载字节数的 tqdm 子类，向 report(done, total) 上报。"""
-    from tqdm.auto import tqdm as _base_tqdm
-
-    lock = threading.Lock()
-    bars: dict = {}
-
-    def _emit() -> None:
-        total = sum(b["total"] for b in bars.values())
-        done = sum(b["n"] for b in bars.values())
-        report(done, total)
-
-    class _ProgressTqdm(_base_tqdm):  # type: ignore[misc]
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            with lock:
-                bars[id(self)] = {"total": self.total or 0, "n": self.n or 0}
-                _emit()
-
-        def update(self, n=1):
-            ret = super().update(n)
-            with lock:
-                bar = bars.get(id(self))
-                if bar is not None:
-                    bar["n"] = self.n
-                    bar["total"] = self.total or bar["total"]
-                _emit()
-            return ret
-
-        def close(self):
-            with lock:
-                bar = bars.get(id(self))
-                if bar is not None and self.total:
-                    bar["n"] = self.total
-                _emit()
-            return super().close()
-
-    return _ProgressTqdm
 
 
 def _resolve_compute_type(device: str, compute_type: Optional[str]) -> str:
@@ -168,17 +128,13 @@ class FasterWhisperEngine(AsrEngine):
         """从 HuggingFace 下载模型到本地缓存，progress(done, total) 上报字节进度。"""
         if os.path.isdir(model):
             return
-        try:
-            import huggingface_hub
-        except ImportError as exc:
-            raise AsrError("缺少 huggingface_hub，无法下载模型") from exc
-
         repo_id = _model_repo(model)
-        kwargs: dict = {"allow_patterns": _ALLOW_PATTERNS}
-        if progress is not None:
-            kwargs["tqdm_class"] = _make_progress_tqdm(progress)
         try:
-            huggingface_hub.snapshot_download(repo_id, **kwargs)
+            snapshot_download_repo(
+                repo_id,
+                progress=progress,
+                allow_patterns=_ALLOW_PATTERNS,
+            )
         except Exception as exc:  # noqa: BLE001 网络/鉴权/磁盘等多种失败
             raise AsrError(f"下载模型失败（{repo_id}）：{exc}") from exc
 

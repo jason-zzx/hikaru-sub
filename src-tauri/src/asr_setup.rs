@@ -28,6 +28,8 @@ pub enum AsrSetupProfile {
     ParakeetCuda,
     Qwen3Cpu,
     Qwen3Cuda,
+    ReazonspeechCpu,
+    ReazonspeechCuda,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -163,6 +165,9 @@ fn requirements_for_profile(profile: AsrSetupProfile) -> &'static [&'static str]
         AsrSetupProfile::ParakeetCuda => &["requirements.txt", "requirements-parakeet-cuda.txt"],
         AsrSetupProfile::Qwen3Cpu => &["requirements.txt", "requirements-qwen3-cpu.txt"],
         AsrSetupProfile::Qwen3Cuda => &["requirements.txt", "requirements-qwen3-cuda.txt"],
+        AsrSetupProfile::ReazonspeechCpu | AsrSetupProfile::ReazonspeechCuda => {
+            &["requirements.txt", "requirements-reazonspeech.txt"]
+        }
     }
 }
 
@@ -173,6 +178,9 @@ fn validate_engine_for_profile(profile: AsrSetupProfile, engine: &str) -> Result
         }
         AsrSetupProfile::ParakeetCpu | AsrSetupProfile::ParakeetCuda => engine == "parakeet",
         AsrSetupProfile::Qwen3Cpu | AsrSetupProfile::Qwen3Cuda => engine == "qwen3-asr",
+        AsrSetupProfile::ReazonspeechCpu | AsrSetupProfile::ReazonspeechCuda => {
+            engine == "reazonspeech-nemo"
+        }
     };
     if compatible {
         Ok(())
@@ -378,7 +386,9 @@ fn has_nvidia_gpu() -> bool {
 fn is_cuda_profile(profile: AsrSetupProfile) -> bool {
     matches!(
         profile,
-        AsrSetupProfile::ParakeetCuda | AsrSetupProfile::Qwen3Cuda
+        AsrSetupProfile::ParakeetCuda
+            | AsrSetupProfile::Qwen3Cuda
+            | AsrSetupProfile::ReazonspeechCuda
     )
 }
 
@@ -407,15 +417,16 @@ fn torch_index_for_requirement(
     setup_profile: AsrSetupProfile,
     requirement: &str,
 ) -> Option<String> {
-    if !requirement.contains("parakeet") && !requirement.contains("qwen3") {
+    if !requirement.contains("parakeet")
+        && !requirement.contains("qwen3")
+        && !requirement.contains("reazonspeech")
+    {
         return None;
     }
-    if is_cuda_profile(setup_profile) || requirement.contains("cuda") {
+    if is_cuda_profile(setup_profile) {
         profile.pytorch_cuda_index_url.clone()
-    } else if requirement.contains("cpu") {
-        profile.pytorch_cpu_index_url.clone()
     } else {
-        None
+        profile.pytorch_cpu_index_url.clone()
     }
 }
 
@@ -424,15 +435,16 @@ fn torch_find_links_for_requirement(
     setup_profile: AsrSetupProfile,
     requirement: &str,
 ) -> Option<String> {
-    if !requirement.contains("parakeet") && !requirement.contains("qwen3") {
+    if !requirement.contains("parakeet")
+        && !requirement.contains("qwen3")
+        && !requirement.contains("reazonspeech")
+    {
         return None;
     }
-    if is_cuda_profile(setup_profile) || requirement.contains("cuda") {
+    if is_cuda_profile(setup_profile) {
         profile.pytorch_cuda_find_links_url.clone()
-    } else if requirement.contains("cpu") {
-        profile.pytorch_cpu_find_links_url.clone()
     } else {
-        None
+        profile.pytorch_cpu_find_links_url.clone()
     }
 }
 
@@ -997,6 +1009,14 @@ mod tests {
             requirements_for_profile(AsrSetupProfile::Qwen3Cuda),
             ["requirements.txt", "requirements-qwen3-cuda.txt"]
         );
+        assert_eq!(
+            requirements_for_profile(AsrSetupProfile::ReazonspeechCpu),
+            ["requirements.txt", "requirements-reazonspeech.txt"]
+        );
+        assert_eq!(
+            requirements_for_profile(AsrSetupProfile::ReazonspeechCuda),
+            ["requirements.txt", "requirements-reazonspeech.txt"]
+        );
     }
 
     #[test]
@@ -1008,6 +1028,12 @@ mod tests {
         assert!(validate_engine_for_profile(AsrSetupProfile::Default, "parakeet").is_err());
         assert!(validate_engine_for_profile(AsrSetupProfile::ParakeetCuda, "parakeet").is_ok());
         assert!(validate_engine_for_profile(AsrSetupProfile::Qwen3Cpu, "qwen3-asr").is_ok());
+        assert!(validate_engine_for_profile(
+            AsrSetupProfile::ReazonspeechCuda,
+            "reazonspeech-nemo"
+        )
+        .is_ok());
+        assert!(validate_engine_for_profile(AsrSetupProfile::ReazonspeechCpu, "parakeet").is_err());
     }
 
     #[test]
@@ -1267,8 +1293,8 @@ mod tests {
 
         let args = pip_install_requirement_args(
             &profile,
-            AsrSetupProfile::ParakeetCpu,
-            "requirements-parakeet-cpu.txt",
+            AsrSetupProfile::ReazonspeechCpu,
+            "requirements-reazonspeech.txt",
         );
 
         assert!(args
@@ -1280,6 +1306,15 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|pair| pair == ["--extra-index-url", "https://fallback.example/simple"]));
+
+        let legacy_args = pip_install_requirement_args(
+            &profile,
+            AsrSetupProfile::ParakeetCpu,
+            "requirements-parakeet-cpu.txt",
+        );
+        assert!(legacy_args
+            .windows(2)
+            .any(|pair| pair == ["--index-url", "https://torch.example/cpu"]));
     }
 
     #[test]
@@ -1300,8 +1335,8 @@ mod tests {
 
         let args = pip_install_requirement_args(
             &profile,
-            AsrSetupProfile::Qwen3Cuda,
-            "requirements-qwen3-cuda.txt",
+            AsrSetupProfile::ReazonspeechCuda,
+            "requirements-reazonspeech.txt",
         );
 
         assert!(args
@@ -1313,5 +1348,14 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|pair| pair == ["--extra-index-url", "https://fallback.example/simple"]));
+
+        let legacy_args = pip_install_requirement_args(
+            &profile,
+            AsrSetupProfile::Qwen3Cuda,
+            "requirements-qwen3-cuda.txt",
+        );
+        assert!(legacy_args
+            .windows(2)
+            .any(|pair| pair == ["--find-links", "https://torch.example/cu126/"]));
     }
 }

@@ -1,0 +1,6 @@
+# Shared NeMo ASR core for Parakeet / ReazonSpeech (no PyTorch).
+# Install a device-specific entry (parakeet-*/reazonspeech-*) after requirements.txt.
+
+nemo_toolkit[asr]==2.7.3
+fsspec==2024.12.0
+huggingface_hub>=0.23.0

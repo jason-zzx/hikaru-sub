@@ -1,0 +1,13 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check every engine/profile/model string across React, Tauri, development sidecar, and packaged sidecar."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that existing registries/jobs/profiles are reused and both sidecar trees stay synchronized."}
+{"file":".trellis/spec/asr/index.md","reason":"Verify ASR inference remains owned by the Python sidecar."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Review engine availability, cache readiness, native VAD behavior, and registry integration."}
+{"file":".trellis/spec/asr/api-and-jobs.md","reason":"Review truthful blocking progress, deferred cancellation, model download, and snapshot compatibility."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Require focused and full unittest coverage plus honest optional-engine reporting."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review Chinese copy, existing UI primitive reuse, and hidden no-op VAD controls."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check setup profile and ASR contract strings remain aligned without casts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Require relevant pnpm tests and production build for the workflow changes."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Review managed dependency/model paths and official/China source compatibility."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Review sidecar lifecycle boundary and absence of inference logic in Rust."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Require cargo tests and safe structured pip invocation behavior."}
+{"file":".trellis/tasks/07-20-extend-asr-reazonspeech/research/asr-model-and-reazonspeech.md","reason":"Validate implementation claims against upstream model, dependency, timestamp, and license evidence."}

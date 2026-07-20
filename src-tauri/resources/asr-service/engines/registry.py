@@ -9,12 +9,14 @@ from .faster_whisper import FasterWhisperEngine
 from .kotoba_faster_whisper import KotobaFasterWhisperEngine
 from .parakeet import ParakeetEngine
 from .qwen3_asr import Qwen3AsrEngine
+from .reazonspeech_nemo import ReazonSpeechNemoEngine
 
 _REGISTRY: Dict[str, Type[AsrEngine]] = {
     FasterWhisperEngine.name: FasterWhisperEngine,
     KotobaFasterWhisperEngine.name: KotobaFasterWhisperEngine,
     ParakeetEngine.name: ParakeetEngine,
     Qwen3AsrEngine.name: Qwen3AsrEngine,
+    ReazonSpeechNemoEngine.name: ReazonSpeechNemoEngine,
 }
 
 

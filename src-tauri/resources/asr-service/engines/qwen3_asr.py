@@ -165,10 +165,7 @@ class Qwen3AsrEngine(AsrEngine):
         *,
         progress: Optional[Callable[[int, int], None]] = None,
     ) -> None:
-        try:
-            import huggingface_hub
-        except ImportError as exc:
-            raise AsrError("缺少 huggingface_hub，无法下载 Qwen3-ASR 模型") from exc
+        from .hf_download import snapshot_download_repo
 
         asr_repo = model or MODEL_ID
         repos = [asr_repo, ALIGNER_MODEL_ID]
@@ -176,7 +173,7 @@ class Qwen3AsrEngine(AsrEngine):
             total_done = 0
             total_total = 0
             for repo in repos:
-                path = huggingface_hub.snapshot_download(repo)
+                path = snapshot_download_repo(repo)
                 if progress is not None:
                     repo_size = 0
                     for root, _, files in os.walk(path):

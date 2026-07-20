@@ -6,6 +6,7 @@ import type { AppSettings } from "../../types";
 import {
   ASR_ENGINE_OPTIONS,
   KOTOBA_FASTER_WHISPER_DESCRIPTION,
+  REAZONSPEECH_NEMO_DESCRIPTION,
   asrModelOptions,
   defaultAsrModel,
 } from "../../constants/asr";
@@ -61,6 +62,12 @@ export function SettingsTranscriptionPanel({
         {settings.asrEngine === "parakeet" && (
           <p className="mt-1 text-xs text-text-muted">
             Parakeet 使用 NVIDIA NeMo，可选依赖需单独安装；当前集成针对日语模型。
+          </p>
+        )}
+        {settings.asrEngine === "reazonspeech-nemo" && (
+          <p className="mt-1 text-xs text-text-muted">
+            ReazonSpeech 复用 NeMo 可选依赖（独立 CPU/CUDA profile，不含 torchaudio
+            直接依赖）。CPU 较慢，推荐 CUDA。{REAZONSPEECH_NEMO_DESCRIPTION}。
           </p>
         )}
         {settings.asrEngine === "kotoba-faster-whisper" && (

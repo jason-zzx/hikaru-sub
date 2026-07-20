@@ -147,6 +147,22 @@ class _CpuOnlyTorch:
         cuda = None
 
 
+class ParakeetDownloadTests(unittest.TestCase):
+    def test_download_uses_shared_hf_helper(self):
+        progress = MagicMock()
+        with patch(
+            "engines.hf_download.snapshot_download_repo",
+            return_value="/cache/model",
+        ) as snapshot, patch("os.walk", return_value=[]):
+            ParakeetEngine.download_model(
+                "nvidia/parakeet-tdt_ctc-0.6b-ja",
+                progress=progress,
+            )
+
+        snapshot.assert_called_once_with("nvidia/parakeet-tdt_ctc-0.6b-ja")
+        progress.assert_called_once_with(0, 0)
+
+
 class ParakeetSegmentTests(unittest.TestCase):
     def test_plans_long_audio_into_overlapping_chunks(self):
         chunks = plan_audio_chunks(125_000, chunk_ms=60_000, overlap_ms=2_000)

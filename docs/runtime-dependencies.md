@@ -114,6 +114,10 @@ The in-app setup flow copies or refreshes the clean ASR service template, create
 | `parakeet-cuda` | Parakeet | Requires a detected NVIDIA GPU |
 | `qwen3-cpu` | Qwen3-ASR | Installs the CPU Qwen/PyTorch requirements |
 | `qwen3-cuda` | Qwen3-ASR | Requires a detected NVIDIA GPU |
+| `reazonspeech-cpu` | ReazonSpeech NeMo | CPU torch + shared NeMo core (no torchaudio direct dep) |
+| `reazonspeech-cuda` | ReazonSpeech NeMo | CUDA torch + shared NeMo core |
+
+Both ReazonSpeech profiles install `requirements-reazonspeech.txt`; the profile selects the CPU or CUDA PyTorch wheel source.
 
 Model weights are checked and downloaded after engine setup. Kotoba's model cache must include `preprocessor_config.json`; that requirement does not apply to ordinary faster-whisper models.
 
@@ -130,6 +134,8 @@ Optional engines require an explicit profile:
 ./scripts/setup-asr.sh parakeet-cuda
 ./scripts/setup-asr.sh qwen3-cpu
 ./scripts/setup-asr.sh qwen3-cuda
+./scripts/setup-asr.sh reazonspeech-cpu
+./scripts/setup-asr.sh reazonspeech-cuda
 ```
 
 Use `./scripts/setup-asr.sh --recreate` when the development virtual environment must be rebuilt. See [ASR Service](../asr-service/README.md) for engine behavior and HTTP API details.

@@ -684,14 +684,11 @@ class ParakeetEngine(AsrEngine):
         *,
         progress: Optional[Callable[[int, int], None]] = None,
     ) -> None:
-        try:
-            import huggingface_hub
-        except ImportError as exc:
-            raise AsrError("缺少 huggingface_hub，无法下载 Parakeet 模型") from exc
+        from .hf_download import snapshot_download_repo
 
         repo = model or MODEL_ID
         try:
-            path = huggingface_hub.snapshot_download(repo)
+            path = snapshot_download_repo(repo)
             if progress is not None:
                 total = 0
                 for root, _, files in os.walk(path):
