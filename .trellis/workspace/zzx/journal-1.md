@@ -338,3 +338,36 @@ Implemented a persistent application-level ASS style library with installed/port
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: 扩展 ASR 模型与 ReazonSpeech
+
+**Date**: 2026-07-20
+**Task**: 扩展 ASR 模型与 ReazonSpeech
+**Branch**: `dev`
+
+### Summary
+
+为 faster-whisper 增加 large-v3-turbo，并新增 ReazonSpeech NeMo v2 引擎；接入 CPU/CUDA 依赖、Windows HF 下载兜底、前端工作流与发布资源，完成 CUDA 真实模型冒烟和长音频内存优化。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fbfab4c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
