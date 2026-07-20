@@ -186,7 +186,9 @@ export type AsrSetupProfile =
   | "parakeet-cpu"
   | "parakeet-cuda"
   | "qwen3-cpu"
-  | "qwen3-cuda";
+  | "qwen3-cuda"
+  | "reazonspeech-cpu"
+  | "reazonspeech-cuda";
 
 export type AsrSetupStatus =
   | "pending"

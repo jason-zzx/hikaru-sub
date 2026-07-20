@@ -43,6 +43,29 @@ describe("resolveAsrSetupProfile", () => {
       }),
     ).toBe("qwen3-cpu");
   });
+
+  it("maps ReazonSpeech devices and auto GPU probe", () => {
+    expect(
+      resolveAsrSetupProfile("reazonspeech-nemo", "cpu", {
+        hasNvidiaGpu: true,
+      }),
+    ).toBe("reazonspeech-cpu");
+    expect(
+      resolveAsrSetupProfile("reazonspeech-nemo", "cuda", {
+        hasNvidiaGpu: false,
+      }),
+    ).toBe("reazonspeech-cuda");
+    expect(
+      resolveAsrSetupProfile("reazonspeech-nemo", "auto", {
+        hasNvidiaGpu: true,
+      }),
+    ).toBe("reazonspeech-cuda");
+    expect(
+      resolveAsrSetupProfile("reazonspeech-nemo", "auto", {
+        hasNvidiaGpu: false,
+      }),
+    ).toBe("reazonspeech-cpu");
+  });
 });
 
 describe("ASR_SETUP_PROFILE_LABEL", () => {
@@ -50,5 +73,10 @@ describe("ASR_SETUP_PROFILE_LABEL", () => {
     expect(ASR_SETUP_PROFILE_LABEL.default).toBe(
       "faster-whisper / kotoba-faster-whisper 依赖",
     );
+  });
+
+  it("names ReazonSpeech profiles", () => {
+    expect(ASR_SETUP_PROFILE_LABEL["reazonspeech-cpu"]).toBe("ReazonSpeech CPU 依赖");
+    expect(ASR_SETUP_PROFILE_LABEL["reazonspeech-cuda"]).toBe("ReazonSpeech CUDA 依赖");
   });
 });

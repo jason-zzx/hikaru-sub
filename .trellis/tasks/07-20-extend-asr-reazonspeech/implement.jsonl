@@ -1,0 +1,15 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Map the React, Tauri setup, and Python sidecar engine/model flow without contract drift."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing engine registry, setup profiles, model jobs, and dual sidecar tree intentionally."}
+{"file":".trellis/spec/asr/index.md","reason":"Apply the ASR sidecar ownership boundary and pre-development checklist."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Implement and register the optional ReazonSpeech engine with honest availability and model cache behavior."}
+{"file":".trellis/spec/asr/api-and-jobs.md","reason":"Preserve model download and transcription job contracts, progress, cancellation, and camelCase snapshots."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Add focused unittest coverage and report optional real-model validation accurately."}
+{"file":".trellis/spec/frontend/index.md","reason":"Keep UI/settings behavior in React and use existing typed services and components."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Use existing controls, Simplified Chinese copy, and avoid invalid ReazonSpeech VAD UI."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Keep ASR setup profile strings aligned across TypeScript and Rust without local casts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Follow pnpm test/build and minimal-diff requirements for the user-visible workflow."}
+{"file":".trellis/spec/tauri/index.md","reason":"Apply Tauri ownership and setup/runtime dependency conventions."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Keep optional dependencies and model weights in managed install/cache paths with existing source policy."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Preserve the Tauri-to-sidecar lifecycle and keep inference in Python."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Validate profile wiring, structured process args, and full Rust tests."}
+{"file":".trellis/tasks/07-20-extend-asr-reazonspeech/research/asr-model-and-reazonspeech.md","reason":"Use verified upstream model IDs, NeMo compatibility, timestamp API, licensing, and native long-form tradeoffs."}

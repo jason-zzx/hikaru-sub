@@ -33,8 +33,9 @@ sources for that inventory.
 | [FastAPI](https://github.com/fastapi/fastapi), [Pydantic](https://github.com/pydantic/pydantic), [Hugging Face Hub](https://github.com/huggingface/huggingface_hub) | MIT, MIT, Apache-2.0 respectively | Sidecar and model-download dependencies. |
 | [Uvicorn](https://github.com/Kludex/uvicorn) | BSD-3-Clause | Sidecar HTTP server. |
 | [PyAV](https://github.com/PyAV-Org/PyAV) | BSD-3-Clause for PyAV; wheel-bundled native libraries retain their own licenses | A wheel can contain FFmpeg libraries. Before redistributing a Python environment, inspect the exact wheel and include the notices and source materials for its bundled native libraries. |
-| [NVIDIA NeMo](https://github.com/NVIDIA-NeMo/NeMo) | Apache-2.0 | Optional Parakeet profile. |
-| [PyTorch](https://github.com/pytorch/pytorch) and [torchaudio](https://github.com/pytorch/audio) | BSD-style | Optional ASR profiles. CUDA-enabled wheels also include NVIDIA components subject to NVIDIA's separate redistribution terms and notices. |
+| [NVIDIA NeMo](https://github.com/NVIDIA-NeMo/NeMo) | Apache-2.0 | Optional Parakeet and ReazonSpeech profiles share this NeMo ASR core. |
+| [PyTorch](https://github.com/pytorch/pytorch) and [torchaudio](https://github.com/pytorch/audio) | BSD-style | Optional ASR profiles. Parakeet/Qwen3 may install torchaudio; ReazonSpeech profiles declare torch only (NeMo extras may still pull transitive deps). CUDA-enabled wheels also include NVIDIA components subject to NVIDIA's separate redistribution terms and notices. |
+| [ReazonSpeech](https://github.com/reazon-research/reazonspeech) NeMo ASR decode algorithm | Apache-2.0 | Local timestamp/segment adapter adapted from `pkg/nemo-asr` (`decode.py` / `transcribe.py`); not installed as the GitHub helper package. |
 | [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) and [Transformers](https://github.com/huggingface/transformers) | Apache-2.0 | Optional Qwen3-ASR profile. Audit the resolved transitive dependencies for the exact package set before distributing an ASR environment. |
 | [soynlp](https://github.com/lovit/soynlp) | The exact package artifact must be verified before redistribution | The Qwen3-ASR dependency graph can install this package. Its published package metadata and upstream license file have reported different GPL-family identifiers; do not bundle it until the exact artifact's license is resolved and its required materials are included. |
 | [Silero VAD](https://github.com/snakers4/silero-vad) | MIT | Downloaded by `torch.hub` only when the Parakeet or Qwen3 VAD path is used. |
@@ -48,9 +49,11 @@ redistribution.
 | Model repository | License / obligation |
 | --- | --- |
 | [Systran/faster-whisper-tiny](https://huggingface.co/Systran/faster-whisper-tiny), `base`, `small`, `medium`, `large-v2`, and `large-v3` | MIT |
+| [mobiuslabsgmbh/faster-whisper-large-v3-turbo](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo) (short name `large-v3-turbo`) | MIT |
 | [kotoba-tech/kotoba-whisper-v2.0-faster](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster) | MIT |
 | [nvidia/parakeet-tdt_ctc-0.6b-ja](https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja) | CC-BY-4.0; preserve the attribution, license link, and change indication required by that license when redistributing the model or an adaptation. |
 | [Qwen/Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) and [Qwen/Qwen3-ForcedAligner-0.6B](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B) | Apache-2.0 |
+| [reazon-research/reazonspeech-nemo-v2](https://huggingface.co/reazon-research/reazonspeech-nemo-v2) | Apache-2.0 |
 
 ## Release-maintainer checklist
 

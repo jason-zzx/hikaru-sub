@@ -1,0 +1,8 @@
+# ReazonSpeech optional deps: PyTorch + shared NeMo (no direct torchaudio dependency).
+# The setup profile selects the CPU or CUDA PyTorch wheel source.
+# Recommended: ./scripts/setup-asr.sh reazonspeech-cpu or reazonspeech-cuda
+# Install requirements.txt first.
+
+torch>=2.6.0
+
+-r requirements-nemo.txt

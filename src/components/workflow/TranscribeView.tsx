@@ -19,6 +19,7 @@ import {
   KOTOBA_FASTER_WHISPER_DESCRIPTION,
   asrModelOptions,
   defaultAsrModel,
+  REAZONSPEECH_NEMO_DESCRIPTION,
 } from "../../constants/asr";
 import {
   cancelAsr,
@@ -628,6 +629,11 @@ export function TranscribeView() {
                 Qwen3-ASR 自带 ForcedAligner 产出字级时间戳，文本质量与时间轴精度优于 Parakeet；长音频自动分块转录。
               </p>
             )}
+            {engine === "reazonspeech-nemo" && (
+              <p className="mt-1 text-xs text-text-muted">
+                {REAZONSPEECH_NEMO_DESCRIPTION}。不使用固定分块或 VAD；推理期间进度不伪造，取消不是即时中断。
+              </p>
+            )}
           </Labeled>
           <Labeled label="设备">
             <Select
@@ -670,6 +676,7 @@ export function TranscribeView() {
           </Button>
         </div>
 
+        {engine !== "reazonspeech-nemo" && (
         <div className="rounded-lg border border-border bg-surface px-4 py-3">
           <label className="flex items-center gap-2">
             <input
@@ -785,6 +792,7 @@ export function TranscribeView() {
             </div>
           )}
         </div>
+        )}
 
         <ModelManager
           ref={modelManagerRef}

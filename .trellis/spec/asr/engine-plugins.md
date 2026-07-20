@@ -19,8 +19,9 @@ Register in `_REGISTRY` inside `engines/registry.py`. `list_engines()` returns `
 | `kotoba-faster-whisper` | `kotoba_faster_whisper.py` | Reuses faster-whisper runtime; needs `faster-whisper>=1.1.1`; single model id `kotoba-tech/kotoba-whisper-v2.0-faster` |
 | `parakeet` | `parakeet.py` | Optional / large — install only when explicitly requested |
 | `qwen3-asr` | `qwen3_asr.py` | Optional / large — same |
+| `reazonspeech-nemo` | `reazonspeech_nemo.py` | Optional NeMo whole-audio engine; CPU/CUDA profiles |
 
-Setup scripts distinguish `parakeet-cpu|parakeet-cuda|qwen3-cpu|qwen3-cuda` from the default faster-whisper install (see `/AGENTS.md`).
+Setup scripts distinguish `parakeet-cpu|parakeet-cuda|qwen3-cpu|qwen3-cuda|reazonspeech-cpu|reazonspeech-cuda` from the default faster-whisper install (see `/AGENTS.md`). ReazonSpeech's CPU/CUDA profiles share `requirements-reazonspeech.txt`; the profile selects the PyTorch wheel source.
 
 ## Kotoba-Specific Cache Rule
 
@@ -29,6 +30,10 @@ Setup scripts distinguish `parakeet-cpu|parakeet-cuda|qwen3-cpu|qwen3-cuda` from
 ## VAD
 
 Engines accept `use_vad` + `vad_config`. Product expectation: VAD load/detect failure should degrade rather than hard-fail the whole transcription when fallback is implemented. VAD config is session-scoped in the app — sidecar should not invent persistence.
+
+## Whole-Audio Buffers
+
+Native whole-audio engines must keep PCM in a compact buffer (`bytes` / `array`) and convert it directly to the inference tensor. Do not materialize the full recording as `list[float]`: Python object overhead scales to multiple GiB per hour. Perform normalization and padding in the tensor path, and keep a unit test asserting that the WAV reader returns a compact representation.
 
 ## Anti-Patterns
 
