@@ -9,9 +9,17 @@ interface ClipStoreState {
   busy: boolean;
   /** 本次切片完成后是否切换为工作视频（随 startJob 写入） */
   useAsWorkingVideo: boolean;
+  /** 确认放弃后，在实际切换工作视频时清理此视频的恢复文件 */
+  discardRecoveryVideoPath: string | null;
   /** 完成提示（App 层写入，ImportView 展示） */
   successMessage: string | null;
-  startJob: (id: string, opts?: { useAsWorkingVideo?: boolean }) => void;
+  startJob: (
+    id: string,
+    opts?: {
+      useAsWorkingVideo?: boolean;
+      discardRecoveryVideoPath?: string | null;
+    },
+  ) => void;
   applySnapshot: (snap: ClipSnapshot) => void;
   setError: (error: string | null) => void;
   setSuccessMessage: (message: string | null) => void;
@@ -28,6 +36,7 @@ export const useClipStore = create<ClipStoreState>((set) => ({
   completedPath: null,
   busy: false,
   useAsWorkingVideo: true,
+  discardRecoveryVideoPath: null,
   successMessage: null,
   startJob: (id, opts) =>
     set({
@@ -38,6 +47,7 @@ export const useClipStore = create<ClipStoreState>((set) => ({
       snapshot: null,
       successMessage: null,
       useAsWorkingVideo: opts?.useAsWorkingVideo ?? true,
+      discardRecoveryVideoPath: opts?.discardRecoveryVideoPath ?? null,
     }),
   applySnapshot: (snap) =>
     set((state) => ({
@@ -50,13 +60,20 @@ export const useClipStore = create<ClipStoreState>((set) => ({
   setError: (error) => set({ error }),
   setSuccessMessage: (message) => set({ successMessage: message }),
   finishJob: () =>
-    set({ jobId: null, busy: false, completedPath: null, snapshot: null }),
+    set({
+      jobId: null,
+      busy: false,
+      completedPath: null,
+      snapshot: null,
+      discardRecoveryVideoPath: null,
+    }),
   resetForStart: () =>
     set({
       error: null,
       completedPath: null,
       snapshot: null,
       successMessage: null,
+      discardRecoveryVideoPath: null,
     }),
   clearAfterCancel: () =>
     set({
@@ -66,6 +83,7 @@ export const useClipStore = create<ClipStoreState>((set) => ({
       completedPath: null,
       successMessage: null,
       error: null,
+      discardRecoveryVideoPath: null,
     }),
   clearSuccessMessage: () => set({ successMessage: null }),
 }));

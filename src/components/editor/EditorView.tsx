@@ -9,8 +9,11 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { selectCueAndSeek } from "../../services/editorActions";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
-import { clearSubtitleRecoveryIfClean } from "../../services/subtitleRecovery";
-import { useProjectStore } from "../../stores/projectStore";
+import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
+import {
+  captureProjectDocumentGuard,
+  useProjectStore,
+} from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useUiStore } from "../../stores/uiStore";
 import { VideoPlayer } from "../player/VideoPlayer";
@@ -240,11 +243,6 @@ export function EditorView() {
       setActiveSubtitle(saveKind, savePath);
       setSubtitleFileExists(true);
       markSaved(snap.token);
-      try {
-        await clearSubtitleRecoveryIfClean(session.videoPath);
-      } catch (err) {
-        notify("error", `字幕已保存，但清理恢复文件失败：${String(err)}`);
-      }
       setSaveError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -261,20 +259,37 @@ export function EditorView() {
     try {
       const subtitlePath = await pickSubtitleFile();
       if (!subtitlePath) return;
-      if (!(await confirmDiscardUnsavedChanges())) return;
+      const discardDecision = await confirmDiscardUnsavedChanges();
+      if (!discardDecision.proceed) return;
+      const documentGuard = captureProjectDocumentGuard(session.videoPath);
 
       const [subtitleText, videoInfo] = await Promise.all([
         loadAssText(subtitlePath),
         getVideoInfo(session.videoPath),
       ]);
+      if (!documentGuard.unchanged()) {
+        notify("info", "当前字幕已发生变化，已取消载入字幕文件");
+        return;
+      }
       const doc = parseExternalSubtitleDocument({
         path: subtitlePath,
         text: subtitleText,
         playRes: { width: videoInfo.width, height: videoInfo.height },
       });
 
-      loadAssDocument(doc, { kind: "translated", path: null });
-      markDirty();
+      const applied = await withDiscardedSubtitleRecovery(
+        discardDecision.recoveryVideoPath,
+        () => {
+          if (!documentGuard.unchanged()) return false;
+          loadAssDocument(doc, { kind: "translated", path: null });
+          markDirty();
+          return true;
+        },
+      );
+      if (!applied) {
+        notify("info", "当前字幕已发生变化，已取消载入字幕文件");
+        return;
+      }
       setSubtitleFileExists(false);
       setSaveError(null);
       if (doc.cues.length > 0) {

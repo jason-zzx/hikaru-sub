@@ -3,6 +3,7 @@ import { getVideoClipProgress, prepareVideoSession } from "../services/tauri";
 import { useClipStore } from "../stores/clipStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useTaskStore } from "../stores/taskStore";
+import { withDiscardedSubtitleRecovery } from "../services/subtitleRecovery";
 
 const POLL_INTERVAL_MS = 700;
 
@@ -52,7 +53,17 @@ export function useClipJobPoller() {
         const next = await prepareVideoSession(outputPath);
         // 取消或新任务已开始：不要切换会话 / 不要误报成功
         if (!stillCurrent()) return;
-        setSession(next); // clears cues — do NOT loadAssDocument
+        const discardRecoveryVideoPath =
+          useClipStore.getState().discardRecoveryVideoPath;
+        const switched = await withDiscardedSubtitleRecovery(
+          discardRecoveryVideoPath,
+          () => {
+            if (!stillCurrent()) return false;
+            setSession(next); // clears cues — do NOT loadAssDocument
+            return true;
+          },
+        );
+        if (!switched || !stillCurrent()) return;
         setSuccessMessage("切片完成，已设为当前工作视频");
         finishJob();
       } catch (e) {
