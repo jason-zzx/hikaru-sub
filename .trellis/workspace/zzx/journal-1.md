@@ -371,3 +371,36 @@ Implemented a persistent application-level ASS style library with installed/port
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: 编辑页字幕查找替换与质检
+
+**Date**: 2026-07-22
+**Task**: 编辑页字幕查找替换与质检
+**Branch**: `dev`
+
+### Summary
+
+实现物理字幕行查找、替换、筛选和前端质检，补充重叠高亮、播放头同步与不挤压列表的悬浮面板；全部替换保持单次历史操作，并完成全量测试、构建和文档同步。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5e5823a` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
