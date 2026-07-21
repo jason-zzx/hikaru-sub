@@ -1,5 +1,5 @@
-use tauri::{AppHandle, Manager};
 use std::path::Path;
+use tauri::{AppHandle, Manager};
 
 #[tauri::command]
 pub fn allow_asset_path(app: AppHandle, path: String) -> Result<(), String> {

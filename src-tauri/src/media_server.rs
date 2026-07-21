@@ -113,9 +113,9 @@ async fn read_http_request(stream: &mut tokio::net::TcpStream) -> Result<HttpReq
 
     let text = String::from_utf8_lossy(&buf[..n]);
     let mut lines = text.lines();
-    let request_line = lines.next().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "缺少请求行")
-    })?;
+    let request_line = lines
+        .next()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "缺少请求行"))?;
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("").to_string();
     let path = parts.next().unwrap_or("").to_string();
@@ -229,22 +229,15 @@ async fn send_media_response(
     };
     let body_len = byte_range.end + 1 - byte_range.start;
 
-    write_headers_only(
-        stream,
-        status,
-        mime,
-        body_len,
-        Some(byte_range),
-        file_len,
-    )
-    .await?;
+    write_headers_only(stream, status, mime, body_len, Some(byte_range), file_len).await?;
 
     if request.method == "HEAD" {
         return Ok(());
     }
 
     let mut file = File::open(&path).await?;
-    file.seek(std::io::SeekFrom::Start(byte_range.start)).await?;
+    file.seek(std::io::SeekFrom::Start(byte_range.start))
+        .await?;
 
     let mut remaining = body_len;
     let mut buf = vec![0_u8; STREAM_CHUNK];
@@ -381,19 +374,37 @@ mod tests {
     #[test]
     fn open_ended_range_covers_tail() {
         let range = resolve_byte_range("bytes=1000-", 5000).unwrap();
-        assert_eq!(range, ByteRange { start: 1000, end: 4999 });
+        assert_eq!(
+            range,
+            ByteRange {
+                start: 1000,
+                end: 4999
+            }
+        );
     }
 
     #[test]
     fn suffix_range_reads_tail() {
         let range = resolve_byte_range("bytes=-500", 5000).unwrap();
-        assert_eq!(range, ByteRange { start: 4500, end: 4999 });
+        assert_eq!(
+            range,
+            ByteRange {
+                start: 4500,
+                end: 4999
+            }
+        );
     }
 
     #[test]
     fn explicit_range_is_honored() {
         let range = resolve_byte_range("bytes=0-1023", 5000).unwrap();
-        assert_eq!(range, ByteRange { start: 0, end: 1023 });
+        assert_eq!(
+            range,
+            ByteRange {
+                start: 0,
+                end: 1023
+            }
+        );
     }
 
     #[test]

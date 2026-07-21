@@ -25,11 +25,17 @@ pub async fn fetch_key_bytes(
         .await
         .map_err(|err| err.to_string())?;
     if !response.status().is_success() {
-        return Err(format!("获取解密密钥失败：HTTP {}", response.status().as_u16()));
+        return Err(format!(
+            "获取解密密钥失败：HTTP {}",
+            response.status().as_u16()
+        ));
     }
     let bytes = response.bytes().await.map_err(|err| err.to_string())?;
     if bytes.len() != 16 {
-        return Err(format!("解密密钥长度应为 16 字节，实际 {} 字节", bytes.len()));
+        return Err(format!(
+            "解密密钥长度应为 16 字节，实际 {} 字节",
+            bytes.len()
+        ));
     }
     let mut key = [0u8; 16];
     key.copy_from_slice(&bytes);
@@ -105,7 +111,9 @@ async fn write_response_stream_to_file(
             return Err("下载已取消".into());
         }
         let chunk = chunk.map_err(|err| err.to_string())?;
-        file.write_all(&chunk).await.map_err(|err| err.to_string())?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|err| err.to_string())?;
         written += chunk.len() as u64;
     }
 
@@ -247,10 +255,9 @@ mod tests {
 
     #[test]
     fn parses_multiline_headers() {
-        let headers = parse_header_map(
-            "Referer: https://example.com/watch\nUser-Agent: Hikaru\nCookie: a=b",
-        )
-        .unwrap();
+        let headers =
+            parse_header_map("Referer: https://example.com/watch\nUser-Agent: Hikaru\nCookie: a=b")
+                .unwrap();
 
         assert_eq!(headers.get("referer").unwrap(), "https://example.com/watch");
         assert_eq!(headers.get("user-agent").unwrap(), "Hikaru");
@@ -280,9 +287,7 @@ mod tests {
         let server = httpmock::MockServer::start_async().await;
         let media = server
             .mock_async(|when, then| {
-                when.method("GET")
-                    .path("/seg.ts")
-                    .header("cookie", "a=b");
+                when.method("GET").path("/seg.ts").header("cookie", "a=b");
                 then.status(200).body("segment-bytes");
             })
             .await;

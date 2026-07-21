@@ -66,9 +66,7 @@ fn build_video_session(video_path: &Path, cache_root: &Path) -> Result<VideoSess
         transcribed_ass_path: path_to_display_string(
             &parent.join(format!("{stem}.transcribed.ass")),
         ),
-        translated_ass_path: path_to_display_string(
-            &parent.join(format!("{stem}.translated.ass")),
-        ),
+        translated_ass_path: path_to_display_string(&parent.join(format!("{stem}.translated.ass"))),
         burn_ass_path: path_to_display_string(&workspace.join("burn.input.ass")),
         source_lang: "ja".into(),
     })

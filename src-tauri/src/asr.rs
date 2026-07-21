@@ -226,9 +226,11 @@ fn select_sidecar_spawn_error(errors: &[String]) -> String {
     {
         return (*message).clone();
     }
-    if errors.iter().all(|message| is_interpreter_missing_error(message)) {
-        return "未找到可用的 Python 3.11。请安装系统 Python 3.11，或先配置 ASR 引擎依赖。"
-            .into();
+    if errors
+        .iter()
+        .all(|message| is_interpreter_missing_error(message))
+    {
+        return "未找到可用的 Python 3.11。请安装系统 Python 3.11，或先配置 ASR 引擎依赖。".into();
     }
     errors
         .last()
