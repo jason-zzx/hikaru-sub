@@ -95,10 +95,10 @@ mod tests {
 
     #[test]
     fn rejects_non_tag_release_urls() {
-        assert!(parse_version_from_release_url(
-            "https://github.com/jason-zzx/hikaru-sub/releases"
-        )
-        .is_err());
+        assert!(
+            parse_version_from_release_url("https://github.com/jason-zzx/hikaru-sub/releases")
+                .is_err()
+        );
         assert!(parse_version_from_release_url(
             "https://github.com/jason-zzx/hikaru-sub/releases/latest"
         )

@@ -354,10 +354,7 @@ fn looks_like_repo_root(dir: &Path) -> bool {
 }
 
 /// 从起点向上查找仓库根；`cwd_hint` 可覆盖 `current_dir`（便于测试）。
-pub fn find_source_checkout_root(
-    exe_path: &Path,
-    cwd_hint: Option<&Path>,
-) -> Option<PathBuf> {
+pub fn find_source_checkout_root(exe_path: &Path, cwd_hint: Option<&Path>) -> Option<PathBuf> {
     let mut starts = Vec::new();
     if let Some(cwd) = cwd_hint {
         starts.push(cwd.to_path_buf());
@@ -413,12 +410,7 @@ pub fn effective_asr_service_dir(
     configured: Option<&str>,
 ) -> Result<PathBuf, String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    resolve_effective_asr_service_dir(
-        configured,
-        &exe,
-        cfg!(debug_assertions),
-        None,
-    )
+    resolve_effective_asr_service_dir(configured, &exe, cfg!(debug_assertions), None)
 }
 
 pub fn managed_model_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -1451,10 +1443,7 @@ fn safe_remove_runtime_dependency_dir(target: &Path, deps_root: &Path) -> Result
     let canonical = target
         .canonicalize()
         .map_err(|e| format!("解析清理路径失败（{}）：{e}", target.display()))?;
-    if canonical
-        .file_name()
-        .is_some_and(|name| name == ".venv")
-    {
+    if canonical.file_name().is_some_and(|name| name == ".venv") {
         if let Some(service_dir) = canonical.parent() {
             if is_source_checkout_asr_service_dir(service_dir) {
                 return fs::remove_dir_all(&canonical)
@@ -1474,8 +1463,7 @@ fn cleanup_target_for_kind(
         RuntimeDependencyKind::Python311 => managed_python_dir(app),
         RuntimeDependencyKind::AsrVenv => {
             let settings = load_settings(app).unwrap_or_default();
-            Ok(effective_asr_service_dir(app, settings.asr_service_path.as_deref())?
-                .join(".venv"))
+            Ok(effective_asr_service_dir(app, settings.asr_service_path.as_deref())?.join(".venv"))
         }
         RuntimeDependencyKind::AsrModels => managed_model_cache_dir(app),
         RuntimeDependencyKind::Downloads => downloads_dir(app),
@@ -1562,7 +1550,10 @@ fn measure_transcode_cache_size(transcode_root: &Path, preserve_hash: Option<&st
         .sum()
 }
 
-fn cleanup_app_cache_dir(cache_root: &Path, preserve_video_path: Option<&str>) -> Result<(), String> {
+fn cleanup_app_cache_dir(
+    cache_root: &Path,
+    preserve_video_path: Option<&str>,
+) -> Result<(), String> {
     cleanup_app_cache_tree(cache_root, preserve_video_path)
 }
 
@@ -1587,7 +1578,10 @@ fn cleanup_app_cache_tree(root: &Path, preserve_video_path: Option<&str>) -> Res
     Ok(())
 }
 
-fn cleanup_workspace_cache(workspace_root: &Path, preserve_key: Option<&str>) -> Result<(), String> {
+fn cleanup_workspace_cache(
+    workspace_root: &Path,
+    preserve_key: Option<&str>,
+) -> Result<(), String> {
     let Ok(entries) = fs::read_dir(workspace_root) else {
         return Ok(());
     };
@@ -1607,7 +1601,10 @@ fn cleanup_workspace_cache(workspace_root: &Path, preserve_key: Option<&str>) ->
     Ok(())
 }
 
-fn cleanup_transcode_cache(transcode_root: &Path, preserve_hash: Option<&str>) -> Result<(), String> {
+fn cleanup_transcode_cache(
+    transcode_root: &Path,
+    preserve_hash: Option<&str>,
+) -> Result<(), String> {
     let Ok(entries) = fs::read_dir(transcode_root) else {
         return Ok(());
     };
@@ -1749,10 +1746,7 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         expected_download_bytes: None,
     });
 
-    Ok(RuntimeDependencyProbe {
-        items,
-        source_mode,
-    })
+    Ok(RuntimeDependencyProbe { items, source_mode })
 }
 
 fn measure_runtime_dependency_storage_inner(
@@ -1774,11 +1768,11 @@ fn measure_runtime_dependency_storage_inner(
             RuntimeDependencyKind::Ffmpeg => {
                 resolve_ffmpeg_paths(app, &settings).source == ResolvedFfmpegSource::Managed
             }
-            RuntimeDependencyKind::Python311 => resolve_python311(app, &settings)
-                .is_some_and(|python| python.managed),
+            RuntimeDependencyKind::Python311 => {
+                resolve_python311(app, &settings).is_some_and(|python| python.managed)
+            }
             RuntimeDependencyKind::AsrVenv => {
-                let service =
-                    effective_asr_service_dir(app, settings.asr_service_path.as_deref())?;
+                let service = effective_asr_service_dir(app, settings.asr_service_path.as_deref())?;
                 !is_source_checkout_asr_service_dir(&service)
             }
             RuntimeDependencyKind::AsrModels
@@ -2051,13 +2045,25 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path();
         fs::create_dir_all(root.join("EBWebView").join("Default")).unwrap();
-        fs::write(root.join("EBWebView").join("Default").join("big.bin"), [1u8; 100]).unwrap();
+        fs::write(
+            root.join("EBWebView").join("Default").join("big.bin"),
+            [1u8; 100],
+        )
+        .unwrap();
         fs::create_dir_all(root.join("preview")).unwrap();
         fs::write(root.join("preview").join("a.png"), [1u8; 7]).unwrap();
         fs::create_dir_all(root.join("workspace").join("keep")).unwrap();
-        fs::write(root.join("workspace").join("keep").join("audio.wav"), [1u8; 11]).unwrap();
+        fs::write(
+            root.join("workspace").join("keep").join("audio.wav"),
+            [1u8; 11],
+        )
+        .unwrap();
         fs::create_dir_all(root.join("workspace").join("drop")).unwrap();
-        fs::write(root.join("workspace").join("drop").join("audio.wav"), [1u8; 13]).unwrap();
+        fs::write(
+            root.join("workspace").join("drop").join("audio.wav"),
+            [1u8; 13],
+        )
+        .unwrap();
         fs::create_dir_all(root.join("transcode")).unwrap();
         fs::write(root.join("transcode").join("abcd.mp4"), [1u8; 17]).unwrap();
         fs::write(root.join("transcode").join("ffff.mp4"), [1u8; 19]).unwrap();
@@ -2097,7 +2103,6 @@ mod tests {
         assert!(app_root.join("clip-frames").join("a.jpg").is_file());
         assert!(app_root.join("EBWebView").join("x.bin").is_file());
     }
-
 
     #[test]
     fn cleanup_rejects_paths_outside_deps() {
@@ -2304,19 +2309,14 @@ mod tests {
 
     #[test]
     fn source_checkout_asr_service_requires_exact_repo_asr_service_path() {
-        let root = std::env::temp_dir().join(format!(
-            "hikaru_sub_asr_checkout_exact_{}",
-            unique_suffix()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("hikaru_sub_asr_checkout_exact_{}", unique_suffix()));
         create_fake_repo(&root);
 
         let service = root.join("asr-service");
         assert!(is_source_checkout_asr_service_dir(&service));
 
-        let resources = root
-            .join("src-tauri")
-            .join("resources")
-            .join("asr-service");
+        let resources = root.join("src-tauri").join("resources").join("asr-service");
         std::fs::create_dir_all(&resources).unwrap();
         std::fs::write(resources.join("main.py"), "").unwrap();
         assert!(!is_source_checkout_asr_service_dir(&resources));
@@ -2336,10 +2336,8 @@ mod tests {
 
     #[test]
     fn effective_asr_service_prefers_source_checkout_in_dev() {
-        let root = std::env::temp_dir().join(format!(
-            "hikaru_sub_asr_effective_dev_{}",
-            unique_suffix()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("hikaru_sub_asr_effective_dev_{}", unique_suffix()));
         create_fake_repo(&root);
         let exe = root
             .join("src-tauri")
@@ -2348,13 +2346,7 @@ mod tests {
             .join("hikaru-sub.exe");
         std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
 
-        let resolved = resolve_effective_asr_service_dir(
-            None,
-            &exe,
-            true,
-            Some(&root),
-        )
-        .unwrap();
+        let resolved = resolve_effective_asr_service_dir(None, &exe, true, Some(&root)).unwrap();
 
         assert_eq!(resolved, root.join("asr-service"));
         let _ = std::fs::remove_dir_all(root);
@@ -2371,13 +2363,7 @@ mod tests {
         let exe = install.join("hikaru-sub.exe");
         std::fs::create_dir_all(&install).unwrap();
 
-        let resolved = resolve_effective_asr_service_dir(
-            None,
-            &exe,
-            false,
-            Some(&root),
-        )
-        .unwrap();
+        let resolved = resolve_effective_asr_service_dir(None, &exe, false, Some(&root)).unwrap();
 
         assert_eq!(resolved, install.join("deps").join("asr-service"));
         let _ = std::fs::remove_dir_all(root);
@@ -2400,13 +2386,8 @@ mod tests {
             .join("hikaru-sub.exe");
         std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
 
-        let resolved = resolve_effective_asr_service_dir(
-            custom.to_str(),
-            &exe,
-            true,
-            Some(&root),
-        )
-        .unwrap();
+        let resolved =
+            resolve_effective_asr_service_dir(custom.to_str(), &exe, true, Some(&root)).unwrap();
 
         assert_eq!(resolved, custom);
         let _ = std::fs::remove_dir_all(root);

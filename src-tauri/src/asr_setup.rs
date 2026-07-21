@@ -478,10 +478,7 @@ fn venv_has_pip(service_dir: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn ensure_venv_pip(
-    job: &Arc<StdMutex<AsrSetupJob>>,
-    service_dir: &Path,
-) -> Result<(), String> {
+fn ensure_venv_pip(job: &Arc<StdMutex<AsrSetupJob>>, service_dir: &Path) -> Result<(), String> {
     if venv_has_pip(service_dir) {
         set_stage(job, "检测到 pip", Some(0.30));
         return Ok(());
@@ -858,7 +855,12 @@ fn resolve_probe_template_path(
 ) -> Option<PathBuf> {
     resolve_template_dir(app, configured, Some(service))
         .ok()
-        .or_else(|| service.join("main.py").is_file().then(|| service.to_path_buf()))
+        .or_else(|| {
+            service
+                .join("main.py")
+                .is_file()
+                .then(|| service.to_path_buf())
+        })
 }
 
 fn probe_engine_status(service_dir: &Path, engine: &str) -> (bool, Option<String>) {
@@ -1129,12 +1131,18 @@ mod tests {
 
         prepare_asr_service_dir(&dir, &dir, false).unwrap();
         assert_eq!(fs::read_to_string(dir.join("main.py")).unwrap(), "keep");
-        assert_eq!(fs::read_to_string(dir.join("custom_dev.py")).unwrap(), "dev");
+        assert_eq!(
+            fs::read_to_string(dir.join("custom_dev.py")).unwrap(),
+            "dev"
+        );
         assert!(dir.join(".venv").join("marker").is_file());
 
         prepare_asr_service_dir(&dir, &dir, true).unwrap();
         assert_eq!(fs::read_to_string(dir.join("main.py")).unwrap(), "keep");
-        assert_eq!(fs::read_to_string(dir.join("custom_dev.py")).unwrap(), "dev");
+        assert_eq!(
+            fs::read_to_string(dir.join("custom_dev.py")).unwrap(),
+            "dev"
+        );
         assert!(!dir.join(".venv").exists());
 
         let _ = fs::remove_dir_all(dir);
@@ -1256,7 +1264,11 @@ mod tests {
     fn ensurepip_bootstrap_args_upgrade_pip_seed() {
         assert_eq!(
             ensurepip_bootstrap_args(),
-            vec!["-m".to_string(), "ensurepip".to_string(), "--upgrade".to_string()]
+            vec![
+                "-m".to_string(),
+                "ensurepip".to_string(),
+                "--upgrade".to_string()
+            ]
         );
     }
 

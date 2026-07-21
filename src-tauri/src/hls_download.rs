@@ -287,10 +287,14 @@ async fn download_plan(
     shared_semaphore: Option<Arc<Semaphore>>,
 ) -> Result<(), HlsDownloadError> {
     let cancel_for_abort = cancel.clone();
-    let keys = Arc::new(prefetch_keys(client, plan, header_map).await.map_err(|err| {
-        cancel_for_abort.cancel();
-        err
-    })?);
+    let keys = Arc::new(
+        prefetch_keys(client, plan, header_map)
+            .await
+            .map_err(|err| {
+                cancel_for_abort.cancel();
+                err
+            })?,
+    );
 
     if let Some(init) = &plan.init {
         let init_path = hls_temp_root(base_dir, job_id)
@@ -524,7 +528,9 @@ mod tests {
         std::fs::write(media_dir.join("00000001.m4s"), b"b;").unwrap();
         let output = base.join("video.bin");
 
-        assemble_media_file(&plan, base, job_id, &output).await.unwrap();
+        assemble_media_file(&plan, base, job_id, &output)
+            .await
+            .unwrap();
 
         assert_eq!(std::fs::read(&output).unwrap(), b"init;a;b;");
     }
@@ -569,16 +575,28 @@ mod tests {
             "cmfv"
         );
         assert_eq!(segment_extension("https://cdn.example.com/seg-3.ts"), "ts");
-        assert_eq!(segment_extension("https://cdn.example.com/a/0.m4s?t=1"), "m4s");
-        assert_eq!(segment_extension("https://cdn.example.com/INIT01.CMFA"), "cmfa");
+        assert_eq!(
+            segment_extension("https://cdn.example.com/a/0.m4s?t=1"),
+            "m4s"
+        );
+        assert_eq!(
+            segment_extension("https://cdn.example.com/INIT01.CMFA"),
+            "cmfa"
+        );
         // 无扩展名 / 仅 query / dotfile / 超长后缀 → 回退 part
-        assert_eq!(segment_extension("https://cdn.example.com/segment/12345?x=1"), "part");
+        assert_eq!(
+            segment_extension("https://cdn.example.com/segment/12345?x=1"),
+            "part"
+        );
         assert_eq!(segment_extension("https://cdn.example.com/.hidden"), "part");
         assert_eq!(
             segment_extension("https://cdn.example.com/file.superlongext"),
             "part"
         );
-        assert_eq!(segment_file_name(7, "https://x/01.cmfv?s=1"), "00000007.cmfv");
+        assert_eq!(
+            segment_file_name(7, "https://x/01.cmfv?s=1"),
+            "00000007.cmfv"
+        );
         assert_eq!(init_file_name("https://x/init01.cmfa?s=1"), "init.cmfa");
     }
 
@@ -620,15 +638,14 @@ mod tests {
         std::fs::write(media_dir.join("00000001.m4s"), vec![b'b'; 64 * 1024]).unwrap();
         let output = base.join("video.bin");
 
-        assemble_media_file(&plan, base, job_id, &output).await.unwrap();
+        assemble_media_file(&plan, base, job_id, &output)
+            .await
+            .unwrap();
 
         let bytes = std::fs::read(&output).unwrap();
         assert_eq!(bytes.len(), 1024 + 64 * 1024 + 64 * 1024);
         assert_eq!(&bytes[0..4], b"iiii");
         assert_eq!(&bytes[1024..1028], b"aaaa");
-        assert_eq!(
-            &bytes[(1024 + 64 * 1024)..(1024 + 64 * 1024 + 4)],
-            b"bbbb"
-        );
+        assert_eq!(&bytes[(1024 + 64 * 1024)..(1024 + 64 * 1024 + 4)], b"bbbb");
     }
 }

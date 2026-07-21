@@ -34,7 +34,10 @@ fn resolve_active_key(base: &Url, key: &Key) -> Result<Option<ActiveKey>, HlsSup
                 Some(raw) => Some(parse_iv_hex(raw)?),
                 None => None,
             };
-            Ok(Some(ActiveKey { key_url, explicit_iv }))
+            Ok(Some(ActiveKey {
+                key_url,
+                explicit_iv,
+            }))
         }
         KeyMethod::SampleAES | KeyMethod::Other(_) => Err(HlsSupportError::UnsupportedEncryption),
     }
@@ -134,10 +137,7 @@ fn map_to_init(base: &Url, map: &m3u8_rs::Map) -> Result<HlsInitSegment, HlsSupp
         .to_string();
     Ok(HlsInitSegment {
         url,
-        byte_range: map
-            .byte_range
-            .as_ref()
-            .map(resolve_init_byte_range),
+        byte_range: map.byte_range.as_ref().map(resolve_init_byte_range),
         decrypt: None,
     })
 }
@@ -147,8 +147,7 @@ pub fn select_master_variant_url(
     base_url: &str,
     playlist_text: &str,
 ) -> Result<Option<String>, HlsSupportError> {
-    let base = Url::parse(base_url)
-        .map_err(|err| HlsSupportError::UrlResolve(err.to_string()))?;
+    let base = Url::parse(base_url).map_err(|err| HlsSupportError::UrlResolve(err.to_string()))?;
     let parsed = parse_playlist_res(playlist_text.as_bytes())
         .map_err(|err| HlsSupportError::PlaylistParse(format!("{err:?}")))?;
 
@@ -193,8 +192,7 @@ pub fn plan_from_playlist_text(
     playlist_text: &str,
     kind: MediaKind,
 ) -> Result<HlsMediaPlan, HlsSupportError> {
-    let base = Url::parse(base_url)
-        .map_err(|err| HlsSupportError::UrlResolve(err.to_string()))?;
+    let base = Url::parse(base_url).map_err(|err| HlsSupportError::UrlResolve(err.to_string()))?;
     let parsed = parse_playlist_res(playlist_text.as_bytes())
         .map_err(|err| HlsSupportError::PlaylistParse(format!("{err:?}")))?;
     let init_encrypted = init_segment_is_encrypted(playlist_text);
@@ -266,7 +264,11 @@ fn plan_from_media_playlist(
         total_duration_ms += duration_ms;
 
         let byte_range = if let Some(raw) = segment.byte_range.as_ref() {
-            Some(resolve_segment_byte_range(&url, raw, &mut byte_range_states)?)
+            Some(resolve_segment_byte_range(
+                &url,
+                raw,
+                &mut byte_range_states,
+            )?)
         } else {
             byte_range_states.insert(url.clone(), UrlByteRangeState::Broken);
             None
@@ -650,8 +652,8 @@ high/index.m3u8
 video/index.m3u8
 "#;
 
-        let err = select_master_variant_url("https://cdn.example.com/master.m3u8", playlist)
-            .unwrap_err();
+        let err =
+            select_master_variant_url("https://cdn.example.com/master.m3u8", playlist).unwrap_err();
 
         assert_eq!(err, HlsSupportError::UnsupportedAudioRendition);
     }

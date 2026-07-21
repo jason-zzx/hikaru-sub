@@ -181,7 +181,11 @@ pub fn unique_output_path(dir: &Path, stem: &str, extension: &str) -> PathBuf {
 }
 
 /// 根据流探测结果推断输出扩展名。
-pub fn infer_extension(mode: DownloadMode, has_video: bool, has_audio: bool) -> Result<String, String> {
+pub fn infer_extension(
+    mode: DownloadMode,
+    has_video: bool,
+    has_audio: bool,
+) -> Result<String, String> {
     match mode {
         DownloadMode::Single => {
             if has_video {
@@ -301,10 +305,7 @@ fn ffprobe_header_args(headers: &str) -> Vec<String> {
     if headers.is_empty() {
         return Vec::new();
     }
-    vec![
-        "-headers".to_string(),
-        format!("{headers}\r\n"),
-    ]
+    vec!["-headers".to_string(), format!("{headers}\r\n")]
 }
 
 /// CMAF/fMP4 HLS（如 Nico 的 `.cmfv` / `.cmfa`）需要放宽扩展名校验。
@@ -553,8 +554,7 @@ fn build_ffmpeg_args(
 
 fn is_job_cancelled(job: &Arc<Mutex<DownloadJobInner>>) -> bool {
     let guard = job.blocking_lock();
-    guard.cancel_flag.load(Ordering::SeqCst)
-        || guard.snapshot.status == DownloadStatus::Cancelled
+    guard.cancel_flag.load(Ordering::SeqCst) || guard.snapshot.status == DownloadStatus::Cancelled
 }
 
 fn is_job_aborted(job: &Arc<Mutex<DownloadJobInner>>) -> bool {
@@ -600,9 +600,7 @@ fn wait_parallel_download_workers(
 
     let mut first_error: Option<String> = None;
     for _ in 0..2 {
-        let (_label, join_result) = rx
-            .recv()
-            .map_err(|_| "下载线程通信失败".to_string())?;
+        let (_label, join_result) = rx.recv().map_err(|_| "下载线程通信失败".to_string())?;
         let worker_result = join_result?;
         if let Err(err) = worker_result {
             if first_error.is_none() {
@@ -615,11 +613,7 @@ fn wait_parallel_download_workers(
     first_error.map_or(Ok(()), Err)
 }
 
-fn register_child(
-    job: &Arc<Mutex<DownloadJobInner>>,
-    kind: ChildKind,
-    child: std::process::Child,
-) {
+fn register_child(job: &Arc<Mutex<DownloadJobInner>>, kind: ChildKind, child: std::process::Child) {
     let mut guard = job.blocking_lock();
     guard.children.push(RunningChild { kind, child });
     guard.snapshot.status = DownloadStatus::Running;
@@ -948,9 +942,8 @@ async fn run_segment_strategy(
                             update_snapshot_progress(&job, |snap| {
                                 snap.processed_ms = done;
                                 snap.duration_ms = total;
-                                snap.progress = (total > 0).then(|| {
-                                    (done as f64 / total as f64 * 0.95).clamp(0.0, 0.95)
-                                });
+                                snap.progress = (total > 0)
+                                    .then(|| (done as f64 / total as f64 * 0.95).clamp(0.0, 0.95));
                             });
                         }
                     },
@@ -964,22 +957,16 @@ async fn run_segment_strategy(
                     snap.duration_ms = snap.duration_ms.max(temp.duration_ms);
                 });
                 let args = build_single_remux_args(&temp.temp_media_path, &output_path);
-                run_ffmpeg_remux(
-                    job.clone(),
-                    ChildKind::Merge,
-                    ffmpeg,
-                    args,
-                    {
-                        let job = job.clone();
-                        move |_processed, _duration| {
-                            update_snapshot_progress(&job, |snap| {
-                                if snap.progress.is_some() {
-                                    snap.progress = Some(0.95);
-                                }
-                            });
-                        }
-                    },
-                )
+                run_ffmpeg_remux(job.clone(), ChildKind::Merge, ffmpeg, args, {
+                    let job = job.clone();
+                    move |_processed, _duration| {
+                        update_snapshot_progress(&job, |snap| {
+                            if snap.progress.is_some() {
+                                snap.progress = Some(0.95);
+                            }
+                        });
+                    }
+                })
                 .await?;
             }
             DownloadMode::Separate => {
@@ -1163,12 +1150,8 @@ fn run_separate_parallel_download(
         let video_job = job.clone();
         let video_progress_for_thread = video_progress.clone();
         let audio_progress_for_video = audio_progress.clone();
-        let video_args = build_input_download_args(
-            DownloadInputKind::Video,
-            &video_url,
-            &headers,
-            &video_tmp,
-        );
+        let video_args =
+            build_input_download_args(DownloadInputKind::Video, &video_url, &headers, &video_tmp);
         let video_ffmpeg = ffmpeg.clone();
         let video_handle = std::thread::spawn(move || {
             run_ffmpeg_child_collect_progress(
@@ -1194,12 +1177,8 @@ fn run_separate_parallel_download(
         let audio_job = job.clone();
         let audio_progress_for_thread = audio_progress.clone();
         let video_progress_for_audio = video_progress.clone();
-        let audio_args = build_input_download_args(
-            DownloadInputKind::Audio,
-            &audio_url,
-            &headers,
-            &audio_tmp,
-        );
+        let audio_args =
+            build_input_download_args(DownloadInputKind::Audio, &audio_url, &headers, &audio_tmp);
         let audio_ffmpeg = ffmpeg.clone();
         let audio_handle = std::thread::spawn(move || {
             run_ffmpeg_child_collect_progress(
@@ -1360,12 +1339,7 @@ fn run_download(
                         continue;
                     }
                     let text = String::from_utf8_lossy(&line).into_owned();
-                    handle_progress_line(
-                        &job,
-                        &text,
-                        &mut parsed_duration_ms,
-                        &mut tail,
-                    );
+                    handle_progress_line(&job, &text, &mut parsed_duration_ms, &mut tail);
                     line.clear();
                 } else {
                     line.push(byte);
@@ -1443,8 +1417,8 @@ fn handle_progress_line(
     let processed_ms = parse_progress_out_time_ms(text).or_else(|| parse_time_token(text));
 
     if let Some(processed) = processed_ms {
-        let progress = (*duration_ms > 0)
-            .then(|| (processed as f64 / *duration_ms as f64).clamp(0.0, 1.0));
+        let progress =
+            (*duration_ms > 0).then(|| (processed as f64 / *duration_ms as f64).clamp(0.0, 1.0));
         update_snapshot_progress(job, |snap| {
             snap.processed_ms = processed;
             if *duration_ms > 0 {

@@ -125,18 +125,14 @@ pub fn app_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
     if is_portable() {
         return Ok(portable_roots(&exe_dir()?).data);
     }
-    app.path()
-        .app_config_dir()
-        .map_err(|e| e.to_string())
+    app.path().app_config_dir().map_err(|e| e.to_string())
 }
 
 pub fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     if is_portable() {
         return Ok(portable_roots(&exe_dir()?).data);
     }
-    app.path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())
+    app.path().app_data_dir().map_err(|e| e.to_string())
 }
 
 pub fn work_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {

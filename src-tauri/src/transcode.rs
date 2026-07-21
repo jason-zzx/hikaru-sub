@@ -1,10 +1,10 @@
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::dependencies::work_cache_dir;
@@ -102,8 +102,7 @@ pub fn evaluate_playback_compat(
     audio_codec: Option<&str>,
 ) -> (bool, Option<String>) {
     let video = video_codec.to_ascii_lowercase();
-    const UNSUPPORTED_VIDEO: &[&str] =
-        &["hevc", "h265", "av1", "mpeg2video", "vc1", "prores"];
+    const UNSUPPORTED_VIDEO: &[&str] = &["hevc", "h265", "av1", "mpeg2video", "vc1", "prores"];
     if UNSUPPORTED_VIDEO.iter().any(|codec| video.contains(codec)) {
         return (
             true,
@@ -127,7 +126,10 @@ pub fn evaluate_playback_compat(
         );
     }
 
-    if formats.iter().any(|f| matches!(*f, "matroska" | "avi" | "mpegts" | "flv" | "asf" | "wmv")) {
+    if formats
+        .iter()
+        .any(|f| matches!(*f, "matroska" | "avi" | "mpegts" | "flv" | "asf" | "wmv"))
+    {
         return (
             true,
             Some(format!(
@@ -157,10 +159,7 @@ pub fn evaluate_playback_compat(
         return (false, None);
     }
 
-    (
-        true,
-        Some(format!("未知或不支持的容器格式 {format_name}")),
-    )
+    (true, Some(format!("未知或不支持的容器格式 {format_name}")))
 }
 
 fn probe_video_codec(ffprobe: &str, path: &str) -> Result<String, String> {
@@ -227,11 +226,8 @@ fn probe_video_playback_with_ffprobe(
         .map(|stream| stream.codec_name.clone());
 
     let format_name = parsed.format.format_name;
-    let (needs_transcode, reason) = evaluate_playback_compat(
-        &format_name,
-        &video_codec,
-        audio_codec.as_deref(),
-    );
+    let (needs_transcode, reason) =
+        evaluate_playback_compat(&format_name, &video_codec, audio_codec.as_deref());
 
     Ok(VideoPlaybackProbe {
         video_codec,
@@ -243,7 +239,10 @@ fn probe_video_playback_with_ffprobe(
 }
 
 #[tauri::command]
-pub async fn probe_video_playback(app: AppHandle, path: String) -> Result<VideoPlaybackProbe, String> {
+pub async fn probe_video_playback(
+    app: AppHandle,
+    path: String,
+) -> Result<VideoPlaybackProbe, String> {
     let settings = load_settings(&app)?;
     let ffprobe = resolve_ffprobe(&app, &settings);
     probe_video_playback_with_ffprobe(&ffprobe, &path)
@@ -316,13 +315,8 @@ fn proxy_temp_cache_path(cache_path: &Path, format: ProxyVideoFormat) -> PathBuf
 /// Windows 上目标已存在时 `rename` 会失败；先删再 rename。
 fn promote_temp_to_final(temp_path: &Path, final_path: &Path) -> Result<(), String> {
     if final_path.exists() {
-        fs::remove_file(final_path).map_err(|e| {
-            format!(
-                "无法覆盖旧代理缓存 {}: {}",
-                final_path.display(),
-                e
-            )
-        })?;
+        fs::remove_file(final_path)
+            .map_err(|e| format!("无法覆盖旧代理缓存 {}: {}", final_path.display(), e))?;
     }
     fs::rename(temp_path, final_path).map_err(|e| {
         format!(
@@ -388,10 +382,7 @@ fn transcode_ffmpeg_args(input: &str, output: &str, _format: ProxyVideoFormat) -
 }
 
 #[tauri::command]
-pub async fn start_transcode(
-    app: AppHandle,
-    video_path: String,
-) -> Result<String, String> {
+pub async fn start_transcode(app: AppHandle, video_path: String) -> Result<String, String> {
     let settings = load_settings(&app)?;
     let ffmpeg = resolve_ffmpeg(&app, &settings).0;
     let ffprobe = resolve_ffprobe(&app, &settings);
@@ -467,7 +458,10 @@ pub async fn start_transcode(
     tokio::spawn(async move {
         println!(
             "Starting transcode ({:?}): {} -> {} (via {})",
-            proxy_format, input_path, final_path.display(), output_path
+            proxy_format,
+            input_path,
+            final_path.display(),
+            output_path
         );
 
         // 先获取视频时长
@@ -522,7 +516,10 @@ pub async fn start_transcode(
                                             }
                                         }
 
-                                        let _ = app_handle.emit("transcode_progress", TranscodeProgressEvent { percent });
+                                        let _ = app_handle.emit(
+                                            "transcode_progress",
+                                            TranscodeProgressEvent { percent },
+                                        );
                                     }
                                 }
                             }
@@ -563,11 +560,7 @@ pub async fn start_transcode(
             Err(e) => {
                 println!("Failed to spawn ffmpeg: {}", e);
                 let _ = fs::remove_file(&output_path);
-                mark_job_failed(
-                    &jobs_handle,
-                    &input_path,
-                    format!("无法启动 FFmpeg: {}", e),
-                );
+                mark_job_failed(&jobs_handle, &input_path, format!("无法启动 FFmpeg: {}", e));
             }
         }
     });
@@ -744,10 +737,8 @@ mod tests {
 
     #[test]
     fn promote_temp_replaces_existing_final_on_windows() {
-        let dir = std::env::temp_dir().join(format!(
-            "hikaru-sub-transcode-test-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("hikaru-sub-transcode-test-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let final_path = dir.join("proxy.mp4");
@@ -764,11 +755,8 @@ mod tests {
 
     #[test]
     fn hevc_mp4_needs_transcode() {
-        let (needs, reason) = evaluate_playback_compat(
-            "mov,mp4,m4v,3gp,3g2,mj2",
-            "hevc",
-            Some("aac"),
-        );
+        let (needs, reason) =
+            evaluate_playback_compat("mov,mp4,m4v,3gp,3g2,mj2", "hevc", Some("aac"));
         assert!(needs);
         assert!(reason.unwrap().contains("视频编码"));
     }
@@ -782,21 +770,14 @@ mod tests {
 
     #[test]
     fn h264_aac_mp4_can_play_directly() {
-        let (needs, _) = evaluate_playback_compat(
-            "mov,mp4,m4v,3gp,3g2,mj2",
-            "h264",
-            Some("aac"),
-        );
+        let (needs, _) = evaluate_playback_compat("mov,mp4,m4v,3gp,3g2,mj2", "h264", Some("aac"));
         assert!(!needs);
     }
 
     #[test]
     fn mp4_with_ac3_needs_transcode() {
-        let (needs, reason) = evaluate_playback_compat(
-            "mov,mp4,m4v,3gp,3g2,mj2",
-            "h264",
-            Some("ac3"),
-        );
+        let (needs, reason) =
+            evaluate_playback_compat("mov,mp4,m4v,3gp,3g2,mj2", "h264", Some("ac3"));
         assert!(needs);
         assert!(reason.unwrap().contains("音频编码"));
     }
