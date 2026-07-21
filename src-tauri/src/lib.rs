@@ -13,6 +13,7 @@ mod hls_download;
 mod hls_fetch;
 mod hls_playlist;
 mod hls_types;
+mod lifecycle;
 mod media_server;
 mod preview;
 mod process;
@@ -55,7 +56,11 @@ pub fn run() {
             ffmpeg::get_video_info,
             ffmpeg::extract_waveform,
             fonts::discover_preview_fonts,
+            lifecycle::exit_app,
             project::prepare_video_session,
+            project::save_subtitle_recovery,
+            project::load_subtitle_recovery,
+            project::delete_subtitle_recovery,
             project::delete_cached_audio,
             project::path_exists,
             asr::list_asr_engines,

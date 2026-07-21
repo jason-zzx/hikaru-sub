@@ -2,6 +2,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { useBurnJobPoller } from "../../hooks/useBurnJobPoller";
 import { useClipJobPoller } from "../../hooks/useClipJobPoller";
 import { useUnsavedChangesCloseGuard } from "../../hooks/useUnsavedChangesCloseGuard";
+import { useSubtitleRecoveryAutosave } from "../../hooks/useSubtitleRecoveryAutosave";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { WelcomeView } from "../workflow/WelcomeView";
@@ -13,6 +14,7 @@ import { EditorView } from "../editor/EditorView";
 import { BurnView } from "../workflow/BurnView";
 import { SettingsView } from "../workflow/SettingsView";
 import { ClipInProgressGate } from "../workflow/ClipInProgressGate";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 
 const stepViews = {
   welcome: WelcomeView,
@@ -32,7 +34,8 @@ export function AppLayout() {
 
   useBurnJobPoller();
   useClipJobPoller();
-  useUnsavedChangesCloseGuard();
+  const closeGuard = useUnsavedChangesCloseGuard();
+  useSubtitleRecoveryAutosave();
 
   return (
     <div className="flex h-full flex-col">
@@ -45,6 +48,22 @@ export function AppLayout() {
         </main>
       </div>
       <StatusBar />
+      <ConfirmDialog
+        open={closeGuard.closePromptOpen}
+        title="字幕尚未保存"
+        description={
+          closeGuard.closePromptError ??
+          "当前字幕尚未保存，继续关闭将丢失这些更改。"
+        }
+        options={[
+          { label: "取消", value: "cancel" },
+          { label: "继续关闭", value: "close", variant: "danger" },
+        ]}
+        escValue="cancel"
+        onSelect={(value) =>
+          void closeGuard.respondToClosePrompt(value === "close")
+        }
+      />
     </div>
   );
 }

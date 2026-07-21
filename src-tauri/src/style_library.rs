@@ -83,7 +83,7 @@ fn unique_temp_path(parent: &Path) -> PathBuf {
 }
 
 /// Platform-correct same-directory replacement. Never deletes dest first.
-fn replace_file(temp: &Path, dest: &Path) -> Result<(), String> {
+pub(crate) fn replace_file(temp: &Path, dest: &Path) -> Result<(), String> {
     #[cfg(windows)]
     {
         replace_file_windows(temp, dest)

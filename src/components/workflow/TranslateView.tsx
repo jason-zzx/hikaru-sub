@@ -18,6 +18,7 @@ import {
   type TranslationProgress,
 } from "../../services/translation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
+import { clearSubtitleRecoveryIfClean } from "../../services/subtitleRecovery";
 import type { AppSettings } from "../../types";
 
 const TARGET_LANGS = [
@@ -219,6 +220,11 @@ export function TranslateView() {
         await saveAssText(session.translatedAssPath, serialized);
         setActiveSubtitle("translated", session.translatedAssPath);
         markSaved(snap.token);
+        try {
+          await clearSubtitleRecoveryIfClean(session.videoPath);
+        } catch (recoveryErr) {
+          console.warn("字幕已保存，但清理恢复文件失败:", recoveryErr);
+        }
         console.log(`翻译后的字幕已保存到: ${session.translatedAssPath}`);
       } catch (saveErr) {
         // Keep physical rows in memory as unsaved translated content.

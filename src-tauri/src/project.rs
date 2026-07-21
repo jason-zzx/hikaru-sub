@@ -1,8 +1,10 @@
 use crate::dependencies::work_cache_dir;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,6 +17,8 @@ pub struct VideoSession {
     pub burn_ass_path: String,
     pub source_lang: String,
 }
+
+const SUBTITLE_RECOVERY_FILENAME: &str = "subtitle.recovery.json";
 
 fn video_stem(video_path: &Path) -> Result<String, String> {
     video_path
@@ -83,6 +87,110 @@ pub fn prepare_video_session(
     fs::create_dir_all(&session.workspace_path)
         .map_err(|e| format!("无法创建缓存工作目录: {e}"))?;
     Ok(session)
+}
+
+fn subtitle_recovery_path(video_path: &str, cache_root: &Path) -> Result<PathBuf, String> {
+    let session = build_video_session(Path::new(video_path), cache_root)?;
+    Ok(Path::new(&session.workspace_path).join(SUBTITLE_RECOVERY_FILENAME))
+}
+
+fn write_subtitle_recovery(path: &Path, content: &str) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("无法解析恢复文件父目录: {}", path.display()))?;
+    fs::create_dir_all(parent)
+        .map_err(|e| format!("无法创建恢复文件目录 {}: {e}", parent.display()))?;
+
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let temp_path = parent.join(format!(
+        ".subtitle-recovery.{}.{}.tmp",
+        std::process::id(),
+        nonce
+    ));
+    let result = (|| -> Result<(), String> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .map_err(|e| format!("无法创建恢复文件临时文件: {e}"))?;
+        file.write_all(content.as_bytes())
+            .map_err(|e| format!("写入恢复文件临时文件失败: {e}"))?;
+        file.sync_all()
+            .map_err(|e| format!("同步恢复文件临时文件失败: {e}"))?;
+        drop(file);
+        crate::style_library::replace_file(&temp_path, path)
+            .map_err(|e| format!("替换恢复文件失败: {e}"))
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+    result
+}
+
+fn load_subtitle_recovery_text(path: &Path) -> Result<Option<String>, String> {
+    match fs::read_to_string(path) {
+        Ok(content) => Ok(Some(content)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("读取恢复文件失败: {e}")),
+    }
+}
+
+fn delete_subtitle_recovery_file(path: &Path) -> Result<bool, String> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(format!("删除恢复文件失败: {e}")),
+    }
+}
+
+#[tauri::command]
+pub async fn save_subtitle_recovery(
+    app: tauri::AppHandle,
+    video_path: String,
+    content: String,
+) -> Result<(), String> {
+    let cache_root = work_cache_dir(&app)?;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let path = subtitle_recovery_path(&video_path, &cache_root)?;
+        write_subtitle_recovery(&path, &content)
+    })
+    .await
+    .map_err(|e| format!("保存恢复文件任务失败: {e}"))?;
+    result
+}
+
+#[tauri::command]
+pub async fn load_subtitle_recovery(
+    app: tauri::AppHandle,
+    video_path: String,
+) -> Result<Option<String>, String> {
+    let cache_root = work_cache_dir(&app)?;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let path = subtitle_recovery_path(&video_path, &cache_root)?;
+        load_subtitle_recovery_text(&path)
+    })
+    .await
+    .map_err(|e| format!("读取恢复文件任务失败: {e}"))?;
+    result
+}
+
+#[tauri::command]
+pub async fn delete_subtitle_recovery(
+    app: tauri::AppHandle,
+    video_path: String,
+) -> Result<bool, String> {
+    let cache_root = work_cache_dir(&app)?;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let path = subtitle_recovery_path(&video_path, &cache_root)?;
+        delete_subtitle_recovery_file(&path)
+    })
+    .await
+    .map_err(|e| format!("删除恢复文件任务失败: {e}"))?;
+    result
 }
 
 #[tauri::command]
@@ -223,5 +331,38 @@ mod tests {
         assert!(is_cached_audio_path(cache.path(), &workspace.join("audio.wav")).unwrap());
         assert!(!is_cached_audio_path(cache.path(), &workspace.join("other.wav")).unwrap());
         assert!(!is_cached_audio_path(cache.path(), &cache.path().join("audio.wav")).unwrap());
+    }
+
+    #[test]
+    fn subtitle_recovery_round_trips_inside_video_workspace() {
+        let video_dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let video_path = video_dir.path().join("episode.mp4");
+        fs::write(&video_path, b"video").unwrap();
+
+        let recovery_path =
+            subtitle_recovery_path(video_path.to_str().unwrap(), cache.path()).unwrap();
+        assert_eq!(
+            recovery_path.file_name().and_then(|name| name.to_str()),
+            Some(SUBTITLE_RECOVERY_FILENAME)
+        );
+        assert!(recovery_path.starts_with(cache.path().join("workspace")));
+
+        write_subtitle_recovery(&recovery_path, "first").unwrap();
+        assert_eq!(
+            load_subtitle_recovery_text(&recovery_path)
+                .unwrap()
+                .as_deref(),
+            Some("first")
+        );
+        write_subtitle_recovery(&recovery_path, "second").unwrap();
+        assert_eq!(
+            load_subtitle_recovery_text(&recovery_path)
+                .unwrap()
+                .as_deref(),
+            Some("second")
+        );
+        assert!(delete_subtitle_recovery_file(&recovery_path).unwrap());
+        assert!(!delete_subtitle_recovery_file(&recovery_path).unwrap());
     }
 }

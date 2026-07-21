@@ -145,6 +145,10 @@ export async function setSettings(settings: AppSettings): Promise<void> {
   return invoke("set_settings", { settings });
 }
 
+export async function exitApp(): Promise<void> {
+  return invoke("exit_app");
+}
+
 export async function prepareVideoSession(videoPath: string): Promise<VideoSession> {
   return invoke<VideoSession>("prepare_video_session", { videoPath });
 }
@@ -159,6 +163,23 @@ export function translatedAssPath(session: VideoSession): string {
 
 export function workspaceDirFromSession(session: VideoSession): string {
   return session.workspacePath;
+}
+
+export async function saveSubtitleRecovery(
+  videoPath: string,
+  content: string,
+): Promise<void> {
+  return invoke("save_subtitle_recovery", { videoPath, content });
+}
+
+export async function loadSubtitleRecovery(
+  videoPath: string,
+): Promise<string | null> {
+  return invoke<string | null>("load_subtitle_recovery", { videoPath });
+}
+
+export async function deleteSubtitleRecovery(videoPath: string): Promise<boolean> {
+  return invoke<boolean>("delete_subtitle_recovery", { videoPath });
 }
 
 export async function deleteCachedAudio(audioPath: string): Promise<boolean> {

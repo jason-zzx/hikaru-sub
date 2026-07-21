@@ -19,6 +19,7 @@ import type {
 } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
+import { restoreSubtitleRecovery } from "../../services/subtitleRecovery";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 import { Button } from "../ui/button";
 
@@ -212,6 +213,7 @@ export function DownloadView() {
     try {
       const session = await prepareVideoSession(completedPath);
       setSession(session);
+      await restoreSubtitleRecovery(session);
       setStep("import");
     } catch (e) {
       setError(`打开视频失败：${String(e)}`);
