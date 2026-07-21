@@ -42,6 +42,7 @@ import type {
   VadConfig,
 } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
+import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import {
   ASR_ENGINE_NOT_INSTALLED_HINT,
   ASR_ENGINE_NOT_INSTALLED_LABEL,
@@ -403,6 +404,8 @@ export function TranscribeView() {
   };
 
   const runTranscribe = async () => {
+    if (!(await confirmDiscardUnsavedChanges())) return;
+
     setAsrError(null);
     setResultCount(null);
     setSavedAssPath(null);

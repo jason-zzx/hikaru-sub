@@ -17,6 +17,7 @@ import {
   createTranslationProvider,
   type TranslationProgress,
 } from "../../services/translation";
+import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import type { AppSettings } from "../../types";
 
 const TARGET_LANGS = [
@@ -129,6 +130,7 @@ export function TranslateView() {
     ) {
       return;
     }
+    if (!(await confirmDiscardUnsavedChanges())) return;
 
     setError(null);
     setSuccess(false);

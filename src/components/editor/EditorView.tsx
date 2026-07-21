@@ -8,6 +8,7 @@ import {
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { selectCueAndSeek } from "../../services/editorActions";
+import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -254,6 +255,7 @@ export function EditorView() {
     try {
       const subtitlePath = await pickSubtitleFile();
       if (!subtitlePath) return;
+      if (!(await confirmDiscardUnsavedChanges())) return;
 
       const [subtitleText, videoInfo] = await Promise.all([
         loadAssText(subtitlePath),
