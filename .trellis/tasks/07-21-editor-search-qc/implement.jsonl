@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "shadcn-first UI, Chinese copy, icon rules for SubtitleFindPanel"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "panel state local vs projectStore mutations for replace/history"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "test/build gates and minimal diff expectations"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "SubtitleCue physical-line model; no bilingual branching"}

@@ -20,6 +20,10 @@ import { VideoPlayer } from "../player/VideoPlayer";
 import { PlaybackControls } from "../player/PlaybackControls";
 import { SubtitleList } from "./SubtitleList";
 import {
+  SubtitleFindPanel,
+  type SubtitleFindPanelHandle,
+} from "./SubtitleFindPanel";
+import {
   SubtitleEditor,
   type SubtitleEditorHistoryHandle,
 } from "./SubtitleEditor";
@@ -99,6 +103,7 @@ export function EditorView() {
   const [hasPendingTimeDraft, setHasPendingTimeDraft] = useState(false);
   const toastIdRef = useRef(0);
   const editorRef = useRef<SubtitleEditorHistoryHandle>(null);
+  const findPanelRef = useRef<SubtitleFindPanelHandle>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const paneDragRef = useRef<EditorPaneDrag | null>(null);
   const [preferredPaneLayout, setPreferredPaneLayout] =
@@ -411,6 +416,7 @@ export function EditorView() {
     onToggleHelp: () => setHelpOpen((v) => !v),
     onUndo: runUndo,
     onRedo: runRedo,
+    onOpenFind: () => findPanelRef.current?.openAndFocus(),
     onNotify: notify,
     hotkeys: editorHotkeys,
     enabled: !helpOpen,
@@ -541,6 +547,7 @@ export function EditorView() {
                   字幕列表 ({cues.length})
                 </h3>
               </div>
+              <SubtitleFindPanel ref={findPanelRef} onNotify={notify} />
               <div className="min-h-0 flex-1 overflow-hidden">
                 <SubtitleList onNotify={notify} />
               </div>
