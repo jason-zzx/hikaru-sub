@@ -9,6 +9,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { selectCueAndSeek } from "../../services/editorActions";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
+import { clearSubtitleRecoveryIfClean } from "../../services/subtitleRecovery";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -239,6 +240,11 @@ export function EditorView() {
       setActiveSubtitle(saveKind, savePath);
       setSubtitleFileExists(true);
       markSaved(snap.token);
+      try {
+        await clearSubtitleRecoveryIfClean(session.videoPath);
+      } catch (err) {
+        notify("error", `字幕已保存，但清理恢复文件失败：${String(err)}`);
+      }
       setSaveError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

@@ -21,6 +21,7 @@ import {
 import type { FfmpegStatus } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
+import { restoreSubtitleRecovery } from "../../services/subtitleRecovery";
 import { ClipDialog } from "./ClipDialog";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
@@ -107,6 +108,13 @@ export function ImportView() {
         } catch {
           // Treat unreadable subtitle files as an incomplete stage.
         }
+      }
+
+      const recovery = await restoreSubtitleRecovery(session);
+      if (recovery === "invalid") {
+        setError("检测到的字幕恢复文件格式无效，已跳过恢复");
+      } else if (recovery === "error") {
+        setError("读取字幕恢复文件失败，已继续打开视频");
       }
     } catch (e) {
       setError(`打开视频失败：${String(e)}`);

@@ -43,6 +43,7 @@ import type {
 } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
+import { clearSubtitleRecoveryIfClean } from "../../services/subtitleRecovery";
 import {
   ASR_ENGINE_NOT_INSTALLED_HINT,
   ASR_ENGINE_NOT_INSTALLED_LABEL,
@@ -372,8 +373,14 @@ export function TranscribeView() {
               setActiveSubtitle("transcribed", session.transcribedAssPath);
               markSaved(snap.token);
               setSavedAssPath(session.transcribedAssPath);
-              if (playResWarning) {
-                setAsrError(playResWarning);
+              let recoveryWarning: string | null = null;
+              try {
+                await clearSubtitleRecoveryIfClean(session.videoPath);
+              } catch (err) {
+                recoveryWarning = `字幕已保存，但清理恢复文件失败：${String(err)}`;
+              }
+              if (playResWarning || recoveryWarning) {
+                setAsrError(playResWarning ?? recoveryWarning);
               }
             } catch (saveErr) {
               console.warn("保存 ASS 文件失败:", saveErr);
