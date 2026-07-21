@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectStore } from "../stores/projectStore";
-import type { VideoSession } from "../types";
+import { makeVideoSession } from "../test-utils/videoSession";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   confirm: vi.fn(),
@@ -25,18 +25,11 @@ const {
   restoreSubtitleRecovery,
   resumeSubtitleRecovery,
   saveCurrentSubtitleRecovery,
+  withDiscardedSubtitleRecovery,
   serializeSubtitleRecovery,
 } = await import("./subtitleRecovery");
 
-const SESSION: VideoSession = {
-  videoPath: "C:/videos/episode.mp4",
-  workspacePath: "C:/cache/workspace/episode",
-  audioPath: "C:/cache/workspace/episode/audio.wav",
-  transcribedAssPath: "C:/videos/episode.transcribed.ass",
-  translatedAssPath: "C:/videos/episode.translated.ass",
-  burnAssPath: "C:/cache/workspace/episode/burn.input.ass",
-  sourceLang: "ja",
-};
+const SESSION = makeVideoSession();
 
 const SNAPSHOT = {
   version: 1 as const,
@@ -106,6 +99,55 @@ describe("subtitle recovery format", () => {
     await expect(saveCurrentSubtitleRecovery()).resolves.toBe(true);
   });
 
+  it("deletes recovery before replacement and resumes writes afterwards", async () => {
+    useProjectStore.getState().setSession(SESSION);
+    useProjectStore.getState().markDirty();
+
+    const replaced = vi.fn(() => {
+      expect(deleteSubtitleRecovery).toHaveBeenCalledWith(SESSION.videoPath);
+      useProjectStore.getState().clearSession();
+      return "replaced";
+    });
+
+    await expect(
+      withDiscardedSubtitleRecovery(SESSION.videoPath, replaced),
+    ).resolves.toBe("replaced");
+    expect(replaced).toHaveBeenCalledOnce();
+
+    useProjectStore.getState().setSession(SESSION);
+    useProjectStore.getState().markDirty();
+    await expect(saveCurrentSubtitleRecovery()).resolves.toBe(true);
+  });
+
+  it("does not block the replacement boundary on the recovery rewrite", async () => {
+    useProjectStore.getState().setSession(SESSION);
+    useProjectStore.getState().markDirty();
+
+    let finishSave!: () => void;
+    vi.mocked(saveSubtitleRecovery).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        }),
+    );
+
+    const replacing = withDiscardedSubtitleRecovery(
+      SESSION.videoPath,
+      () => "replaced",
+    );
+    await vi.waitFor(() => expect(saveSubtitleRecovery).toHaveBeenCalled());
+
+    let settled = false;
+    void replacing.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(true);
+
+    finishSave();
+    await expect(replacing).resolves.toBe("replaced");
+  });
+
   it("rechecks dirty state when a queued autosave actually runs", async () => {
     useProjectStore.getState().setSession(SESSION);
     useProjectStore.getState().markDirty();
@@ -169,17 +211,68 @@ describe("subtitle recovery format", () => {
     expect(state.activeSubtitlePath).toBe(SESSION.translatedAssPath);
   });
 
-  it("does not trust an arbitrary save target from recovery content", async () => {
+  it("keeps a missing save target missing after restore", async () => {
     useProjectStore.getState().setSession(SESSION);
     vi.mocked(loadSubtitleRecovery).mockResolvedValueOnce(
       serializeSubtitleRecovery({
         ...SNAPSHOT,
-        activeSubtitlePath: "C:/untrusted/overwrite.ass",
+        activeSubtitlePath: null,
       }),
     );
     vi.mocked(confirm).mockResolvedValueOnce(true);
 
     await expect(restoreSubtitleRecovery(SESSION)).resolves.toBe("restored");
     expect(useProjectStore.getState().activeSubtitlePath).toBeNull();
+  });
+
+  it("restores an explicitly confirmed custom ASS save target", async () => {
+    const customPath = "D:/subtitles/review-copy.ass";
+    useProjectStore.getState().setSession(SESSION);
+    vi.mocked(loadSubtitleRecovery).mockResolvedValueOnce(
+      serializeSubtitleRecovery({
+        ...SNAPSHOT,
+        activeSubtitlePath: customPath,
+      }),
+    );
+    vi.mocked(confirm).mockResolvedValueOnce(true);
+
+    await expect(restoreSubtitleRecovery(SESSION)).resolves.toBe("restored");
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining(customPath),
+      expect.objectContaining({ okLabel: "恢复", cancelLabel: "放弃" }),
+    );
+    expect(useProjectStore.getState().activeSubtitlePath).toBe(customPath);
+  });
+
+  it("deletes recovery with a non-ASS custom save target", async () => {
+    useProjectStore.getState().setSession(SESSION);
+    vi.mocked(loadSubtitleRecovery).mockResolvedValueOnce(
+      serializeSubtitleRecovery({
+        ...SNAPSHOT,
+        activeSubtitlePath: "C:/untrusted/overwrite.txt",
+      }),
+    );
+
+    await expect(restoreSubtitleRecovery(SESSION)).resolves.toBe("invalid");
+    expect(confirm).not.toHaveBeenCalled();
+    expect(deleteSubtitleRecovery).toHaveBeenCalledWith(SESSION.videoPath);
+  });
+
+  it("deletes malformed recovery content so it does not recur", async () => {
+    useProjectStore.getState().setSession(SESSION);
+    vi.mocked(loadSubtitleRecovery).mockResolvedValueOnce("not json");
+
+    await expect(restoreSubtitleRecovery(SESSION)).resolves.toBe("invalid");
+    expect(deleteSubtitleRecovery).toHaveBeenCalledWith(SESSION.videoPath);
+  });
+
+  it("reports an error when malformed recovery cleanup fails", async () => {
+    useProjectStore.getState().setSession(SESSION);
+    vi.mocked(loadSubtitleRecovery).mockResolvedValueOnce("not json");
+    vi.mocked(deleteSubtitleRecovery).mockRejectedValueOnce(
+      new Error("locked"),
+    );
+
+    await expect(restoreSubtitleRecovery(SESSION)).resolves.toBe("error");
   });
 });

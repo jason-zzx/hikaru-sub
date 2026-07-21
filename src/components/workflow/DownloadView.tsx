@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { message } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -19,7 +20,10 @@ import type {
 } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
-import { restoreSubtitleRecovery } from "../../services/subtitleRecovery";
+import {
+  restoreSubtitleRecovery,
+  withDiscardedSubtitleRecovery,
+} from "../../services/subtitleRecovery";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 import { Button } from "../ui/button";
 
@@ -207,13 +211,31 @@ export function DownloadView() {
 
   const handleImport = async () => {
     if (!completedPath) return;
-    if (!(await confirmDiscardUnsavedChanges())) return;
+    const discardDecision = await confirmDiscardUnsavedChanges();
+    if (!discardDecision.proceed) return;
     setImporting(true);
     setError(null);
     try {
       const session = await prepareVideoSession(completedPath);
-      setSession(session);
-      await restoreSubtitleRecovery(session);
+      await withDiscardedSubtitleRecovery(
+        discardDecision.recoveryVideoPath,
+        () => setSession(session),
+      );
+      const recovery = await restoreSubtitleRecovery(session);
+      if (recovery === "invalid" || recovery === "error") {
+        const recoveryMessage =
+          recovery === "invalid"
+            ? "检测到的字幕恢复文件格式无效，已删除"
+            : "处理字幕恢复文件失败，已继续打开视频";
+        try {
+          await message(recoveryMessage, {
+            title: "Hikaru Sub",
+            kind: recovery === "invalid" ? "warning" : "error",
+          });
+        } catch {
+          // Dialog failure must not block opening the prepared video.
+        }
+      }
       setStep("import");
     } catch (e) {
       setError(`打开视频失败：${String(e)}`);

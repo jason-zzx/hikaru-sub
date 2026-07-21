@@ -7,7 +7,10 @@ import {
   serializeAss,
 } from "@/lib/ass";
 import { useUiStore } from "../../stores/uiStore";
-import { useProjectStore } from "../../stores/projectStore";
+import {
+  captureProjectDocumentGuard,
+  useProjectStore,
+} from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { IconCheck } from "../layout/NavIcons";
 import { Button } from "../ui/button";
@@ -43,7 +46,7 @@ import type {
 } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
-import { clearSubtitleRecoveryIfClean } from "../../services/subtitleRecovery";
+import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
 import {
   ASR_ENGINE_NOT_INSTALLED_HINT,
   ASR_ENGINE_NOT_INSTALLED_LABEL,
@@ -133,6 +136,7 @@ export function TranscribeView() {
   const [resultCount, setResultCount] = useState<number | null>(null);
   const [savedAssPath, setSavedAssPath] = useState<string | null>(null);
 
+  const mountedRef = useRef(true);
   const pollingRef = useRef(false);
   const jobIdRef = useRef<string | null>(null);
   const engineCheckRequestRef = useRef(0);
@@ -183,9 +187,11 @@ export function TranscribeView() {
     };
   }, [session]);
 
-  // 卸载时停止轮询
+  // 卸载时停止轮询，并阻止模型下载等旧异步链重新启动任务。
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       pollingRef.current = false;
     };
   }, []);
@@ -304,15 +310,27 @@ export function TranscribeView() {
     setSidecarEngineMissing(false);
   };
 
-  const pollLoop = async (jobId: string) => {
-    pollingRef.current = true;
+  const pollLoop = async (
+    jobId: string,
+    documentGuard: ReturnType<typeof captureProjectDocumentGuard>,
+    discardRecoveryVideoPath: string | null,
+  ) => {
+    const rejectStaleResult = () => {
+      if (documentGuard.unchanged()) return false;
+      if (mountedRef.current) {
+        setAsrError("字幕或工作视频已发生变化，已放弃本次转录结果");
+      }
+      updateTask("asr", { status: "error" });
+      return true;
+    };
+
     let progressQueryFailures = 0;
     while (pollingRef.current) {
+      if (rejectStaleResult()) break;
       let snap: AsrJobSnapshot;
       try {
         snap = await getAsrProgress(jobId, false);
         progressQueryFailures = 0;
-        setAsrError(null);
       } catch (e) {
         if (!pollingRef.current) break;
         const message = String(e);
@@ -328,16 +346,30 @@ export function TranscribeView() {
         updateTask("asr", { status: "error" });
         break;
       }
-      if (!pollingRef.current) break; // 轮询期间已被取消，丢弃本次结果
+      if (!pollingRef.current || rejectStaleResult()) break;
+      if (mountedRef.current) setAsrError(null);
       setJob(snap);
       updateTask("asr", { progress: Math.round(snap.progress * 100) });
 
       if (snap.status === "completed") {
         try {
           const full = await getAsrProgress(jobId, true);
+          if (!pollingRef.current || rejectStaleResult()) break;
           const segments = full.segments ?? [];
           const cues = mergeShortCues(segmentsToCues(segments, PRIMARY_STYLE));
-          setCues(cues);
+          const applied = await withDiscardedSubtitleRecovery(
+            discardRecoveryVideoPath,
+            () => {
+              if (!documentGuard.unchanged()) return false;
+              setCues(cues);
+              return true;
+            },
+          );
+          if (!applied) {
+            rejectStaleResult();
+            break;
+          }
+          const resultGuard = captureProjectDocumentGuard(session.videoPath);
           setResultCount(cues.length);
           setJob(full);
           updateTask("asr", { status: "success", progress: 100 });
@@ -359,9 +391,20 @@ export function TranscribeView() {
                   "无法读取视频分辨率，字幕 PlayRes 已使用默认 1920×1080";
               }
 
+              if (!pollingRef.current || !resultGuard.unchanged()) {
+                if (mountedRef.current) {
+                  setAsrError(
+                    "转录结果载入后字幕发生变化，已停止自动保存",
+                  );
+                }
+                updateTask("asr", { status: "error" });
+                break;
+              }
+
               const doc = createDefaultDocument("Hikaru Sub", resX, resY);
               doc.cues = cues;
               setAssMetadata(doc.scriptInfo, doc.styles);
+              const saveGuard = captureProjectDocumentGuard(session.videoPath);
               // Capture paired snapshot after metadata, serialize immediately before write.
               const snap = useProjectStore.getState().captureSaveSnapshot();
               const assText = serializeAss({
@@ -370,18 +413,14 @@ export function TranscribeView() {
                 cues: snap.cues,
               });
               await saveAssText(session.transcribedAssPath, assText);
+              if (!saveGuard.sameDocument()) {
+                updateTask("asr", { status: "error" });
+                break;
+              }
               setActiveSubtitle("transcribed", session.transcribedAssPath);
               markSaved(snap.token);
               setSavedAssPath(session.transcribedAssPath);
-              let recoveryWarning: string | null = null;
-              try {
-                await clearSubtitleRecoveryIfClean(session.videoPath);
-              } catch (err) {
-                recoveryWarning = `字幕已保存，但清理恢复文件失败：${String(err)}`;
-              }
-              if (playResWarning || recoveryWarning) {
-                setAsrError(playResWarning ?? recoveryWarning);
-              }
+              if (playResWarning) setAsrError(playResWarning);
             } catch (saveErr) {
               console.warn("保存 ASS 文件失败:", saveErr);
               setAsrError(`转录完成，但保存 ASS 失败：${String(saveErr)}`);
@@ -407,11 +446,26 @@ export function TranscribeView() {
       await sleep(ASR_POLL_INTERVAL_MS);
     }
     pollingRef.current = false;
-    setTranscribing(false);
+    if (mountedRef.current) setTranscribing(false);
   };
 
   const runTranscribe = async () => {
-    if (!(await confirmDiscardUnsavedChanges())) return;
+    if (
+      !mountedRef.current ||
+      useProjectStore.getState().session?.videoPath !== session.videoPath
+    ) {
+      return;
+    }
+    const discardDecision = await confirmDiscardUnsavedChanges();
+    if (!discardDecision.proceed) return;
+    if (
+      !mountedRef.current ||
+      useProjectStore.getState().session?.videoPath !== session.videoPath
+    ) {
+      return;
+    }
+    const documentGuard = captureProjectDocumentGuard(session.videoPath);
+    pollingRef.current = true;
 
     setAsrError(null);
     setResultCount(null);
@@ -446,12 +500,33 @@ export function TranscribeView() {
             }
           : null,
       });
+      if (
+        !mountedRef.current ||
+        !pollingRef.current ||
+        !documentGuard.unchanged()
+      ) {
+        pollingRef.current = false;
+        void cancelAsr(jobId).catch(() => undefined);
+        updateTask("asr", { status: "error" });
+        if (mountedRef.current) {
+          setAsrError("字幕或工作视频已发生变化，已取消启动转录");
+          setTranscribing(false);
+        }
+        return;
+      }
       jobIdRef.current = jobId;
-      void pollLoop(jobId);
+      void pollLoop(
+        jobId,
+        documentGuard,
+        discardDecision.recoveryVideoPath,
+      );
     } catch (e) {
-      setAsrError(`启动转录失败：${String(e)}`);
+      pollingRef.current = false;
+      if (mountedRef.current) {
+        setAsrError(`启动转录失败：${String(e)}`);
+        setTranscribing(false);
+      }
       updateTask("asr", { status: "error" });
-      setTranscribing(false);
     }
   };
 

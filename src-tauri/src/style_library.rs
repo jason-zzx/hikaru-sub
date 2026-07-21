@@ -39,27 +39,43 @@ fn save_style_library_text_with(
     content: &str,
     replace: fn(&Path, &Path) -> Result<(), String>,
 ) -> Result<(), String> {
+    atomic_write_text_with(path, content, "style-library", replace)
+        .map_err(|err| format!("保存样式库失败（{}）：{err}", path.display()))
+}
+
+pub(crate) fn atomic_write_text(
+    path: &Path,
+    content: &str,
+    temp_prefix: &str,
+) -> Result<(), String> {
+    atomic_write_text_with(path, content, temp_prefix, replace_file)
+}
+
+fn atomic_write_text_with(
+    path: &Path,
+    content: &str,
+    temp_prefix: &str,
+    replace: fn(&Path, &Path) -> Result<(), String>,
+) -> Result<(), String> {
     let parent = path
         .parent()
-        .ok_or_else(|| format!("无法解析样式库父目录：{}", path.display()))?;
+        .ok_or_else(|| format!("无法解析文件父目录：{}", path.display()))?;
     fs::create_dir_all(parent)
-        .map_err(|err| format!("无法创建样式库配置目录（{}）：{err}", parent.display()))?;
+        .map_err(|err| format!("无法创建文件目录（{}）：{err}", parent.display()))?;
 
-    let temp_path = unique_temp_path(parent);
+    let temp_path = unique_temp_path(parent, temp_prefix);
     let write_result = (|| -> Result<(), String> {
         let mut file = OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&temp_path)
-            .map_err(|err| format!("无法创建样式库临时文件（{}）：{err}", temp_path.display()))?;
+            .map_err(|err| format!("无法创建临时文件（{}）：{err}", temp_path.display()))?;
         file.write_all(content.as_bytes())
-            .map_err(|err| format!("写入样式库临时文件失败（{}）：{err}", temp_path.display()))?;
-        // Ensure OS buffer is committed before replacement.
+            .map_err(|err| format!("写入临时文件失败（{}）：{err}", temp_path.display()))?;
         file.sync_all()
-            .map_err(|err| format!("同步样式库临时文件失败（{}）：{err}", temp_path.display()))?;
+            .map_err(|err| format!("同步临时文件失败（{}）：{err}", temp_path.display()))?;
         drop(file);
-        replace(&temp_path, path)
-            .map_err(|err| format!("保存样式库失败（{}）：{err}", path.display()))?;
+        replace(&temp_path, path)?;
         Ok(())
     })();
 
@@ -69,21 +85,17 @@ fn save_style_library_text_with(
     write_result
 }
 
-fn unique_temp_path(parent: &Path) -> PathBuf {
+fn unique_temp_path(parent: &Path, prefix: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
         .unwrap_or(0);
     // ponytail: pid+nanos is enough; no need for uuid crate.
-    parent.join(format!(
-        ".style-library.{}.{}.tmp",
-        std::process::id(),
-        nanos
-    ))
+    parent.join(format!(".{prefix}.{}.{}.tmp", std::process::id(), nanos))
 }
 
 /// Platform-correct same-directory replacement. Never deletes dest first.
-pub(crate) fn replace_file(temp: &Path, dest: &Path) -> Result<(), String> {
+fn replace_file(temp: &Path, dest: &Path) -> Result<(), String> {
     #[cfg(windows)]
     {
         replace_file_windows(temp, dest)

@@ -21,7 +21,10 @@ import {
 import type { FfmpegStatus } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
-import { restoreSubtitleRecovery } from "../../services/subtitleRecovery";
+import {
+  restoreSubtitleRecovery,
+  withDiscardedSubtitleRecovery,
+} from "../../services/subtitleRecovery";
 import { ClipDialog } from "./ClipDialog";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
@@ -76,12 +79,16 @@ export function ImportView() {
       return;
     }
     if (!videoPath) return;
-    if (!(await confirmDiscardUnsavedChanges())) return;
+    const discardDecision = await confirmDiscardUnsavedChanges();
+    if (!discardDecision.proceed) return;
 
     setBusy(true);
     try {
       const session = await prepareVideoSession(videoPath);
-      setSession(session);
+      await withDiscardedSubtitleRecovery(
+        discardDecision.recoveryVideoPath,
+        () => setSession(session),
+      );
 
       const { loadAssDocument } = useProjectStore.getState();
       const translatedPath = translatedAssPath(session);
@@ -112,9 +119,9 @@ export function ImportView() {
 
       const recovery = await restoreSubtitleRecovery(session);
       if (recovery === "invalid") {
-        setError("检测到的字幕恢复文件格式无效，已跳过恢复");
+        setError("检测到的字幕恢复文件格式无效，已删除");
       } else if (recovery === "error") {
-        setError("读取字幕恢复文件失败，已继续打开视频");
+        setError("处理字幕恢复文件失败，已继续打开视频");
       }
     } catch (e) {
       setError(`打开视频失败：${String(e)}`);
@@ -284,12 +291,11 @@ export function ImportView() {
           onOpenChange={setClipOpen}
           videoPath={session.videoPath}
           onStart={async (args) => {
-            if (
-              args.useAsWorkingVideo &&
-              !(await confirmDiscardUnsavedChanges())
-            ) {
-              return;
-            }
+            const discardDecision = args.useAsWorkingVideo
+              ? await confirmDiscardUnsavedChanges()
+              : { proceed: true, recoveryVideoPath: null };
+            if (!discardDecision.proceed) return;
+
             const run = async () => {
               setClipOpen(false);
               clearSuccessMessage();
@@ -304,7 +310,11 @@ export function ImportView() {
                   saveDir: args.saveDir,
                   fileName: args.fileName,
                 });
-                startJob(id, { useAsWorkingVideo: args.useAsWorkingVideo });
+                startJob(id, {
+                  useAsWorkingVideo: args.useAsWorkingVideo,
+                  discardRecoveryVideoPath:
+                    discardDecision.recoveryVideoPath,
+                });
               } catch (e) {
                 clipSetError(String(e));
                 updateTask("video-clip", { status: "error" });

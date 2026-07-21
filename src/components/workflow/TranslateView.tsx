@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { parseAss, serializeAss, type SubtitleCue } from "@/lib/ass";
 import { isTranslationProviderReady } from "@/constants/translationProviders";
 import { useUiStore } from "../../stores/uiStore";
-import { useProjectStore } from "../../stores/projectStore";
+import {
+  captureProjectDocumentGuard,
+  useProjectStore,
+} from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { IconAlertTriangle, IconCheck } from "../layout/NavIcons";
 import { Select } from "../ui/select-adapter";
@@ -18,7 +21,7 @@ import {
   type TranslationProgress,
 } from "../../services/translation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
-import { clearSubtitleRecoveryIfClean } from "../../services/subtitleRecovery";
+import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
 import type { AppSettings } from "../../types";
 
 const TARGET_LANGS = [
@@ -131,7 +134,15 @@ export function TranslateView() {
     ) {
       return;
     }
-    if (!(await confirmDiscardUnsavedChanges())) return;
+    const discardDecision = await confirmDiscardUnsavedChanges();
+    if (!discardDecision.proceed) return;
+    const documentGuard = captureProjectDocumentGuard(session.videoPath);
+    const rejectStaleResult = () => {
+      if (documentGuard.unchanged()) return false;
+      setError("字幕或工作视频已发生变化，已放弃本次翻译结果");
+      updateTask("translate", { status: "error" });
+      return true;
+    };
 
     setError(null);
     setSuccess(false);
@@ -187,8 +198,7 @@ export function TranslateView() {
           });
         },
       );
-
-      setLogicalResultCues(result.cues);
+      if (rejectStaleResult()) return;
 
       // Bilingual boundary: serialize logical result, re-parse as physical rows.
       const { assScriptInfo, assStyles } = useProjectStore.getState();
@@ -203,30 +213,47 @@ export function TranslateView() {
         const originalAssText = await loadAssText(session.transcribedAssPath);
         baseDoc = parseAss(originalAssText, { mergeBilingual: false });
         baseDoc.cues = result.cues;
-        setAssMetadata(baseDoc.scriptInfo, baseDoc.styles);
       }
+      if (rejectStaleResult()) return;
 
       const serialized = serializeAss(baseDoc, {
         mergeMode: settings.subtitleMergeMode,
         preserveOrder: true,
       });
       const physicalDoc = parseAss(serialized, { mergeBilingual: false });
+      const applied = await withDiscardedSubtitleRecovery(
+        discardDecision.recoveryVideoPath,
+        () => {
+          if (!documentGuard.unchanged()) return false;
+          setCues(physicalDoc.cues);
+          setAssMetadata(physicalDoc.scriptInfo, physicalDoc.styles);
+          return true;
+        },
+      );
+      if (!applied) {
+        rejectStaleResult();
+        return;
+      }
+      setLogicalResultCues(result.cues);
       // Pair immutable serialized output with physical doc/token before write await.
-      setCues(physicalDoc.cues);
-      setAssMetadata(physicalDoc.scriptInfo, physicalDoc.styles);
+      const resultGuard = captureProjectDocumentGuard(session.videoPath);
       const snap = useProjectStore.getState().captureSaveSnapshot();
 
       try {
         await saveAssText(session.translatedAssPath, serialized);
+        if (!resultGuard.sameDocument()) {
+          setError("工作视频已切换，翻译文件已写入但未覆盖当前字幕");
+          updateTask("translate", { status: "error" });
+          return;
+        }
         setActiveSubtitle("translated", session.translatedAssPath);
         markSaved(snap.token);
-        try {
-          await clearSubtitleRecoveryIfClean(session.videoPath);
-        } catch (recoveryErr) {
-          console.warn("字幕已保存，但清理恢复文件失败:", recoveryErr);
-        }
         console.log(`翻译后的字幕已保存到: ${session.translatedAssPath}`);
       } catch (saveErr) {
+        if (!resultGuard.sameDocument()) {
+          updateTask("translate", { status: "error" });
+          return;
+        }
         // Keep physical rows in memory as unsaved translated content.
         setActiveSubtitle("translated", null);
         console.warn("保存翻译后的字幕失败:", saveErr);

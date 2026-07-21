@@ -72,6 +72,13 @@ export function parseSubtitleRecovery(
     ) {
       return null;
     }
+    if (
+      candidate.activeSubtitlePath !== null &&
+      (!candidate.activeSubtitleKind ||
+        !candidate.activeSubtitlePath.toLowerCase().endsWith(".ass"))
+    ) {
+      return null;
+    }
     return {
       version: RECOVERY_VERSION,
       videoPath,
@@ -102,6 +109,26 @@ export async function discardSubtitleRecovery(videoPath: string): Promise<void> 
 
 export function resumeSubtitleRecovery(videoPath: string): void {
   recoveryWriteSuppressed.delete(videoPath);
+}
+
+export async function withDiscardedSubtitleRecovery<T>(
+  videoPath: string | null,
+  replaceDocument: () => T,
+): Promise<T> {
+  if (!videoPath) return replaceDocument();
+
+  await discardSubtitleRecovery(videoPath);
+  try {
+    return replaceDocument();
+  } finally {
+    resumeSubtitleRecovery(videoPath);
+    const state = useProjectStore.getState();
+    if (state.session?.videoPath === videoPath && state.isDirty) {
+      void saveCurrentSubtitleRecovery().catch(() => {
+        // The normal autosave interval will retry.
+      });
+    }
+  }
 }
 
 export async function clearSubtitleRecoveryIfClean(
@@ -176,12 +203,34 @@ export async function restoreSubtitleRecovery(
   if (!content) return "none";
 
   const snapshot = parseSubtitleRecovery(content, session.videoPath);
-  if (!snapshot) return "invalid";
+  if (!snapshot) {
+    try {
+      await clearSubtitleRecovery(session.videoPath);
+      return "invalid";
+    } catch (err) {
+      console.warn("删除无效字幕恢复文件失败:", err);
+      return "error";
+    }
+  }
+
+  const expectedSubtitlePath =
+    snapshot.activeSubtitleKind === "translated"
+      ? session.translatedAssPath
+      : snapshot.activeSubtitleKind === "transcribed"
+        ? session.transcribedAssPath
+        : null;
+  const customSubtitlePath =
+    snapshot.activeSubtitlePath &&
+    snapshot.activeSubtitlePath !== expectedSubtitlePath
+      ? snapshot.activeSubtitlePath
+      : null;
 
   let restore = false;
   try {
     restore = await confirm(
-      "检测到此工作视频的未保存字幕恢复文件，是否恢复？",
+      customSubtitlePath
+        ? `检测到此工作视频的未保存字幕恢复文件。恢复后将继续保存到以下自定义位置：\n${customSubtitlePath}\n\n是否恢复？`
+        : "检测到此工作视频的未保存字幕恢复文件，是否恢复？",
       {
         title: "Hikaru Sub",
         kind: "warning",
@@ -207,16 +256,7 @@ export async function restoreSubtitleRecovery(
     return "none";
   }
   const doc = parseAss(snapshot.assText, { mergeBilingual: false });
-  const expectedSubtitlePath =
-    snapshot.activeSubtitleKind === "translated"
-      ? session.translatedAssPath
-      : snapshot.activeSubtitleKind === "transcribed"
-        ? session.transcribedAssPath
-        : null;
-  const activeSubtitlePath =
-    snapshot.activeSubtitlePath === expectedSubtitlePath
-      ? expectedSubtitlePath
-      : null;
+  const activeSubtitlePath = snapshot.activeSubtitlePath;
   useProjectStore.getState().loadAssDocument(
     doc,
     snapshot.activeSubtitleKind

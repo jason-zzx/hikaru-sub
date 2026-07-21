@@ -1,10 +1,8 @@
 use crate::dependencies::work_cache_dir;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -95,40 +93,8 @@ fn subtitle_recovery_path(video_path: &str, cache_root: &Path) -> Result<PathBuf
 }
 
 fn write_subtitle_recovery(path: &Path, content: &str) -> Result<(), String> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| format!("无法解析恢复文件父目录: {}", path.display()))?;
-    fs::create_dir_all(parent)
-        .map_err(|e| format!("无法创建恢复文件目录 {}: {e}", parent.display()))?;
-
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
-    let temp_path = parent.join(format!(
-        ".subtitle-recovery.{}.{}.tmp",
-        std::process::id(),
-        nonce
-    ));
-    let result = (|| -> Result<(), String> {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temp_path)
-            .map_err(|e| format!("无法创建恢复文件临时文件: {e}"))?;
-        file.write_all(content.as_bytes())
-            .map_err(|e| format!("写入恢复文件临时文件失败: {e}"))?;
-        file.sync_all()
-            .map_err(|e| format!("同步恢复文件临时文件失败: {e}"))?;
-        drop(file);
-        crate::style_library::replace_file(&temp_path, path)
-            .map_err(|e| format!("替换恢复文件失败: {e}"))
-    })();
-
-    if result.is_err() {
-        let _ = fs::remove_file(&temp_path);
-    }
-    result
+    crate::style_library::atomic_write_text(path, content, "subtitle-recovery")
+        .map_err(|e| format!("保存恢复文件失败: {e}"))
 }
 
 fn load_subtitle_recovery_text(path: &Path) -> Result<Option<String>, String> {

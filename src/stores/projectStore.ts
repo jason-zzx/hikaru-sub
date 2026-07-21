@@ -816,3 +816,33 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }),
   };
 });
+
+export function captureProjectDocumentGuard(
+  expectedVideoPath: string | null =
+    useProjectStore.getState().session?.videoPath ?? null,
+) {
+  const captured = useProjectStore.getState();
+  const capturedVideoPath = captured.session?.videoPath ?? null;
+  const documentEpoch = captured.documentEpoch;
+  const cues = captured.cues;
+  const scriptInfo = captured.assScriptInfo;
+  const styles = captured.assStyles;
+
+  const matchesDocument = (state: ProjectState) =>
+    capturedVideoPath === expectedVideoPath &&
+    (state.session?.videoPath ?? null) === expectedVideoPath &&
+    state.documentEpoch === documentEpoch;
+
+  return {
+    sameDocument: () => matchesDocument(useProjectStore.getState()),
+    unchanged: () => {
+      const current = useProjectStore.getState();
+      return (
+        matchesDocument(current) &&
+        current.cues === cues &&
+        current.assScriptInfo === scriptInfo &&
+        current.assStyles === styles
+      );
+    },
+  };
+}

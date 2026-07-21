@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDefaultStyles, type AssStyle } from "@/lib/ass";
-import { useProjectStore } from "./projectStore";
+import {
+  captureProjectDocumentGuard,
+  useProjectStore,
+} from "./projectStore";
 import { usePlaybackStore } from "./playbackStore";
 import type { SubtitleCue } from "../types";
 import { makeTextOp } from "../services/editorTextHistory";
@@ -505,6 +508,47 @@ describe("projectStore unified history", () => {
     expect(state.history.compositionBaseline).toBeNull();
     expect(state.history.past).toHaveLength(1);
     expect(state.history.past[0]!.cues[0].primaryText).toBe("ab");
+  });
+
+  it("invalidates captured document content after cue or style edits", () => {
+    const cueGuard = captureProjectDocumentGuard();
+    expect(cueGuard.sameDocument()).toBe(true);
+    expect(cueGuard.unchanged()).toBe(true);
+
+    useProjectStore.getState().updateCue("a", { primaryText: "later edit" });
+    expect(cueGuard.sameDocument()).toBe(true);
+    expect(cueGuard.unchanged()).toBe(false);
+
+    const styleGuard = captureProjectDocumentGuard();
+    useProjectStore.getState().updateStyle("Primary", { fontSize: 72 });
+    expect(styleGuard.sameDocument()).toBe(true);
+    expect(styleGuard.unchanged()).toBe(false);
+  });
+
+  it("rejects capture when the current session is not the expected video", () => {
+    const guard = captureProjectDocumentGuard("C:/video/expected.mp4");
+    expect(guard.sameDocument()).toBe(false);
+    expect(guard.unchanged()).toBe(false);
+  });
+
+  it("invalidates the captured document after a lifecycle replacement", () => {
+    const guard = captureProjectDocumentGuard();
+    useProjectStore.getState().loadAssDocument({
+      scriptInfo: {
+        title: "replacement",
+        scriptType: "v4.00+",
+        playResX: 1920,
+        playResY: 1080,
+        wrapStyle: 0,
+        scaledBorderAndShadow: true,
+        extra: {},
+      },
+      styles: createDefaultStyles(),
+      cues: [cue("b", 0, 1000)],
+    });
+
+    expect(guard.sameDocument()).toBe(false);
+    expect(guard.unchanged()).toBe(false);
   });
 
   it("advances document epoch only for history-reset lifecycle actions", () => {
