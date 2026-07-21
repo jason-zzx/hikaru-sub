@@ -265,12 +265,14 @@ describe("编辑动作", () => {
 });
 
 describe("系统动作", () => {
-  it("save / toggle-help 走回调；undo/redo 走 projectStore", () => {
+  it("save / toggle-help / open-find 走回调；undo/redo 走 projectStore", () => {
     const onSave = vi.fn();
     const onToggleHelp = vi.fn();
+    const onOpenFind = vi.fn();
     const actions = buildEditorActions({
       onSave,
       onToggleHelp,
+      onOpenFind,
       onUndo: () => useProjectStore.getState().undo(),
       onRedo: () => useProjectStore.getState().redo(),
     });
@@ -278,6 +280,8 @@ describe("系统动作", () => {
     expect(onSave).toHaveBeenCalledOnce();
     actions["toggle-help"]!();
     expect(onToggleHelp).toHaveBeenCalledOnce();
+    actions["open-find"]!();
+    expect(onOpenFind).toHaveBeenCalledOnce();
 
     useProjectStore.getState().updateCue("a", { primaryText: "changed" });
     actions["undo"]!();

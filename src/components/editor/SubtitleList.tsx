@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import {
   deleteCuesById,
   duplicateCues,
@@ -23,6 +30,7 @@ import {
   getCueListColumnVisibility,
   type CueListColumn,
 } from "./cueListColumns";
+import { collectOverlappingCueIds } from "../../utils/subtitleQc";
 
 type SubtitleListNotify = (variant: EditorToastVariant, text: string) => void;
 
@@ -87,6 +95,10 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
   const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
   const knownStyleNames = new Set(assStyles.map((style) => style.name));
   const columnVisibility = getCueListColumnVisibility(cues);
+  const overlappingIds = useMemo(
+    () => collectOverlappingCueIds(cues, selectedCueId),
+    [cues, selectedCueId],
+  );
 
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
@@ -292,6 +304,7 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
         {cues.map((cue, index) => {
           const isSelected =
             selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
+          const isOverlap = !isSelected && overlappingIds.has(cue.id);
           const styleMissing =
             assStyles.length > 0 && !knownStyleNames.has(cue.style);
           return (
@@ -303,7 +316,9 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
               className={`col-span-full grid cursor-pointer grid-cols-subgrid items-center rounded py-1 text-sm transition-colors ${
                 isSelected
                   ? "bg-primary/10 ring-1 ring-inset ring-primary/40"
-                  : "hover:bg-surface-overlay"
+                  : isOverlap
+                    ? "bg-danger/10 text-danger ring-1 ring-inset ring-danger/35 hover:bg-danger/15"
+                    : "hover:bg-surface-overlay"
               }`}
             >
               {columns.map((column) => {
@@ -320,7 +335,9 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
                     key={column}
                     title={value.trim() === "" ? undefined : value}
                     className={`min-w-0 truncate whitespace-nowrap ${
-                      mono ? "font-mono text-xs text-text-muted" : ""
+                      mono
+                        ? `font-mono text-xs ${isOverlap ? "" : "text-text-muted"}`
+                        : ""
                     } ${
                       column === "index" ||
                       column === "layer" ||
@@ -330,11 +347,13 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
                     } ${
                       warnStyle
                         ? "text-warning"
-                        : column === "text"
-                          ? "text-text"
-                          : column === "style"
-                            ? "text-text-muted"
-                            : ""
+                        : isOverlap
+                          ? ""
+                          : column === "text"
+                            ? "text-text"
+                            : column === "style"
+                              ? "text-text-muted"
+                              : ""
                     }`}
                   >
                     {value || (column === "text" ? "" : "\u00A0")}

@@ -39,7 +39,8 @@ export type EditorActionId =
   | "save"
   | "undo"
   | "redo"
-  | "toggle-help";
+  | "toggle-help"
+  | "open-find";
 
 export interface HotkeyDef {
   /** Stable persistence ID. */
@@ -98,6 +99,7 @@ export const EDITOR_HOTKEYS: HotkeyDef[] = [
   { id: "redo-ctrl-y", key: "y", ctrl: true, scope: "history-command", action: "redo", description: "重做", category: "系统" },
   { id: "redo-ctrl-shift-z", key: "z", ctrl: true, shift: true, scope: "history-command", action: "redo", description: "重做", category: "系统" },
   { id: "toggle-help", key: "?", shift: true, scope: "outside-input", action: "toggle-help", description: "键位速查", category: "系统" },
+  { id: "open-find", key: "f", ctrl: true, scope: "global", action: "open-find", description: "打开查找 / 质检", category: "系统" },
 ];
 
 /** 按 category 分组，保持键位表内出现顺序。 */

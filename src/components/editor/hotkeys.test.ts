@@ -128,6 +128,8 @@ describe("findHotkey", () => {
 
   it("? 呼出速查（Shift+/ 产生的 key）", () => {
     expect(findHotkey(ev({ key: "?", shiftKey: true, target: BODY }))?.action).toBe("toggle-help");
+    expect(findHotkey(ev({ key: "f", ctrlKey: true, target: BODY }))?.action).toBe("open-find");
+    expect(findHotkey(ev({ key: "f", ctrlKey: true, target: TEXTAREA }))?.action).toBe("open-find");
   });
 
   it("handledLocally 的键分发器跳过（Enter 由 SubtitleEditor 处理）", () => {

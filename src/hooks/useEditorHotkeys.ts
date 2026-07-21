@@ -30,6 +30,7 @@ export interface EditorHotkeyOptions {
   onToggleHelp: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onOpenFind?: () => void;
   onNotify?: (variant: "success" | "error" | "info", text: string) => void;
   hotkeys?: readonly HotkeyDef[];
   enabled?: boolean;
@@ -210,6 +211,7 @@ export function buildEditorActions(
     undo: options.onUndo,
     redo: options.onRedo,
     "toggle-help": options.onToggleHelp,
+    "open-find": () => options.onOpenFind?.(),
   };
 }
 
@@ -224,6 +226,7 @@ export function useEditorHotkeys(options: EditorHotkeyOptions) {
       onToggleHelp: () => optionsRef.current.onToggleHelp(),
       onUndo: () => optionsRef.current.onUndo(),
       onRedo: () => optionsRef.current.onRedo(),
+      onOpenFind: () => optionsRef.current.onOpenFind?.(),
       onNotify: (variant, text) => optionsRef.current.onNotify?.(variant, text),
     });
     const onKeyDown = (e: KeyboardEvent) => {
