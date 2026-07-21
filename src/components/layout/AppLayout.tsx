@@ -1,6 +1,7 @@
 import { useUiStore } from "../../stores/uiStore";
 import { useBurnJobPoller } from "../../hooks/useBurnJobPoller";
 import { useClipJobPoller } from "../../hooks/useClipJobPoller";
+import { useUnsavedChangesCloseGuard } from "../../hooks/useUnsavedChangesCloseGuard";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { WelcomeView } from "../workflow/WelcomeView";
@@ -31,6 +32,7 @@ export function AppLayout() {
 
   useBurnJobPoller();
   useClipJobPoller();
+  useUnsavedChangesCloseGuard();
 
   return (
     <div className="flex h-full flex-col">

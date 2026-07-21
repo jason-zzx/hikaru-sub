@@ -18,6 +18,7 @@ import type {
   FfmpegStatus,
 } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
+import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 import { Button } from "../ui/button";
 
@@ -205,6 +206,7 @@ export function DownloadView() {
 
   const handleImport = async () => {
     if (!completedPath) return;
+    if (!(await confirmDiscardUnsavedChanges())) return;
     setImporting(true);
     setError(null);
     try {

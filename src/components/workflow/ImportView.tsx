@@ -20,6 +20,7 @@ import {
 } from "../../services/tauri";
 import type { FfmpegStatus } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
+import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import { ClipDialog } from "./ClipDialog";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
@@ -74,6 +75,7 @@ export function ImportView() {
       return;
     }
     if (!videoPath) return;
+    if (!(await confirmDiscardUnsavedChanges())) return;
 
     setBusy(true);
     try {
@@ -274,6 +276,12 @@ export function ImportView() {
           onOpenChange={setClipOpen}
           videoPath={session.videoPath}
           onStart={async (args) => {
+            if (
+              args.useAsWorkingVideo &&
+              !(await confirmDiscardUnsavedChanges())
+            ) {
+              return;
+            }
             const run = async () => {
               setClipOpen(false);
               clearSuccessMessage();
