@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { parseAss, serializeAss, type SubtitleCue } from "@/lib/ass";
 import { isTranslationProviderReady } from "@/constants/translationProviders";
 import { useUiStore } from "../../stores/uiStore";
@@ -19,10 +19,15 @@ import {
 import {
   createTranslationProvider,
   type TranslationProgress,
+  type TranslationResult,
 } from "../../services/translation";
-import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
+import {
+  confirmDiscardUnsavedChanges,
+  type DiscardUnsavedChangesDecision,
+} from "../../services/unsavedChanges";
 import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
 import type { AppSettings } from "../../types";
+import { mergeRetryResult, translatedCueCount } from "./translationResult";
 
 const TARGET_LANGS = [
   { value: "zh-CN", label: "简体中文" },
@@ -32,33 +37,59 @@ const TARGET_LANGS = [
   { value: "ko", label: "韩语" },
 ];
 
+const MAX_VISIBLE_ERRORS = 20;
+
+type ActiveRun = {
+  id: number;
+  controller: AbortController;
+  acceptingRequests: boolean;
+  cancelRequested: boolean;
+};
+
+type ApplyResult = "saved" | "save-error" | "stale";
+
+function buildGlossary(settings: AppSettings): Record<string, string> | undefined {
+  const glossary: Record<string, string> = {};
+  for (const line of settings.translationGlossary?.split("\n") ?? []) {
+    const match = line.trim().match(/^(.+?)\s*->\s*(.+)$/);
+    if (match) glossary[match[1].trim()] = match[2].trim();
+  }
+  return Object.keys(glossary).length > 0 ? glossary : undefined;
+}
+
 export function TranslateView() {
-  const setStep = useUiStore((s) => s.setStep);
-  const openSettings = useUiStore((s) => s.openSettings);
-  const session = useProjectStore((s) => s.session);
-  const setCues = useProjectStore((s) => s.setCues);
-  const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
-  const setActiveSubtitle = useProjectStore((s) => s.setActiveSubtitle);
-  const markSaved = useProjectStore((s) => s.markSaved);
-  const upsertTask = useTaskStore((s) => s.upsertTask);
-  const updateTask = useTaskStore((s) => s.updateTask);
+  const setStep = useUiStore((state) => state.setStep);
+  const openSettings = useUiStore((state) => state.openSettings);
+  const session = useProjectStore((state) => state.session);
+  const setCues = useProjectStore((state) => state.setCues);
+  const setAssMetadata = useProjectStore((state) => state.setAssMetadata);
+  const setActiveSubtitle = useProjectStore(
+    (state) => state.setActiveSubtitle,
+  );
+  const markSaved = useProjectStore((state) => state.markSaved);
+  const translationTask = useTaskStore((state) => state.tasks.translate);
+  const upsertTask = useTaskStore((state) => state.upsertTask);
+  const updateTask = useTaskStore((state) => state.updateTask);
 
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [targetLang, setTargetLang] = useState("zh-CN");
   const [translating, setTranslating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [canCancel, setCanCancel] = useState(false);
   const [progress, setProgress] = useState<TranslationProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [result, setResult] = useState<TranslationResult | null>(null);
+  const [resultApplied, setResultApplied] = useState(false);
 
   // Page-owned logical source (transcribed ASS), not projectStore editor rows.
   const [sourceCues, setSourceCues] = useState<SubtitleCue[]>([]);
   const [sourceLoading, setSourceLoading] = useState(true);
   const [hasAss, setHasAss] = useState(false);
-  const [logicalResultCues, setLogicalResultCues] = useState<SubtitleCue[] | null>(
-    null,
-  );
+
+  const operationIdRef = useRef(0);
+  const activeRunRef = useRef<ActiveRun | null>(null);
 
   useEffect(() => {
     getSettings()
@@ -73,16 +104,43 @@ export function TranslateView() {
   }, []);
 
   useEffect(() => {
+    setTranslating(false);
+    setSaving(false);
+    setCanCancel(false);
+    setProgress(null);
+
+    return () => {
+      operationIdRef.current += 1;
+      const run = activeRunRef.current;
+      activeRunRef.current = null;
+      if (run) {
+        run.acceptingRequests = false;
+        run.controller.abort();
+      }
+      const task = useTaskStore.getState().tasks.translate;
+      if (task?.status === "running") {
+        useTaskStore.getState().updateTask("translate", {
+          status: "idle",
+          message: "翻译已取消，不会在后台继续运行",
+        });
+      }
+    };
+  }, [session?.videoPath]);
+
+  useEffect(() => {
     if (!session) {
       setSourceCues([]);
       setHasAss(false);
       setSourceLoading(false);
+      setResult(null);
+      setResultApplied(false);
       return;
     }
     setTargetLang(settings?.defaultTargetLang || "zh-CN");
     setSourceLoading(true);
-    setSuccess(false);
-    setLogicalResultCues(null);
+    setResult(null);
+    setResultApplied(false);
+    setError(null);
 
     let cancelled = false;
     (async () => {
@@ -98,7 +156,6 @@ export function TranslateView() {
         if (cancelled) return;
         const doc = parseAss(text, { mergeBilingual: false });
         setHasAss(true);
-        // Page-owned source only — do not overwrite editor styles/scriptInfo on enter.
         setSourceCues(doc.cues);
       } catch {
         if (!cancelled) {
@@ -125,96 +182,42 @@ export function TranslateView() {
   );
   const activeProviderReady = isTranslationProviderReady(activeProvider);
 
-  const handleTranslate = useCallback(async () => {
-    if (
-      !session ||
-      !settings ||
-      !activeProviderReady ||
-      sourceCues.length === 0
-    ) {
-      return;
-    }
-    const discardDecision = await confirmDiscardUnsavedChanges();
-    if (!discardDecision.proceed) return;
-    const documentGuard = captureProjectDocumentGuard(session.videoPath);
-    const rejectStaleResult = () => {
-      if (documentGuard.unchanged()) return false;
-      setError("字幕或工作视频已发生变化，已放弃本次翻译结果");
-      updateTask("translate", { status: "error" });
-      return true;
-    };
-
-    setError(null);
-    setSuccess(false);
-    setTranslating(true);
+  const showStaleError = useCallback(() => {
+    setResult(null);
+    setResultApplied(false);
     setProgress(null);
-
-    upsertTask({
-      id: "translate",
-      label: "AI 翻译",
-      status: "running",
-      progress: 0,
+    setError("字幕或工作视频已发生变化，已放弃本次翻译结果");
+    updateTask("translate", {
+      status: "error",
+      message: "翻译结果已过期",
     });
+  }, [updateTask]);
 
-    try {
-      const provider = createTranslationProvider({
-        apiType: activeProvider.apiType,
-        baseUrl: activeProvider.baseUrl,
-        apiKey: activeProvider.apiKey,
-        model: activeProvider.model,
-        maxConcurrency: activeProvider.maxConcurrency,
-        requestsPerMinute: activeProvider.requestsPerMinute,
-        temperature: 0.3,
-      });
-
-      const glossary: Record<string, string> = {};
-      if (settings.translationGlossary) {
-        const lines = settings.translationGlossary.split("\n");
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          const match = trimmed.match(/^(.+?)\s*->\s*(.+)$/);
-          if (match) {
-            glossary[match[1].trim()] = match[2].trim();
-          }
-        }
+  const applyAndSave = useCallback(
+    async (
+      logicalCues: SubtitleCue[],
+      discardDecision: DiscardUnsavedChangesDecision,
+      documentGuard: ReturnType<typeof captureProjectDocumentGuard>,
+      isCurrent: () => boolean,
+    ): Promise<ApplyResult> => {
+      if (!session || !settings || !isCurrent() || !documentGuard.unchanged()) {
+        return "stale";
       }
 
-      const result = await provider.translateBatch(
-        sourceCues,
-        {
-          sourceLang: "ja",
-          targetLang: targetLang,
-          batchSize: settings.translationBatchSize,
-          contextWindow: settings.translationContextWindow,
-          customPrompt: settings.translationCustomPrompt,
-          glossary: Object.keys(glossary).length > 0 ? glossary : undefined,
-          timeout: 60000,
-        },
-        (p) => {
-          setProgress(p);
-          updateTask("translate", {
-            progress: Math.round(p.progress * 100),
-          });
-        },
-      );
-      if (rejectStaleResult()) return;
-
-      // Bilingual boundary: serialize logical result, re-parse as physical rows.
       const { assScriptInfo, assStyles } = useProjectStore.getState();
       let baseDoc;
       if (assScriptInfo && assStyles.length > 0) {
         baseDoc = {
           scriptInfo: assScriptInfo,
           styles: assStyles,
-          cues: result.cues,
+          cues: logicalCues,
         };
       } else {
         const originalAssText = await loadAssText(session.transcribedAssPath);
+        if (!isCurrent() || !documentGuard.unchanged()) return "stale";
         baseDoc = parseAss(originalAssText, { mergeBilingual: false });
-        baseDoc.cues = result.cues;
+        baseDoc.cues = logicalCues;
       }
-      if (rejectStaleResult()) return;
 
       const serialized = serializeAss(baseDoc, {
         mergeMode: settings.subtitleMergeMode,
@@ -224,81 +227,362 @@ export function TranslateView() {
       const applied = await withDiscardedSubtitleRecovery(
         discardDecision.recoveryVideoPath,
         () => {
-          if (!documentGuard.unchanged()) return false;
+          if (!isCurrent() || !documentGuard.unchanged()) return false;
           setCues(physicalDoc.cues);
           setAssMetadata(physicalDoc.scriptInfo, physicalDoc.styles);
           return true;
         },
       );
-      if (!applied) {
-        rejectStaleResult();
-        return;
-      }
-      setLogicalResultCues(result.cues);
-      // Pair immutable serialized output with physical doc/token before write await.
-      const resultGuard = captureProjectDocumentGuard(session.videoPath);
-      const snap = useProjectStore.getState().captureSaveSnapshot();
+      if (!applied) return "stale";
 
+      const resultGuard = captureProjectDocumentGuard(session.videoPath);
+      const snapshot = useProjectStore.getState().captureSaveSnapshot();
       try {
         await saveAssText(session.translatedAssPath, serialized);
-        if (!resultGuard.sameDocument()) {
-          setError("工作视频已切换，翻译文件已写入但未覆盖当前字幕");
-          updateTask("translate", { status: "error" });
-          return;
-        }
+        if (!isCurrent() || !resultGuard.sameDocument()) return "stale";
         setActiveSubtitle("translated", session.translatedAssPath);
-        markSaved(snap.token);
-        console.log(`翻译后的字幕已保存到: ${session.translatedAssPath}`);
-      } catch (saveErr) {
-        if (!resultGuard.sameDocument()) {
-          updateTask("translate", { status: "error" });
+        markSaved(snapshot.token);
+        return "saved";
+      } catch {
+        if (!isCurrent() || !resultGuard.sameDocument()) return "stale";
+        setActiveSubtitle("translated", null);
+        return "save-error";
+      }
+    },
+    [
+      markSaved,
+      session,
+      setActiveSubtitle,
+      setAssMetadata,
+      setCues,
+      settings,
+    ],
+  );
+
+  const executeTranslation = useCallback(
+    async (
+      inputCues: SubtitleCue[],
+      currentResult: TranslationResult | null,
+      discardDecision: DiscardUnsavedChangesDecision,
+      documentGuard: ReturnType<typeof captureProjectDocumentGuard>,
+    ) => {
+      if (!session || !settings || !activeProvider || inputCues.length === 0) {
+        return;
+      }
+
+      const priorRun = activeRunRef.current;
+      if (priorRun) {
+        priorRun.acceptingRequests = false;
+        priorRun.controller.abort();
+      }
+      const run: ActiveRun = {
+        id: ++operationIdRef.current,
+        controller: new AbortController(),
+        acceptingRequests: true,
+        cancelRequested: false,
+      };
+      activeRunRef.current = run;
+      const isCurrent = () =>
+        activeRunRef.current === run && operationIdRef.current === run.id;
+
+      setError(null);
+      setResultApplied(false);
+      setTranslating(true);
+      setCanCancel(true);
+      setProgress(null);
+      if (!currentResult) setResult(null);
+      upsertTask({
+        id: "translate",
+        label: "AI 翻译",
+        status: "running",
+        progress: 0,
+        message: "正在翻译",
+      });
+
+      let latestProgress = 0;
+      try {
+        const provider = createTranslationProvider({
+          apiType: activeProvider.apiType,
+          baseUrl: activeProvider.baseUrl,
+          apiKey: activeProvider.apiKey,
+          model: activeProvider.model,
+          maxConcurrency: activeProvider.maxConcurrency,
+          requestsPerMinute: activeProvider.requestsPerMinute,
+          temperature: 0.3,
+        });
+        const nextAttempt = await provider.translateBatch(
+          inputCues,
+          {
+            sourceLang: "ja",
+            targetLang,
+            batchSize: settings.translationBatchSize,
+            contextWindow: settings.translationContextWindow,
+            customPrompt: settings.translationCustomPrompt,
+            glossary: buildGlossary(settings),
+            timeout: 60_000,
+            signal: run.controller.signal,
+          },
+          (nextProgress) => {
+            if (!isCurrent()) return;
+            latestProgress = nextProgress.progress;
+            setProgress(nextProgress);
+            updateTask("translate", {
+              progress: Math.round(nextProgress.progress * 100),
+            });
+          },
+        );
+
+        run.acceptingRequests = false;
+        if (isCurrent()) setCanCancel(false);
+        if (!isCurrent()) return;
+        if (!documentGuard.unchanged()) {
+          showStaleError();
           return;
         }
-        // Keep physical rows in memory as unsaved translated content.
-        setActiveSubtitle("translated", null);
-        console.warn("保存翻译后的字幕失败:", saveErr);
-      }
 
-      setSuccess(true);
-      updateTask("translate", { status: "success", progress: 100 });
+        let nextResult = currentResult
+          ? mergeRetryResult(currentResult, nextAttempt)
+          : nextAttempt;
+        if (run.cancelRequested) {
+          nextResult = { ...nextResult, cancelled: true };
+        }
+        setResult(nextResult);
 
-      if (result.errors.length > 0) {
-        console.warn(`翻译完成，但有 ${result.errors.length} 个请求发生错误`);
+        if (nextResult.cancelled) {
+          updateTask("translate", {
+            status: "idle",
+            progress: Math.round(latestProgress * 100),
+            message: `翻译已取消：成功 ${nextResult.successCount} 条，失败 ${nextResult.failedCount} 条`,
+          });
+          return;
+        }
+        if (nextResult.failedCount > 0) {
+          updateTask("translate", {
+            status: "error",
+            message:
+              nextResult.successCount > 0
+                ? `翻译部分完成：成功 ${nextResult.successCount} 条，失败 ${nextResult.failedCount} 条`
+                : `翻译失败：成功 0 条，失败 ${nextResult.failedCount} 条`,
+          });
+          return;
+        }
+
+        const applyResult = await applyAndSave(
+          nextResult.cues,
+          discardDecision,
+          documentGuard,
+          isCurrent,
+        );
+        if (applyResult === "stale") {
+          if (isCurrent()) showStaleError();
+          return;
+        }
+        setResultApplied(true);
+        if (applyResult === "save-error") {
+          setError("翻译已完成，但保存字幕文件失败，请进入编辑器另存");
+          updateTask("translate", {
+            status: "error",
+            progress: 100,
+            message: "翻译完成，但保存失败",
+          });
+          return;
+        }
+        updateTask("translate", {
+          status: "success",
+          progress: 100,
+          message: `翻译完成：成功 ${nextResult.successCount} 条，失败 0 条`,
+        });
+      } catch {
+        run.acceptingRequests = false;
+        if (!isCurrent()) return;
+        setCanCancel(false);
+        if (run.cancelRequested) {
+          const cancelledAttempt: TranslationResult = {
+            cues: inputCues,
+            successCount: 0,
+            failedCount: inputCues.length,
+            errors: [],
+            cancelled: true,
+          };
+          const cancelledResult = currentResult
+            ? mergeRetryResult(currentResult, cancelledAttempt)
+            : cancelledAttempt;
+          setResult(cancelledResult);
+          updateTask("translate", {
+            status: "idle",
+            message: `翻译已取消：成功 ${cancelledResult.successCount} 条，失败 ${cancelledResult.failedCount} 条`,
+          });
+        } else {
+          setError("翻译请求失败，请稍后重试");
+          updateTask("translate", {
+            status: "error",
+            message: "翻译失败",
+          });
+        }
+      } finally {
+        if (isCurrent()) {
+          activeRunRef.current = null;
+          setCanCancel(false);
+          setTranslating(false);
+        }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      updateTask("translate", { status: "error" });
+    },
+    [
+      activeProvider,
+      applyAndSave,
+      session,
+      settings,
+      showStaleError,
+      targetLang,
+      updateTask,
+      upsertTask,
+    ],
+  );
+
+  const startTranslation = useCallback(
+    async (
+      inputCues: SubtitleCue[],
+      currentResult: TranslationResult | null,
+    ) => {
+      if (!session || !activeProviderReady || inputCues.length === 0) return;
+      const preflightId = ++operationIdRef.current;
+      const documentGuard = captureProjectDocumentGuard(session.videoPath);
+      const discardDecision = await confirmDiscardUnsavedChanges();
+      if (!discardDecision.proceed || operationIdRef.current !== preflightId) {
+        return;
+      }
+      if (!documentGuard.unchanged()) {
+        showStaleError();
+        return;
+      }
+      await executeTranslation(
+        inputCues,
+        currentResult,
+        discardDecision,
+        documentGuard,
+      );
+    },
+    [
+      activeProviderReady,
+      executeTranslation,
+      session,
+      showStaleError,
+    ],
+  );
+
+  const handleTranslate = useCallback(
+    () => startTranslation(sourceCues, null),
+    [sourceCues, startTranslation],
+  );
+
+  const handleRetry = useCallback(() => {
+    if (!result) return;
+    const failedCues = result.cues.filter(
+      (cue) => !cue.secondaryText?.trim(),
+    );
+    return startTranslation(failedCues, result);
+  }, [result, startTranslation]);
+
+  const handleCancel = useCallback(() => {
+    const run = activeRunRef.current;
+    if (!run?.acceptingRequests) return;
+    run.acceptingRequests = false;
+    run.cancelRequested = true;
+    setCanCancel(false);
+    run.controller.abort();
+  }, []);
+
+  const handleSaveCurrent = useCallback(async () => {
+    if (!session || !result || translatedCueCount(result.cues) === 0) return;
+    const operationId = ++operationIdRef.current;
+    const documentGuard = captureProjectDocumentGuard(session.videoPath);
+    const discardDecision = await confirmDiscardUnsavedChanges();
+    if (!discardDecision.proceed || operationIdRef.current !== operationId) {
+      return;
+    }
+    if (!documentGuard.unchanged()) {
+      showStaleError();
+      return;
+    }
+
+    const isCurrent = () => operationIdRef.current === operationId;
+    setSaving(true);
+    setError(null);
+    upsertTask({
+      id: "translate",
+      label: "AI 翻译",
+      status: "running",
+      progress: 100,
+      message: "正在保存翻译结果",
+    });
+
+    try {
+      const applyResult = await applyAndSave(
+        result.cues,
+        discardDecision,
+        documentGuard,
+        isCurrent,
+      );
+      if (applyResult === "stale") {
+        if (isCurrent()) showStaleError();
+        return;
+      }
+      setResultApplied(true);
+      if (applyResult === "save-error") {
+        setError("翻译结果已应用，但保存字幕文件失败，请进入编辑器另存");
+        updateTask("translate", {
+          status: "error",
+          message: "翻译结果保存失败",
+        });
+        return;
+      }
+      updateTask("translate", {
+        status: result.cancelled ? "idle" : "error",
+        message: `已保存当前结果：成功 ${result.successCount} 条，失败 ${result.failedCount} 条`,
+      });
+    } catch {
+      if (isCurrent()) {
+        setError("保存当前结果失败，请稍后重试");
+        updateTask("translate", {
+          status: "error",
+          message: "翻译结果保存失败",
+        });
+      }
     } finally {
-      setTranslating(false);
+      if (isCurrent()) setSaving(false);
     }
   }, [
+    applyAndSave,
+    result,
     session,
-    settings,
-    activeProvider,
-    activeProviderReady,
-    sourceCues,
-    targetLang,
-    setCues,
-    setAssMetadata,
-    setActiveSubtitle,
-    markSaved,
-    upsertTask,
+    showStaleError,
     updateTask,
+    upsertTask,
   ]);
 
+  const busy = translating || saving;
   const canTranslate =
-    !translating &&
+    !busy &&
     !sourceLoading &&
     sourceCues.length > 0 &&
     activeProviderReady;
-
-  const statsCues = logicalResultCues ?? sourceCues;
-  const hasTranslation = Boolean(
-    logicalResultCues?.some((c) => c.secondaryText),
+  const statsCues = result?.cues ?? sourceCues;
+  const hasTranslation = translatedCueCount(statsCues) > 0;
+  const incompleteResult = Boolean(
+    result && (result.cancelled || result.failedCount > 0),
   );
+  const visibleErrors = result?.errors.slice(0, MAX_VISIBLE_ERRORS) ?? [];
+  const previousTaskMessage =
+    !busy &&
+    !result &&
+    !error &&
+    translationTask?.status === "idle" &&
+    translationTask.message?.startsWith("翻译已取消")
+      ? translationTask.message
+      : undefined;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-x-hidden overflow-y-auto p-6">
       <header>
         <h2 className="text-xl font-semibold">AI 翻译</h2>
         <p className="mt-1 text-sm text-text-muted">
@@ -332,7 +616,6 @@ export function TranslateView() {
 
       <section className="rounded-xl border border-border bg-surface-raised p-5">
         <h3 className="mb-4 font-medium">翻译配置</h3>
-
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <label className="w-24 text-sm text-text-muted">源语言</label>
@@ -340,24 +623,22 @@ export function TranslateView() {
               日语
             </div>
           </div>
-
           <div className="flex items-center gap-4">
             <label className="w-24 text-sm text-text-muted">目标语言</label>
             <Select
               value={targetLang}
               onChange={setTargetLang}
               options={TARGET_LANGS}
-              disabled={translating}
+              disabled={busy}
             />
           </div>
-
           <div className="flex items-center gap-4">
             <label className="w-24 text-sm text-text-muted">供应商</label>
             <Select
               value={selectedProviderId}
               onChange={setSelectedProviderId}
               options={providerOptions}
-              disabled={translating || settingsLoading}
+              disabled={busy || settingsLoading}
               placeholder="选择供应商"
             />
           </div>
@@ -392,45 +673,117 @@ export function TranslateView() {
         </div>
       </section>
 
-      {(translating || progress || success || error) && (
+      {(busy || progress || result || error || previousTaskMessage) && (
         <section className="rounded-xl border border-border bg-surface-raised p-5">
           <h3 className="mb-4 font-medium">翻译状态</h3>
 
-          {translating && progress && (
+          {translating && (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-text-muted">{progress.currentBatch}</span>
+                <span className="text-text-muted">
+                  {progress?.currentBatch ?? "正在准备翻译"}
+                </span>
                 <span className="font-mono text-primary">
-                  {Math.round(progress.progress * 100)}%
+                  {Math.round((progress?.progress ?? 0) * 100)}%
                 </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-surface">
                 <div
                   className="h-full bg-primary transition-all"
-                  style={{ width: `${progress.progress * 100}%` }}
+                  style={{ width: `${(progress?.progress ?? 0) * 100}%` }}
                 />
               </div>
-              <div className="flex justify-between text-xs text-text-muted">
-                <span>
-                  {progress.completedCues} / {progress.totalCues} 条
-                </span>
-                <span>
-                  {progress.completedBatches} / {progress.totalBatches} 批次
-                </span>
-              </div>
+              {progress && (
+                <div className="flex justify-between text-xs text-text-muted">
+                  <span>
+                    {progress.completedCues} / {progress.totalCues} 条
+                  </span>
+                  <span>
+                    {progress.completedBatches} / {progress.totalBatches} 批次
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
-          {success && !translating && (
+          {saving && <p className="text-sm text-text-muted">正在保存当前结果...</p>}
+
+          {previousTaskMessage && (
+            <div className="rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
+              <p className="font-medium text-text">上次翻译状态</p>
+              <p className="mt-1 text-xs">{previousTaskMessage}</p>
+            </div>
+          )}
+
+          {result &&
+            !busy &&
+            !error &&
+            !result.cancelled &&
+            result.failedCount === 0 && (
             <div className="flex items-center gap-2 text-sm text-green-400">
               <IconCheck className="h-5 w-5" />
-              <span>翻译完成，已生成双语字幕</span>
+              <span>
+                翻译完成，成功 {result.successCount} 条、失败 0 条
+              </span>
             </div>
+          )}
+
+          {result && !busy && result.cancelled && (
+            <div className="rounded-md border border-yellow-600/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-200">
+              <p className="font-medium">翻译已取消</p>
+              <p className="mt-1 text-xs">
+                成功 {result.successCount} 条、失败 {result.failedCount} 条
+              </p>
+            </div>
+          )}
+
+          {result &&
+            !busy &&
+            !result.cancelled &&
+            result.successCount > 0 &&
+            result.failedCount > 0 && (
+              <div className="rounded-md border border-yellow-600/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-200">
+                <p className="font-medium">翻译部分完成</p>
+                <p className="mt-1 text-xs">
+                  成功 {result.successCount} 条、失败 {result.failedCount} 条
+                </p>
+              </div>
+            )}
+
+          {result &&
+            !busy &&
+            !result.cancelled &&
+            result.successCount === 0 &&
+            result.failedCount > 0 && (
+              <div className="rounded-md border border-red-600/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">
+                <p className="font-medium">翻译失败</p>
+                <p className="mt-1 text-xs">
+                  成功 0 条、失败 {result.failedCount} 条
+                </p>
+              </div>
+            )}
+
+          {result && incompleteResult && visibleErrors.length > 0 && !busy && (
+            <details className="mt-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-muted">
+              <summary className="cursor-pointer font-medium text-text">
+                查看失败原因
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {visibleErrors.map((message, index) => (
+                  <li key={`${index}-${message}`}>{message}</li>
+                ))}
+              </ul>
+              {result.errors.length > MAX_VISIBLE_ERRORS && (
+                <p className="mt-2 text-text-dimmed">
+                  另有 {result.errors.length - MAX_VISIBLE_ERRORS} 条未显示
+                </p>
+              )}
+            </details>
           )}
 
           {error && (
-            <div className="rounded-md border border-red-600/30 bg-red-500/10 p-3 text-sm text-red-300">
-              <p className="font-medium">翻译失败</p>
+            <div className="mt-3 rounded-md border border-red-600/30 bg-red-500/10 p-3 text-sm text-red-300">
+              <p className="font-medium">操作失败</p>
               <p className="mt-1 text-xs text-red-400">{error}</p>
             </div>
           )}
@@ -449,13 +802,13 @@ export function TranslateView() {
             </div>
             <div>
               <div className="text-2xl font-semibold text-primary">
-                {statsCues.filter((c) => c.secondaryText).length}
+                {translatedCueCount(statsCues)}
               </div>
               <div className="mt-1 text-xs text-text-muted">已翻译</div>
             </div>
             <div>
               <div className="text-2xl font-semibold text-primary">
-                {statsCues.filter((c) => !c.secondaryText).length}
+                {statsCues.length - translatedCueCount(statsCues)}
               </div>
               <div className="mt-1 text-xs text-text-muted">未翻译</div>
             </div>
@@ -468,31 +821,56 @@ export function TranslateView() {
           onClick={() => setStep("transcribe")}
           variant="outline"
           className="text-sm"
-          disabled={translating}
+          disabled={busy}
         >
           返回转录
         </Button>
 
-        <div className="flex gap-3">
-          <Button
-            onClick={handleTranslate}
-            disabled={!canTranslate}
-            variant="default"
-            className="px-6 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {translating
-              ? "翻译中..."
-              : hasTranslation
-                ? "重新翻译"
-                : "开始翻译"}
-          </Button>
+        <div className="flex flex-wrap justify-end gap-3">
+          {translating && canCancel && (
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              取消翻译
+            </Button>
+          )}
 
-          {hasTranslation && (
+          {result && incompleteResult && !busy && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleRetry}
+                disabled={result.failedCount === 0 || !activeProviderReady}
+              >
+                重试失败条目
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSaveCurrent}
+                disabled={result.successCount === 0}
+              >
+                保存当前结果
+              </Button>
+            </>
+          )}
+
+          {!translating && (
+            <Button
+              onClick={handleTranslate}
+              disabled={!canTranslate}
+              variant="default"
+              className="px-6 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {hasTranslation ? "重新翻译" : "开始翻译"}
+            </Button>
+          )}
+
+          {resultApplied && hasTranslation && (
             <Button
               onClick={() => setStep("editor")}
-              disabled={translating}
+              disabled={busy}
               variant="outline"
-              className="px-6 py-2 text-sm font-medium border-primary text-primary hover:bg-primary/10 disabled:opacity-50"
+              className="border-primary px-6 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
             >
               进入编辑
             </Button>

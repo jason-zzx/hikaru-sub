@@ -1,4 +1,5 @@
 import type { SubtitleCue } from "../../types";
+import { GenerationError } from "./http";
 import { RequestScheduler } from "./requestScheduler";
 import type {
   TranslationOptions,
@@ -10,6 +11,8 @@ import type {
 const DEFAULT_BATCH_SIZE = 25;
 const DEFAULT_CONTEXT_WINDOW = 2;
 const DEFAULT_TIMEOUT = 60_000;
+const MAX_CONSECUTIVE_TRANSIENT_FAILURES = 2;
+const TRANSIENT_HTTP_STATUSES = new Set([408, 409, 425, 429]);
 
 interface TranslationBatch {
   cues: SubtitleCue[];
@@ -17,11 +20,21 @@ interface TranslationBatch {
   contextAfter: SubtitleCue[];
 }
 
+class BatchResponseFormatError extends Error {}
+
 interface BatchResult {
   cues: SubtitleCue[];
   successCount: number;
   errors: string[];
+  cancelled: boolean;
+  stopped: boolean;
 }
+
+interface TranslationRunState {
+  consecutiveTransientFailures: number;
+}
+
+type FailureDisposition = "fallback" | "deterministic" | "transient";
 
 export abstract class TranslationProvider {
   protected readonly config: TranslationProviderConfig;
@@ -44,6 +57,7 @@ export abstract class TranslationProvider {
     systemPrompt: string | undefined,
     userPrompt: string,
     timeout: number,
+    signal?: AbortSignal,
   ): Promise<string>;
 
   async translateBatch(
@@ -63,16 +77,32 @@ export abstract class TranslationProvider {
     const totalBatches = Math.ceil(cues.length / batchSize);
 
     if (cues.length === 0) {
-      onProgress?.({
-        completedBatches: 0,
-        totalBatches: 0,
-        completedCues: 0,
-        totalCues: 0,
-        progress: 1,
-      });
-      return { cues: [], successCount: 0, failedCount: 0, errors: [] };
+      const cancelled = options.signal?.aborted ?? false;
+      if (!cancelled) {
+        onProgress?.({
+          completedBatches: 0,
+          totalBatches: 0,
+          completedCues: 0,
+          totalCues: 0,
+          progress: 1,
+        });
+      }
+      return {
+        cues: [],
+        successCount: 0,
+        failedCount: 0,
+        errors: [],
+        cancelled,
+      };
     }
 
+    const stopController = new AbortController();
+    const requestSignal = options.signal
+      ? AbortSignal.any([options.signal, stopController.signal])
+      : stopController.signal;
+    const runState: TranslationRunState = {
+      consecutiveTransientFailures: 0,
+    };
     const batchResults = new Array<BatchResult>(totalBatches);
     let completedBatches = 0;
     let completedCues = 0;
@@ -104,17 +134,26 @@ export abstract class TranslationProvider {
           batchIndex,
           options,
           timeout,
+          requestSignal,
+          stopController,
+          runState,
         );
-        completedBatches += 1;
-        completedCues += batchCues.length;
-        onProgress?.({
-          completedBatches,
-          totalBatches,
-          completedCues,
-          totalCues: cues.length,
-          progress: completedCues / cues.length,
-          currentBatch: `已完成 ${completedBatches}/${totalBatches} 批次`,
-        });
+        if (
+          !batchResults[batchIndex].cancelled &&
+          !batchResults[batchIndex].stopped &&
+          !options.signal?.aborted
+        ) {
+          completedBatches += 1;
+          completedCues += batchCues.length;
+          onProgress?.({
+            completedBatches,
+            totalBatches,
+            completedCues,
+            totalCues: cues.length,
+            progress: completedCues / cues.length,
+            currentBatch: `已完成 ${completedBatches}/${totalBatches} 批次`,
+          });
+        }
       }),
     );
 
@@ -128,12 +167,17 @@ export abstract class TranslationProvider {
       successCount,
       failedCount: cues.length - successCount,
       errors: batchResults.flatMap((result) => result.errors),
+      cancelled:
+        (options.signal?.aborted ?? false) ||
+        batchResults.some((result) => result.cancelled),
     };
   }
 
   async translateSingle(
     cue: SubtitleCue,
     options: TranslationOptions,
+    requestSignal = options.signal,
+    priority = false,
   ): Promise<string> {
     const sourceName = this.getLangName(options.sourceLang);
     const targetName = this.getLangName(options.targetLang);
@@ -142,8 +186,12 @@ export abstract class TranslationProvider {
       undefined,
       prompt,
       options.timeout ?? 30_000,
+      requestSignal,
+      priority,
     );
-    return response.trim();
+    const translation = response.trim();
+    if (!translation) throw new GenerationError("response");
+    return translation;
   }
 
   private async translateOneBatch(
@@ -151,20 +199,36 @@ export abstract class TranslationProvider {
     batchIndex: number,
     options: TranslationOptions,
     timeout: number,
+    requestSignal: AbortSignal,
+    stopController: AbortController,
+    runState: TranslationRunState,
   ): Promise<BatchResult> {
     try {
-      const response = await this.scheduleGeneration(
-        this.buildSystemPrompt(options),
-        this.buildBatchPrompt(batch),
-        timeout,
+      const translations = await this.runWithBatchFormatRetry(
+        async (priority) => {
+          const response = await this.runWithTransientRetry(
+            (retryPriority) =>
+              this.scheduleGeneration(
+                this.buildSystemPrompt(options),
+                this.buildBatchPrompt(batch),
+                timeout,
+                requestSignal,
+                priority || retryPriority,
+              ),
+            options.signal,
+            stopController.signal,
+          );
+          const parsed = this.parseTranslationResponse(
+            response,
+            batch.cues.length,
+          );
+          if (!parsed) throw new BatchResponseFormatError();
+          return parsed;
+        },
+        options.signal,
+        stopController.signal,
       );
-      const translations = this.parseTranslationResponse(
-        response,
-        batch.cues.length,
-      );
-      if (!translations) {
-        throw new Error("响应索引或 JSON 格式无效");
-      }
+      runState.consecutiveTransientFailures = 0;
       return {
         cues: batch.cues.map((cue, index) => ({
           ...cue,
@@ -172,37 +236,159 @@ export abstract class TranslationProvider {
         })),
         successCount: batch.cues.length,
         errors: [],
+        cancelled: false,
+        stopped: false,
       };
     } catch (error) {
+      if (options.signal?.aborted) {
+        return {
+          cues: batch.cues.map((cue) => ({ ...cue })),
+          successCount: 0,
+          errors: [],
+          cancelled: true,
+          stopped: false,
+        };
+      }
+      if (stopController.signal.aborted) {
+        return {
+          cues: batch.cues.map((cue) => ({ ...cue })),
+          successCount: 0,
+          errors: [],
+          cancelled: false,
+          stopped: true,
+        };
+      }
+
+      const disposition = this.failureDisposition(error);
+      if (disposition !== "fallback") {
+        const stopped =
+          disposition === "deterministic" ||
+          ++runState.consecutiveTransientFailures >=
+            MAX_CONSECUTIVE_TRANSIENT_FAILURES;
+        if (stopped) stopController.abort();
+        return {
+          cues: batch.cues.map((cue) => ({ ...cue })),
+          successCount: 0,
+          errors: [`批次 ${batchIndex + 1} 失败: ${this.safeError(error)}`],
+          cancelled: false,
+          stopped,
+        };
+      }
+
       const errors = [
-        `批次 ${batchIndex + 1} 失败，尝试逐条翻译: ${this.errorMessage(error)}`,
+        `批次 ${batchIndex + 1} 失败，尝试逐条翻译: ${this.safeError(error)}`,
       ];
-      let successCount = 0;
-      const fallbackCues = await Promise.all(
-        batch.cues.map(async (cue) => {
+      const fallbackResults = await Promise.all(
+        batch.cues.map(async (cue, cueIndex) => {
           try {
-            const translation = await this.translateSingle(cue, options);
-            successCount += 1;
-            return { ...cue, secondaryText: translation };
-          } catch (fallbackError) {
-            errors.push(
-              `单条翻译失败 [${cue.id}]: ${this.errorMessage(fallbackError)}`,
+            const translation = await this.runWithTransientRetry(
+              (priority) =>
+                this.translateSingle(cue, options, requestSignal, priority),
+              options.signal,
+              stopController.signal,
             );
-            return { ...cue };
+            runState.consecutiveTransientFailures = 0;
+            return { cue: { ...cue, secondaryText: translation }, success: true };
+          } catch (fallbackError) {
+            if (options.signal?.aborted || stopController.signal.aborted) {
+              return { cue: { ...cue }, success: false };
+            }
+            errors.push(
+              `批次 ${batchIndex + 1} 条目 ${cueIndex + 1} 失败: ${this.safeError(fallbackError)}`,
+            );
+            const fallbackDisposition =
+              this.failureDisposition(fallbackError);
+            const stopped =
+              fallbackDisposition === "deterministic" ||
+              (fallbackDisposition === "transient" &&
+                ++runState.consecutiveTransientFailures >=
+                  MAX_CONSECUTIVE_TRANSIENT_FAILURES);
+            if (stopped) stopController.abort();
+            return { cue: { ...cue }, success: false };
           }
         }),
       );
-      return { cues: fallbackCues, successCount, errors };
+      return {
+        cues: fallbackResults.map((result) => result.cue),
+        successCount: fallbackResults.filter((result) => result.success).length,
+        errors,
+        cancelled: options.signal?.aborted ?? false,
+        stopped: !options.signal?.aborted && stopController.signal.aborted,
+      };
     }
+  }
+
+  private async runWithBatchFormatRetry<T>(
+    run: (priority: boolean) => Promise<T>,
+    userSignal?: AbortSignal,
+    stopSignal?: AbortSignal,
+  ): Promise<T> {
+    try {
+      return await run(false);
+    } catch (error) {
+      if (
+        userSignal?.aborted ||
+        stopSignal?.aborted ||
+        !(error instanceof BatchResponseFormatError)
+      ) {
+        throw error;
+      }
+      return run(true);
+    }
+  }
+
+  private async runWithTransientRetry<T>(
+    run: (priority: boolean) => Promise<T>,
+    userSignal?: AbortSignal,
+    stopSignal?: AbortSignal,
+  ): Promise<T> {
+    try {
+      return await run(false);
+    } catch (error) {
+      if (
+        userSignal?.aborted ||
+        stopSignal?.aborted ||
+        this.failureDisposition(error) !== "transient"
+      ) {
+        throw error;
+      }
+      return run(true);
+    }
+  }
+
+  private failureDisposition(error: unknown): FailureDisposition {
+    if (error instanceof BatchResponseFormatError) return "fallback";
+    if (error instanceof GenerationError) {
+      if (error.kind === "response") return "deterministic";
+      if (error.kind === "network" || error.kind === "timeout") {
+        return "transient";
+      }
+      if (
+        error.status !== undefined &&
+        (TRANSIENT_HTTP_STATUSES.has(error.status) ||
+          (error.status >= 500 && error.status <= 599))
+      ) {
+        return "transient";
+      }
+      return "deterministic";
+    }
+    if (error instanceof Error && error.name === "TimeoutError") {
+      return "transient";
+    }
+    return "deterministic";
   }
 
   private scheduleGeneration(
     systemPrompt: string | undefined,
     userPrompt: string,
     timeout: number,
+    signal?: AbortSignal,
+    priority = false,
   ): Promise<string> {
-    return this.scheduler.schedule(() =>
-      this.generateText(systemPrompt, userPrompt, timeout),
+    return this.scheduler.schedule(
+      () => this.generateText(systemPrompt, userPrompt, timeout, signal),
+      signal,
+      priority,
     );
   }
 
@@ -296,8 +482,13 @@ export abstract class TranslationProvider {
     }
   }
 
-  private errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
+  private safeError(error: unknown): string {
+    if (error instanceof BatchResponseFormatError) return "响应格式无效";
+    if (error instanceof GenerationError) return error.message;
+    if (error instanceof Error && error.name === "TimeoutError") {
+      return "请求超时";
+    }
+    return "翻译请求失败";
   }
 
   protected getLangName(langCode: string): string {

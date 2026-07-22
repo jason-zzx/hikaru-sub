@@ -17,6 +17,8 @@ export interface TranslationOptions {
   customPrompt?: string;
   /** API 超时（毫秒） */
   timeout?: number;
+  /** 当前翻译运行的取消信号 */
+  signal?: AbortSignal;
 }
 
 /** 翻译提供商配置 */
@@ -56,4 +58,6 @@ export interface TranslationResult {
   failedCount: number;
   /** 错误信息（如果有） */
   errors: string[];
+  /** 是否由调用方主动取消 */
+  cancelled: boolean;
 }

@@ -4,7 +4,7 @@ import { OpenAITranslationProvider } from "./openai";
 import type { TranslationProvider } from "./base";
 import type { TranslationProviderConfig } from "./types";
 
-export type { TranslationProgress } from "./types";
+export type { TranslationOptions, TranslationProgress, TranslationResult } from "./types";
 
 export function createTranslationProvider(
   config: TranslationProviderConfig,

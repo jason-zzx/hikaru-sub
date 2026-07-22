@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Check ownership boundaries and frontend pre-development/quality gates."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check TranslateView UI, lifecycle, save behavior, shadcn usage, and ASS generation boundary."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Check taskStore status, page-local state, document guards, project updates, and save checkpoint pairing."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check translation result/options types and SubtitleCue/ASS compatibility."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Check translation service ownership and ensure credentials/prompts/bodies never leak."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check focused/full tests, build, minimal diff, and no secret-bearing fixtures/logs."}
+{"file":".trellis/tasks/07-22-translation-failure-retry-cancel/research/cancellation-and-partial-results.md","reason":"Check cancellation edge cases, partial-result retention, retry merge, explicit save, and test matrix against researched risks."}

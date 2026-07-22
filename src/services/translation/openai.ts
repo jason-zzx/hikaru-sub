@@ -3,6 +3,8 @@ import {
   buildProviderUrl,
   DEFAULT_MODEL_LIST_TIMEOUT,
   fetchWithTimeout,
+  GenerationError,
+  generationHttpError,
   providerHttpError,
 } from "./http";
 
@@ -51,6 +53,7 @@ export class OpenAITranslationProvider extends TranslationProvider {
     systemPrompt: string | undefined,
     userPrompt: string,
     timeout: number,
+    signal?: AbortSignal,
   ): Promise<string> {
     const messages = [
       ...(systemPrompt
@@ -72,22 +75,26 @@ export class OpenAITranslationProvider extends TranslationProvider {
           ...this.authHeaders(),
         },
         body,
+        signal,
       },
       timeout,
     );
     if (!response.ok) {
-      throw await providerHttpError(response, [
-        this.config.apiKey,
-        body,
-        systemPrompt,
-        userPrompt,
-      ]);
+      throw await generationHttpError(response, {
+        credentials: [this.config.apiKey, `Bearer ${this.config.apiKey}`],
+        requestContent: [body, systemPrompt, userPrompt],
+      });
     }
 
-    const data = (await response.json()) as OpenAIChatResponse;
+    let data: OpenAIChatResponse;
+    try {
+      data = (await response.json()) as OpenAIChatResponse;
+    } catch {
+      throw new GenerationError("response");
+    }
     const content = data.choices?.[0]?.message?.content;
     if (typeof content !== "string" || !content.trim()) {
-      throw new Error("API 响应缺少文本内容");
+      throw new GenerationError("response");
     }
     return content;
   }

@@ -1,0 +1,7 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership boundary and pre-development checklist for translation service and workflow UI changes."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"TranslateView contracts, shadcn controls, Chinese copy, and logical-to-physical ASS boundary."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Page-local translation state, taskStore status behavior, project document guards, and save token pairing."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Translation type placement and canonical SubtitleCue/physical ASS contracts."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Translation service ownership and API-key secrecy constraints."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Required frontend validation, minimal diff, and secret-safe testing rules."}
+{"file":".trellis/tasks/07-22-translation-failure-retry-cancel/research/cancellation-and-partial-results.md","reason":"Traced cancellation, scheduler, partial-result, retry, explicit-save, lifecycle, and verification design evidence."}

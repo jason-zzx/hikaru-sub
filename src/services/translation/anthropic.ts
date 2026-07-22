@@ -3,6 +3,8 @@ import {
   buildProviderUrl,
   DEFAULT_MODEL_LIST_TIMEOUT,
   fetchWithTimeout,
+  GenerationError,
+  generationHttpError,
   providerHttpError,
 } from "./http";
 
@@ -62,6 +64,7 @@ export class AnthropicTranslationProvider extends TranslationProvider {
     systemPrompt: string | undefined,
     userPrompt: string,
     timeout: number,
+    signal?: AbortSignal,
   ): Promise<string> {
     const body = JSON.stringify({
       model: this.config.model,
@@ -79,24 +82,28 @@ export class AnthropicTranslationProvider extends TranslationProvider {
           ...this.headers(),
         },
         body,
+        signal,
       },
       timeout,
     );
     if (!response.ok) {
-      throw await providerHttpError(response, [
-        this.config.apiKey,
-        body,
-        systemPrompt,
-        userPrompt,
-      ]);
+      throw await generationHttpError(response, {
+        credentials: [this.config.apiKey],
+        requestContent: [body, systemPrompt, userPrompt],
+      });
     }
 
-    const data = (await response.json()) as AnthropicMessageResponse;
+    let data: AnthropicMessageResponse;
+    try {
+      data = (await response.json()) as AnthropicMessageResponse;
+    } catch {
+      throw new GenerationError("response");
+    }
     const text = (data.content ?? [])
       .filter((block) => block.type === "text")
       .map((block) => (typeof block.text === "string" ? block.text : ""))
       .join("");
-    if (!text.trim()) throw new Error("Anthropic 响应缺少文本内容");
+    if (!text.trim()) throw new GenerationError("response");
     return text;
   }
 
