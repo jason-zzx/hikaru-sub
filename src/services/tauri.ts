@@ -83,6 +83,29 @@ export async function pickSaveAssFile(defaultPath?: string): Promise<string | nu
   return typeof selected === "string" ? ensureAssExtension(selected) : null;
 }
 
+export type SubtitleExportFormat = "ass" | "srt";
+
+export interface SubtitleSaveTarget {
+  path: string;
+  format: SubtitleExportFormat;
+}
+
+/** 弹出字幕另存为对话框（ASS/SRT），按扩展名判定格式，取消返回 null。 */
+export async function pickSaveSubtitleFile(
+  defaultPath?: string,
+): Promise<SubtitleSaveTarget | null> {
+  const selected = await save({
+    defaultPath,
+    filters: [
+      { name: "ASS 字幕", extensions: ["ass"] },
+      { name: "SRT 字幕", extensions: ["srt"] },
+    ],
+  });
+  if (typeof selected !== "string") return null;
+  if (/\.srt$/i.test(selected)) return { path: selected, format: "srt" };
+  return { path: ensureAssExtension(selected), format: "ass" };
+}
+
 /** 弹出目录对话框，取消返回 null（如选择保存目录、sidecar 目录）。 */
 export async function pickDirectory(): Promise<string | null> {
   const selected = await open({ multiple: false, directory: true });

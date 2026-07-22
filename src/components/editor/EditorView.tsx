@@ -38,18 +38,24 @@ import {
   type HotkeyDef,
 } from "./hotkeys";
 import { Button } from "../ui/button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import {
   getSettings,
   getVideoInfo,
   loadAssText,
   pathExists,
   pickSaveAssFile,
+  pickSaveSubtitleFile,
   pickSubtitleFile,
   saveAssText,
 } from "../../services/tauri";
 import { serializeAss } from "@/lib/ass";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
 import { parseExternalSubtitleDocument } from "../../utils/subtitleImport";
+import {
+  hasOverlappingCues,
+  serializeSrt,
+} from "../../utils/subtitleExport";
 import type { ActiveSubtitleKind } from "../../types";
 import {
   DEFAULT_EDITOR_PANE_LAYOUT,
@@ -98,6 +104,11 @@ export function EditorView() {
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [pendingSrtExport, setPendingSrtExport] = useState<{
+    path: string;
+    overlap: boolean;
+  } | null>(null);
   const [toast, setToast] = useState<EditorToastMessage | null>(null);
   const [subtitleFileExists, setSubtitleFileExists] = useState(false);
   const [hasPendingTimeDraft, setHasPendingTimeDraft] = useState(false);
@@ -255,6 +266,69 @@ export function EditorView() {
       notify("error", `保存失败：${message}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // 导出副本到 ASS/SRT，不改变当前文档的保存状态。
+  const writeAssExport = async (path: string) => {
+    const live = useProjectStore.getState();
+    const doc = resolveAssDocumentForSave(
+      live.cues,
+      live.assScriptInfo,
+      live.assStyles,
+      { title: "Hikaru Sub" },
+    );
+    await saveAssText(path, serializeAss(doc, { preserveOrder: true }));
+  };
+
+  const writeSrtExport = async (path: string) => {
+    await saveAssText(path, serializeSrt(useProjectStore.getState().cues));
+  };
+
+  const handleExport = async () => {
+    if (exporting || saving || !session) return;
+
+    setExporting(true);
+    try {
+      // 先提交未落盘的时间草稿，再导出内存中的最新文档。
+      editorRef.current?.commitPendingTimeDraft();
+      const target = await pickSaveSubtitleFile(
+        currentSubtitlePath ?? session.translatedAssPath,
+      );
+      if (!target) return;
+
+      if (target.format === "srt") {
+        setPendingSrtExport({
+          path: target.path,
+          overlap: hasOverlappingCues(useProjectStore.getState().cues),
+        });
+        return;
+      }
+
+      await writeAssExport(target.path);
+      notify("success", "已导出 ASS 字幕");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      notify("error", `导出失败：${message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleSrtExportConfirm = async (value: string) => {
+    const pending = pendingSrtExport;
+    setPendingSrtExport(null);
+    if (value !== "confirm" || !pending) return;
+
+    setExporting(true);
+    try {
+      await writeSrtExport(pending.path);
+      notify("success", "已导出 SRT 字幕");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      notify("error", `导出失败：${message}`);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -463,6 +537,16 @@ export function EditorView() {
           <Button
             type="button"
             variant="outline"
+            onClick={handleExport}
+            disabled={saving || exporting || !session || cues.length === 0}
+            className="px-3 py-1.5 text-sm hover:border-accent/50"
+            title="将当前字幕导出为 ASS 或 SRT 副本"
+          >
+            {exporting ? "导出中…" : "导出字幕"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={handleSelectSubtitleFile}
             disabled={saving}
             className="px-3 py-1.5 text-sm hover:border-accent/50"
@@ -604,6 +688,23 @@ export function EditorView() {
       <EditorToast message={toast} onClose={() => setToast(null)} />
 
       <StyleManager />
+
+      {/* SRT 导出信息丢失提示 */}
+      <ConfirmDialog
+        open={pendingSrtExport !== null}
+        title="导出 SRT 字幕"
+        description={`导出为 SRT 仅保留起止时间与纯文本，Layer、样式、ASS 行内标签等信息将丢失。${
+          pendingSrtExport?.overlap
+            ? "检测到多条字幕时间段重叠（可能来自 Separate Lines 文档），导出的 SRT 将包含同时间段的重叠条目。"
+            : ""
+        }`}
+        options={[
+          { label: "取消", value: "cancel" },
+          { label: "继续导出", value: "confirm", variant: "primary" },
+        ]}
+        onSelect={handleSrtExportConfirm}
+        escValue="cancel"
+      />
 
       {/* 键位速查浮层（? 呼出） */}
       <HotkeyHelpOverlay
