@@ -108,3 +108,4 @@ After `pnpm release:local`, validate the build on a Windows release machine:
 12. After transcription with managed FFmpeg, a present `deps/ffmpeg/current/ffprobe.exe` must be used to determine PlayRes instead of falling back to 1920×1080.
 13. Model download status must show the effective source and diagnostic log. With the China source, diagnostics should report `HF_ENDPOINT=https://hf-mirror.com` and the managed Hugging Face cache under `deps/models/huggingface`.
 14. Selecting `kotoba-faster-whisper` must verify Kotoba itself. An old sidecar or insufficient `faster-whisper` version must remain unavailable until setup updates the shared dependencies and service template.
+15. After editing subtitles, closing or switching the Working Video must warn about unsaved changes; cancelling must preserve the document, while reopening the same video after an unexpected exit must offer recovery and an explicit discard must prevent the prompt from recurring.
