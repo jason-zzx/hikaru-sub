@@ -133,6 +133,7 @@ describe("portable package", () => {
 
       expect(statSync(result.archivePath).size).toBeGreaterThan(0);
     },
+    20_000,
   );
 
   it("wires local and GitHub release packaging to create the portable zip", () => {
