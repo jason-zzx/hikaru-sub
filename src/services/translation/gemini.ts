@@ -3,6 +3,8 @@ import {
   buildProviderUrl,
   DEFAULT_MODEL_LIST_TIMEOUT,
   fetchWithTimeout,
+  GenerationError,
+  generationHttpError,
   providerHttpError,
 } from "./http";
 
@@ -73,6 +75,7 @@ export class GeminiTranslationProvider extends TranslationProvider {
     systemPrompt: string | undefined,
     userPrompt: string,
     timeout: number,
+    signal?: AbortSignal,
   ): Promise<string> {
     const model = this.normalizeModel(this.config.model.trim());
     if (!model) throw new Error("Gemini 模型不能为空");
@@ -98,23 +101,27 @@ export class GeminiTranslationProvider extends TranslationProvider {
           ...this.authHeaders(),
         },
         body,
+        signal,
       },
       timeout,
     );
     if (!response.ok) {
-      throw await providerHttpError(response, [
-        this.config.apiKey,
-        body,
-        systemPrompt,
-        userPrompt,
-      ]);
+      throw await generationHttpError(response, {
+        credentials: [this.config.apiKey],
+        requestContent: [body, systemPrompt, userPrompt],
+      });
     }
 
-    const data = (await response.json()) as GeminiGenerateResponse;
+    let data: GeminiGenerateResponse;
+    try {
+      data = (await response.json()) as GeminiGenerateResponse;
+    } catch {
+      throw new GenerationError("response");
+    }
     const text = (data.candidates?.[0]?.content?.parts ?? [])
       .map((part) => (typeof part.text === "string" ? part.text : ""))
       .join("");
-    if (!text.trim()) throw new Error("Gemini 响应缺少文本内容");
+    if (!text.trim()) throw new GenerationError("response");
     return text;
   }
 

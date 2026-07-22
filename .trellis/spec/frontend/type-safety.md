@@ -54,6 +54,26 @@ Frontend types mirror camelCase JSON from Tauri and the ASR sidecar (e.g. `durat
 
 OpenAI-compatible, Gemini, and Anthropic adapters live under `src/services/translation/` with shared batching, fallback, scheduling, and `types.ts`. Persist provider records in `AppSettings.translationProviders`; every provider carries an `apiKey: string`, where an empty/whitespace-only value is persisted but fails readiness. `defaultTranslationProviderId` initializes the Translation view's page-local provider selection; changing that selection does not update settings.
 
+Translation runs use the shared contracts below:
+
+```ts
+interface TranslationOptions {
+  signal?: AbortSignal;
+}
+
+interface TranslationResult {
+  cues: SubtitleCue[];
+  successCount: number;
+  failedCount: number;
+  errors: string[];
+  cancelled: boolean;
+}
+```
+
+`cancelled` means the page/run signal was aborted, not that a request timed out. Only two sequential local batch index/translation JSON validation failures of the same otherwise valid provider response may enter single-cue fallback; the first format failure retries that batch once with priority. This same-batch format rule is independent of the shared transient-failure streak. Deterministic HTTP/provider-envelope errors do not retry and stop immediately. A batch or fallback single request that receives `408/409/425/429/5xx` or a timeout/network `GenerationError` explicitly wrapped by `fetchWithTimeout` retries the same request once with priority over queued normal work; only a second failure counts as one failed work unit. Unknown exceptions default to deterministic and expose only a controlled generic message. Update the shared streak by work-unit completion order: two retry-exhausted failures completing with no successful work-unit completion between them stop the run, and any completed success resets the streak. Internal stops do not set `cancelled`; cancelled and failed cues retain their source text. `failedCount` is `input.length - successCount`, so partial/cancelled output shares the failed-only retry path.
+
+Generation HTTP error details use application-controlled categories and may append only a structured JSON server reason. Exact known API credential/Authorization, request body, subtitle, glossary, and custom/system/user prompt values are always redacted. A residual API credential/Authorization overlap of 4+ consecutive characters, or request-content/subtitle/glossary/prompt overlap of 8+ consecutive characters, suppresses the entire server reason. Non-JSON bodies and arbitrary exception text remain hidden.
+
 ## Anti-Patterns
 
 - Defining a second `SubtitleCue`-like interface in a view

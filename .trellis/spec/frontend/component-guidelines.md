@@ -51,7 +51,12 @@ Examples: `ImportView`, `TranscribeView`, `TranslateView`, `BurnView`, `Settings
 - Initialize a page-local provider selection from `defaultTranslationProviderId`. The Translation view dropdown changes only that mounted view's selection; it must not persist settings or change the configured default. Missing/incomplete selections, including an empty API key, deep-link to `openSettings("providers")`.
 - Page-owned source loads from **transcribed** ASS on enter; do not treat current `projectStore` physical rows as translation source.
 - Entering the page must not write or delete the existing translated ASS file.
-- On successful translation: serialize logical result with `settings.subtitleMergeMode`, re-parse with `mergeBilingual: false`, then load physical cues into the store for editor/burn.
+- On complete translation success: serialize logical result with `settings.subtitleMergeMode`, re-parse with `mergeBilingual: false`, then load physical cues into the store for editor/burn.
+- A partial failure or user cancellation remains a page-local logical draft: do not call project-store setters or write `translatedAssPath` until the user explicitly selects `保存当前结果`. That action must run `confirmDiscardUnsavedChanges` again, preserve the existing document guard/recovery/token-aware save sequence, and only then enable `进入编辑`.
+- `重试失败条目` sends only cues without a non-empty `secondaryText`; merge retry successes by cue `id` into the page-local result while preserving existing translations and source order.
+- Each mounted translation run owns an `AbortController`. Pass its signal through the translation service, cancel only while provider requests are active, and abort/invalidate the run on unmount or session-video change. A cancellation accepted before the request phase closes must never proceed to automatic apply/save, even when the last HTTP response settles concurrently. Cancellation caused by leaving Translation or switching the session video must remain visible in the global status bar and as the previous status when Translation mounts again, explicitly saying it will not continue in the background. Manual cancellation may keep the concise success/failure count message.
+- Translation service retry and error-redaction contracts live under [Type Safety > Translation Types](./type-safety.md#translation-types).
+- A non-cancelled result with zero successes and at least one failure is `翻译失败`, not `翻译部分完成`; saving the current result remains disabled. Translation's root container must keep `min-h-0 flex-1 overflow-y-auto overflow-x-hidden` so the status section cannot be clipped by AppLayout.
 
 ## Anti-Patterns
 

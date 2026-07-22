@@ -7,6 +7,12 @@ interface ScheduledRequest<T> {
   run: () => Promise<T>;
   resolve: (value: T) => void;
   reject: (reason: unknown) => void;
+  signal?: AbortSignal;
+  onAbort?: () => void;
+}
+
+function abortReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("Aborted", "AbortError");
 }
 
 export class RequestScheduler {
@@ -29,11 +35,44 @@ export class RequestScheduler {
     this.startIntervalMs = 60_000 / normalizedRpm;
   }
 
-  schedule<T>(run: () => Promise<T>): Promise<T> {
+  schedule<T>(
+    run: () => Promise<T>,
+    signal?: AbortSignal,
+    priority = false,
+  ): Promise<T> {
+    if (signal?.aborted) return Promise.reject(abortReason(signal));
+
     return new Promise<T>((resolve, reject) => {
-      this.queue.push({ run, resolve, reject } as ScheduledRequest<unknown>);
+      const request = {
+        run,
+        resolve,
+        reject,
+        signal,
+      } as ScheduledRequest<unknown>;
+      if (signal) {
+        request.onAbort = () => this.cancel(request, signal);
+        signal.addEventListener("abort", request.onAbort, { once: true });
+      }
+      if (priority) this.queue.unshift(request);
+      else this.queue.push(request);
       this.drain();
     });
+  }
+
+  private cancel(
+    request: ScheduledRequest<unknown>,
+    signal: AbortSignal,
+  ): void {
+    const index = this.queue.indexOf(request);
+    if (index < 0) return;
+
+    this.queue.splice(index, 1);
+    request.reject(abortReason(signal));
+    if (this.queue.length === 0 && this.startTimer !== null) {
+      clearTimeout(this.startTimer);
+      this.startTimer = null;
+    }
+    this.drain();
   }
 
   private drain(): void {
@@ -45,13 +84,18 @@ export class RequestScheduler {
       return;
     }
 
-    const request = this.queue.shift();
-    if (!request) return;
-
-    this.activeSlots += 1;
     const delay = Math.max(0, this.nextStartAt - Date.now());
     this.startTimer = setTimeout(() => {
       this.startTimer = null;
+      const request = this.queue.shift();
+      if (!request) {
+        this.drain();
+        return;
+      }
+      if (request.signal && request.onAbort) {
+        request.signal.removeEventListener("abort", request.onAbort);
+      }
+      this.activeSlots += 1;
       this.nextStartAt = Date.now() + this.startIntervalMs;
       this.run(request);
       this.drain();
@@ -59,8 +103,8 @@ export class RequestScheduler {
   }
 
   private run(request: ScheduledRequest<unknown>): void {
-    void request
-      .run()
+    void Promise.resolve()
+      .then(request.run)
       .finally(() => {
         this.activeSlots -= 1;
         this.drain();
