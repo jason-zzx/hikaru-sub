@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
-- **Last Active**: 2026-07-22
+- **Total Sessions**: 13
+- **Last Active**: 2026-07-23
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~406 | Active |
+| `journal-1.md` | ~439 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-07-23 | 翻译失败重试与取消 | `8d4f1f5` | `main` |
 | 12 | 2026-07-22 | 编辑页字幕查找替换与质检 | `5e5823a` | `dev` |
 | 11 | 2026-07-20 | 扩展 ASR 模型与 ReazonSpeech | `fbfab4c` | `dev` |
 | 10 | 2026-07-20 | Persistent Subtitle Style Library | `2bbf2c2` | `dev` |

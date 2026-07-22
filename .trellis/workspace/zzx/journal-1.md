@@ -404,3 +404,36 @@ Implemented a persistent application-level ASS style library with installed/port
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: 翻译失败重试与取消
+
+**Date**: 2026-07-23
+**Task**: 翻译失败重试与取消
+**Branch**: `main`
+
+### Summary
+
+实现翻译完整、部分失败与取消状态；支持取消排队和在途请求、仅重试未完成条目、显式保存不完整结果、安全错误摘要，以及按错误类别重试和快速停止。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8d4f1f5` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
