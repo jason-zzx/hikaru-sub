@@ -127,8 +127,9 @@ scripts/                开发、ASR、发布辅助脚本
 - `translatedAssPath`：视频同目录 `{视频文件名}.translated.ass`
 - `audioPath`：应用工作缓存 `workspace/` 中的临时 `audio.wav`（转录成功后保留，便于重新转录；可用「重新提取」覆盖；根目录见下方「应用缓存」/portable 约定）
 - `burnAssPath`：应用工作缓存中的压制输入 ASS
+- `subtitle.recovery.json`：当前工作视频 workspace 中的未保存字幕恢复快照，不属于 `VideoSession` 持久字段；仅脏文档周期性写入，成功保存或明确放弃后清理，异常退出后重新打开同一视频时可选择恢复。
 
-打开视频时优先加载翻译字幕，其次加载转录字幕；都不存在时准备空会话。
+打开视频时优先加载翻译字幕，其次加载转录字幕；都不存在时准备空会话。若存在匹配的字幕恢复快照，打开流程必须允许用户恢复或放弃；恢复后的文档保持脏状态，并继续使用快照记录的 ASS 保存目标。
 
 下载完成与导入选视频后留在导入页（不自动跳转录）。导入页可「继续转录」或「切片」：切片在 Dialog 内选起止与软/硬切，完成后可选替换为当前工作视频（默认勾选）；替换时仅 `setSession`，不 `loadAssDocument`、不迁移 ASS。切片进行中由 App 层 `useClipJobPoller` 收尾并解除导航锁（勿把完成逻辑只写在 ImportView，否则离开导入页会卡住 busy）。
 
@@ -170,7 +171,7 @@ interface SubtitleCue {
 - FFmpeg 解析顺序：用户设置路径 → 系统 `PATH` → 安装目录 `deps/ffmpeg/current` 下的受管 FFmpeg。
 - Python 解析顺序：用户设置路径 → 系统 Python 3.11 → 安装目录 `deps/python311/current` 下的受管 Python 3.11。ASR 配置只接受 Python 3.11。
 - 受管 ASR venv 位于安装目录 `deps/asr-service/.venv`；模型缓存位于 `deps/models/huggingface`；临时归档位于 `deps/downloads`。
-- 设置页进入时只调用 `probe_runtime_dependencies`（状态/路径/版本，不做递归扫盘）；磁盘占用走独立 `measure_runtime_dependency_storage`，由「存储空间 → 计算占用空间」触发。清理按钮只在已计算且占用 > 0、且该项为受管目标时显示；不要把 `dir_size` 重新塞回 probe。「应用缓存」对应安装版 `%LOCALAPPDATA%\com.hikaru.sub\cache` 或 portable `<exe>/cache`（`work_cache_dir`），只统计/清理其下 `workspace`/`transcode`/`preview`/`clip-frames`，并保留当前工作视频相关缓存；新增工作缓存也放到该 `cache/` 目录下。旧版直接落在 `com.hikaru.sub\` 根下的同名目录不再纳入统计与清理。`measure_runtime_dependency_storage` 与 `cleanup_runtime_dependency` 须保持 async + `spawn_blocking`（清理受管 `deps/` 前仍可在 async 侧做可写性/提权检查），勿在 async worker 上直接递归扫盘或删目录。
+- 设置页进入时只调用 `probe_runtime_dependencies`（状态/路径/版本，不做递归扫盘）；磁盘占用走独立 `measure_runtime_dependency_storage`，由「存储空间 → 计算占用空间」触发。清理按钮只在已计算且占用 > 0、且该项为受管目标时显示；不要把 `dir_size` 重新塞回 probe。「应用缓存」对应安装版 `%LOCALAPPDATA%\com.hikaru.sub\cache` 或 portable `<exe>/cache`（`work_cache_dir`），只统计/清理其下 `workspace`/`transcode`/`preview`/`clip-frames`，并保留当前工作视频相关缓存（包括 `subtitle.recovery.json`）；新增工作缓存也放到该 `cache/` 目录下。旧版直接落在 `com.hikaru.sub\` 根下的同名目录不再纳入统计与清理。`measure_runtime_dependency_storage` 与 `cleanup_runtime_dependency` 须保持 async + `spawn_blocking`（清理受管 `deps/` 前仍可在 async 侧做可写性/提权检查），勿在 async worker 上直接递归扫盘或删目录。
 - Portable 绿色版：exe 同级存在 `.portable` 时，配置落在 `<exe>/data`，工作缓存落在 `<exe>/cache`，WebView2 落在 `<exe>/webview`（启动时设 `WEBVIEW2_USER_DATA_FOLDER`）；判定与解析统一走 `src-tauri/src/app_paths.rs`，不要再直接用 `app.path().app_config_dir()` / `app_cache_dir()` 定位业务数据。安装版与 `tauri dev`（无标记）仍用系统 AppData。不做旧 AppData 迁移。便携目录创建/初始化失败时须弹框提示并退出，且不得在失败后把 `is_portable` 锁成 true。
 - `tauri-plugin-persisted-scope` 仍硬编码 Tauri `app_data_dir`，portable 下可能在系统 AppData 留下极小的 scope 持久化文件；不要为此改写 `APPDATA`/`LOCALAPPDATA` 环境变量。
 - 不要重新引入 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 作为大型受管依赖目录。

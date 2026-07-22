@@ -81,16 +81,18 @@ The portable directory must be writable. If initialization fails, Hikaru Sub rep
 
 ## Working cache
 
-The application cache owns only generated working media:
+The application cache owns only generated working data and media:
 
-- `workspace/` for per-video audio and burn input;
+- `workspace/` for per-video audio, burn input, and dirty subtitle recovery snapshots (`subtitle.recovery.json`);
 - `transcode/` for playback proxy videos;
 - `preview/` for diagnostic subtitle frames;
 - `clip-frames/` for clipping previews.
 
+Dirty subtitle documents are periodically written to the current video's workspace as a recovery snapshot. When the same Working Video is opened again, Hikaru Sub can restore or discard the snapshot. A successful save or an explicit discard removes it; an unexpected exit leaves it available for recovery. The snapshot is cache data, not a user-visible ASS document or a saved project.
+
 Installed builds use `<LocalAppData>/com.hikaru.sub/cache`; portable builds use the sibling `cache/` directory. Older same-named directories directly below `com.hikaru.sub/` are not part of current storage measurement or cleanup.
 
-Cleanup may preserve cache entries associated with the current Working Video. User videos and visible `.transcribed.ass` or `.translated.ass` files are never application-cache targets.
+Cleanup may preserve cache entries associated with the current Working Video, including its workspace and recovery snapshot. User videos and visible `.transcribed.ass` or `.translated.ass` files are never application-cache targets.
 
 ## Download sources and integrity
 
