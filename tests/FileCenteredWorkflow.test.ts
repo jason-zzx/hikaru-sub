@@ -69,10 +69,7 @@ describe("file-centered editor shell integration", () => {
 describe("file-centered import and download flow", () => {
   it("prepares video sessions without project directory flows", () => {
     const oldHiddenDir = ".hi" + "karu";
-    expect(importSource).toContain("prepareVideoSession");
-    expect(importSource).toContain("setSession");
-    expect(importSource).toContain("translatedAssPath(session)");
-    expect(importSource).toContain("transcribedAssPath(session)");
+    expect(importSource).toContain("openVideoSession");
     expect(importSource).not.toContain("pickDirectory");
     expect(importSource).not.toContain(oldHiddenDir);
     expect(downloadSource).toContain("prepareVideoSession");

@@ -37,7 +37,7 @@ import type {
   VideoSession,
 } from "../types";
 
-const VIDEO_EXTENSIONS = [
+export const VIDEO_EXTENSIONS = [
   "mp4",
   "mkv",
   "mov",
@@ -48,7 +48,7 @@ const VIDEO_EXTENSIONS = [
   "m4v",
 ];
 
-const SUBTITLE_EXTENSIONS = ["ass", "srt"];
+export const SUBTITLE_EXTENSIONS = ["ass", "srt"];
 
 /** 弹出文件对话框选择视频，取消返回 null。 */
 export async function pickVideoFile(): Promise<string | null> {

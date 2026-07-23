@@ -35,7 +35,7 @@ describe("download/import stay on import page", () => {
   it("import select video stays on import page", () => {
     const fnStart = importSource.indexOf("const handleSelectVideo");
     const fnBody = importSource.slice(fnStart, importSource.indexOf("const ffmpegMissing"));
-    expect(fnBody).toContain("setSession(session)");
+    expect(fnBody).toContain("openVideoSession(videoPath)");
     expect(fnBody).not.toContain('setStep("transcribe")');
   });
 

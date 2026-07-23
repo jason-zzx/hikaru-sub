@@ -2,6 +2,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { useBurnJobPoller } from "../../hooks/useBurnJobPoller";
 import { useClipJobPoller } from "../../hooks/useClipJobPoller";
 import { useUnsavedChangesCloseGuard } from "../../hooks/useUnsavedChangesCloseGuard";
+import { useGlobalFileDrop } from "../../hooks/useGlobalFileDrop";
 import { useSubtitleRecoveryAutosave } from "../../hooks/useSubtitleRecoveryAutosave";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
@@ -36,6 +37,7 @@ export function AppLayout() {
   useClipJobPoller();
   const closeGuard = useUnsavedChangesCloseGuard();
   useSubtitleRecoveryAutosave();
+  useGlobalFileDrop();
 
   return (
     <div className="flex h-full flex-col">
