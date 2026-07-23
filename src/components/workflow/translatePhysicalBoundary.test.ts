@@ -1,20 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  createDefaultStyles,
   parseAss,
   serializeAss,
   type AssDocument,
+  type SerializeOptions,
   type SubtitleCue,
 } from "@/lib/ass";
 
-/** Translation boundary: logical cues -> serialize(mergeMode) -> parse physical rows. */
+/** Translation boundary: logical cues -> serialize(options) -> parse physical rows. */
 function expandToPhysicalRows(
   logical: SubtitleCue[],
   base: AssDocument,
-  mergeMode: "inline" | "separate",
+  options: SerializeOptions,
 ): SubtitleCue[] {
   const serialized = serializeAss(
     { ...base, cues: logical },
-    { mergeMode, preserveOrder: true },
+    { ...options, preserveOrder: true },
   );
   return parseAss(serialized, { mergeBilingual: false }).cues;
 }
@@ -52,19 +54,52 @@ describe("translation physical boundary", () => {
     },
   ];
 
-  it("inline mode expands to one combined physical row", () => {
-    const physical = expandToPhysicalRows(logical, base, "inline");
+  it("uses equal default vertical margins for bilingual styles", () => {
+    expect(createDefaultStyles().map((style) => style.marginV)).toEqual([40, 40]);
+  });
+
+  it("inline mode uses translation-first order and the fixed separator", () => {
+    const physical = expandToPhysicalRows(logical, base, {
+      mergeMode: "inline",
+    });
     expect(physical).toHaveLength(1);
     expect(physical[0].primaryText).toBe("译文 / 源文");
     expect(physical[0].secondaryText).toBeUndefined();
   });
 
-  it("separate mode expands to independent primary/secondary rows", () => {
-    const physical = expandToPhysicalRows(logical, base, "separate");
+  it("inline mode supports source-first order", () => {
+    const physical = expandToPhysicalRows(logical, base, {
+      mergeMode: "inline",
+      textOrder: "source-first",
+    });
+    expect(physical[0].primaryText).toBe("源文 / 译文");
+  });
+
+  it("separate mode emits translation first by default", () => {
+    const physical = expandToPhysicalRows(logical, base, { mergeMode: "separate" });
     expect(physical).toHaveLength(2);
-    expect(physical.map((c) => c.style)).toEqual(["Primary", "Secondary"]);
-    expect(physical.map((c) => c.primaryText)).toEqual(["源文", "译文"]);
+    expect(physical.map((c) => c.style)).toEqual(["Secondary", "Primary"]);
+    expect(physical.map((c) => c.primaryText)).toEqual(["译文", "源文"]);
     expect(physical.every((c) => c.secondaryText === undefined)).toBe(true);
+  });
+
+  it("separate mode supports source-first order", () => {
+    const physical = expandToPhysicalRows(logical, base, {
+      mergeMode: "separate",
+      textOrder: "source-first",
+    });
+    expect(physical.map((c) => c.style)).toEqual(["Secondary", "Primary"]);
+    expect(physical.map((c) => c.primaryText)).toEqual(["源文", "译文"]);
+  });
+
+  it("translation-only mode omits source-only cues", () => {
+    const physical = expandToPhysicalRows(
+      [logical[0], { ...logical[0], id: "missing", secondaryText: undefined }],
+      base,
+      { mergeMode: "translation-only" },
+    );
+    expect(physical.map((c) => c.primaryText)).toEqual(["译文"]);
+    expect(physical[0].style).toBe("Primary");
   });
 
   it("preserves source cue order while expanding bilingual output", () => {
@@ -72,7 +107,7 @@ describe("translation physical boundary", () => {
       { ...logical[0], id: "later", startMs: 5000, endMs: 6000, primaryText: "后文" },
       { ...logical[0], id: "earlier", startMs: 0, endMs: 1000, primaryText: "前文" },
     ];
-    const physical = expandToPhysicalRows(reordered, base, "inline");
+    const physical = expandToPhysicalRows(reordered, base, { mergeMode: "inline" });
 
     expect(physical.map((cue) => cue.primaryText)).toEqual([
       "译文 / 后文",

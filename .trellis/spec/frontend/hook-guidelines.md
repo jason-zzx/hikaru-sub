@@ -25,7 +25,7 @@ Rules observed in code:
 
 ## Subtitle Merge Mode
 
-`settings.subtitleMergeMode` (`inline` | `separate`) is **translation-generation only**. Do not reintroduce `useSubtitleMergeMode` or read merge mode in the editor list, selected-row form, preview, burn, or save paths.
+`settings.subtitleMergeMode` (`inline` | `separate` | `translation-only`) and `subtitleTextOrder` are **translation-generation only**. Do not read them in the editor list, selected-row form, preview, burn, or save paths.
 
 Physical editor cues are one row per ASS `Dialogue:` event (`primaryText` only). Translation applies merge mode when serializing logical results, then re-parses with `mergeBilingual: false` before writing `projectStore`.
 

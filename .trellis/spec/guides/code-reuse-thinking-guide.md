@@ -156,7 +156,7 @@ of that replay model.
 
 **Bad**: Ad-hoc `primaryText` / `secondaryText` formatting in list, editor, and player.
 
-**Good**: translation generation uses `serializeAss({ mergeMode: settings.subtitleMergeMode })` then physical re-parse; editor/clipboard use `primaryText` + `eventLine` helpers from `src/lib/ass/`.
+**Good**: translation generation passes `subtitleMergeMode` and `subtitleTextOrder` to `serializeAss`, then physically re-parses; editor/clipboard use `primaryText` + `eventLine` helpers from `src/lib/ass/`.
 
 ### Trap 3: Dual ASR service trees
 

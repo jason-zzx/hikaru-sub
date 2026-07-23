@@ -91,6 +91,7 @@ const settings: AppSettings = {
   translationBatchSize: 2,
   translationContextWindow: 0,
   subtitleMergeMode: "inline",
+  subtitleTextOrder: "translation-first",
   editorHotkeys: [],
 };
 

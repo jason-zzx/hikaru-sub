@@ -1,5 +1,10 @@
 import { DEFAULT_BILINGUAL_OPTIONS, createId } from "./defaults";
-import type { AssEvent, BilingualOptions, SubtitleCue } from "./types";
+import type {
+  AssEvent,
+  BilingualOptions,
+  SubtitleCue,
+  SubtitleTextOrder,
+} from "./types";
 
 /** 行内合并模式的分隔符，与 `cueToEvents` 序列化一致。 */
 export const INLINE_CUE_SEPARATOR = " / ";
@@ -8,25 +13,16 @@ export type CueDisplay =
   | { mode: "single"; text: string }
   | { mode: "dual"; secondaryText: string; primaryText: string };
 
-/** 将 cue 格式化为行内合并文本「译文 / 原文」；无译文时返回 null。 */
+/** 按设置将 cue 格式化为行内合并文本；无译文时返回 null。 */
 export function formatInlineCueText(
   cue: Pick<SubtitleCue, "primaryText" | "secondaryText">,
+  textOrder: SubtitleTextOrder = "translation-first",
 ): string | null {
   const secondary = cue.secondaryText?.trim();
   if (!secondary) return null;
-  return `${secondary}${INLINE_CUE_SEPARATOR}${cue.primaryText}`;
-}
-
-/** 解析行内合并文本，分隔符与 `formatInlineCueText` 一致。 */
-export function splitInlineCueText(
-  text: string,
-): { secondaryText: string; primaryText: string } | null {
-  const idx = text.indexOf(INLINE_CUE_SEPARATOR);
-  if (idx < 0) return null;
-  return {
-    secondaryText: text.slice(0, idx),
-    primaryText: text.slice(idx + INLINE_CUE_SEPARATOR.length),
-  };
+  return textOrder === "source-first"
+    ? `${cue.primaryText}${INLINE_CUE_SEPARATOR}${secondary}`
+    : `${secondary}${INLINE_CUE_SEPARATOR}${cue.primaryText}`;
 }
 
 /** 按合并模式决定 UI 展示为单行或双行。 */
@@ -80,8 +76,9 @@ function makeEvent(
 
 /**
  * 单条 cue 展开为 Dialogue 事件：
- * - mergeMode = "inline"（默认）: 译文存在时，单行显示「译文 / 原文」
- * - mergeMode = "separate": 原文一行；若有译文，再加一行（同 start/end，使用 secondaryStyle）
+ * - mergeMode = "inline"（默认）: 译文存在时按设置拼接为单行
+ * - mergeMode = "separate": 原文、译文按设置生成两行
+ * - mergeMode = "translation-only": 仅生成译文行
  */
 export function cueToEvents(
   cue: SubtitleCue,
@@ -89,24 +86,34 @@ export function cueToEvents(
 ): AssEvent[] {
   const opts = { ...DEFAULT_BILINGUAL_OPTIONS, ...options };
   const mergeMode = options.mergeMode ?? "inline";
-  const events: AssEvent[] = [];
+  const textOrder = options.textOrder ?? "translation-first";
   const primaryStyle = cue.style || opts.primaryStyle;
+  const translation = cue.secondaryText?.trim();
 
-  // 行内拼接模式：译文 / 原文
+  if (mergeMode === "translation-only") {
+    return translation
+      ? [makeEvent(cue, primaryStyle, translation)]
+      : [];
+  }
+
   const mergedText =
-    mergeMode === "inline" ? formatInlineCueText(cue) : null;
+    mergeMode === "inline" ? formatInlineCueText(cue, textOrder) : null;
   if (mergedText) {
-    events.push(makeEvent(cue, primaryStyle, mergedText));
-    return events;
+    return [makeEvent(cue, primaryStyle, mergedText)];
   }
 
-  // 分离双行模式或无译文：原文单独一行
-  events.push(makeEvent(cue, primaryStyle, cue.primaryText));
-  if (mergeMode === "separate" && cue.secondaryText && cue.secondaryText.trim() !== "") {
-    events.push(makeEvent(cue, opts.secondaryStyle, cue.secondaryText));
+  if (mergeMode === "separate" && translation) {
+    const [firstText, secondText] =
+      textOrder === "source-first"
+        ? [cue.primaryText, translation]
+        : [translation, cue.primaryText];
+    return [
+      makeEvent(cue, opts.secondaryStyle, firstText),
+      makeEvent(cue, primaryStyle, secondText),
+    ];
   }
 
-  return events;
+  return [makeEvent(cue, primaryStyle, cue.primaryText)];
 }
 
 /** 多条 cue 展开为事件列表（默认按时间排序；preserveOrder 时保留数组顺序）。 */

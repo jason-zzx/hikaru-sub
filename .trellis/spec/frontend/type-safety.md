@@ -30,10 +30,61 @@ interface SubtitleCue {
 
 Physical ASS parse paths populate the optional Dialogue fields. Synthetic cues may omit them; list/serialize boundaries must normalize with `?? ""` / `?? 0`. Operations that clone or inherit a physical cue must preserve any present values. Do not export a shared defaults object solely to make every synthetic cue/test fixture spell out empty fields.
 
-Bilingual **generation** (translation page only) may serialize as:
+## Subtitle Generation Settings Contract
 
-- **inline**: one Dialogue with `译文 / 原文` (`mergeMode: "inline"`)
-- **separate**: Primary + Secondary Dialogue lines (`mergeMode: "separate"`)
+### 1. Scope / Trigger
+
+`AppSettings` persists subtitle layout through Tauri, but these fields apply only when the Translation page turns logical bilingual cues into ASS. Editor/save/preview/burn remain physical-row consumers.
+
+### 2. Signatures
+
+```typescript
+subtitleMergeMode: "inline" | "separate" | "translation-only"
+subtitleTextOrder: "translation-first" | "source-first"
+
+serializeAss(doc, {
+  mergeMode: settings.subtitleMergeMode,
+  textOrder: settings.subtitleTextOrder,
+})
+```
+
+### 3. Contracts
+
+- `inline`: one Dialogue, with source/translation ordered by `subtitleTextOrder` and joined by the fixed ` / ` separator.
+- `separate`: two Dialogue rows in the selected text order. The first uses `secondaryStyle`, the second uses the cue/primary style; both default styles use `marginV: 40`.
+- `translation-only`: one primary-style Dialogue for a non-empty translation; source-only cues are omitted.
+- Defaults are `inline` and `translation-first`.
+- After generation, re-parse with `mergeBilingual: false`; each Dialogue becomes one physical editor cue.
+
+### 4. Validation & Error Matrix
+
+- Missing fields in old `settings.json` -> Rust `AppSettings::default()` values.
+- Unknown mode/order -> normalize to `inline` / `translation-first`.
+
+### 5. Good/Base/Bad Cases
+
+- Good: source-first inline -> `原文 / 译文`.
+- Base: defaults -> `译文 / 原文`.
+- Bad input: unknown mode/order -> repaired defaults before persistence/use.
+
+### 6. Tests Required
+
+- `translatePhysicalBoundary.test.ts`: each mode, both orders, fixed separator, and translation-only omission.
+- `SettingsTranslationPanel.test.tsx`: conditional order control.
+- Rust `settings::tests::subtitle_generation_settings_default_and_normalize`: old-config defaults and normalization.
+
+### 7. Wrong vs Correct
+
+```typescript
+// Wrong: order silently falls back during translation generation.
+serializeAss(doc, { mergeMode: settings.subtitleMergeMode })
+
+// Correct: apply the complete persisted generation contract once.
+serializeAss(doc, {
+  mergeMode: settings.subtitleMergeMode,
+  textOrder: settings.subtitleTextOrder,
+})
+```
 
 After generation, ASS is re-parsed with `mergeBilingual: false` so the editor holds **physical rows**: one `SubtitleCue` per `Dialogue:` event, text in `primaryText`, no paired `secondaryText` editing.
 

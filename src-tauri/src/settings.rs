@@ -115,6 +115,7 @@ pub struct AppSettings {
     pub translation_custom_prompt: Option<String>,
     pub translation_glossary: Option<String>,
     pub subtitle_merge_mode: String,
+    pub subtitle_text_order: String,
     pub runtime_source_mode: RuntimeDependencySourceMode,
     #[serde(default, deserialize_with = "deserialize_editor_hotkeys")]
     pub editor_hotkeys: Vec<EditorHotkeyOverride>,
@@ -138,6 +139,7 @@ impl Default for AppSettings {
             translation_custom_prompt: None,
             translation_glossary: None,
             subtitle_merge_mode: "inline".into(),
+            subtitle_text_order: "translation-first".into(),
             runtime_source_mode: RuntimeDependencySourceMode::Official,
             editor_hotkeys: Vec::new(),
         }
@@ -170,6 +172,7 @@ pub fn save_settings(app: &AppHandle, settings: &AppSettings) -> Result<(), Stri
     let path = settings_path(app)?;
     let mut normalized = settings.clone();
     normalize_translation_providers(&mut normalized);
+    normalize_subtitle_settings(&mut normalized);
     let content = serde_json::to_string_pretty(&normalized).map_err(|e| e.to_string())?;
     fs::write(path, content).map_err(|e| e.to_string())
 }
@@ -189,7 +192,23 @@ fn parse_settings_json(content: &str) -> Result<AppSettings, String> {
     migrate_legacy_translation_settings(&mut value);
     let mut settings: AppSettings = serde_json::from_value(value).map_err(|e| e.to_string())?;
     normalize_translation_providers(&mut settings);
+    normalize_subtitle_settings(&mut settings);
     Ok(settings)
+}
+
+fn normalize_subtitle_settings(settings: &mut AppSettings) {
+    if !matches!(
+        settings.subtitle_merge_mode.as_str(),
+        "inline" | "separate" | "translation-only"
+    ) {
+        settings.subtitle_merge_mode = "inline".into();
+    }
+    if !matches!(
+        settings.subtitle_text_order.as_str(),
+        "translation-first" | "source-first"
+    ) {
+        settings.subtitle_text_order = "translation-first".into();
+    }
 }
 
 fn migrate_legacy_translation_settings(value: &mut serde_json::Value) {
@@ -422,6 +441,26 @@ mod tests {
             settings.runtime_source_mode,
             RuntimeDependencySourceMode::Official
         );
+    }
+
+    #[test]
+    fn subtitle_generation_settings_default_and_normalize() {
+        let defaults = parse_settings_json("{}").unwrap();
+        assert_eq!(defaults.subtitle_merge_mode, "inline");
+        assert_eq!(defaults.subtitle_text_order, "translation-first");
+
+        let normalized = parse_settings_json(
+            r#"{"subtitleMergeMode":"translation-only","subtitleTextOrder":"source-first"}"#,
+        )
+        .unwrap();
+        assert_eq!(normalized.subtitle_merge_mode, "translation-only");
+        assert_eq!(normalized.subtitle_text_order, "source-first");
+
+        let repaired =
+            parse_settings_json(r#"{"subtitleMergeMode":"unknown","subtitleTextOrder":"unknown"}"#)
+                .unwrap();
+        assert_eq!(repaired.subtitle_merge_mode, "inline");
+        assert_eq!(repaired.subtitle_text_order, "translation-first");
     }
 
     #[test]

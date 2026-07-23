@@ -23,6 +23,10 @@ export function SettingsTranslationPanel({
   settings,
   update,
 }: SettingsTranslationPanelProps) {
+  const supportsTextOrder =
+    settings.subtitleMergeMode === "inline" ||
+    settings.subtitleMergeMode === "separate";
+
   return (
     <div className="flex flex-col gap-8">
       <SettingsSection
@@ -86,17 +90,29 @@ export function SettingsTranslationPanel({
           <Select
             value={settings.subtitleMergeMode}
             onChange={(v) =>
-              update("subtitleMergeMode", v as "inline" | "separate")
+              update("subtitleMergeMode", v as AppSettings["subtitleMergeMode"])
             }
             options={[
-              { value: "inline", label: "行内拼接（译文 / 原文）" },
+              { value: "inline", label: "行内拼接" },
               { value: "separate", label: "分离双行（上下两条字幕）" },
+              { value: "translation-only", label: "仅保留译文" },
             ]}
           />
-          <p className="mt-1 text-xs text-text-muted">
-            行内拼接：单条字幕显示「译文 / 原文」；分离双行：生成两条时间轴相同的字幕
-          </p>
         </SettingsField>
+        {supportsTextOrder && (
+          <SettingsField label="原文/译文顺序">
+            <Select
+              value={settings.subtitleTextOrder}
+              onChange={(v) =>
+                update("subtitleTextOrder", v as AppSettings["subtitleTextOrder"])
+              }
+              options={[
+                { value: "translation-first", label: "译文在前" },
+                { value: "source-first", label: "原文在前" },
+              ]}
+            />
+          </SettingsField>
+        )}
       </SettingsSection>
 
       <SettingsSection

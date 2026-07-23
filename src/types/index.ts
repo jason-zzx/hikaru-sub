@@ -1,3 +1,5 @@
+import type { SubtitleMergeMode, SubtitleTextOrder } from "@/lib/ass";
+
 export type WorkflowStep =
   | "welcome"
   | "download"
@@ -77,7 +79,8 @@ export interface AppSettings {
   translationContextWindow: number;
   translationCustomPrompt?: string;
   translationGlossary?: string;
-  subtitleMergeMode: "inline" | "separate";
+  subtitleMergeMode: SubtitleMergeMode;
+  subtitleTextOrder: SubtitleTextOrder;
   runtimeSourceMode?: RuntimeDependencySourceMode;
   editorHotkeys: EditorHotkeyOverride[];
 }
