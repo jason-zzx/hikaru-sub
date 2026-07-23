@@ -7,6 +7,8 @@ export type {
   BilingualOptions,
   ParseOptions,
   SerializeOptions,
+  SubtitleMergeMode,
+  SubtitleTextOrder,
 } from "./types";
 
 export { parseAssTime, formatAssTime } from "./time";
@@ -36,7 +38,6 @@ export {
   toAssText,
   fromAssText,
   formatInlineCueText,
-  splitInlineCueText,
   getCueDisplay,
   cueToEvents,
   cuesToEvents,

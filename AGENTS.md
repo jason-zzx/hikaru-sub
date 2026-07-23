@@ -156,7 +156,7 @@ interface SubtitleCue {
 
 - 物理 ASS 加载路径须填充并保留 `name` / margins / `effect`；合成 cue 可省略这些字段，列表与序列化边界用 `?? ""` / `?? 0` 归一化。复制或继承物理 cue 时不得丢失已有值。
 - 产品面向日语转录与翻译，新建视频会话固定 `sourceLang: "ja"`；不要重新在转录/设置页暴露源语言选择。
-- **`subtitleMergeMode` 只在翻译生成 ASS 时生效**：`inline` 写出一条 `译文 / 原文` Dialogue；`separate` 写出同时间轴的 Primary + Secondary 两条 Dialogue。
+- **字幕排版设置只在翻译生成 ASS 时生效**：`subtitleMergeMode` 支持 `inline`（按 `subtitleTextOrder` 与固定分隔符 ` / ` 拼接）、`separate`（按顺序生成上下两条物理 Dialogue）与 `translation-only`（只生成非空译文）；默认译文在前。
 - **编辑器 / 预览 / 压制 / 保存** 按物理 ASS 行：一条 `Dialogue:` ↔ 一个 cue（`primaryText`），加载用 `parseAss(..., { mergeBilingual: false })`，保存/压制用 `serializeAss(..., { preserveOrder: true })`，**不再**读 `subtitleMergeMode` 或经 `getCueDisplay` 做双语展示分支。
 - 翻译页进入时加载 **转录 ASS** 作页内源，不把已展开的物理译稿当翻译源；仅再点翻译时才写 `*.translated.ass`，进入页面本身不覆盖/删除该文件。
 - 编辑器整行复制/剪切/粘贴走系统剪贴板（`subtitleClipboard` + Tauri clipboard-manager，ASS `Dialogue:` 行；非 ASS 文本按选中行后 2s fallback）；聚焦 `input`/`textarea` 时不拦截整行剪贴板快捷键，保留原生文本剪贴。

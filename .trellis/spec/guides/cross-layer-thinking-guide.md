@@ -66,7 +66,7 @@ For each arrow ask: format, validation owner, failure mode.
 |----------|----------------|
 | React ↔ Tauri invoke | Missing wrapper, camelCase drift, capabilities denied |
 | Tauri ↔ ASR HTTP | Job snapshot shape, sidecar not running, debug log path |
-| ASS file ↔ `SubtitleCue` | inline vs separate merge mode; PlayRes not re-probed on every save |
+| ASS file ↔ `SubtitleCue` | inline/separate/translation-only generation plus text order; PlayRes not re-probed on every save |
 | VideoSession paths ↔ UI | Clip `setSession` clears cues; do not migrate ASS |
 | Settings ↔ runtime deps | Probe ≠ measure; portable vs installed roots |
 
@@ -98,7 +98,7 @@ For each boundary, pin:
 
 **Bad**: Editor list/preview re-apply `subtitleMergeMode` after translation already expanded physical rows; or save merges/splits rows that the store holds 1:1 with Dialogue events.
 
-**Good**: Translation page applies `settings.subtitleMergeMode` once when generating ASS, then loads physical rows (`mergeBilingual: false`). Editor list/form/preview/burn use one cue per Dialogue (`primaryText`). Clipboard whole-row I/O uses `formatDialogueEventLine` / `parseDialogueEventLine`.
+**Good**: Translation applies merge mode and text order once when generating ASS, then loads physical rows (`mergeBilingual: false`). Editor list/form/preview/burn use one cue per Dialogue (`primaryText`). Clipboard whole-row I/O uses `formatDialogueEventLine` / `parseDialogueEventLine`.
 
 ### Mistake 4: VideoSession / clip semantics
 

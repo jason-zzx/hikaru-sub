@@ -50,16 +50,15 @@ function baseStyle(overrides: Partial<AssStyle> & Pick<AssStyle, "name">): AssSt
 
 /**
  * 默认双语样式：
- * - Primary（原文）：底部主行，字号较大
- * - Secondary（译文）：原文上方一行，字号略小
+ * - Primary（原文）：主行，字号较大
+ * - Secondary（译文）：与 Primary 使用相同垂直边距，字号略小
  */
 export function createDefaultStyles(): AssStyle[] {
   return [
-    baseStyle({ name: PRIMARY_STYLE, fontSize: 54, marginV: 40 }),
+    baseStyle({ name: PRIMARY_STYLE, fontSize: 54 }),
     baseStyle({
       name: SECONDARY_STYLE,
       fontSize: 44,
-      marginV: 95,
       primaryColor: "&H0000F5F5",
     }),
   ];

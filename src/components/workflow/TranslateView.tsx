@@ -221,6 +221,7 @@ export function TranslateView() {
 
       const serialized = serializeAss(baseDoc, {
         mergeMode: settings.subtitleMergeMode,
+        textOrder: settings.subtitleTextOrder,
         preserveOrder: true,
       });
       const physicalDoc = parseAss(serialized, { mergeBilingual: false });

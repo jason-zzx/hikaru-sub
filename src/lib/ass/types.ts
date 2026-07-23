@@ -106,10 +106,15 @@ export interface ParseOptions extends Partial<BilingualOptions> {
   mergeBilingual?: boolean;
 }
 
+export type SubtitleMergeMode = "inline" | "separate" | "translation-only";
+export type SubtitleTextOrder = "translation-first" | "source-first";
+
 /** 序列化选项。 */
 export interface SerializeOptions extends Partial<BilingualOptions> {
-  /** 字幕合并模式：inline = 单行拼接（译文 / 原文），separate = 分离双行 */
-  mergeMode?: "inline" | "separate";
+  /** 字幕合并模式：inline = 单行拼接，separate = 分离双行，translation-only = 仅译文 */
+  mergeMode?: SubtitleMergeMode;
+  /** 原文与译文的生成顺序。 */
+  textOrder?: SubtitleTextOrder;
   /** 保留 cue 数组顺序（编辑器）；默认按时间排序 */
   preserveOrder?: boolean;
 }
