@@ -80,6 +80,7 @@ const settings: AppSettings = {
       baseUrl: "https://api.example.invalid/v1",
       apiKey: "synthetic-key",
       model: "synthetic-model",
+      temperature: 0.7,
       maxConcurrency: 1,
       requestsPerMinute: 10,
     },
@@ -195,6 +196,9 @@ describe("TranslateView", () => {
 
     await user.click(screen.getByRole("button", { name: "开始翻译" }));
 
+    expect(createTranslationProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ temperature: 0.7 }),
+    );
     expect(await screen.findByText("翻译失败")).toBeTruthy();
     expect(screen.queryByText("翻译部分完成")).toBeNull();
     expect(screen.getByText("成功 0 条、失败 2 条")).toBeTruthy();

@@ -40,7 +40,7 @@ pub enum TranslationApiType {
     Anthropic,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct TranslationProviderSettings {
     pub id: String,
@@ -49,6 +49,8 @@ pub struct TranslationProviderSettings {
     pub base_url: String,
     pub api_key: String,
     pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
     pub max_concurrency: i64,
     pub requests_per_minute: i64,
 }
@@ -62,6 +64,7 @@ impl Default for TranslationProviderSettings {
             base_url: DEFAULT_OPENAI_BASE_URL.into(),
             api_key: String::new(),
             model: DEFAULT_OPENAI_MODEL.into(),
+            temperature: None,
             max_concurrency: 1,
             requests_per_minute: 10,
         }
@@ -251,6 +254,15 @@ fn migrate_legacy_translation_settings(value: &mut serde_json::Value) {
 
 fn normalize_translation_providers(settings: &mut AppSettings) {
     for provider in &mut settings.translation_providers {
+        let max_temperature = if provider.api_type == TranslationApiType::Anthropic {
+            1.0
+        } else {
+            2.0
+        };
+        provider.temperature = provider
+            .temperature
+            .filter(|value| value.is_finite())
+            .map(|value| value.clamp(0.0, max_temperature));
         provider.max_concurrency = provider.max_concurrency.clamp(1, 50);
         provider.requests_per_minute = provider.requests_per_minute.clamp(1, 100);
         if provider.api_key.trim().is_empty() {
@@ -459,6 +471,9 @@ mod tests {
         );
         let serialized = serde_json::to_value(settings).unwrap();
         assert_eq!(serialized["translationProviders"][0]["apiKey"], "");
+        assert!(serialized["translationProviders"][0]
+            .get("temperature")
+            .is_none());
         assert_eq!(
             serialized["defaultTranslationProviderId"],
             serde_json::Value::String(DEFAULT_PROVIDER_ID.into())
@@ -478,6 +493,7 @@ mod tests {
         assert_eq!(provider.base_url, DEFAULT_OPENAI_BASE_URL);
         assert_eq!(provider.model, DEFAULT_OPENAI_MODEL);
         assert_eq!(provider.api_key, "");
+        assert_eq!(provider.temperature, None);
         assert_eq!(provider.max_concurrency, 1);
         assert_eq!(provider.requests_per_minute, 10);
         assert_eq!(
@@ -545,6 +561,7 @@ mod tests {
                         "baseUrl": "",
                         "apiKey": "  ",
                         "model": "",
+                        "temperature": 9,
                         "maxConcurrency": -9,
                         "requestsPerMinute": 999
                     }
@@ -555,6 +572,7 @@ mod tests {
         .unwrap();
         let provider = &settings.translation_providers[0];
 
+        assert_eq!(provider.temperature, Some(2.0));
         assert_eq!(provider.max_concurrency, 1);
         assert_eq!(provider.requests_per_minute, 100);
         assert_eq!(provider.api_key, "");
@@ -572,11 +590,13 @@ mod tests {
         let mut original = AppSettings::default();
         original.translation_providers[0].name = "Synthetic Provider".into();
         original.translation_providers[0].model = "synthetic-model".into();
+        original.translation_providers[0].temperature = Some(0.7);
         let json = serde_json::to_string(&original).unwrap();
         let loaded = parse_settings_json(&json).unwrap();
 
         assert_eq!(loaded.translation_providers[0].name, "Synthetic Provider");
         assert_eq!(loaded.translation_providers[0].model, "synthetic-model");
+        assert_eq!(loaded.translation_providers[0].temperature, Some(0.7));
     }
 
     #[test]

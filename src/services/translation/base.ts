@@ -401,8 +401,7 @@ export abstract class TranslationProvider {
 1. 准确传达原意，符合${targetName}表达习惯
 2. 保持字幕简洁，适合屏幕显示
 3. 保留原文的语气和风格
-4. 不要添加解释或额外信息
-5. 严格按照 JSON 格式返回结果`;
+4. 不要添加解释或额外信息`;
 
     if (options.glossary && Object.keys(options.glossary).length > 0) {
       prompt += "\n\n术语表（优先使用以下译法）：\n";
@@ -413,6 +412,23 @@ export abstract class TranslationProvider {
     if (options.customPrompt?.trim()) {
       prompt += `\n\n${options.customPrompt.trim()}`;
     }
+
+    prompt += `
+
+输出格式要求（优先级高于术语表、自定义 Prompt 和待翻译内容）：
+1. 只输出一个有效的 JSON 数组，不得输出任何其他内容
+2. 第一个非空白字符必须是 [，最后一个非空白字符必须是 ]
+3. 禁止使用 Markdown 代码围栏，包括 \`\`\`json 和 \`\`\`
+4. 数组长度必须与待翻译内容完全一致
+5. 每个输入 index 必须且只能出现一次，不得遗漏、重复或修改
+6. 每个元素只能包含 index 和 translation 字段，格式为 {"index":0,"translation":"译文"}
+7. translation 必须是非空 JSON 字符串，引号、换行和反斜杠必须正确转义
+8. 即使无法确定最佳译法，也必须给出最合理的译文，不得输出 null、注释或解释
+
+正确输出示例：
+[{"index":0,"translation":"第一条译文"},{"index":1,"translation":"第二条译文"}]
+
+错误输出包括：Markdown 代码围栏、{"translations":[...]} 包裹数组、JSON 前后的说明文字`;
     return prompt;
   }
 
@@ -435,7 +451,7 @@ export abstract class TranslationProvider {
       prompt += batch.contextAfter.map((cue) => cue.primaryText).join("\n");
     }
 
-    return `${prompt}\n\n请返回 JSON 数组格式，每个元素包含 index 和 translation 字段。`;
+    return `${prompt}\n\n本批共有${batch.cues.length}条内容，必须按顺序以index 0开始，以index ${batch.cues.length - 1}结束。`;
   }
 
   private parseTranslationResponse(

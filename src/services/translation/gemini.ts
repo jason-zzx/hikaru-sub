@@ -24,8 +24,6 @@ interface GeminiModelsResponse {
   nextPageToken?: unknown;
 }
 
-const DEFAULT_TEMPERATURE = 0.3;
-
 export class GeminiTranslationProvider extends TranslationProvider {
   async listModels(): Promise<string[]> {
     const models = new Set<string>();
@@ -85,9 +83,9 @@ export class GeminiTranslationProvider extends TranslationProvider {
         ? { systemInstruction: { parts: [{ text: systemPrompt }] } }
         : {}),
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        temperature: this.config.temperature ?? DEFAULT_TEMPERATURE,
-      },
+      ...(this.config.temperature === undefined
+        ? {}
+        : { generationConfig: { temperature: this.config.temperature } }),
     });
     const response = await fetchWithTimeout(
       buildProviderUrl(

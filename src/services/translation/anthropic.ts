@@ -21,8 +21,6 @@ interface AnthropicModelsResponse {
   last_id?: unknown;
 }
 
-const DEFAULT_TEMPERATURE = 0.3;
-
 export class AnthropicTranslationProvider extends TranslationProvider {
   async listModels(): Promise<string[]> {
     const models = new Set<string>();
@@ -71,7 +69,9 @@ export class AnthropicTranslationProvider extends TranslationProvider {
       max_tokens: 4096,
       ...(systemPrompt ? { system: systemPrompt } : {}),
       messages: [{ role: "user", content: userPrompt }],
-      temperature: this.config.temperature ?? DEFAULT_TEMPERATURE,
+      ...(this.config.temperature === undefined
+        ? {}
+        : { temperature: this.config.temperature }),
     });
     const response = await fetchWithTimeout(
       buildProviderUrl(this.config.baseUrl, "messages"),
