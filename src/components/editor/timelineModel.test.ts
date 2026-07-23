@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   clipVisibleCueRect,
   hitTestTimelineCue,
+  isCueActiveAtTime,
   revealTimelineTime,
 } from "./timelineModel";
 import type { SubtitleCue } from "../../types";
@@ -85,6 +86,15 @@ describe("revealTimelineTime", () => {
     expect(revealTimelineTime(1000, 800, 10, 5000)).toBe(1000);
     expect(revealTimelineTime(1000, 800, 10, 12000)).toBe(8000);
     expect(revealTimelineTime(5000, 800, 10, 500)).toBe(0);
+  });
+});
+
+describe("isCueActiveAtTime", () => {
+  it("includes cue boundaries and excludes times outside the cue", () => {
+    expect(isCueActiveAtTime(cue, 0)).toBe(true);
+    expect(isCueActiveAtTime(cue, 1000)).toBe(true);
+    expect(isCueActiveAtTime(cue, -1)).toBe(false);
+    expect(isCueActiveAtTime(cue, 1001)).toBe(false);
   });
 });
 

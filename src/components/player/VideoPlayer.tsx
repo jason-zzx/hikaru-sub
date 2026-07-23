@@ -36,7 +36,6 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
   const setDuration = usePlaybackStore((s) => s.setDuration);
   const setPlaying = usePlaybackStore((s) => s.setPlaying);
-  const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
 
   const cues = useProjectStore((s) => s.cues);
   const assStyles = useProjectStore((s) => s.assStyles);
@@ -275,14 +274,6 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       if (playUntilMs !== null && ms >= playUntilMs) {
         video.pause();
       }
-
-      // 仅在普通播放时自动选中当前时间轴的字幕；「播放当前句」期间保持选中不变
-      if (isPlaying && playUntilMs === null) {
-        const activeCue = cues.find(
-          (c) => ms >= c.startMs && ms <= c.endMs,
-        );
-        setSelectedCueId(activeCue?.id || null);
-      }
     };
 
     const handleLoadedMetadata = () => {
@@ -311,7 +302,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [videoSrc, cues, isPlaying, setCurrentTime, setDuration, setPlaying, setSelectedCueId]);
+  }, [videoSrc, setCurrentTime, setDuration, setPlaying]);
 
   // 播放时高频同步播放时间并在片段终点及时停止。
   // timeupdate 仅 ~4Hz，会导致时间轴指针跳动（bug 4）与 R 段落播放越界（bug 3）。

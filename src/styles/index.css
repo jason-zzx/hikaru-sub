@@ -53,6 +53,7 @@
   --timeline-wave: oklch(0.55 0.18 250);
   --timeline-cue: #94a3b8;
   --timeline-cue-selected: oklch(0.55 0.18 250);
+  --timeline-cue-playing: rgba(34, 197, 94, 0.45);
   --timeline-cue-text: #fff;
   --timeline-cue-handle: rgba(255, 255, 255, 0.75);
   --timeline-playhead: #ef4444;
@@ -99,6 +100,7 @@
   --timeline-wave: #3b82f6;
   --timeline-cue: #4b5563;
   --timeline-cue-selected: #3b82f6;
+  --timeline-cue-playing: rgba(74, 222, 128, 0.5);
   --timeline-cue-text: #fff;
   --timeline-cue-handle: rgba(255, 255, 255, 0.75);
   --timeline-playhead: #ef4444;

@@ -10,6 +10,7 @@ import {
 import {
   clipVisibleCueRect,
   hitTestTimelineCue,
+  isCueActiveAtTime,
   revealTimelineTime,
   type TimelineCueRect,
 } from "./timelineModel";
@@ -159,7 +160,15 @@ export function Timeline() {
         height: LANE_HEIGHT,
       }));
 
-    drawLaneLayer(laneCtx, width, laneCanvasHeight, cueRectsRef.current, selectedCueId, colors);
+    drawLaneLayer(
+      laneCtx,
+      width,
+      laneCanvasHeight,
+      cueRectsRef.current,
+      selectedCueId,
+      isPlaying ? currentTimeMs : null,
+      colors,
+    );
 
     const pointerX = (currentTimeMs - viewStartMs) / msPerPixel;
     if (pointerX >= 0 && pointerX <= width) {
@@ -175,6 +184,7 @@ export function Timeline() {
     currentTimeMs,
     dragPreviewState,
     durationMs,
+    isPlaying,
     msPerPixel,
     selectedCueId,
     themeVersion,
@@ -496,6 +506,7 @@ function drawLaneLayer(
   height: number,
   rects: TimelineCueRect[],
   selectedCueId: string | null,
+  activeTimeMs: number | null,
   colors: TimelineColors,
 ) {
   ctx.fillStyle = colors.bg;
@@ -506,9 +517,25 @@ function drawLaneLayer(
     if (!clipped) return;
 
     const isSelected = rect.cue.id === selectedCueId;
+    const isPlaybackActive =
+      !isSelected &&
+      activeTimeMs !== null &&
+      isCueActiveAtTime(rect.cue, activeTimeMs);
     ctx.fillStyle = isSelected ? colors.cueSelected : colors.cue;
     const drawWidth = Math.max(2, clipped.width);
     ctx.fillRect(clipped.x, rect.y, drawWidth, rect.height);
+
+    if (isPlaybackActive) {
+      ctx.save();
+      ctx.fillStyle = colors.cuePlaying;
+      ctx.globalAlpha = 0.25;
+      ctx.fillRect(clipped.x, rect.y, drawWidth, rect.height);
+      ctx.restore();
+
+      ctx.strokeStyle = colors.cuePlaying;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(clipped.x + 0.5, rect.y + 0.5, drawWidth - 1, rect.height - 1);
+    }
 
     ctx.fillStyle = colors.cueHandle;
     if (clipped.showStartHandle) {

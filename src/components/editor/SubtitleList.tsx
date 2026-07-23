@@ -30,6 +30,7 @@ import {
   getCueListColumnVisibility,
   type CueListColumn,
 } from "./cueListColumns";
+import { isCueActiveAtTime } from "./timelineModel";
 import { collectOverlappingCueIds } from "../../utils/subtitleQc";
 
 type SubtitleListNotify = (variant: EditorToastVariant, text: string) => void;
@@ -89,6 +90,7 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
   const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
+  const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const setSelectedCueIds = usePlaybackStore((s) => s.setSelectedCueIds);
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
@@ -305,6 +307,8 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
           const isSelected =
             selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
           const isOverlap = !isSelected && overlappingIds.has(cue.id);
+          const isPlaybackActive =
+            !isSelected && isPlaying && isCueActiveAtTime(cue, currentTimeMs);
           const styleMissing =
             assStyles.length > 0 && !knownStyleNames.has(cue.style);
           return (
@@ -315,10 +319,20 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
               onContextMenu={(event) => handleCueContextMenu(cue, event)}
               className={`col-span-full grid cursor-pointer grid-cols-subgrid items-center rounded py-1 text-sm transition-colors ${
                 isSelected
-                  ? "bg-primary/10 ring-1 ring-inset ring-primary/40"
+                  ? "bg-primary/10"
                   : isOverlap
-                    ? "bg-danger/10 text-danger ring-1 ring-inset ring-danger/35 hover:bg-danger/15"
-                    : "hover:bg-surface-overlay"
+                    ? "bg-danger/10 text-danger hover:bg-danger/15"
+                    : isPlaybackActive
+                      ? "bg-success/10"
+                      : "hover:bg-surface-overlay"
+              } ${
+                isPlaybackActive
+                  ? "ring-1 ring-inset ring-success/35"
+                  : isSelected
+                    ? "ring-1 ring-inset ring-primary/40"
+                    : isOverlap
+                      ? "ring-1 ring-inset ring-danger/35"
+                      : ""
               }`}
             >
               {columns.map((column) => {
