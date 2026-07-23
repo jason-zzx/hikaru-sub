@@ -20,8 +20,6 @@ interface OpenAIModelsResponse {
   data?: Array<{ id?: unknown }>;
 }
 
-const DEFAULT_TEMPERATURE = 0.3;
-
 /** OpenAI、DeepSeek、Ollama 和自建 Chat Completions 网关。 */
 export class OpenAITranslationProvider extends TranslationProvider {
   async listModels(): Promise<string[]> {
@@ -64,7 +62,9 @@ export class OpenAITranslationProvider extends TranslationProvider {
     const body = JSON.stringify({
       model: this.config.model,
       messages,
-      temperature: this.config.temperature ?? DEFAULT_TEMPERATURE,
+      ...(this.config.temperature === undefined
+        ? {}
+        : { temperature: this.config.temperature }),
     });
     const response = await fetchWithTimeout(
       buildProviderUrl(this.config.baseUrl, "chat/completions"),

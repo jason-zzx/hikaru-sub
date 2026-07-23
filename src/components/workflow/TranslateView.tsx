@@ -308,7 +308,7 @@ export function TranslateView() {
           model: activeProvider.model,
           maxConcurrency: activeProvider.maxConcurrency,
           requestsPerMinute: activeProvider.requestsPerMinute,
-          temperature: 0.3,
+          temperature: activeProvider.temperature,
         });
         const nextAttempt = await provider.translateBatch(
           inputCues,

@@ -140,8 +140,18 @@ describe("OpenAI-compatible contract", () => {
       "https://api.example.invalid/proxy/v1/chat/completions",
     );
     const body = JSON.parse(String(requests[1].init?.body));
-    expect(body).toMatchObject({ model: "synthetic-model", temperature: 0.3 });
+    expect(body).toMatchObject({ model: "synthetic-model" });
+    expect(body).not.toHaveProperty("temperature");
     expect(body.messages).toHaveLength(1);
+
+    const configuredProvider = new OpenAITranslationProvider(
+      config("openai-compatible", { temperature: 0.7 }),
+    );
+    await configuredProvider.translateSingle(cue("b", "synthetic source"), options);
+    const configuredBody = JSON.parse(
+      String(requests[requests.length - 1]?.init?.body),
+    );
+    expect(configuredBody.temperature).toBe(0.7);
   });
 
   it("bounds provider errors and redacts configured credentials", async () => {
@@ -440,6 +450,16 @@ describe("Gemini contract", () => {
     const body = JSON.parse(String(generation?.init?.body));
     expect(body.systemInstruction.parts[0].text).toContain("字幕翻译助手");
     expect(body.contents[0].parts[0].text).toContain("synthetic source");
+    expect(body).not.toHaveProperty("generationConfig");
+
+    const configuredProvider = new GeminiTranslationProvider(
+      config("gemini", { model: "gemini-a", temperature: 1 }),
+    );
+    await configuredProvider.translateSingle(cue("b", "synthetic source"), options);
+    const configuredBody = JSON.parse(
+      String(requests[requests.length - 1]?.init?.body),
+    );
+    expect(configuredBody.generationConfig.temperature).toBe(1);
   });
 
   it("rejects repeated pagination tokens", async () => {
@@ -499,8 +519,18 @@ describe("Anthropic contract", () => {
     );
     const body = JSON.parse(String(generation?.init?.body));
     expect(body).toMatchObject({ model: "synthetic-model", max_tokens: 4096 });
+    expect(body).not.toHaveProperty("temperature");
     expect(body.system).toContain("字幕翻译助手");
     expect(body.messages[0].content).toContain("synthetic source");
+
+    const configuredProvider = new AnthropicTranslationProvider(
+      config("anthropic", { temperature: 0.4 }),
+    );
+    await configuredProvider.translateSingle(cue("b", "synthetic source"), options);
+    const configuredBody = JSON.parse(
+      String(requests[requests.length - 1]?.init?.body),
+    );
+    expect(configuredBody.temperature).toBe(0.4);
   });
 
   it("rejects missing pagination progress", async () => {
@@ -515,6 +545,44 @@ describe("Anthropic contract", () => {
 });
 
 describe("shared request scheduling and pipeline", () => {
+  it("places the strict JSON contract last and declares the batch index range", async () => {
+    let systemPrompt = "";
+    let userPrompt = "";
+    const provider = new StubProvider(
+      config("openai-compatible"),
+      (nextSystemPrompt, nextUserPrompt) => {
+        systemPrompt = nextSystemPrompt ?? "";
+        userPrompt = nextUserPrompt;
+        return '[{"index":0,"translation":"一"},{"index":1,"translation":"二"},{"index":2,"translation":"三"}]';
+      },
+    );
+
+    const result = await provider.translateBatch(
+      [cue("a", "first"), cue("b", "second"), cue("c", "third")],
+      {
+        ...options,
+        batchSize: 3,
+        customPrompt: "custom translation guidance",
+      },
+    );
+
+    expect(result.successCount).toBe(3);
+    expect(systemPrompt).toContain("custom translation guidance");
+    expect(systemPrompt).toContain("只输出一个有效的 JSON 数组");
+    expect(systemPrompt).toContain(
+      "禁止使用 Markdown 代码围栏，包括 ```json 和 ```",
+    );
+    expect(systemPrompt).toContain(
+      '[{"index":0,"translation":"第一条译文"},{"index":1,"translation":"第二条译文"}]',
+    );
+    expect(systemPrompt.indexOf("custom translation guidance")).toBeLessThan(
+      systemPrompt.indexOf("输出格式要求"),
+    );
+    expect(userPrompt).toContain(
+      "本批共有3条内容，必须按顺序以index 0开始，以index 2结束。",
+    );
+  });
+
   it("reserves concurrency slots and spaces FIFO request starts by RPM", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

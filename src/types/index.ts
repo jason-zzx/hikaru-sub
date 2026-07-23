@@ -49,6 +49,7 @@ export interface TranslationProviderSettings {
   baseUrl: string;
   apiKey: string;
   model: string;
+  temperature?: number;
   maxConcurrency: number;
   requestsPerMinute: number;
 }

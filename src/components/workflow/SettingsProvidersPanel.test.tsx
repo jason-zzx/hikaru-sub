@@ -30,6 +30,7 @@ const providers: TranslationProviderSettings[] = [
     baseUrl: "https://api.example.invalid/v1",
     apiKey: "synthetic-test-key",
     model: "existing-model",
+    temperature: 0.7,
     maxConcurrency: 1,
     requestsPerMinute: 10,
   },
@@ -59,6 +60,7 @@ describe("provider settings helpers", () => {
       apiType: "gemini",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta",
       model: "",
+      temperature: undefined,
       name: "Alpha",
       apiKey: "synthetic-test-key",
       maxConcurrency: 1,
@@ -86,6 +88,7 @@ describe("provider settings helpers", () => {
       maxConcurrency: 1,
       requestsPerMinute: 10,
     });
+    expect(created.temperature).toBeUndefined();
     expect(
       clampProviderInteger(99, TRANSLATION_PROVIDER_LIMITS.maxConcurrency),
     ).toBe(50);
@@ -154,6 +157,13 @@ describe("SettingsProvidersPanel", () => {
       (screen.getByRole("button", { name: "默认供应商" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+
+    const temperatureInput = screen.getByLabelText("生成温度（Temperature）");
+    expect((temperatureInput as HTMLInputElement).value).toBe("");
+    fireEvent.change(temperatureInput, { target: { value: "0.7" } });
+    expect((temperatureInput as HTMLInputElement).value).toBe("0.7");
+    fireEvent.change(temperatureInput, { target: { value: "" } });
+    expect((temperatureInput as HTMLInputElement).value).toBe("");
 
     fireEvent.change(screen.getByLabelText("最大并发数"), {
       target: { value: "99" },

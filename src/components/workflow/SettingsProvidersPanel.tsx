@@ -36,6 +36,7 @@ export function changeProviderApiType(
     apiType,
     baseUrl: TRANSLATION_API_DEFAULT_URLS[apiType],
     model: "",
+    temperature: undefined,
   };
 }
 
@@ -75,6 +76,7 @@ export function SettingsProvidersPanel({
   const modelRequestIdRef = useRef(0);
 
   const selected = providers.find((provider) => provider.id === selectedId);
+  const temperatureMax = selected?.apiType === "anthropic" ? 1 : 2;
 
   const resetModelDiscovery = () => {
     modelRequestIdRef.current += 1;
@@ -316,6 +318,29 @@ export function SettingsProvidersPanel({
                 {modelsError ? (
                   <p className="break-words text-xs text-danger">{modelsError}</p>
                 ) : null}
+              </SettingsField>
+
+              <SettingsField label="生成温度（Temperature）">
+                <Input
+                  aria-label="生成温度（Temperature）"
+                  type="number"
+                  min={0}
+                  max={temperatureMax}
+                  step={0.1}
+                  value={selected.temperature ?? ""}
+                  placeholder="使用模型默认值"
+                  onChange={(event) => {
+                    const value = event.target.valueAsNumber;
+                    updateSelected({
+                      temperature: Number.isFinite(value)
+                        ? Math.min(temperatureMax, Math.max(0, value))
+                        : undefined,
+                    });
+                  }}
+                />
+                <p className="text-xs text-text-muted">
+                  留空使用模型官方默认值；范围：0-{temperatureMax}
+                </p>
               </SettingsField>
 
               <div className="grid grid-cols-2 gap-3">
