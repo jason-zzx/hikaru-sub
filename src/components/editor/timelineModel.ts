@@ -22,6 +22,10 @@ export interface ClippedCueRect {
   showEndHandle: boolean;
 }
 
+export function isCueActiveAtTime(cue: SubtitleCue, timeMs: number): boolean {
+  return timeMs >= cue.startMs && timeMs <= cue.endMs;
+}
+
 /** Return a centered view start when a target time falls outside the viewport. */
 export function revealTimelineTime(
   viewStartMs: number,

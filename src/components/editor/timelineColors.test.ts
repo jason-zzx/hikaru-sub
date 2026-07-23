@@ -21,6 +21,7 @@ describe("resolveTimelineColors", () => {
           "--timeline-wave": "#3b82f6",
           "--timeline-cue": "#94a3b8",
           "--timeline-cue-selected": "#3b82f6",
+          "--timeline-cue-playing": "#22c55e",
           "--timeline-cue-text": "#ffffff",
           "--timeline-cue-handle": "rgba(255,255,255,0.75)",
           "--timeline-playhead": "#ef4444",
@@ -36,6 +37,7 @@ describe("resolveTimelineColors", () => {
     expect(colors.wave).toBe("#3b82f6");
     expect(colors.cue).toBe("#94a3b8");
     expect(colors.cueSelected).toBe("#3b82f6");
+    expect(colors.cuePlaying).toBe("#22c55e");
     expect(colors.cueText).toBe("#ffffff");
     expect(colors.cueHandle).toBe("rgba(255,255,255,0.75)");
     expect(colors.playhead).toBe("#ef4444");
@@ -51,11 +53,12 @@ describe("resolveTimelineColors", () => {
     expect(colors.bg).toBe("#111827");
     expect(colors.waveBg).toBe("#1a1a1a");
     expect(colors.cue).toBe("#4b5563");
+    expect(colors.cuePlaying).toBe("rgba(74,222,128,0.6)");
     expect(colors.playhead).toBe("#ef4444");
   });
 
   it("exposes the full CSS variable name list", () => {
     expect(TIMELINE_COLOR_VARS.bg).toBe("--timeline-bg");
-    expect(Object.keys(TIMELINE_COLOR_VARS)).toHaveLength(9);
+    expect(Object.keys(TIMELINE_COLOR_VARS)).toHaveLength(10);
   });
 });

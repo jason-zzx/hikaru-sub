@@ -5,6 +5,7 @@ export type TimelineColors = {
   wave: string;
   cue: string;
   cueSelected: string;
+  cuePlaying: string;
   cueText: string;
   cueHandle: string;
   playhead: string;
@@ -17,6 +18,7 @@ export const TIMELINE_COLOR_VARS = {
   wave: "--timeline-wave",
   cue: "--timeline-cue",
   cueSelected: "--timeline-cue-selected",
+  cuePlaying: "--timeline-cue-playing",
   cueText: "--timeline-cue-text",
   cueHandle: "--timeline-cue-handle",
   playhead: "--timeline-playhead",
@@ -30,6 +32,7 @@ export const TIMELINE_COLOR_FALLBACKS: TimelineColors = {
   wave: "#3b82f6",
   cue: "#4b5563",
   cueSelected: "#3b82f6",
+  cuePlaying: "rgba(74,222,128,0.6)",
   cueText: "#fff",
   cueHandle: "rgba(255,255,255,0.75)",
   playhead: "#ef4444",
@@ -56,6 +59,11 @@ export function resolveTimelineColors(el: Element): TimelineColors {
       style,
       TIMELINE_COLOR_VARS.cueSelected,
       TIMELINE_COLOR_FALLBACKS.cueSelected,
+    ),
+    cuePlaying: readVar(
+      style,
+      TIMELINE_COLOR_VARS.cuePlaying,
+      TIMELINE_COLOR_FALLBACKS.cuePlaying,
     ),
     cueText: readVar(
       style,
