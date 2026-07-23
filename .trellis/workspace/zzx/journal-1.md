@@ -437,3 +437,36 @@ Implemented a persistent application-level ASS style library with installed/port
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: 最近工作视频与首页续接
+
+**Date**: 2026-07-23
+**Task**: 最近工作视频与首页续接
+**Branch**: `dev`
+
+### Summary
+
+实现最近视频持久化、首页续接入口、共享视频/字幕打开流程与全局拖放，并补充竞态保护、回归测试和前端规范。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ff27cbc` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
