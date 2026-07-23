@@ -53,6 +53,12 @@ Physical editor cues are one row per ASS `Dialogue:` event (`primaryText` only).
 
 Keep hotkey definitions centralized; test via `useEditorHotkeys.test.ts` / `hotkeys.test.ts` / `subtitleClipboard.test.ts`.
 
+## Global File Drop
+
+`useGlobalFileDrop` is mounted at `AppLayout` scope. It handles Tauri's `drop` event, selects the first recognized video/ASS/SRT path, routes videos through `openVideoSession`, and routes subtitles through `importExternalSubtitle`.
+
+Because listener registration is asynchronous and the app runs under React StrictMode, its effect must track disposal: stale callbacks return immediately after unmount, an unlisten function that resolves after unmount is called immediately, and registration failures are handled without an unhandled Promise. Successful subtitle drops select/seek the first imported cue even when `EditorView` is already mounted.
+
 ## Runtime Dependency Preparation
 
 `useRuntimeDependencyPreparation` coordinates prepare/progress UI for managed deps — pair with Settings / setup panels, not ad-hoc invoke loops in unrelated views.

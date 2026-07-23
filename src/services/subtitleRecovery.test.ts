@@ -211,6 +211,39 @@ describe("subtitle recovery format", () => {
     expect(state.activeSubtitlePath).toBe(SESSION.translatedAssPath);
   });
 
+  it("does not restore after the document changes while confirmation is open", async () => {
+    useProjectStore.getState().setSession(SESSION);
+    vi.mocked(loadSubtitleRecovery).mockResolvedValueOnce(
+      serializeSubtitleRecovery(SNAPSHOT),
+    );
+    let finishConfirm!: (value: boolean) => void;
+    vi.mocked(confirm).mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishConfirm = resolve;
+        }),
+    );
+    const restoring = restoreSubtitleRecovery(SESSION);
+    await vi.waitFor(() => expect(confirm).toHaveBeenCalled());
+
+    useProjectStore.getState().setCues([
+      {
+        id: "new-edit",
+        startMs: 0,
+        endMs: 1000,
+        primaryText: "确认期间的新编辑",
+        style: "Default",
+        layer: 0,
+      },
+    ]);
+    finishConfirm(true);
+
+    await expect(restoring).resolves.toBe("none");
+    const state = useProjectStore.getState();
+    expect(state.activeSubtitleKind).toBeNull();
+    expect(state.cues[0].primaryText).toBe("确认期间的新编辑");
+  });
+
   it("keeps a missing save target missing after restore", async () => {
     useProjectStore.getState().setSession(SESSION);
     vi.mocked(loadSubtitleRecovery).mockResolvedValueOnce(

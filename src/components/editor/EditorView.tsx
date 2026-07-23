@@ -8,12 +8,8 @@ import {
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
 import { selectCueAndSeek } from "../../services/editorActions";
-import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
-import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
-import {
-  captureProjectDocumentGuard,
-  useProjectStore,
-} from "../../stores/projectStore";
+import { importExternalSubtitle } from "../../services/openVideo";
+import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useUiStore } from "../../stores/uiStore";
 import { VideoPlayer } from "../player/VideoPlayer";
@@ -41,8 +37,6 @@ import { Button } from "../ui/button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import {
   getSettings,
-  getVideoInfo,
-  loadAssText,
   pathExists,
   pickSaveAssFile,
   pickSaveSubtitleFile,
@@ -51,7 +45,6 @@ import {
 } from "../../services/tauri";
 import { serializeAss } from "@/lib/ass";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
-import { parseExternalSubtitleDocument } from "../../utils/subtitleImport";
 import {
   hasOverlappingCues,
   serializeSrt,
@@ -88,12 +81,10 @@ export function EditorView() {
   const futureLen = useProjectStore((s) => s.history.future.length);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
-  const markDirty = useProjectStore((s) => s.markDirty);
   const markSaved = useProjectStore((s) => s.markSaved);
   const captureSaveSnapshot = useProjectStore((s) => s.captureSaveSnapshot);
   const setAssMetadata = useProjectStore((s) => s.setAssMetadata);
   const setActiveSubtitle = useProjectStore((s) => s.setActiveSubtitle);
-  const loadAssDocument = useProjectStore((s) => s.loadAssDocument);
   const acceptTextSession = useProjectStore((s) => s.acceptTextSession);
   const setStep = useUiStore((s) => s.setStep);
   const toggleStyleManager = useUiStore((s) => s.toggleStyleManager);
@@ -338,41 +329,23 @@ export function EditorView() {
     try {
       const subtitlePath = await pickSubtitleFile();
       if (!subtitlePath) return;
-      const discardDecision = await confirmDiscardUnsavedChanges();
-      if (!discardDecision.proceed) return;
-      const documentGuard = captureProjectDocumentGuard(session.videoPath);
-
-      const [subtitleText, videoInfo] = await Promise.all([
-        loadAssText(subtitlePath),
-        getVideoInfo(session.videoPath),
-      ]);
-      if (!documentGuard.unchanged()) {
-        notify("info", "当前字幕已发生变化，已取消载入字幕文件");
-        return;
-      }
-      const doc = parseExternalSubtitleDocument({
-        path: subtitlePath,
-        text: subtitleText,
-        playRes: { width: videoInfo.width, height: videoInfo.height },
-      });
-
-      const applied = await withDiscardedSubtitleRecovery(
-        discardDecision.recoveryVideoPath,
-        () => {
-          if (!documentGuard.unchanged()) return false;
-          loadAssDocument(doc, { kind: "translated", path: null });
-          markDirty();
-          return true;
-        },
+      const result = await importExternalSubtitle(
+        session.videoPath,
+        subtitlePath,
       );
-      if (!applied) {
-        notify("info", "当前字幕已发生变化，已取消载入字幕文件");
+      if (!result.ok) {
+        if ("changed" in result) {
+          notify("info", "当前字幕已发生变化，已取消载入字幕文件");
+        } else if ("error" in result) {
+          notify("error", `选择字幕文件失败：${result.error}`);
+        }
         return;
       }
       setSubtitleFileExists(false);
       setSaveError(null);
-      if (doc.cues.length > 0) {
-        selectCueAndSeek(doc.cues[0]);
+      const { cues } = useProjectStore.getState();
+      if (cues.length > 0) {
+        selectCueAndSeek(cues[0]);
       }
       notify("info", "已载入字幕文件，首次保存时请选择保存位置");
     } catch (err) {

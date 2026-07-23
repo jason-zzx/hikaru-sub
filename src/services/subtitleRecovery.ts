@@ -1,7 +1,10 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { parseAss, serializeAss } from "@/lib/ass";
 import type { ActiveSubtitleKind, VideoSession } from "../types";
-import { useProjectStore } from "../stores/projectStore";
+import {
+  captureProjectDocumentGuard,
+  useProjectStore,
+} from "../stores/projectStore";
 import {
   deleteSubtitleRecovery as deleteSubtitleRecoveryFile,
   loadSubtitleRecovery as loadSubtitleRecoveryFile,
@@ -193,6 +196,7 @@ export async function saveCurrentSubtitleRecovery(): Promise<boolean> {
 export async function restoreSubtitleRecovery(
   session: VideoSession,
 ): Promise<RecoveryRestoreResult> {
+  const documentGuard = captureProjectDocumentGuard(session.videoPath);
   let content: string | null;
   try {
     content = await loadSubtitleRecovery(session.videoPath);
@@ -200,7 +204,7 @@ export async function restoreSubtitleRecovery(
     console.warn("读取字幕恢复文件失败:", err);
     return "error";
   }
-  if (!content) return "none";
+  if (!content || !documentGuard.unchanged()) return "none";
 
   const snapshot = parseSubtitleRecovery(content, session.videoPath);
   if (!snapshot) {
@@ -242,6 +246,8 @@ export async function restoreSubtitleRecovery(
     return "none";
   }
 
+  if (!documentGuard.unchanged()) return "none";
+
   if (!restore) {
     try {
       await clearSubtitleRecovery(session.videoPath);
@@ -252,10 +258,9 @@ export async function restoreSubtitleRecovery(
     }
   }
 
-  if (useProjectStore.getState().session?.videoPath !== session.videoPath) {
-    return "none";
-  }
   const doc = parseAss(snapshot.assText, { mergeBilingual: false });
+  if (!documentGuard.unchanged()) return "none";
+
   const activeSubtitlePath = snapshot.activeSubtitlePath;
   useProjectStore.getState().loadAssDocument(
     doc,

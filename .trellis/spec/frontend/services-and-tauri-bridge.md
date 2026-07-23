@@ -31,6 +31,8 @@ Full chain (must stay intact): **Rust impl → `lib.rs` `generate_handler!` → 
 | `translation/` | OpenAI-compatible / Gemini / Anthropic HTTP, model discovery, shared batching/fallback, and request scheduling |
 | `editorActions.ts` | Pure editor list actions (split/merge/timing/delete) on cue arrays |
 | `subtitleClipboard.ts` | Whole-row ASS event copy/cut/paste via `@tauri-apps/plugin-clipboard-manager` + `eventLine` codec |
+| `openVideo.ts` | Shared open-video flow (`openVideoSession`: document guard → confirm → `prepareVideoSession` → same-dir ASS auto-load → recovery) and external ASS/SRT import (`importExternalSubtitle`). All video-open entry points (ImportView, WelcomeView recents, global drag-drop) must go through it. Callers route only with `hasSubtitleDocument`, which includes restored recovery documents. Every async prepare/read boundary rechecks the document guard; `restoreSubtitleRecovery` captures its own guard so edits made while its native confirmation is open cannot be overwritten. Stale results return `changed` and must not replace newer edits or sessions. |
+| `recentVideos.ts` | MRU recent-video list (10 entries) in `localStorage` (`hikaru-sub:recent-videos`); entries snapshot session-derived ASS paths so WelcomeView can badge via `pathExists` without re-deriving Rust naming rules. |
 
 Official Tauri plugins (e.g. clipboard-manager) are called from a focused domain service (`subtitleClipboard.ts`), not from React components and not via a custom Rust command / `tauri.ts` invoke. Still register the plugin in `lib.rs` and grant only needed capabilities (`clipboard-manager:allow-read-text`, `allow-write-text`).
 

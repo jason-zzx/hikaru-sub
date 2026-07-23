@@ -87,8 +87,7 @@ describe("EditorView Phase 2B behavior guards", () => {
   it("opens or reveals visible subtitle files without falling back to hidden project files", () => {
     expect(source).toContain("handleSelectSubtitleFile");
     expect(source).toContain("pickSubtitleFile()");
-    expect(source).toContain("parseExternalSubtitleDocument");
-    expect(source).toContain('loadAssDocument(doc, { kind: "translated", path: null })');
+    expect(source).toContain("importExternalSubtitle");
     expect(source).toContain("pickSaveAssFile(session.translatedAssPath)");
     expect(source).toContain("pathExists(currentSubtitlePath)");
     expect(source).toContain("revealItemInDir(currentSubtitlePath)");
@@ -100,6 +99,8 @@ describe("EditorView Phase 2B behavior guards", () => {
   it("auto-selects the first cue on mount and after loading a subtitle file", () => {
     expect(source).toContain("selectCueAndSeek");
     expect(source).toMatch(/selectCueAndSeek\(cues\[0\]\)/);
-    expect(source).toMatch(/selectCueAndSeek\(doc\.cues\[0\]\)/);
+    const fnStart = source.indexOf("const handleSelectSubtitleFile");
+    const fnBody = source.slice(fnStart, source.indexOf("const handleRevealSubtitleFile"));
+    expect(fnBody).toContain("selectCueAndSeek(cues[0])");
   });
 });

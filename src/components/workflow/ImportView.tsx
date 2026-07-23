@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { parseAss } from "@/lib/ass";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useClipStore } from "../../stores/clipStore";
@@ -10,21 +9,13 @@ import {
   cancelVideoClip,
   checkFfmpeg,
   invalidateFfmpegStatus,
-  loadAssText,
-  pathExists,
   pickVideoFile,
-  prepareVideoSession,
   startVideoClip,
-  transcribedAssPath,
-  translatedAssPath,
 } from "../../services/tauri";
 import type { FfmpegStatus } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
-import {
-  restoreSubtitleRecovery,
-  withDiscardedSubtitleRecovery,
-} from "../../services/subtitleRecovery";
+import { openVideoSession } from "../../services/openVideo";
 import { ClipDialog } from "./ClipDialog";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
@@ -32,7 +23,6 @@ export function ImportView() {
   const setStep = useUiStore((s) => s.setStep);
   const openSettings = useUiStore((s) => s.openSettings);
   const session = useProjectStore((s) => s.session);
-  const setSession = useProjectStore((s) => s.setSession);
 
   const clipBusy = useClipStore((s) => s.busy);
   const jobId = useClipStore((s) => s.jobId);
@@ -79,52 +69,22 @@ export function ImportView() {
       return;
     }
     if (!videoPath) return;
-    const discardDecision = await confirmDiscardUnsavedChanges();
-    if (!discardDecision.proceed) return;
-
     setBusy(true);
     try {
-      const session = await prepareVideoSession(videoPath);
-      await withDiscardedSubtitleRecovery(
-        discardDecision.recoveryVideoPath,
-        () => setSession(session),
-      );
-
-      const { loadAssDocument } = useProjectStore.getState();
-      const translatedPath = translatedAssPath(session);
-      const transcribedPath = transcribedAssPath(session);
-
-      let loaded = false;
-      if (await pathExists(translatedPath)) {
-        try {
-          loadAssDocument(parseAss(await loadAssText(translatedPath), { mergeBilingual: false }), {
-            kind: "translated",
-            path: translatedPath,
-          });
-          loaded = true;
-        } catch {
-          loaded = false;
+      const result = await openVideoSession(videoPath);
+      if (!result.ok) {
+        if ("error" in result) {
+          setError(result.error);
+        } else if ("changed" in result) {
+          setError("当前字幕已发生变化，已取消打开视频");
         }
+        return;
       }
-      if (!loaded && await pathExists(transcribedPath)) {
-        try {
-          loadAssDocument(parseAss(await loadAssText(transcribedPath), { mergeBilingual: false }), {
-            kind: "transcribed",
-            path: transcribedPath,
-          });
-        } catch {
-          // Treat unreadable subtitle files as an incomplete stage.
-        }
-      }
-
-      const recovery = await restoreSubtitleRecovery(session);
-      if (recovery === "invalid") {
+      if (result.recovery === "invalid") {
         setError("检测到的字幕恢复文件格式无效，已删除");
-      } else if (recovery === "error") {
+      } else if (result.recovery === "error") {
         setError("处理字幕恢复文件失败，已继续打开视频");
       }
-    } catch (e) {
-      setError(`打开视频失败：${String(e)}`);
     } finally {
       setBusy(false);
     }
