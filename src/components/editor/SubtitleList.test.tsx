@@ -56,9 +56,17 @@ function rowFor(text: string): HTMLElement {
   return cell.parentElement;
 }
 
-describe("SubtitleList shift menu", () => {
+describe("SubtitleList", () => {
   beforeEach(() => resetSelection(["a"]));
   afterEach(cleanup);
+
+  it("keeps the cue under the playhead highlighted while paused", () => {
+    usePlaybackStore.setState({ currentTimeMs: 2500, isPlaying: false });
+
+    render(<SubtitleList />);
+
+    expect(rowFor("B text").className).toContain("ring-success/35");
+  });
 
   it("flushes the old active draft before right-click selects an unselected row", async () => {
     const user = userEvent.setup();

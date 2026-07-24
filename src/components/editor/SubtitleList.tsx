@@ -96,7 +96,6 @@ export function SubtitleList({
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
   const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
-  const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const setSelectedCueIds = usePlaybackStore((s) => s.setSelectedCueIds);
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
@@ -317,7 +316,7 @@ export function SubtitleList({
             selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
           const isOverlap = !isSelected && overlappingIds.has(cue.id);
           const isPlaybackActive =
-            !isSelected && isPlaying && isCueActiveAtTime(cue, currentTimeMs);
+            !isSelected && isCueActiveAtTime(cue, currentTimeMs);
           const styleMissing =
             assStyles.length > 0 && !knownStyleNames.has(cue.style);
           return (

@@ -234,7 +234,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       laneCanvasHeight,
       cueRectsRef.current,
       selectedCueId,
-      isPlaying ? currentTimeMs : null,
+      currentTimeMs,
       colors,
     );
 
@@ -260,7 +260,6 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
     currentTimeMs,
     dragPreviewState,
     durationMs,
-    isPlaying,
     msPerPixel,
     selectedCueId,
     snapTargetMs,
@@ -839,7 +838,7 @@ function drawLaneLayer(
   height: number,
   rects: TimelineCueRect[],
   selectedCueId: string | null,
-  activeTimeMs: number | null,
+  activeTimeMs: number,
   colors: TimelineColors,
 ) {
   ctx.fillStyle = colors.bg;
@@ -851,9 +850,7 @@ function drawLaneLayer(
 
     const isSelected = rect.cue.id === selectedCueId;
     const isPlaybackActive =
-      !isSelected &&
-      activeTimeMs !== null &&
-      isCueActiveAtTime(rect.cue, activeTimeMs);
+      !isSelected && isCueActiveAtTime(rect.cue, activeTimeMs);
     ctx.fillStyle = isSelected ? colors.cueSelected : colors.cue;
     const drawWidth = Math.max(2, clipped.width);
     ctx.fillRect(clipped.x, rect.y, drawWidth, rect.height);

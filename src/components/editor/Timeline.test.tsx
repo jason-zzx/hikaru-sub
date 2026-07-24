@@ -126,6 +126,17 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("Timeline playback cue styling", () => {
+  it("keeps the cue under the playhead highlighted while paused", () => {
+    usePlaybackStore.setState({ currentTimeMs: 4500, isPlaying: false });
+    context.strokeRect.mockClear();
+
+    renderTimeline();
+
+    expect(context.strokeRect).toHaveBeenCalled();
+  });
+});
+
 describe("Timeline pointer gestures", () => {
   it("keeps body clicks as selection and seek without creating history", () => {
     reset(["b"]);
