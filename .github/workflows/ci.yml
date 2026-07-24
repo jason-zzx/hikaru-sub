@@ -12,6 +12,23 @@ permissions:
   contents: read
 
 jobs:
+  asr-unit:
+    name: Test ASR sidecar
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Run dependency-free ASR unit tests
+        working-directory: asr-service
+        run: python -S -m unittest discover tests
+
   test:
     name: Test Windows
     runs-on: windows-latest

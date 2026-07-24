@@ -1,58 +1,53 @@
+import sys
 import unittest
 from pathlib import Path
-import sys
+from types import ModuleType, SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from engines.vad import VadEngine
+from engines.vad import SpeechSegment, VadEngine, split_long_segments
+
+
+def _fake_torch(load_result):
+    hub_load = MagicMock(return_value=load_result)
+    torch_module = ModuleType("torch")
+    torch_module.hub = SimpleNamespace(load=hub_load)
+    return torch_module, hub_load
 
 
 class VadEngineLoadTests(unittest.TestCase):
     def test_load_initializes_model_and_utils(self):
-        """load() 应加载 Silero VAD 模型"""
+        model = object()
+        utils = (object(),)
+        torch_module, hub_load = _fake_torch((model, utils))
         vad = VadEngine()
-        vad.load()
 
-        self.assertIsNotNone(vad._model)
-        self.assertIsNotNone(vad._utils)
+        with patch.dict(sys.modules, {"torch": torch_module}):
+            vad.load()
+
+        self.assertIs(vad._model, model)
+        self.assertIs(vad._utils, utils)
+        hub_load.assert_called_once_with(
+            repo_or_dir="snakers4/silero-vad",
+            model="silero_vad",
+            force_reload=False,
+            trust_repo=True,
+        )
 
     def test_load_is_idempotent(self):
-        """多次调用 load() 应该是幂等的"""
+        model = object()
+        torch_module, hub_load = _fake_torch((model, (object(),)))
         vad = VadEngine()
-        vad.load()
-        model_first = vad._model
 
-        vad.load()
-        model_second = vad._model
+        with patch.dict(sys.modules, {"torch": torch_module}):
+            vad.load()
+            model_first = vad._model
+            vad.load()
 
-        self.assertIs(model_first, model_second)
-
-
-import tempfile
-import wave
-import math
-from engines.vad import SpeechSegment
-
-
-def _write_activity_wav(
-    path: Path,
-    duration_ms: int,
-    active_ranges: list[tuple[int, int]],
-) -> None:
-    """生成测试音频：指定区域有活动信号，其他区域静音"""
-    rate = 16000
-    frames = int(rate * duration_ms / 1000)
-    with wave.open(str(path), "wb") as wav:
-        wav.setnchannels(1)
-        wav.setsampwidth(2)
-        wav.setframerate(rate)
-        samples = bytearray()
-        for index in range(frames):
-            time_ms = int(index * 1000 / rate)
-            active = any(start <= time_ms < end for start, end in active_ranges)
-            value = int(8000 * math.sin(index * 0.05)) if active else 0
-            samples.extend(value.to_bytes(2, "little", signed=True))
-        wav.writeframes(bytes(samples))
+        self.assertIs(model_first, model)
+        self.assertIs(vad._model, model)
+        hub_load.assert_called_once()
 
 
 class VadDetectionTests(unittest.TestCase):
@@ -79,12 +74,12 @@ class VadDetectionTests(unittest.TestCase):
 
         vad._utils = (fake_get_speech_timestamps,)
 
-        with tempfile.TemporaryDirectory() as tmp:
-            audio = Path(tmp) / "audio.wav"
-            _write_activity_wav(audio, 10_000, [(1000, 3000), (5000, 8000)])
-
+        with patch(
+            "engines.vad._read_wav_as_tensor",
+            return_value=range(160_000),
+        ):
             segments = vad.detect_speech_segments(
-                str(audio),
+                "audio.wav",
                 threshold=0.6,
                 min_speech_duration_ms=500,
             )
@@ -100,9 +95,6 @@ class VadDetectionTests(unittest.TestCase):
         self.assertEqual(captured['kwargs']['min_speech_duration_ms'], 500)
         # 10s @ 16kHz 应读出约 160000 采样点
         self.assertAlmostEqual(captured['wav_len'], 160000, delta=160)
-
-
-from engines.vad import split_long_segments
 
 
 class VadSplitTests(unittest.TestCase):

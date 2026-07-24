@@ -1,12 +1,19 @@
-import unittest
-from unittest.mock import patch
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
+from types import ModuleType
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engines.qwen3_asr import Qwen3AsrEngine, ASR_MODEL_ID, ALIGNER_MODEL_ID, MODEL_ID, _extract_char_timestamps
 from engines.base import AsrError
+
+
+def _fake_huggingface_hub(cache_lookup) -> ModuleType:
+    module = ModuleType("huggingface_hub")
+    module.try_to_load_from_cache = MagicMock(side_effect=cache_lookup)
+    return module
 
 
 class IsAvailableTests(unittest.TestCase):
@@ -23,29 +30,33 @@ class IsAvailableTests(unittest.TestCase):
 
 class IsModelDownloadedTests(unittest.TestCase):
     def test_returns_false_when_hub_missing(self):
-        with patch.dict("sys.modules", {"huggingface_hub": None}):
+        with patch.dict(sys.modules, {"huggingface_hub": None}):
             # import 会失败 → except ImportError → False
             self.assertFalse(Qwen3AsrEngine.is_model_downloaded(MODEL_ID))
 
     def test_returns_true_only_when_both_repos_cached(self):
-        with patch("huggingface_hub.try_to_load_from_cache") as mock_cache:
-            def fake_cache(repo, filename):
-                if repo in (MODEL_ID, ALIGNER_MODEL_ID) and filename == "config.json":
-                    return f"/fake/cache/{repo}/config.json"
-                return None
-            mock_cache.side_effect = fake_cache
-            with patch("os.path.exists", return_value=True):
-                self.assertTrue(Qwen3AsrEngine.is_model_downloaded(MODEL_ID))
+        def fake_cache(repo, filename):
+            if repo in (MODEL_ID, ALIGNER_MODEL_ID) and filename == "config.json":
+                return f"/fake/cache/{repo}/config.json"
+            return None
+
+        with patch.dict(
+            sys.modules,
+            {"huggingface_hub": _fake_huggingface_hub(fake_cache)},
+        ), patch("os.path.exists", return_value=True):
+            self.assertTrue(Qwen3AsrEngine.is_model_downloaded(MODEL_ID))
 
     def test_returns_false_when_only_asr_cached(self):
-        with patch("huggingface_hub.try_to_load_from_cache") as mock_cache:
-            def fake_cache(repo, filename):
-                if repo == MODEL_ID and filename == "config.json":
-                    return f"/fake/cache/{repo}/config.json"
-                return None
-            mock_cache.side_effect = fake_cache
-            with patch("os.path.exists", return_value=True):
-                self.assertFalse(Qwen3AsrEngine.is_model_downloaded(MODEL_ID))
+        def fake_cache(repo, filename):
+            if repo == MODEL_ID and filename == "config.json":
+                return f"/fake/cache/{repo}/config.json"
+            return None
+
+        with patch.dict(
+            sys.modules,
+            {"huggingface_hub": _fake_huggingface_hub(fake_cache)},
+        ), patch("os.path.exists", return_value=True):
+            self.assertFalse(Qwen3AsrEngine.is_model_downloaded(MODEL_ID))
 
 
 class DownloadModelTests(unittest.TestCase):

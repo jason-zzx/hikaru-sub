@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -13,6 +14,18 @@ from engines.kotoba_faster_whisper import (
     KotobaFasterWhisperEngine,
 )
 from engines.registry import create_engine, list_engines
+
+
+def _fake_faster_whisper(
+    *,
+    version: str = "",
+    model_path: str | None = None,
+) -> ModuleType:
+    module = ModuleType("faster_whisper")
+    module.__version__ = version
+    module.download_model = MagicMock(return_value=model_path)
+    module.WhisperModel = MagicMock()
+    return module
 
 
 class KotobaFasterWhisperEngineTests(unittest.TestCase):
@@ -29,7 +42,10 @@ class KotobaFasterWhisperEngineTests(unittest.TestCase):
                 ("1.2.1", True),
             ):
                 with self.subTest(version=version):
-                    with patch("faster_whisper.__version__", version):
+                    with patch.dict(
+                        sys.modules,
+                        {"faster_whisper": _fake_faster_whisper(version=version)},
+                    ):
                         self.assertEqual(
                             KotobaFasterWhisperEngine.is_available(),
                             expected,
@@ -37,10 +53,12 @@ class KotobaFasterWhisperEngineTests(unittest.TestCase):
 
     def test_refuses_to_load_an_unsupported_faster_whisper_runtime(self):
         engine = KotobaFasterWhisperEngine(device="cpu")
-        with patch("faster_whisper.__version__", "1.1.0"):
-            with patch("faster_whisper.WhisperModel"):
-                with self.assertRaisesRegex(AsrError, r"faster-whisper>=1\.1\.1"):
-                    engine.load()
+        with patch.dict(
+            sys.modules,
+            {"faster_whisper": _fake_faster_whisper(version="1.1.0")},
+        ):
+            with self.assertRaisesRegex(AsrError, r"faster-whisper>=1\.1\.1"):
+                engine.load()
 
     def test_rejects_unsupported_models_at_construction(self):
         for model in ("", "kotoba-tech/unsupported"):
@@ -78,7 +96,14 @@ class KotobaFasterWhisperEngineTests(unittest.TestCase):
             (snapshot / "tokenizer.json").write_text("{}", encoding="utf-8")
             (snapshot / "vocabulary.json").write_text("{}", encoding="utf-8")
 
-            with patch("faster_whisper.download_model", return_value=directory):
+            with patch.dict(
+                sys.modules,
+                {
+                    "faster_whisper": _fake_faster_whisper(
+                        model_path=directory,
+                    )
+                },
+            ):
                 self.assertFalse(
                     KotobaFasterWhisperEngine.is_model_downloaded(MODEL_ID)
                 )
