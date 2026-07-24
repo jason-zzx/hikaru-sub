@@ -1,6 +1,6 @@
 [package]
 name = "hikaru-sub"
-version = "0.3.0"
+version = "0.4.0"
 description = "Hikaru Sub AI subtitle editor"
 authors = ["you"]
 edition = "2021"
