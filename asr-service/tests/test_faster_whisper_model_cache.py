@@ -2,11 +2,18 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import ModuleType
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engines.faster_whisper import FasterWhisperEngine
+
+
+def _fake_faster_whisper(model_path: str) -> ModuleType:
+    module = ModuleType("faster_whisper")
+    module.download_model = MagicMock(return_value=model_path)
+    return module
 
 
 class FasterWhisperModelCacheTests(unittest.TestCase):
@@ -17,7 +24,10 @@ class FasterWhisperModelCacheTests(unittest.TestCase):
             (snapshot / "tokenizer.json").write_text("{}", encoding="utf-8")
             (snapshot / "vocabulary.json").write_text("{}", encoding="utf-8")
 
-            with patch("faster_whisper.download_model", return_value=directory):
+            with patch.dict(
+                sys.modules,
+                {"faster_whisper": _fake_faster_whisper(directory)},
+            ):
                 self.assertFalse(
                     FasterWhisperEngine.is_model_downloaded("owner/model")
                 )
@@ -30,7 +40,10 @@ class FasterWhisperModelCacheTests(unittest.TestCase):
             (snapshot / "tokenizer.json").write_text("{}", encoding="utf-8")
             (snapshot / "vocabulary.txt").write_text("token", encoding="utf-8")
 
-            with patch("faster_whisper.download_model", return_value=directory):
+            with patch.dict(
+                sys.modules,
+                {"faster_whisper": _fake_faster_whisper(directory)},
+            ):
                 self.assertTrue(
                     FasterWhisperEngine.is_model_downloaded("owner/model")
                 )
