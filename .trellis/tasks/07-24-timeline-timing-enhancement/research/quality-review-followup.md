@@ -22,7 +22,7 @@ A follow-up complexity review reused the existing Store-to-input synchronization
 
 - PRD and design include all three contracts.
 - Frontend component guidelines preserve them for future work.
-- `implement.md` reflects completed implementation/automated checks and leaves only the real Tauri WebView visual/pointer pass unchecked.
+- `implement.md` reflects completed implementation, automated checks, and the user-confirmed real Tauri WebView visual/pointer pass.
 - The original interaction research is explicitly labeled as a pre-implementation snapshot.
 
 ## Verification
@@ -30,3 +30,4 @@ A follow-up complexity review reused the existing Store-to-input synchronization
 - Full `pnpm test`: 100 files / 751 tests passed.
 - `pnpm build`: passed with the existing large-chunk warning only.
 - `git diff --check`: passed.
+- Real Tauri WebView manual pass: user-confirmed for light/dark snap guides, zoom, multi-lane rendering, and native pointer feel.
