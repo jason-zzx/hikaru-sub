@@ -151,7 +151,12 @@ mod tests {
     use super::*;
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::Mutex;
     use tempfile::tempdir;
+
+    // These tests mutate process-global WebView2 state; keep them isolated while
+    // Rust runs the suite in parallel.
+    static WEBVIEW_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn detect_portable_requires_marker_file() {
@@ -172,6 +177,9 @@ mod tests {
 
     #[test]
     fn apply_portable_bootstrap_creates_dirs_and_sets_webview_env() {
+        let _env_guard = WEBVIEW_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let dir = tempdir().unwrap();
         fs::write(dir.path().join(".portable"), b"").unwrap();
         let prev = std::env::var_os(WEBVIEW2_USER_DATA_FOLDER);
@@ -197,6 +205,9 @@ mod tests {
 
     #[test]
     fn resolve_portable_flag_true_after_successful_bootstrap() {
+        let _env_guard = WEBVIEW_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let dir = tempdir().unwrap();
         fs::write(dir.path().join(".portable"), b"").unwrap();
         let prev = std::env::var_os(WEBVIEW2_USER_DATA_FOLDER);
