@@ -12,22 +12,28 @@ import {
   createCueAtPlayhead,
   createCueAtPlayheadWithUniqueId,
   createUniqueCueId,
+  createTimelineSnapSnapshot,
   deleteCuesById,
   duplicateCues,
   findSubtitleBoundary,
+  framesToMilliseconds,
   frameStepTarget,
   hasMultipleSelectedCues,
   insertCueRelative,
   mergeSelectedCues,
   nextAfterCommit,
   normalizeBoundaryDrag,
+  resolveCueMove,
+  resolveTimelineSnap,
   selectCueAfterDelete,
   selectCueAndSeek,
   selectCueByOffset,
   splitCueAtTime,
+  shiftCueTimes,
   swapSelectedCues,
 } from "./editorActions";
 import { usePlaybackStore } from "../stores/playbackStore";
+import { useProjectStore } from "../stores/projectStore";
 import type { SubtitleCue } from "../types";
 
 function cue(id: string, startMs: number, endMs: number): SubtitleCue {
@@ -42,6 +48,10 @@ function cue(id: string, startMs: number, endMs: number): SubtitleCue {
 }
 
 const CUES = [cue("a", 0, 1000), cue("b", 2000, 3000), cue("c", 5000, 6000)];
+const snapThresholds = (strongMs: number, frameMs = strongMs) => ({
+  strongMs,
+  frameMs,
+});
 
 describe("selectCueAndSeek", () => {
   beforeEach(() => {
@@ -131,6 +141,261 @@ describe("frameStepTarget", () => {
 
   it("clamp 到时长", () => {
     expect(frameStepTarget(59990, 25, 10, 60000)).toBe(60000);
+  });
+});
+
+describe("timeline timing transforms", () => {
+  it("converts frame counts with the detected FPS and 30 FPS fallback", () => {
+    expect(framesToMilliseconds(3, 25)).toBe(120);
+    expect(framesToMilliseconds(3, null)).toBe(100);
+    expect(framesToMilliseconds(1, 0)).toBe(33);
+  });
+
+  it("shifts every selected cue by the full delta and preserves other references", () => {
+    const shifted = shiftCueTimes(CUES, ["a", "b"], -2500, "both");
+
+    expect(shifted.map(({ startMs, endMs }) => [startMs, endMs])).toEqual([
+      [0, 0],
+      [0, 500],
+      [5000, 6000],
+    ]);
+    expect(shifted[2]).toBe(CUES[2]);
+  });
+
+  it.each([
+    ["start advance below zero", "start", -2000, 0, 1500],
+    ["start delay across end", "start", 1000, 1500, 1500],
+    ["end advance across start", "end", -2000, 1000, 1000],
+    ["end delay past video end", "end", 9000, 1000, 10500],
+  ] as const)("handles one-sided shift: %s", (_name, target, delta, startMs, endMs) => {
+    const source = [cue("x", 1000, 1500)];
+    const result = shiftCueTimes(source, ["x"], delta, target);
+    expect(result[0]).toMatchObject({ startMs, endMs });
+  });
+
+  it("returns the original list for empty, zero, missing, or unchanged shifts", () => {
+    expect(shiftCueTimes(CUES, [], 100, "both")).toBe(CUES);
+    expect(shiftCueTimes(CUES, ["a"], 0, "both")).toBe(CUES);
+    expect(shiftCueTimes(CUES, ["missing"], 100, "both")).toBe(CUES);
+    expect(shiftCueTimes(CUES, ["a"], -100, "start")).toBe(CUES);
+  });
+
+  it("bounds whole-cue movement without changing duration", () => {
+    const snapshot = createTimelineSnapSnapshot([], "x", 9000, 25, 10000);
+    expect(resolveCueMove(cue("x", 1000, 3000), -5000, 10000, snapshot, snapThresholds(-1))).toEqual({
+      startMs: 0,
+      endMs: 2000,
+      snapTargetMs: null,
+    });
+    expect(resolveCueMove(cue("x", 9000, 11000), 0, 10000, snapshot, snapThresholds(-1))).toEqual({
+      startMs: 8000,
+      endMs: 10000,
+      snapTargetMs: null,
+    });
+  });
+
+  it("does not move a cue whose duration exceeds the video", () => {
+    const source = cue("x", 0, 12000);
+    const snapshot = createTimelineSnapSnapshot([], "x", 0, null, 10000);
+    expect(resolveCueMove(source, 1000, 10000, snapshot, snapThresholds(80))).toEqual({
+      startMs: 0,
+      endMs: 12000,
+      snapTargetMs: null,
+    });
+  });
+});
+
+describe("numeric shift history integration", () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      ...useProjectStore.getInitialState(),
+      cues: CUES,
+    });
+    usePlaybackStore.setState({
+      selectedCueId: "b",
+      selectedCueIds: ["a", "b"],
+    });
+  });
+
+  it("records a batch shift as one undoable command", () => {
+    const store = useProjectStore.getState();
+    store.replaceCues(shiftCueTimes(store.cues, ["a", "b"], 500, "both"));
+
+    expect(useProjectStore.getState().history.past).toHaveLength(1);
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().cues).toEqual(CUES);
+  });
+
+  it("keeps a prior time draft and the shift as separate history commands", () => {
+    useProjectStore.getState().updateCue("b", { endMs: 3200 });
+    const live = useProjectStore.getState();
+    live.replaceCues(shiftCueTimes(live.cues, ["b"], 500, "both"));
+
+    expect(useProjectStore.getState().history.past).toHaveLength(2);
+    useProjectStore.getState().undo();
+    expect(useProjectStore.getState().cues[1]).toMatchObject({
+      startMs: 2000,
+      endMs: 3200,
+    });
+  });
+});
+
+describe("timeline snapping", () => {
+  it("prefers a strong playhead target over a closer frame target", () => {
+    const snapshot = {
+      playheadMs: 1100,
+      cueBoundariesMs: [],
+      effectiveFps: 25,
+      durationMs: 10000,
+    };
+    expect(resolveTimelineSnap(1060, snapThresholds(50, 25), snapshot)).toMatchObject({
+      timeMs: 1100,
+      source: "playhead",
+    });
+  });
+
+  it("prefers a strong cue boundary over a closer frame target", () => {
+    const snapshot = {
+      playheadMs: 9000,
+      cueBoundariesMs: [1100],
+      effectiveFps: 25,
+      durationMs: 10000,
+    };
+    expect(resolveTimelineSnap(1060, snapThresholds(50, 25), snapshot)).toMatchObject({
+      timeMs: 1100,
+      source: "cue",
+    });
+  });
+
+  it("uses playhead, cue, then frame priority for exact-distance ties", () => {
+    const snapshot = {
+      playheadMs: 990,
+      cueBoundariesMs: [1010],
+      effectiveFps: 0.7,
+      durationMs: 10000,
+    };
+    expect(resolveTimelineSnap(1000, snapThresholds(20), snapshot)).toMatchObject({
+      timeMs: 990,
+      source: "playhead",
+    });
+  });
+
+  it("snaps to frame starts at non-integer FPS and falls back to 30 FPS", () => {
+    const at2997 = createTimelineSnapSnapshot([], "x", 5000, 29.97, 10010);
+    expect(resolveTimelineSnap(1002, snapThresholds(20), at2997)).toMatchObject({
+      timeMs: 1001,
+      source: "frame",
+    });
+
+    const fallback = createTimelineSnapSnapshot([], "x", 5000, null, 10000);
+    expect(resolveTimelineSnap(67, snapThresholds(20), fallback)).toMatchObject({
+      timeMs: 67,
+      source: "frame",
+    });
+  });
+
+  it("excludes the edited cue and ignores candidates outside the video", () => {
+    const snapshot = createTimelineSnapSnapshot(
+      [cue("x", 1000, 2000), cue("other", 3000, 12000)],
+      "x",
+      5000,
+      25,
+      10000,
+    );
+    expect(snapshot.cueBoundariesMs).toEqual([3000, 12000]);
+    expect(resolveTimelineSnap(11990, snapThresholds(100), snapshot).timeMs).toBe(10000);
+  });
+
+  it("ignores an out-of-range strong target and uses a legal frame start", () => {
+    const snapshot = {
+      playheadMs: 1100,
+      cueBoundariesMs: [],
+      effectiveFps: 25,
+      durationMs: 10000,
+    };
+    expect(
+      resolveTimelineSnap(1060, snapThresholds(50, 25), snapshot, 0, 1080),
+    ).toMatchObject({
+      timeMs: 1040,
+      source: "frame",
+    });
+  });
+
+  it("snaps a whole cue using the endpoint needing the smaller correction", () => {
+    const source = cue("x", 1000, 2000);
+    const snapshot = {
+      playheadMs: 1535,
+      cueBoundariesMs: [2520],
+      effectiveFps: 1,
+      durationMs: 10000,
+    };
+    expect(resolveCueMove(source, 500, 10000, snapshot, snapThresholds(80))).toEqual({
+      startMs: 1520,
+      endMs: 2520,
+      snapTargetMs: 2520,
+    });
+  });
+
+  it("prefers a strong body anchor over a closer frame correction", () => {
+    const source = cue("x", 1000, 2000);
+    const snapshot = {
+      playheadMs: 1100,
+      cueBoundariesMs: [],
+      effectiveFps: 25,
+      durationMs: 10000,
+    };
+    expect(
+      resolveCueMove(source, 60, 10000, snapshot, snapThresholds(50, 25)),
+    ).toEqual({
+      startMs: 1100,
+      endMs: 2100,
+      snapTargetMs: 1100,
+    });
+  });
+
+  it("prefers the start endpoint when both endpoint corrections tie", () => {
+    const source = cue("x", 1000, 2000);
+    const snapshot = {
+      playheadMs: 9000,
+      cueBoundariesMs: [1490, 2510],
+      effectiveFps: 1,
+      durationMs: 10000,
+    };
+    expect(resolveCueMove(source, 500, 10000, snapshot, snapThresholds(20))).toEqual({
+      startMs: 1490,
+      endMs: 2490,
+      snapTargetMs: 1490,
+    });
+  });
+
+  it("ignores an illegal nearer target when a legal body snap is in range", () => {
+    const source = cue("x", 8000, 9000);
+    const snapshot = {
+      playheadMs: 9005,
+      cueBoundariesMs: [8990],
+      effectiveFps: 0.001,
+      durationMs: 10000,
+    };
+    expect(resolveCueMove(source, 1000, 10000, snapshot, snapThresholds(20))).toEqual({
+      startMs: 8990,
+      endMs: 9990,
+      snapTargetMs: 8990,
+    });
+  });
+
+  it("compares exact endpoint corrections before rounding final cue times", () => {
+    const source = cue("x", 1000, 2000);
+    const snapshot = {
+      playheadMs: 1000.49,
+      cueBoundariesMs: [1999.6],
+      effectiveFps: 0.001,
+      durationMs: 10000,
+    };
+    expect(resolveCueMove(source, 0, 10000, snapshot, snapThresholds(1))).toEqual({
+      startMs: 1000,
+      endMs: 2000,
+      snapTargetMs: 1999.6,
+    });
   });
 });
 

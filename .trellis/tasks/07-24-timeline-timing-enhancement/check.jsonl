@@ -1,0 +1,9 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Check frontend architecture boundaries and the package quality gate."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Verify shadcn usage, editor behavior compatibility, Chinese copy, and time draft coordination."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Verify one history item per gesture/batch, no transient Store state, and reference-preserving no-ops."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Run required frontend tests/build and reject unrelated changes or new dependencies."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/current-timeline-interactions.md","reason":"Cross-check implementation against existing pointer, FPS, selection, menu, and test evidence."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/planning-review.md","reason":"Verify blocker resolutions, immutable gesture snapshots, idempotent pointer cleanup, and history-focused behavioral coverage."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/immediate-undo-regression.md","reason":"Verify the explicit time-draft dirty contract and immediate project undo/redo regression coverage."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/snap-strength-followup.md","reason":"Verify strong semantic targets beat closer frames and thresholds remain screen-space stable."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/quality-review-followup.md","reason":"Verify reviewed draft flushing, modal hotkey suppression, visible undo sync, and documentation state."}

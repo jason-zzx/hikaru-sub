@@ -61,16 +61,229 @@ export function findSubtitleBoundary(
 
 /** 帧步进：取目标帧中心时间避免边界抖动；fps 无效时按 30fps 回退。
  *  用 floor 而非 round：从帧中心前进/后退恰好落在相邻帧中心，不跳帧、不卡死。 */
+export const DEFAULT_TIMELINE_FPS = 30;
+
+export function effectiveTimelineFps(fps: number | null): number {
+  return fps && Number.isFinite(fps) && fps > 0 ? fps : DEFAULT_TIMELINE_FPS;
+}
+
 export function frameStepTarget(
   currentMs: number,
   fps: number | null,
   frames: number,
   durationMs: number,
 ): number {
-  const effectiveFps = fps && fps > 0 ? fps : 30;
+  const effectiveFps = effectiveTimelineFps(fps);
   const frameIdx = Math.floor((currentMs * effectiveFps) / 1000);
   const targetMs = ((frameIdx + frames + 0.5) * 1000) / effectiveFps;
   return Math.max(0, Math.min(durationMs, targetMs));
+}
+
+export function framesToMilliseconds(frames: number, fps: number | null): number {
+  return Math.round((frames * 1000) / effectiveTimelineFps(fps));
+}
+
+export type CueTimeShiftTarget = "both" | "start" | "end";
+
+export function shiftCueTimes(
+  cues: SubtitleCue[],
+  selectedIds: string[],
+  deltaMs: number,
+  target: CueTimeShiftTarget,
+): SubtitleCue[] {
+  if (selectedIds.length === 0 || !Number.isFinite(deltaMs) || deltaMs === 0) {
+    return cues;
+  }
+
+  const selected = new Set(selectedIds);
+  const roundedDelta = Math.round(deltaMs);
+  if (roundedDelta === 0) return cues;
+
+  let changed = false;
+  const shifted = cues.map((cue) => {
+    if (!selected.has(cue.id)) return cue;
+
+    let startMs = cue.startMs;
+    let endMs = cue.endMs;
+    if (target !== "end") startMs = Math.max(0, startMs + roundedDelta);
+    if (target !== "start") endMs = Math.max(0, endMs + roundedDelta);
+
+    if (target === "start" && startMs > endMs) startMs = endMs;
+    if (target === "end" && endMs < startMs) endMs = startMs;
+    if (startMs === cue.startMs && endMs === cue.endMs) return cue;
+
+    changed = true;
+    return { ...cue, startMs, endMs };
+  });
+
+  return changed ? shifted : cues;
+}
+
+export type TimelineSnapSource = "playhead" | "cue" | "frame";
+
+export interface TimelineSnapSnapshot {
+  playheadMs: number;
+  cueBoundariesMs: number[];
+  effectiveFps: number;
+  durationMs: number;
+}
+
+export interface TimelineSnapResult {
+  timeMs: number;
+  targetMs: number | null;
+  source: TimelineSnapSource | null;
+}
+
+export interface TimelineSnapThresholds {
+  strongMs: number;
+  frameMs: number;
+}
+
+export interface CueMoveResult {
+  startMs: number;
+  endMs: number;
+  snapTargetMs: number | null;
+}
+
+export function createTimelineSnapSnapshot(
+  cues: SubtitleCue[],
+  excludedCueId: string,
+  playheadMs: number,
+  fps: number | null,
+  durationMs: number,
+): TimelineSnapSnapshot {
+  return {
+    playheadMs,
+    cueBoundariesMs: cues.flatMap((cue) =>
+      cue.id === excludedCueId ? [] : [cue.startMs, cue.endMs],
+    ),
+    effectiveFps: effectiveTimelineFps(fps),
+    durationMs,
+  };
+}
+
+const SNAP_SOURCE_PRIORITY: Record<TimelineSnapSource, number> = {
+  playhead: 0,
+  cue: 1,
+  frame: 2,
+};
+
+export function resolveTimelineSnap(
+  rawTimeMs: number,
+  thresholds: TimelineSnapThresholds,
+  snapshot: TimelineSnapSnapshot,
+  minMs = 0,
+  maxMs = snapshot.durationMs,
+): TimelineSnapResult {
+  const boundedMin = Math.max(0, minMs);
+  const boundedMax = Math.min(snapshot.durationMs, maxMs);
+  const boundedRaw = Math.max(boundedMin, Math.min(rawTimeMs, boundedMax));
+  const nearest = (
+    candidates: Array<{ timeMs: number; source: TimelineSnapSource }>,
+    thresholdMs: number,
+  ) =>
+    candidates
+      .filter(
+        (candidate) =>
+          candidate.timeMs >= boundedMin &&
+          candidate.timeMs <= boundedMax &&
+          Math.abs(candidate.timeMs - boundedRaw) <= thresholdMs,
+      )
+      .sort((a, b) => {
+        const distance =
+          Math.abs(a.timeMs - boundedRaw) - Math.abs(b.timeMs - boundedRaw);
+        return distance || SNAP_SOURCE_PRIORITY[a.source] - SNAP_SOURCE_PRIORITY[b.source];
+      })[0];
+
+  const strongMatch = nearest(
+    [
+      { timeMs: snapshot.playheadMs, source: "playhead" },
+      ...snapshot.cueBoundariesMs.map((timeMs) => ({
+        timeMs,
+        source: "cue" as const,
+      })),
+    ],
+    thresholds.strongMs,
+  );
+  if (strongMatch) {
+    return {
+      timeMs: Math.round(strongMatch.timeMs),
+      targetMs: strongMatch.timeMs,
+      source: strongMatch.source,
+    };
+  }
+
+  const rawFrameIndex = (boundedRaw * snapshot.effectiveFps) / 1000;
+  const frameMatch = nearest(
+    [...new Set([
+      Math.max(0, Math.floor(rawFrameIndex)),
+      Math.max(0, Math.ceil(rawFrameIndex)),
+    ])].map((frameIndex) => ({
+      timeMs: (frameIndex * 1000) / snapshot.effectiveFps,
+      source: "frame" as const,
+    })),
+    thresholds.frameMs,
+  );
+
+  return frameMatch
+    ? {
+        timeMs: Math.round(frameMatch.timeMs),
+        targetMs: frameMatch.timeMs,
+        source: frameMatch.source,
+      }
+    : { timeMs: Math.round(boundedRaw), targetMs: null, source: null };
+}
+
+export function resolveCueMove(
+  cue: SubtitleCue,
+  requestedDeltaMs: number,
+  durationMs: number,
+  snapshot: TimelineSnapSnapshot,
+  thresholds: TimelineSnapThresholds,
+): CueMoveResult {
+  const cueDuration = cue.endMs - cue.startMs;
+  if (durationMs < 0 || cueDuration > durationMs) {
+    return { startMs: cue.startMs, endMs: cue.endMs, snapTargetMs: null };
+  }
+
+  const minDelta = -cue.startMs;
+  const maxDelta = durationMs - cue.endMs;
+  const boundedDelta = Math.max(minDelta, Math.min(requestedDeltaMs, maxDelta));
+  const anchors = [cue.startMs, cue.endMs];
+  const snapMatches = anchors.flatMap((anchorMs, anchorIndex) => {
+    const rawAnchorMs = anchorMs + boundedDelta;
+    const snap = resolveTimelineSnap(
+      rawAnchorMs,
+      thresholds,
+      snapshot,
+      anchorMs + minDelta,
+      anchorMs + maxDelta,
+    );
+    if (snap.targetMs === null || snap.source === null) return [];
+    const snappedDelta = snap.targetMs - anchorMs;
+    if (snappedDelta < minDelta || snappedDelta > maxDelta) return [];
+    return [{
+      anchorIndex,
+      correctionMs: snappedDelta - boundedDelta,
+      deltaMs: snappedDelta,
+      targetMs: snap.targetMs,
+      source: snap.source,
+    }];
+  });
+
+  const best = snapMatches.sort((a, b) => {
+    const strength = Number(a.source === "frame") - Number(b.source === "frame");
+    const correction = Math.abs(a.correctionMs) - Math.abs(b.correctionMs);
+    const source = SNAP_SOURCE_PRIORITY[a.source] - SNAP_SOURCE_PRIORITY[b.source];
+    return strength || correction || source || a.anchorIndex - b.anchorIndex;
+  })[0];
+  const deltaMs = Math.round(best?.deltaMs ?? boundedDelta);
+
+  return {
+    startMs: cue.startMs + deltaMs,
+    endMs: cue.endMs + deltaMs,
+    snapTargetMs: best?.targetMs ?? null,
+  };
 }
 
 export type CreateIdFn = () => string;

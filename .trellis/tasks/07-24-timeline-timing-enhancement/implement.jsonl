@@ -1,0 +1,9 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Load the frontend boundary, pre-development checklist, and package quality commands."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Follow editor composition, shadcn control, Chinese copy, physical-row, and pending time draft conventions."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Preserve projectStore single-command history, batch replaceCues, selection snapshot, and no-op contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Apply frontend minimal-diff standards and required pnpm test/build verification."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/current-timeline-interactions.md","reason":"Use the evidence-backed current gesture, FPS, menu selection, history, helper, and test analysis."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/planning-review.md","reason":"Apply reviewed ordering, auto-reveal, immutable snap snapshot, out-of-range cue, pointer cleanup, and behavioral test clarifications."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/immediate-undo-regression.md","reason":"Preserve the explicit user-edited time-draft contract and immediate global project-history response."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/snap-strength-followup.md","reason":"Preserve the 12px strong semantic target tier and 4px frame fallback across all timeline gestures."}
+{"file":".trellis/tasks/07-24-timeline-timing-enhancement/research/quality-review-followup.md","reason":"Preserve reviewed draft, modal-hotkey, and immediate-undo synchronization contracts."}

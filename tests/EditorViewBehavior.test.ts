@@ -29,9 +29,15 @@ describe("EditorView Phase 2B behavior guards", () => {
 
   it("passes notify feedback to editor hotkeys and subtitle editor", () => {
     expect(source).toContain("onNotify: notify");
-    expect(source).toContain("<SubtitleList onNotify={notify}");
+    expect(source).toContain("<SubtitleList");
     expect(source).toContain("onNotify={notify}");
+    expect(source).toContain("onRequestShiftTimes={setShiftSelectionIds}");
     expect(source).toContain("SubtitleEditor");
+  });
+
+  it("coordinates modal hotkeys and visible time input history", () => {
+    expect(source).toContain("enabled: !helpOpen && shiftSelectionIds === null");
+    expect(source).toContain("editorRef.current?.syncTimeInputsFromStore()");
   });
 
   it("isolates scrollable timeline content from resizing the editor grid", () => {
