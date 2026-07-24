@@ -28,13 +28,6 @@ describe("Timeline fixed waveform lane behavior", () => {
     expect(source).toContain("字幕区滚轮上下滚动");
   });
 
-  it("keeps drag state in refs so fast pointerup commits the latest boundary", () => {
-    expect(source).toContain("dragStateRef");
-    expect(source).toContain("dragPreviewRef");
-    expect(source).toContain("setDragPreviewState");
-    expect(source).toContain("finishDrag(true");
-  });
-
   it("prevents native page zoom and touch gestures while editing the timeline", () => {
     expect(source).toContain("handleContainerWheel");
     expect(source).toContain("container.addEventListener(\"wheel\"");

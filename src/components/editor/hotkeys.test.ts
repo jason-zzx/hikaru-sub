@@ -67,18 +67,20 @@ describe("findHotkey", () => {
     expect(findHotkey(ev({ key: "s", metaKey: true, target: BODY }))?.action).toBe("save");
   });
 
-  it("Ctrl+Z 在框外与标记的持久控件内匹配 project undo；未标记框内放行原生撤销", () => {
+  it("Ctrl+Z / Ctrl+Y use project history outside inputs and in marked cue fields", () => {
     const marked = {
       tagName: "TEXTAREA",
       getAttribute: (name: string) =>
         name === "data-history-command" ? "true" : null,
     };
     expect(findHotkey(ev({ key: "z", ctrlKey: true, target: TEXTAREA }))).toBeNull();
+    expect(findHotkey(ev({ key: "z", ctrlKey: true, target: INPUT }))).toBeNull();
     expect(findHotkey(ev({ key: "z", ctrlKey: true, target: marked }))?.action).toBe("undo");
     expect(findHotkey(ev({ key: "z", ctrlKey: true, target: BODY }))?.action).toBe("undo");
     expect(findHotkey(ev({ key: "z", ctrlKey: true, shiftKey: true, target: BODY }))?.action).toBe("redo");
     expect(findHotkey(ev({ key: "y", ctrlKey: true, target: BODY }))?.action).toBe("redo");
     expect(findHotkey(ev({ key: "y", ctrlKey: true, target: marked }))?.action).toBe("redo");
+    expect(findHotkey(ev({ key: "y", ctrlKey: true, target: INPUT }))).toBeNull();
   });
 
   it("Ctrl/Cmd+C/X/V match whole-row clipboard actions only outside text inputs", () => {

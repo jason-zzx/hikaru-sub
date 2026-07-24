@@ -7,7 +7,11 @@ import {
 } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEditorHotkeys } from "../../hooks/useEditorHotkeys";
-import { selectCueAndSeek } from "../../services/editorActions";
+import {
+  selectCueAndSeek,
+  shiftCueTimes,
+  type CueTimeShiftTarget,
+} from "../../services/editorActions";
 import { importExternalSubtitle } from "../../services/openVideo";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
@@ -25,6 +29,7 @@ import {
 } from "./SubtitleEditor";
 import { EditorToast, type EditorToastMessage, type EditorToastVariant } from "./EditorToast";
 import { Timeline } from "./Timeline";
+import { ShiftTimesDialog } from "./ShiftTimesDialog";
 import { HotkeyHelpOverlay } from "./HotkeyHelpOverlay";
 import { StyleManager } from "./StyleManager";
 import {
@@ -88,6 +93,7 @@ export function EditorView() {
   const acceptTextSession = useProjectStore((s) => s.acceptTextSession);
   const setStep = useUiStore((s) => s.setStep);
   const toggleStyleManager = useUiStore((s) => s.toggleStyleManager);
+  const fps = usePlaybackStore((s) => s.fps);
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [editorHotkeys, setEditorHotkeys] = useState<readonly HotkeyDef[]>(
@@ -103,6 +109,7 @@ export function EditorView() {
   const [toast, setToast] = useState<EditorToastMessage | null>(null);
   const [subtitleFileExists, setSubtitleFileExists] = useState(false);
   const [hasPendingTimeDraft, setHasPendingTimeDraft] = useState(false);
+  const [shiftSelectionIds, setShiftSelectionIds] = useState<string[] | null>(null);
   const toastIdRef = useRef(0);
   const editorRef = useRef<SubtitleEditorHistoryHandle>(null);
   const findPanelRef = useRef<SubtitleFindPanelHandle>(null);
@@ -194,10 +201,15 @@ export function EditorView() {
     });
   }, [acceptTextSession]);
 
-  const runUndo = useCallback(() => {
+  const commitPendingTimeDraft = useCallback(() => {
     editorRef.current?.commitPendingTimeDraft();
+  }, []);
+
+  const runUndo = useCallback(() => {
+    commitPendingTimeDraft();
     undo();
-  }, [undo]);
+    editorRef.current?.syncTimeInputsFromStore();
+  }, [commitPendingTimeDraft, undo]);
 
   const runRedo = useCallback(() => {
     if (hasPendingTimeDraft) return;
@@ -206,6 +218,15 @@ export function EditorView() {
 
   const canUndo = pastLen > 0 || hasPendingTimeDraft;
   const canRedo = futureLen > 0 && !hasPendingTimeDraft;
+
+  const handleShiftTimes = (deltaMs: number, target: CueTimeShiftTarget) => {
+    const selectedIds = shiftSelectionIds;
+    if (!selectedIds) return;
+    commitPendingTimeDraft();
+    const live = useProjectStore.getState();
+    live.replaceCues(shiftCueTimes(live.cues, selectedIds, deltaMs, target));
+    setShiftSelectionIds(null);
+  };
 
   const handleSave = async () => {
     if (saving || !session) return;
@@ -466,7 +487,7 @@ export function EditorView() {
     onOpenFind: () => findPanelRef.current?.openAndFocus(),
     onNotify: notify,
     hotkeys: editorHotkeys,
-    enabled: !helpOpen,
+    enabled: !helpOpen && shiftSelectionIds === null,
   });
 
   if (!session) {
@@ -560,7 +581,7 @@ export function EditorView() {
             <VideoPlayer videoPath={session.videoPath} />
           </div>
           <div className="min-h-0 overflow-hidden bg-surface">
-            <Timeline />
+            <Timeline onCommitPendingTimeDraft={commitPendingTimeDraft} />
           </div>
         </div>
 
@@ -606,7 +627,11 @@ export function EditorView() {
               </div>
               <SubtitleFindPanel ref={findPanelRef} onNotify={notify} />
               <div className="min-h-0 flex-1 overflow-hidden">
-                <SubtitleList onNotify={notify} />
+                <SubtitleList
+                  onNotify={notify}
+                  onCommitPendingTimeDraft={commitPendingTimeDraft}
+                  onRequestShiftTimes={setShiftSelectionIds}
+                />
               </div>
             </div>
           </div>
@@ -655,6 +680,16 @@ export function EditorView() {
         onUndo={runUndo}
         onRedo={runRedo}
         hotkeys={editorHotkeys}
+      />
+
+      <ShiftTimesDialog
+        open={shiftSelectionIds !== null}
+        selectedCount={shiftSelectionIds?.length ?? 0}
+        fps={fps}
+        onOpenChange={(open) => {
+          if (!open) setShiftSelectionIds(null);
+        }}
+        onConfirm={handleShiftTimes}
       />
 
       {/* 编辑页局部反馈 */}

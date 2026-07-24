@@ -66,6 +66,7 @@ type TimeField = "start" | "end";
 
 export interface SubtitleEditorHistoryHandle {
   commitPendingTimeDraft(): boolean;
+  syncTimeInputsFromStore(): void;
 }
 
 interface SubtitleEditorProps {
@@ -147,6 +148,7 @@ export const SubtitleEditor = forwardRef<
   );
   const composingRef = useRef(false);
   const pendingTimeFieldRef = useRef<TimeField>("end");
+  const timeDraftDirtyRef = useRef(false);
 
   const fontNames = usePreviewFontNames([
     ...QUICK_FONT_OPTIONS,
@@ -157,12 +159,14 @@ export const SubtitleEditor = forwardRef<
     ? normalizeTimeRange(startTime, endTime, pendingTimeFieldRef.current)
     : null;
   const hasPendingTimeDraft =
+    timeDraftDirtyRef.current &&
     pendingTime !== null &&
     (pendingTime.startMs !== selectedCue?.startMs ||
       pendingTime.endMs !== selectedCue?.endMs);
 
   const commitTimeDraft = (field: TimeField = "end") => {
-    if (!selectedCue) return false;
+    if (!selectedCue || !timeDraftDirtyRef.current) return false;
+    timeDraftDirtyRef.current = false;
     const result = normalizeTimeRange(startTime, endTime, field);
     const changed =
       result.startMs !== selectedCue.startMs ||
@@ -176,6 +180,16 @@ export const SubtitleEditor = forwardRef<
     return changed;
   };
 
+  const syncTimeInputsFromStore = () => {
+    timeDraftDirtyRef.current = false;
+    const selectedId = usePlaybackStore.getState().selectedCueId;
+    const liveCue = useProjectStore
+      .getState()
+      .cues.find((cue) => cue.id === selectedId);
+    setStartTime(liveCue ? formatTimeInput(liveCue.startMs) : "");
+    setEndTime(liveCue ? formatTimeInput(liveCue.endMs) : "");
+  };
+
   useEffect(() => {
     onPendingTimeDraftChange?.(hasPendingTimeDraft);
   }, [hasPendingTimeDraft, onPendingTimeDraftChange]);
@@ -185,6 +199,7 @@ export const SubtitleEditor = forwardRef<
     () => ({
       commitPendingTimeDraft: () =>
         commitTimeDraft(pendingTimeFieldRef.current),
+      syncTimeInputsFromStore,
     }),
     [selectedCue, startTime, endTime, updateCue],
   );
@@ -195,10 +210,16 @@ export const SubtitleEditor = forwardRef<
     composingRef.current = false;
     beforeInputRef.current = null;
     textSelectionRef.current = null;
+    timeDraftDirtyRef.current = false;
   }, [selectedCue?.id, documentEpoch]);
 
   useEffect(() => {
-    if (!selectedCue) return;
+    timeDraftDirtyRef.current = false;
+    if (!selectedCue) {
+      setStartTime("");
+      setEndTime("");
+      return;
+    }
     setStartTime(formatTimeInput(selectedCue.startMs));
     setEndTime(formatTimeInput(selectedCue.endMs));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -242,6 +263,7 @@ export const SubtitleEditor = forwardRef<
 
   const setTimeValue = (field: TimeField, value: string) => {
     pendingTimeFieldRef.current = field;
+    timeDraftDirtyRef.current = true;
     if (field === "start") setStartTime(value);
     else setEndTime(value);
   };
@@ -474,16 +496,10 @@ export const SubtitleEditor = forwardRef<
     );
   };
 
-  const resetDraftsFromStore = () => {
-    if (!selectedCue) return;
-    setStartTime(formatTimeInput(selectedCue.startMs));
-    setEndTime(formatTimeInput(selectedCue.endMs));
-  };
-
   const discardAndBlur = (el: HTMLElement) => {
     escapingRef.current = true;
     if (el instanceof HTMLTextAreaElement) rollbackTextSession();
-    else resetDraftsFromStore();
+    else syncTimeInputsFromStore();
     el.blur();
     escapingRef.current = false;
   };

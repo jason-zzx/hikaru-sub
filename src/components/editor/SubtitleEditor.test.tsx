@@ -359,6 +359,63 @@ describe("SubtitleEditor text history", () => {
     });
   });
 
+  it("keeps a pending time draft separate from the preceding timeline command", () => {
+    reset([{ ...cue("a", "ab"), startMs: 1000, endMs: 2000 }]);
+    const ref = createRef<SubtitleEditorHistoryHandle>();
+    render(<SubtitleEditor ref={ref} />);
+
+    act(() => {
+      useProjectStore.getState().updateCue("a", {
+        startMs: 2000,
+        endMs: 3000,
+      });
+    });
+    const startInput = document.querySelector<HTMLInputElement>(
+      'input[placeholder="0:00:00.00"]',
+    );
+    fireEvent.change(startInput!, { target: { value: "0:00:02.50" } });
+
+    act(() => {
+      ref.current?.commitPendingTimeDraft();
+      useProjectStore.getState().undo();
+      ref.current?.syncTimeInputsFromStore();
+    });
+    expect(useProjectStore.getState().cues[0]).toMatchObject({
+      startMs: 2000,
+      endMs: 3000,
+    });
+    expect(useProjectStore.getState().history.past).toHaveLength(1);
+    expect(startInput?.value).toBe("0:00:02.00");
+
+    act(() => useProjectStore.getState().undo());
+    expect(useProjectStore.getState().cues[0]).toMatchObject({
+      startMs: 1000,
+      endMs: 2000,
+    });
+    expect(useProjectStore.getState().history.past).toHaveLength(0);
+  });
+
+  it("does not turn stale local times into a new command before immediate undo", () => {
+    reset([{ ...cue("a", "ab"), startMs: 1000, endMs: 2000 }]);
+    const ref = createRef<SubtitleEditorHistoryHandle>();
+    render(<SubtitleEditor ref={ref} />);
+
+    act(() => {
+      useProjectStore.getState().updateCue("a", {
+        startMs: 2000,
+        endMs: 3000,
+      });
+      ref.current?.commitPendingTimeDraft();
+      useProjectStore.getState().undo();
+    });
+
+    expect(useProjectStore.getState().cues[0]).toMatchObject({
+      startMs: 1000,
+      endMs: 2000,
+    });
+    expect(useProjectStore.getState().history.past).toHaveLength(0);
+  });
+
   it("treats a start draft clamped to the existing end as no pending change", () => {
     reset([{ ...cue("a", "ab"), startMs: 2000, endMs: 2000 }]);
     const ref = createRef<SubtitleEditorHistoryHandle>();

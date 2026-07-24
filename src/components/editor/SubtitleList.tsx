@@ -37,6 +37,8 @@ type SubtitleListNotify = (variant: EditorToastVariant, text: string) => void;
 
 interface SubtitleListProps {
   onNotify?: SubtitleListNotify;
+  onCommitPendingTimeDraft?: () => void;
+  onRequestShiftTimes?: (selectedCueIds: string[]) => void;
 }
 
 interface ContextMenuState {
@@ -83,7 +85,11 @@ function isNumericColumn(column: CueListColumn): boolean {
   );
 }
 
-export function SubtitleList({ onNotify }: SubtitleListProps) {
+export function SubtitleList({
+  onNotify,
+  onCommitPendingTimeDraft,
+  onRequestShiftTimes,
+}: SubtitleListProps) {
   const cues = useProjectStore((s) => s.cues);
   const replaceCues = useProjectStore((s) => s.replaceCues);
   const assStyles = useProjectStore((s) => s.assStyles);
@@ -205,7 +211,10 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
 
     const isSelected = selectedCueIds.includes(cue.id);
     const menuSelectionIds = isSelected ? selectedCueIds : [cue.id];
-    if (!isSelected) setSelectedCueId(cue.id);
+    if (!isSelected) {
+      onCommitPendingTimeDraft?.();
+      setSelectedCueId(cue.id);
+    }
     setSelectionAnchorId(cue.id);
     setPlayUntil(null);
     setContextMenu({
@@ -473,6 +482,18 @@ export function SubtitleList({ onNotify }: SubtitleListProps) {
             onClick={() => runAsyncMenuAction(pasteRows, "没有可粘贴的字幕行")}
           >
             粘贴行
+          </MenuButton>
+
+          <MenuSeparator />
+
+          <MenuButton
+            onClick={() => {
+              const selectionSnapshot = [...contextMenu.selectedCueIds];
+              setContextMenu(null);
+              onRequestShiftTimes?.(selectionSnapshot);
+            }}
+          >
+            平移时间轴
           </MenuButton>
 
           <MenuSeparator />

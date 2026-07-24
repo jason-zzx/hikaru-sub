@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, renderHook } from "@testing-library/react";
 import { useEditorHotkeys, buildEditorActions } from "./useEditorHotkeys";
 import { applySelectedCueToggle } from "../services/editorActions";
+import { makeTextOp } from "../services/editorTextHistory";
 import { useProjectStore } from "../stores/projectStore";
 import { usePlaybackStore } from "../stores/playbackStore";
 import { useUiStore } from "../stores/uiStore";
@@ -344,6 +345,90 @@ describe("undo/redo callback routing", () => {
     expect(onRedo).toHaveBeenCalledOnce();
     // Store history untouched by wrappers that no-op / only call callbacks
     expect(useProjectStore.getState().history.past).toHaveLength(0);
+  });
+
+  it("does not dispatch editor actions while disabled", () => {
+    const onUndo = vi.fn();
+    const { unmount } = renderHook(() =>
+      useEditorHotkeys({
+        onSave: vi.fn(),
+        onToggleHelp: vi.fn(),
+        onUndo,
+        onRedo: vi.fn(),
+        enabled: false,
+      }),
+    );
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    expect(onUndo).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("keeps native undo in transient inputs and dispatches project history from marked fields", () => {
+    const onUndo = vi.fn();
+    const onRedo = vi.fn();
+    const { unmount } = renderHook(() =>
+      useEditorHotkeys({
+        onSave: vi.fn(),
+        onToggleHelp: vi.fn(),
+        onUndo,
+        onRedo,
+      }),
+    );
+    const transientInput = document.createElement("input");
+    const historyInput = document.createElement("input");
+    historyInput.setAttribute("data-history-command", "true");
+    document.body.append(transientInput, historyInput);
+
+    expect(fireEvent.keyDown(transientInput, { key: "z", ctrlKey: true })).toBe(true);
+    expect(fireEvent.keyDown(transientInput, { key: "y", ctrlKey: true })).toBe(true);
+    expect(onUndo).not.toHaveBeenCalled();
+    expect(onRedo).not.toHaveBeenCalled();
+
+    expect(fireEvent.keyDown(historyInput, { key: "z", ctrlKey: true })).toBe(false);
+    expect(fireEvent.keyDown(historyInput, { key: "y", ctrlKey: true })).toBe(false);
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(onRedo).toHaveBeenCalledOnce();
+
+    transientInput.remove();
+    historyInput.remove();
+    unmount();
+  });
+
+  it("undoes and redoes an active grouped subtitle text edit from a marked field", () => {
+    const { unmount } = renderHook(() =>
+      useEditorHotkeys({
+        onSave: vi.fn(),
+        onToggleHelp: vi.fn(),
+        onUndo: () => useProjectStore.getState().undo(),
+        onRedo: () => useProjectStore.getState().redo(),
+      }),
+    );
+    const textarea = document.createElement("textarea");
+    textarea.setAttribute("data-history-command", "true");
+    document.body.append(textarea);
+
+    useProjectStore.getState().applyTextEdit({
+      cueId: "a",
+      text: "aX",
+      op: makeTextOp({
+        cueId: "a",
+        before: { start: 1, end: 1 },
+        after: { start: 2, end: 2 },
+        inputType: "insertText",
+        timestampMs: 1000,
+      }),
+    });
+
+    fireEvent.keyDown(textarea, { key: "z", ctrlKey: true });
+    expect(useProjectStore.getState().cues[0].primaryText).toBe("a");
+    expect(useProjectStore.getState().history.future).toHaveLength(1);
+
+    fireEvent.keyDown(textarea, { key: "y", ctrlKey: true });
+    expect(useProjectStore.getState().cues[0].primaryText).toBe("aX");
+
+    textarea.remove();
+    unmount();
   });
 
   it("dispatches customized global bindings", () => {
