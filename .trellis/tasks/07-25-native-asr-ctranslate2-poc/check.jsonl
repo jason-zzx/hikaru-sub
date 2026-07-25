@@ -1,0 +1,6 @@
+{"file":".trellis/spec/asr/index.md","reason":"Check that the disposable PoC does not become a second production ASR implementation."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Review CPU/Kotoba requirements and prevent the preprocessor rule from leaking to ordinary Whisper."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Review CTests, Python oracle checks, optional model limitations, and forbidden artifacts."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Check fixed routes, timestamp constraints, runtime budget, and parent Gate 0 scope."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check that the PoC consumes, rather than duplicates, the T01 benchmark contract; refresh before start."}
+{"file":".trellis/tasks/07-25-native-asr-ctranslate2-poc/research/planning-evidence.md","reason":"Check task-local evidence against current source behavior and stated non-goals."}
