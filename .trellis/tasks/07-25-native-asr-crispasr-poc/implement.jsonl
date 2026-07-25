@@ -1,0 +1,6 @@
+{"file":".trellis/spec/asr/index.md","reason":"Keep the PoC separate from current production inference ownership while retaining Python behavior as baseline evidence."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Understand the five-engine contracts, VAD expectation, Kotoba scope boundary, and existing optional-engine reality."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Use focused Python oracle tests and report unavailable model-backed validation truthfully."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Parent CrispASR routes, C ABI direction, Qwen3 aligner rule, model variants, quality gates, and supply-chain constraints."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Preliminary shared corpus/metric decisions; replace with final T01 handoff artifacts before activation."}
+{"file":".trellis/tasks/07-25-native-asr-crispasr-poc/research/planning-evidence.md","reason":"Current engine evidence, task boundaries, and required downstream handoffs."}

@@ -137,6 +137,7 @@
 
 ## Planning State
 
-- 当前无阻塞总体规划的问题。
-- 本父任务保持 `planning`；本轮不创建或启动子任务。
-- 下一评审点：确认本 PRD、`design.md` 和 `implement.md` 后，再按阶段创建近期子任务，而不是一次性启动全部工作。
+- 总体 PRD、设计与实施任务地图已于本轮获得用户评审确认。
+- T01 `native-asr-benchmark-baseline`、T02 `native-asr-ctranslate2-poc` 与 T03 `native-asr-crispasr-poc` 已创建为独立 `planning` 子任务，并各自具备 PRD、设计、实施计划和 context manifests。
+- 三个子任务均未启动；T01 是唯一可在当前 Gate 0 阶段进入实施的候选任务。T02/T03 的模型实测明确依赖 T01 的正式 benchmark handoff。
+- 父任务继续保持 `planning`，不直接承载实现。下一评审点是确认并单独启动 T01，而不是并行启动所有 Gate 0 工作。

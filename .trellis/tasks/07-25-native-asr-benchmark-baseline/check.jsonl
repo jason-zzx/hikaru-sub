@@ -1,0 +1,5 @@
+{"file":".trellis/spec/asr/index.md","reason":"Review ASR ownership and ensure the task remains baseline-only."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Check all five registry routes, refresh behavior, Kotoba readiness, and optional dependencies."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Verify focused tests, full sidecar tests, and honest model-backed limitations."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Check corpus coverage, quantitative metrics, engine routes, and security/privacy requirements against the parent proposal."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check implementation against the repository facts and benchmark decisions discovered during planning."}

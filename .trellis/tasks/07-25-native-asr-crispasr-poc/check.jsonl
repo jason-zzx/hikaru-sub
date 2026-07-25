@@ -1,0 +1,6 @@
+{"file":".trellis/spec/asr/index.md","reason":"Check that a feasibility harness did not become a second production ASR path."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Review current engine behavior, output contracts, and optional dependency limitations against the PoC evidence."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check focused tests, model-backed limitation reporting, and absence of forbidden artifacts."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Check fixed CrispASR routes, ForcedAligner rules, long-audio risks, licenses, and parent Gate 0 constraints."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check that T03 consumes shared metrics rather than recreating them; refresh before start."}
+{"file":".trellis/tasks/07-25-native-asr-crispasr-poc/research/planning-evidence.md","reason":"Check lifecycle, Qwen3 fallback prohibition, long-audio evidence, and handoff boundaries."}

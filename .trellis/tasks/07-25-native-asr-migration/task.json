@@ -18,7 +18,11 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "07-25-native-asr-benchmark-baseline",
+    "07-25-native-asr-ctranslate2-poc",
+    "07-25-native-asr-crispasr-poc"
+  ],
   "parent": null,
   "relatedFiles": [],
   "notes": "",

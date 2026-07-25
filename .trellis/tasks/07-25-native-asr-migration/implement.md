@@ -438,8 +438,9 @@ Rollback point: restore the previous production package inputs and per-engine ro
 
 ## Parent Review Gate
 
-Before creating Stage 0 child tasks:
+Stage 0 child-task creation:
 
-- [ ] User reviews and approves `prd.md`, `design.md` and this task map.
-- [ ] Confirm T01-T03 are the first creation batch.
-- [ ] Keep parent status at `planning`; start only T01 when its child artifacts are ready.
+- [x] User reviewed and approved the parent `prd.md`, `design.md` and task map.
+- [x] T01-T03 are confirmed as the first creation batch and now exist as planning children.
+- [x] Each child has independently reviewable `prd.md`, `design.md`, `implement.md`, `implement.jsonl` and `check.jsonl`.
+- [ ] Keep parent status at `planning`; start only T01 after this child batch receives final user review. T02/T03 remain blocked on T01's benchmark handoff.
