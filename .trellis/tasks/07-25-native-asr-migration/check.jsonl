@@ -1,0 +1,9 @@
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Authoritative proposal and quantitative acceptance thresholds for cross-task verification."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check ownership, data flow, command wiring, settings, paths, cancellation, and progress across layers."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Current engine/job compatibility and model-dependent verification expectations."}
+{"file":".trellis/spec/asr/api-and-jobs.md","reason":"Verify stable job states, snapshot fields, aliases, cancellation, and diagnostics behavior."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Check process/path safety, command registration, tests, logging, and runtime dependency consistency."}
+{"file":".trellis/spec/tauri/async-and-blocking.md","reason":"Verify recursive disk work and blocking process operations stay off async workers."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Verify installed/portable roots, bounded cleanup, and probe-versus-measure behavior."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check frontend tests/build, minimal integration changes, shadcn/UI conventions, and no raw invoke drift."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Verify complete Rust-to-TypeScript command and type wiring and runtime UI behavior."}

@@ -1,0 +1,12 @@
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Detailed native ASR proposal, model routes, protocol, packaging budgets, risks, and source research."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Cross-layer ownership and contract checklist for React, Tauri, and the current ASR boundary."}
+{"file":".trellis/spec/asr/index.md","reason":"Current Python sidecar architecture baseline that migration children must preserve or intentionally replace."}
+{"file":".trellis/spec/asr/api-and-jobs.md","reason":"Current ASR job lifecycle and camelCase snapshot contract to keep compatible."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Current five-engine behavior, Kotoba cache rule, VAD fallback, and engine-specific constraints."}
+{"file":".trellis/spec/tauri/index.md","reason":"Tauri ownership and command wiring baseline for process, paths, runtime dependencies, and ASR lifecycle."}
+{"file":".trellis/spec/tauri/command-guidelines.md","reason":"Required Rust registration, typed frontend wrapper, capability, and long-job command chain."}
+{"file":".trellis/spec/tauri/async-and-blocking.md","reason":"Async and spawn_blocking constraints for process waits, storage measurement, and cleanup."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Installed/portable roots, managed deps layout, and probe-versus-measure contract."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Current Tauri/Python ASR process boundary and exit cleanup behavior to migrate deliberately."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend ownership boundaries, UI conventions, test commands, and ASS responsibilities."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Typed Tauri facade and runtime dependency UI/service integration contract."}
