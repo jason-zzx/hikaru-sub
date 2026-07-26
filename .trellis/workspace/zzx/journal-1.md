@@ -470,3 +470,37 @@ Implemented a persistent application-level ASS style library with installed/port
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: Editor playback UX: waveform alignment, smooth playhead, play-current-line
+
+**Date**: 2026-07-27
+**Task**: Editor playback UX: waveform alignment, smooth playhead, play-current-line
+**Branch**: `dev`
+
+### Summary
+
+Fixed waveform readability (duration-scaled sampling, per-pixel peak aggregation, auto noise-floor contrast + Shift+wheel gain) and timeline alignment (aresample=async=1:first_pts=0 for HLS timestamp gaps, coveredMs-based mapping; same fix applied to ASR audio extraction). Smoothed playhead by moving heavy React consumers to boundary-frequency activeCueIds, transient DOM playhead overlay, requestSeek intent channel, memoized subtitle rows, split canvas layers. Added play-current-line button sharing R/play-segment action. Included 8 external review fixes and ponytail simplification round (-89 lines). Specs updated: audio decode timeline contract (tauri) and high-frequency playback timing rules (frontend).
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6acc3a4` | (see git log) |
+| `f094111` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
