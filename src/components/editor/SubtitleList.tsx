@@ -1,10 +1,13 @@
 import {
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   deleteCuesById,
@@ -30,7 +33,6 @@ import {
   getCueListColumnVisibility,
   type CueListColumn,
 } from "./cueListColumns";
-import { isCueActiveAtTime } from "./timelineModel";
 import { collectOverlappingCueIds } from "../../utils/subtitleQc";
 
 type SubtitleListNotify = (variant: EditorToastVariant, text: string) => void;
@@ -46,6 +48,10 @@ interface ContextMenuState {
   y: number;
   targetId: string;
   selectedCueIds: string[];
+  /** 打开菜单时刻的播放头快照：按钮可用性与实际分割点都用它，菜单挂起期间播放继续也不分裂 */
+  playheadMs: number;
+  /** 打开菜单时刻的分割可用性快照：按严格开区间 (startMs, endMs) 判定 */
+  canSplitTarget: boolean;
 }
 
 function renderCellValue(column: CueListColumn, cue: SubtitleCue, index: number): string {
@@ -95,13 +101,18 @@ export function SubtitleList({
   const assStyles = useProjectStore((s) => s.assStyles);
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
-  const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
+  // 播放期间整表重渲染频率 = 字幕边界频率（activeCueIds 内容变化），不按帧订阅时间
+  const activeCueIds = usePlaybackStore((s) => s.activeCueIds);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const setSelectedCueIds = usePlaybackStore((s) => s.setSelectedCueIds);
-  const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
+  const requestSeek = usePlaybackStore((s) => s.requestSeek);
   const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
-  const knownStyleNames = new Set(assStyles.map((style) => style.name));
-  const columnVisibility = getCueListColumnVisibility(cues);
+  // 边界频率重渲染（activeCueIds 变化）不重算样式集合与列可见性
+  const knownStyleNames = useMemo(
+    () => new Set(assStyles.map((style) => style.name)),
+    [assStyles],
+  );
+  const columnVisibility = useMemo(() => getCueListColumnVisibility(cues), [cues]);
   const overlappingIds = useMemo(
     () => collectOverlappingCueIds(cues, selectedCueId),
     [cues, selectedCueId],
@@ -150,79 +161,98 @@ export function SubtitleList({
     const nextSelected = result.cues.find((cue) =>
       result.selectedCueIds.includes(cue.id),
     );
-    if (nextSelected) setCurrentTime(nextSelected.startMs);
+    if (nextSelected) requestSeek(nextSelected.startMs);
     setPlayUntil(null);
     return true;
   };
 
-  const selectCueRange = (targetId: string): string[] | null => {
-    const anchorId = selectionAnchorId ?? selectedCueId;
-    const anchorIndex = anchorId ? cues.findIndex((cue) => cue.id === anchorId) : -1;
-    const targetIndex = cues.findIndex((cue) => cue.id === targetId);
-    if (anchorIndex < 0 || targetIndex < 0) return null;
+  const selectCueRange = useCallback(
+    (targetId: string): string[] | null => {
+      const anchorId = selectionAnchorId ?? selectedCueId;
+      const anchorIndex = anchorId
+        ? cues.findIndex((cue) => cue.id === anchorId)
+        : -1;
+      const targetIndex = cues.findIndex((cue) => cue.id === targetId);
+      if (anchorIndex < 0 || targetIndex < 0) return null;
 
-    const startIndex = Math.min(anchorIndex, targetIndex);
-    const endIndex = Math.max(anchorIndex, targetIndex);
-    const range = cues.slice(startIndex, endIndex + 1).map((cue) => cue.id);
-    return targetIndex >= anchorIndex ? range : range.reverse();
-  };
+      const startIndex = Math.min(anchorIndex, targetIndex);
+      const endIndex = Math.max(anchorIndex, targetIndex);
+      const range = cues.slice(startIndex, endIndex + 1).map((cue) => cue.id);
+      return targetIndex >= anchorIndex ? range : range.reverse();
+    },
+    [cues, selectedCueId, selectionAnchorId],
+  );
 
-  const handleCueClick = (
-    cue: SubtitleCue,
-    event: MouseEvent<HTMLDivElement>,
-  ) => {
-    setContextMenu(null);
+  // 行回调保持稳定标识（不依赖 activeCueIds），memo Row 在边界重渲染时才能 bail out
+  const handleCueClick = useCallback(
+    (cue: SubtitleCue, event: MouseEvent<HTMLDivElement>) => {
+      setContextMenu(null);
 
-    if (event.shiftKey) {
-      event.preventDefault();
-      const range = selectCueRange(cue.id);
-      if (range) {
-        setSelectedCueIds(range);
+      if (event.shiftKey) {
+        event.preventDefault();
+        const range = selectCueRange(cue.id);
+        if (range) {
+          setSelectedCueIds(range);
+        } else {
+          setSelectedCueId(cue.id);
+          setSelectionAnchorId(cue.id);
+        }
+      } else if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        const selectedSet = new Set(selectedCueIds);
+        if (selectedSet.has(cue.id)) {
+          selectedSet.delete(cue.id);
+        } else {
+          selectedSet.add(cue.id);
+        }
+        setSelectedCueIds([...selectedSet]);
+        setSelectionAnchorId(cue.id);
       } else {
         setSelectedCueId(cue.id);
         setSelectionAnchorId(cue.id);
       }
-    } else if (event.ctrlKey || event.metaKey) {
+
+      requestSeek(cue.startMs);
+      setPlayUntil(null);
+    },
+    [
+      requestSeek,
+      selectCueRange,
+      selectedCueIds,
+      setPlayUntil,
+      setSelectedCueId,
+      setSelectedCueIds,
+    ],
+  );
+
+  const handleCueContextMenu = useCallback(
+    (cue: SubtitleCue, event: MouseEvent<HTMLDivElement>) => {
       event.preventDefault();
-      const selectedSet = new Set(selectedCueIds);
-      if (selectedSet.has(cue.id)) {
-        selectedSet.delete(cue.id);
-      } else {
-        selectedSet.add(cue.id);
+      event.stopPropagation();
+
+      const isSelected = selectedCueIds.includes(cue.id);
+      const menuSelectionIds = isSelected ? selectedCueIds : [cue.id];
+      if (!isSelected) {
+        onCommitPendingTimeDraft?.();
+        setSelectedCueId(cue.id);
       }
-      setSelectedCueIds([...selectedSet]);
       setSelectionAnchorId(cue.id);
-    } else {
-      setSelectedCueId(cue.id);
-      setSelectionAnchorId(cue.id);
-    }
-
-    setCurrentTime(cue.startMs);
-    setPlayUntil(null);
-  };
-
-  const handleCueContextMenu = (
-    cue: SubtitleCue,
-    event: MouseEvent<HTMLDivElement>,
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const isSelected = selectedCueIds.includes(cue.id);
-    const menuSelectionIds = isSelected ? selectedCueIds : [cue.id];
-    if (!isSelected) {
-      onCommitPendingTimeDraft?.();
-      setSelectedCueId(cue.id);
-    }
-    setSelectionAnchorId(cue.id);
-    setPlayUntil(null);
-    setContextMenu({
-      x: event.clientX,
-      y: event.clientY,
-      targetId: cue.id,
-      selectedCueIds: menuSelectionIds,
-    });
-  };
+      setPlayUntil(null);
+      // 分割动作（splitCueAtTime）要求分割点严格位于 (startMs, endMs) 开区间；
+      // activeCueIds 是闭区间命中口径，播放头恰在行首/行尾时会「可点但必失败」。
+      // 菜单打开是离散事件，直接读即时播放时间做同口径判定即可（无性能问题）。
+      const playheadMs = Math.round(usePlaybackStore.getState().currentTimeMs);
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        targetId: cue.id,
+        selectedCueIds: menuSelectionIds,
+        playheadMs,
+        canSplitTarget: playheadMs > cue.startMs && playheadMs < cue.endMs,
+      });
+    },
+    [onCommitPendingTimeDraft, selectedCueIds, setPlayUntil, setSelectedCueId],
+  );
 
   const getActionSelectionIds = () => {
     if (contextMenu) return contextMenu.selectedCueIds;
@@ -276,11 +306,9 @@ export function SubtitleList({
     return applyCueListResult(result.listResult);
   };
 
-  const targetCue = cues.find((cue) => cue.id === getActionTargetId()) ?? null;
-  const canSplitTarget =
-    !!targetCue &&
-    currentTimeMs > targetCue.startMs &&
-    currentTimeMs < targetCue.endMs;
+  // 可用性用菜单打开时的严格开区间快照（activeCueIds 仅用于行高亮）；
+  // 精确分割点仍在动作时经 getState 取即时时间
+  const canSplitTarget = contextMenu?.canSplitTarget ?? false;
   const actionSelectionIds = getActionSelectionIds();
 
   if (cues.length === 0) {
@@ -314,75 +342,22 @@ export function SubtitleList({
         {cues.map((cue, index) => {
           const isSelected =
             selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
-          const isOverlap = !isSelected && overlappingIds.has(cue.id);
-          const isPlaybackActive =
-            !isSelected && isCueActiveAtTime(cue, currentTimeMs);
-          const styleMissing =
-            assStyles.length > 0 && !knownStyleNames.has(cue.style);
           return (
-            <div
+            <SubtitleRow
               key={cue.id}
-              ref={cue.id === selectedCueId ? selectedRef : null}
-              onClick={(event) => handleCueClick(cue, event)}
-              onContextMenu={(event) => handleCueContextMenu(cue, event)}
-              className={`col-span-full grid cursor-pointer grid-cols-subgrid items-center rounded py-1 text-sm transition-colors ${
-                isSelected
-                  ? "bg-primary/10"
-                  : isOverlap
-                    ? "bg-danger/10 text-danger hover:bg-danger/15"
-                    : isPlaybackActive
-                      ? "bg-success/10"
-                      : "hover:bg-surface-overlay"
-              } ${
-                isPlaybackActive
-                  ? "ring-1 ring-inset ring-success/35"
-                  : isSelected
-                    ? "ring-1 ring-inset ring-primary/40"
-                    : isOverlap
-                      ? "ring-1 ring-inset ring-danger/35"
-                      : ""
-              }`}
-            >
-              {columns.map((column) => {
-                const value = renderCellValue(column, cue, index);
-                const mono =
-                  column === "start" ||
-                  column === "end" ||
-                  column === "index" ||
-                  column === "layer" ||
-                  column.startsWith("margin");
-                const warnStyle = column === "style" && styleMissing;
-                return (
-                  <div
-                    key={column}
-                    title={value.trim() === "" ? undefined : value}
-                    className={`min-w-0 truncate whitespace-nowrap ${
-                      mono
-                        ? `font-mono text-xs ${isOverlap ? "" : "text-text-muted"}`
-                        : ""
-                    } ${
-                      column === "index" ||
-                      column === "layer" ||
-                      column.startsWith("margin")
-                        ? "text-center"
-                        : ""
-                    } ${
-                      warnStyle
-                        ? "text-warning"
-                        : isOverlap
-                          ? ""
-                          : column === "text"
-                            ? "text-text"
-                            : column === "style"
-                              ? "text-text-muted"
-                              : ""
-                    }`}
-                  >
-                    {value || (column === "text" ? "" : "\u00A0")}
-                  </div>
-                );
-              })}
-            </div>
+              cue={cue}
+              index={index}
+              columns={columns}
+              isSelected={isSelected}
+              isOverlap={!isSelected && overlappingIds.has(cue.id)}
+              isPlaybackActive={!isSelected && activeCueIds.includes(cue.id)}
+              styleMissing={
+                assStyles.length > 0 && !knownStyleNames.has(cue.style)
+              }
+              rowRef={cue.id === selectedCueId ? selectedRef : null}
+              onCueClick={handleCueClick}
+              onCueContextMenu={handleCueContextMenu}
+            />
           );
         })}
       </div>
@@ -437,11 +412,7 @@ export function SubtitleList({
               runMenuAction(
                 () =>
                   applyCueListResult(
-                    splitCueAtTime(
-                      cues,
-                      contextMenu.targetId,
-                      currentTimeMs,
-                    ),
+                    splitCueAtTime(cues, contextMenu.targetId, contextMenu.playheadMs),
                   ),
                 "当前帧不在该字幕范围内",
               )
@@ -542,6 +513,102 @@ export function SubtitleList({
     </div>
   );
 }
+
+interface SubtitleRowProps {
+  cue: SubtitleCue;
+  index: number;
+  columns: CueListColumn[];
+  isSelected: boolean;
+  isOverlap: boolean;
+  isPlaybackActive: boolean;
+  styleMissing: boolean;
+  rowRef: RefObject<HTMLDivElement | null> | null;
+  onCueClick: (cue: SubtitleCue, event: MouseEvent<HTMLDivElement>) => void;
+  onCueContextMenu: (cue: SubtitleCue, event: MouseEvent<HTMLDivElement>) => void;
+}
+
+/**
+ * 单行字幕：memo 化，播放边界（activeCueIds）变化时只重渲染进入/离开的行。
+ * props 保持值语义：cue 引用来自 store（未编辑行引用稳定）、布尔标记与
+ * 稳定回调，其余行浅比较 bail out。
+ */
+const SubtitleRow = memo(function SubtitleRow({
+  cue,
+  index,
+  columns,
+  isSelected,
+  isOverlap,
+  isPlaybackActive,
+  styleMissing,
+  rowRef,
+  onCueClick,
+  onCueContextMenu,
+}: SubtitleRowProps) {
+  return (
+    <div
+      ref={rowRef}
+      onClick={(event) => onCueClick(cue, event)}
+      onContextMenu={(event) => onCueContextMenu(cue, event)}
+      className={`col-span-full grid cursor-pointer grid-cols-subgrid items-center rounded py-1 text-sm transition-colors ${
+        isSelected
+          ? "bg-primary/10"
+          : isOverlap
+            ? "bg-danger/10 text-danger hover:bg-danger/15"
+            : isPlaybackActive
+              ? "bg-success/10"
+              : "hover:bg-surface-overlay"
+      } ${
+        isPlaybackActive
+          ? "ring-1 ring-inset ring-success/35"
+          : isSelected
+            ? "ring-1 ring-inset ring-primary/40"
+            : isOverlap
+              ? "ring-1 ring-inset ring-danger/35"
+              : ""
+      }`}
+    >
+      {columns.map((column) => {
+        const value = renderCellValue(column, cue, index);
+        const mono =
+          column === "start" ||
+          column === "end" ||
+          column === "index" ||
+          column === "layer" ||
+          column.startsWith("margin");
+        const warnStyle = column === "style" && styleMissing;
+        return (
+          <div
+            key={column}
+            title={value.trim() === "" ? undefined : value}
+            className={`min-w-0 truncate whitespace-nowrap ${
+              mono
+                ? `font-mono text-xs ${isOverlap ? "" : "text-text-muted"}`
+                : ""
+            } ${
+              column === "index" ||
+              column === "layer" ||
+              column.startsWith("margin")
+                ? "text-center"
+                : ""
+            } ${
+              warnStyle
+                ? "text-warning"
+                : isOverlap
+                  ? ""
+                  : column === "text"
+                    ? "text-text"
+                    : column === "style"
+                      ? "text-text-muted"
+                      : ""
+            }`}
+          >
+            {value || (column === "text" ? "" : "\u00A0")}
+          </div>
+        );
+      })}
+    </div>
+  );
+});
 
 interface MenuButtonProps {
   children: ReactNode;

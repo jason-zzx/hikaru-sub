@@ -17,7 +17,7 @@ export function selectCueAndSeek(cue: SubtitleCue | null) {
   if (!cue) return;
   const pb = usePlaybackStore.getState();
   pb.setSelectedCueId(cue.id);
-  pb.setCurrentTime(cue.startMs);
+  pb.requestSeek(cue.startMs);
   pb.setPlayUntil(null);
 }
 

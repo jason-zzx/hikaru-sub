@@ -1,3 +1,4 @@
+import { playSelectedCueSegment } from "../../services/playbackActions";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { formatPlaybackTime } from "../../utils/formatTime";
 import {
@@ -25,16 +26,17 @@ export function PlaybackControls({
   const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
   const durationMs = usePlaybackStore((s) => s.durationMs);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
+  const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const setPlaying = usePlaybackStore((s) => s.setPlaying);
-  const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
+  const requestSeek = usePlaybackStore((s) => s.requestSeek);
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentTime(Number(e.target.value));
+    requestSeek(Number(e.target.value));
   };
 
   const handleSkip = (delta: number) => {
     const newTime = Math.max(0, Math.min(durationMs, currentTimeMs + delta));
-    setCurrentTime(newTime);
+    requestSeek(newTime);
   };
 
   return (
@@ -70,6 +72,24 @@ export function PlaybackControls({
             <path d="M8 5v14l11-7z" />
           </svg>
         )}
+      </Button>
+
+      {/* 播放当前行：与 R（play-segment）共用 playSelectedCueSegment，段播中再点=中断 */}
+      <Button
+        variant="ghost"
+        onClick={() => playSelectedCueSegment()}
+        disabled={!selectedCueId}
+        className="p-1 disabled:opacity-30"
+        title={formatActionShortcutTitle("播放当前行", "play-segment", hotkeys)}
+      >
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5 7.5v9M19 7.5v9M10 8.5l5.5 3.5-5.5 3.5V8.5z"
+          />
+        </svg>
       </Button>
 
       <Button

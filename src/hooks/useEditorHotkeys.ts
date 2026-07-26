@@ -15,6 +15,7 @@ import {
   selectCueAndSeek,
   selectCueByOffset,
 } from "../services/editorActions";
+import { playSelectedCueSegment } from "../services/playbackActions";
 import {
   copyCuesToSystemClipboard,
   cutCuesToSystemClipboard,
@@ -51,7 +52,7 @@ export function buildEditorActions(
 
   const frameStep = (frames: number) => {
     const pb = usePlaybackStore.getState();
-    pb.setCurrentTime(
+    pb.requestSeek(
       frameStepTarget(pb.currentTimeMs, pb.fps, frames, pb.durationMs),
     );
   };
@@ -60,7 +61,7 @@ export function buildEditorActions(
     const { cues } = useProjectStore.getState();
     const pb = usePlaybackStore.getState();
     const target = findSubtitleBoundary(cues, pb.currentTimeMs, direction);
-    if (target !== null) pb.setCurrentTime(target);
+    if (target !== null) pb.requestSeek(target);
   };
 
   const stamp = (field: "startMs" | "endMs") => {
@@ -88,21 +89,6 @@ export function buildEditorActions(
     usePlaybackStore.getState().setSelectedCueIds(result.selectedCueIds);
     usePlaybackStore.getState().setPlayUntil(null);
     return true;
-  };
-
-  const playSegment = () => {
-    const pb = usePlaybackStore.getState();
-    if (pb.isPlaying && pb.playUntilMs !== null) {
-      pb.setPlaying(false); // setPlaying(false) 内清除 playUntilMs
-      return;
-    }
-    const cue = useProjectStore
-      .getState()
-      .cues.find((c) => c.id === pb.selectedCueId);
-    if (!cue) return;
-    pb.setCurrentTime(cue.startMs);
-    pb.setPlayUntil(cue.endMs);
-    pb.setPlaying(true);
   };
 
   const newCue = () => {
@@ -198,7 +184,7 @@ export function buildEditorActions(
     "frame-fast-next": () => frameStep(FAST_JUMP_FRAMES),
     "boundary-prev": () => boundaryJump(-1),
     "boundary-next": () => boundaryJump(1),
-    "play-segment": playSegment,
+    "play-segment": playSelectedCueSegment,
     "stamp-start": () => stamp("startMs"),
     "stamp-end": () => stamp("endMs"),
     "new-cue": newCue,

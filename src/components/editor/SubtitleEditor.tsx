@@ -119,7 +119,7 @@ export const SubtitleEditor = forwardRef<
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
-  const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
+  const requestSeek = usePlaybackStore((s) => s.requestSeek);
   const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
   const editorFocusNonce = useUiStore((s) => s.editorFocusNonce);
 
@@ -327,7 +327,7 @@ export const SubtitleEditor = forwardRef<
     setPlayUntil(null);
     if (followUp.kind === "select") {
       setSelectedCueId(followUp.cue.id);
-      setCurrentTime(followUp.cue.startMs);
+      requestSeek(followUp.cue.startMs);
       return;
     }
     const appended = appendCueAfterWithUniqueId(
@@ -340,7 +340,7 @@ export const SubtitleEditor = forwardRef<
     }
     addCue(appended);
     setSelectedCueId(appended.id);
-    setCurrentTime(appended.startMs);
+    requestSeek(appended.startMs);
   };
 
   const currentStyle = selectedCue

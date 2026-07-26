@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useUiStore } from "../../stores/uiStore";
+import { initActiveCueTracker } from "../../services/activeCueTracker";
 import { useBurnJobPoller } from "../../hooks/useBurnJobPoller";
 import { useClipJobPoller } from "../../hooks/useClipJobPoller";
 import { useUnsavedChangesCloseGuard } from "../../hooks/useUnsavedChangesCloseGuard";
@@ -32,6 +34,11 @@ export function AppLayout() {
   const currentStep = useUiStore((s) => s.currentStep);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const View = stepViews[currentStep];
+
+  // activeCueIds 派生维护（模块单例，重复挂载幂等）
+  useEffect(() => {
+    initActiveCueTracker();
+  }, []);
 
   useBurnJobPoller();
   useClipJobPoller();

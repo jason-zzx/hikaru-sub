@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "R2 核心是 playbackStore 扩展（activeCueIds/seekRequest）与 zustand 瞬态 subscribe 用法，需遵循项目 store 约定"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "PlaybackControls 新按钮、Timeline 播放头 overlay 与 canvas 重绘改造需遵循组件规范（shadcn/SVG 图标/令牌）"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "useEditorHotkeys 提取 playSegment、activeCueTracker 单例初始化模式参照 hook/服务约定"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "新文件落位：services/playbackActions.ts、services/activeCueTracker.ts、components/editor/waveformDisplay.ts"}
+{"file": ".trellis/spec/tauri/media-ffmpeg-asr.md", "reason": "R1 涉及 ffmpeg.rs 波形提取输出精度调整，需符合媒体管线约定"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "hotkey 与按钮共享 playSelectedCueSegment、多个组件共享 activeCueIds 派生态，防止重复实现"}
