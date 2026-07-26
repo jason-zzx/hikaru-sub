@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
-- **Last Active**: 2026-07-23
+- **Total Sessions**: 15
+- **Last Active**: 2026-07-27
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~472 | Active |
+| `journal-1.md` | ~506 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-07-27 | Editor playback UX: waveform alignment, smooth playhead, play-current-line | `6acc3a4`, `f094111` | `dev` |
 | 14 | 2026-07-23 | 最近工作视频与首页续接 | `ff27cbc` | `dev` |
 | 13 | 2026-07-23 | 翻译失败重试与取消 | `8d4f1f5` | `main` |
 | 12 | 2026-07-22 | 编辑页字幕查找替换与质检 | `5e5823a` | `dev` |
