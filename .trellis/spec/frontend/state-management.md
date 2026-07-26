@@ -31,6 +31,27 @@ Settings (`AppSettings`) are loaded/saved via Tauri (`getSettings` / `setSetting
 
 When a clip finishes and becomes the working video, call `setSession(next)` only. That clears cues. Do **not** load or migrate previous ASS onto the new file.
 
+## Playback Timing (High-Frequency State)
+
+`playbackStore.currentTimeMs` is written at rAF rate (~60Hz) during playback — by design. The render budget is protected on the **consumer** side:
+
+- Heavy components (SubtitleList, Timeline, page containers) must **not** subscribe raw `currentTimeMs`. Subscribe `activeCueIds` instead: the derived hit-set (overlaps included) maintained by `src/services/activeCueTracker.ts` (module singleton, `initActiveCueTracker()` in AppLayout), which writes only when membership changes — subtitle-boundary frequency.
+- Per-frame visuals (timeline playhead overlay) bypass React entirely: vanilla `usePlaybackStore.subscribe` inside an effect, writing DOM `transform` only. Cache layout inputs (container width) into refs via ResizeObserver; never `getBoundingClientRect` / `getComputedStyle` per frame. Boundary-frequency canvas work stays split so cue-highlight redraws never re-run the waveform pixel loop (fixed vs lane layers).
+- Seek intent vs playback writeback: user-intent jumps (slider, ±5s, timeline click, row activation, frame step, boundary jump, segment play, find-locate) call `requestSeek(ms)` — it bumps `seekRequest.seq`, which is the **only** trigger of VideoPlayer's seek effect. `setCurrentTime` is reserved for playback-writeback paths inside VideoPlayer (rAF tick, timeupdate, pause snap, clamp) where the video element is already at that position. Calling `setCurrentTime` for a user jump means the video never seeks.
+- Leaf components that genuinely need per-frame values (PlaybackControls ms readout) may keep a raw subscription.
+- Event handlers read instantaneous time with `usePlaybackStore.getState().currentTimeMs`; menu-style UI must snapshot it at open time and act on the snapshot (see SubtitleList split).
+
+```ts
+// Wrong: 60Hz re-render of a whole list/canvas component
+const t = usePlaybackStore((s) => s.currentTimeMs);
+
+// Correct: boundary-frequency membership + transient per-frame DOM writes
+const activeCueIds = usePlaybackStore((s) => s.activeCueIds);
+useEffect(() => usePlaybackStore.subscribe((s, prev) => {
+  if (s.currentTimeMs !== prev.currentTimeMs) positionPlayhead(s.currentTimeMs);
+}), []);
+```
+
 ## History
 
 `projectStore` owns one chronological project undo/redo stack for committed `SubtitleCue` edits (max depth 50). Prefer `updateCue` / `replaceCues` / `setCues` / grouped text APIs over mutating arrays outside the store.
@@ -69,6 +90,8 @@ Capture the snapshot in the same uninterrupted synchronous section as the payloa
 
 ## Anti-Patterns
 
+- Subscribing raw `currentTimeMs` from list/canvas/page components (60Hz re-renders; steppy playhead, laggy pause)
+- Calling `setCurrentTime` for user seek intent instead of `requestSeek` (video element never seeks)
 - Reintroducing a hidden on-disk project metadata directory
 - Persisting VAD settings into `AppSettings`
 - Duplicating job progress only in local React state without `taskStore` / job stores when StatusBar or App pollers need it
