@@ -16,7 +16,7 @@ asr-service/
 │   ├── kotoba_faster_whisper.py  # Kotoba Whisper v2.0 的 faster-whisper 薄适配器
 │   ├── parakeet.py    # NVIDIA NeMo Parakeet 日语适配器（re-export chunking）
 │   ├── qwen3_asr.py   # Qwen3-ASR 日语适配器（自带 ForcedAligner 字级时间戳）
-│   ├── reazonspeech_nemo.py  # ReazonSpeech NeMo v2（原生整段推理 + RNN-T 时间戳）
+│   ├── reazonspeech_nemo.py  # ReazonSpeech NeMo v2（短音频整段 + 长音频 45s 分块，RNN-T 时间戳）
 │   ├── hf_download.py # 所有引擎共用的 Hugging Face snapshot 下载适配
 │   ├── chunking.py    # 引擎无关的分块/合并/字幕组装工具（parakeet/qwen3 共用）
 │   ├── vad.py         # Silero VAD 封装，供 Parakeet / Qwen3-ASR 预切分语音段
@@ -154,9 +154,9 @@ python main.py --host 127.0.0.1 --port 0
 - `device`：`auto` / `cpu` / `cuda`
 - `language`：`auto` 或 `null` 表示自动检测
 - `computeType`：留空时按设备推导（cpu→int8，cuda→float16）
-- `useVad` / `vadConfig`：可选 VAD 高级配置。faster-whisper / kotoba-faster-whisper 透传到内置 Silero VAD；Parakeet / Qwen3-ASR 用 `engines/vad.py` 先切分语音段，再逐段转录。`reazonspeech-nemo` 忽略 VAD，始终原生整段推理。
+- `useVad` / `vadConfig`：可选 VAD 高级配置。faster-whisper / kotoba-faster-whisper 透传到内置 Silero VAD；Parakeet / Qwen3-ASR 用 `engines/vad.py` 先切分语音段，再逐段转录。`reazonspeech-nemo` 忽略 VAD；短音频整段推理，≥60s 音频固定 45s 分块。
 - `kotoba-faster-whisper` 仅支持 `kotoba-tech/kotoba-whisper-v2.0-faster`，要求 `faster-whisper>=1.1.1`，复用 faster-whisper 的下载、缓存、CPU/CUDA、VAD 与 segment 时间戳；转录固定传入 `chunk_length=15` 和 `condition_on_previous_text=False`。
-- `reazonspeech-nemo` 仅支持 `reazon-research/reazonspeech-nemo-v2`。输入须为项目约定的 16 kHz / 16-bit / mono PCM WAV；整段交给 NeMo RNN-T，按官方 subword 时间戳规则分段。阻塞推理期间不伪造进度；取消请求在推理返回后生效，不会写出本次完整结果。缓存完成标记为 `reazonspeech-nemo-v2.nemo`。
+- `reazonspeech-nemo` 仅支持 `reazon-research/reazonspeech-nemo-v2`。输入须为项目约定的 16 kHz / 16-bit / mono PCM WAV。<60s 音频整段交给 NeMo RNN-T，按官方 subword 时间戳规则分段；≥60s 音频按 45 秒块（2 秒重叠）逐块解码（模型内置 ALSD beam search 的整段耗时随时长二次增长，且整段激活显存在 8GB 显卡约 20 分钟即溢出），复用 `engines/chunking.py` 合并去重，每块完成后上报进度并检查取消，收尾以 `TranscriptSegmentRefresh` 下发最终列表替换预览片段。缓存完成标记为 `reazonspeech-nemo-v2.nemo`。
 - `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段（`engines/chunking.py`）。长音频分块合并时会合并重叠文本而非简单取长弃短。
 
   **Gap backfill**（缓解漏句与重叠碎片）：

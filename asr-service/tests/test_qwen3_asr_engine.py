@@ -7,7 +7,14 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engines.qwen3_asr import Qwen3AsrEngine, ASR_MODEL_ID, ALIGNER_MODEL_ID, MODEL_ID, _extract_char_timestamps
-from engines.base import AsrError
+from engines.base import AsrError, TranscriptSegmentRefresh
+
+
+def _split_stream(stream):
+    """把引擎输出流拆成（预览段列表, 收尾 refresh 列表）。"""
+    previews = [item for item in stream if not isinstance(item, TranscriptSegmentRefresh)]
+    refreshes = [item for item in stream if isinstance(item, TranscriptSegmentRefresh)]
+    return previews, refreshes
 
 
 def _fake_huggingface_hub(cache_lookup) -> ModuleType:
@@ -164,10 +171,11 @@ class TranscribeAssembleTests(unittest.TestCase):
         engine = self._make_engine_with_fake_model(result)
         # 不开 VAD：短音频走一次性整段路径，直接用 qwen-asr 返回的全局时间戳
         transcription = engine.transcribe(str(wav_path), language="ja")
-        segments = list(transcription.segments)
+        segments, refreshes = _split_stream(list(transcription.segments))
         self.assertEqual(len(segments), 1)
         self.assertEqual(segments[0].text, "こんにちは")
         self.assertEqual(transcription.language, "ja")
+        self.assertEqual(len(refreshes), 1)
 
 
 class TranscribeChunkedTests(unittest.TestCase):
@@ -203,7 +211,11 @@ class TranscribeChunkedTests(unittest.TestCase):
         transcription = engine.transcribe(
             str(wav_path), language="ja", progress_callback=progresses.append,
         )
-        segments = list(transcription.segments)
+        stream = list(transcription.segments)
+        segments, refreshes = _split_stream(stream)
+        # 收尾必须是 TranscriptSegmentRefresh，最终列表与预览一致
+        self.assertEqual(len(refreshes), 1)
+        self.assertIsInstance(stream[-1], TranscriptSegmentRefresh)
         # 70s 按 45s 分块应调用 2 次（块1 + 块2）
         self.assertEqual(engine._model.transcribe.call_count, 2)
         # 每块完成上报真实进度（块1 end=45000，块2 end=70000）
@@ -217,6 +229,54 @@ class TranscribeChunkedTests(unittest.TestCase):
         self.assertAlmostEqual(segments[1].start_ms, 43_000.0, places=0)
         self.assertAlmostEqual(segments[1].end_ms, 43_300.0, places=0)
         self.assertTrue(all(s.text == "テスト" for s in segments))
+
+    def test_overlap_extension_refresh_replaces_previews(self):
+        """第二块把第一块已产出的 overlap 片段合并成新 key（时间轴扩展）时，
+        收尾 TranscriptSegmentRefresh 必须以最终列表整体替换，jobs.py 语义下仅存一条。
+        """
+        import tempfile, wave
+        from unittest.mock import MagicMock
+        tmp = Path(tempfile.mkdtemp())
+        wav_path = tmp / "overlap.wav"
+        rate = 16000
+        with wave.open(str(wav_path), "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+            w.writeframes(b"\0\0" * (rate * 70))
+
+        # 块1 尾部 [44.0s, 44.3s]；块2（start=43s）相对 [1.0s, 1.4s] → 绝对 [44.0s, 44.4s] 同文本
+        calls = {"n": 0}
+
+        def fake_transcribe(audio, **kw):
+            calls["n"] += 1
+            stamp = lambda t, s, e: type("S", (), {"text": t, "start_time": s, "end_time": e})()
+            if calls["n"] == 1:
+                stamps = [stamp("テ", 44.0, 44.1), stamp("ス", 44.1, 44.2), stamp("ト", 44.2, 44.3)]
+            else:
+                stamps = [stamp("テ", 1.0, 1.15), stamp("ス", 1.15, 1.3), stamp("ト", 1.3, 1.4)]
+            return [type("R", (), {
+                "language": "Japanese", "text": "テスト", "time_stamps": [stamps],
+            })()]
+
+        engine = Qwen3AsrEngine(model=ASR_MODEL_ID, device="cpu")
+        engine._model = MagicMock()
+        engine._model.transcribe.side_effect = fake_transcribe
+
+        stream = list(engine.transcribe(str(wav_path), language="ja").segments)
+        previews, refreshes = _split_stream(stream)
+        # 预览流里新旧两版并存（这是重复隐患本身），收尾 refresh 整体替换后只剩合并版
+        self.assertEqual(len(previews), 2)
+        self.assertEqual(len(refreshes), 1)
+        self.assertIsInstance(stream[-1], TranscriptSegmentRefresh)
+        accumulated = []
+        for item in stream:
+            if isinstance(item, TranscriptSegmentRefresh):
+                accumulated = list(item.segments)
+            else:
+                accumulated.append(item)
+        self.assertEqual(len(accumulated), 1)
+        self.assertEqual(accumulated[0].text, "テスト")
+        self.assertEqual(accumulated[0].start_ms, 44_000)
+        self.assertEqual(accumulated[0].end_ms, 44_400)
 
     def test_short_audio_single_chunk_no_offset(self):
         """短音频（<45s）只分 1 块整段，无偏移，时间轴即 qwen-asr 返回值。"""
@@ -241,9 +301,10 @@ class TranscribeChunkedTests(unittest.TestCase):
         engine._model.transcribe.side_effect = fake_transcribe
 
         transcription = engine.transcribe(str(wav_path), language="ja")
-        segments = list(transcription.segments)
+        segments, refreshes = _split_stream(list(transcription.segments))
         # 短音频单块，仅 1 次调用
         self.assertEqual(engine._model.transcribe.call_count, 1)
+        self.assertEqual(len(refreshes), 1)
         self.assertEqual(len(segments), 1)
         self.assertEqual(segments[0].text, "テスト")
         # 无偏移，时间即 fake 返回的 0~0.3s

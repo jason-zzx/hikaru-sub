@@ -716,7 +716,7 @@ export function TranscribeView() {
             )}
             {engine === "reazonspeech-nemo" && (
               <p className="mt-1 text-xs text-text-muted">
-                {REAZONSPEECH_NEMO_DESCRIPTION}。不使用固定分块或 VAD；推理期间进度不伪造，取消不是即时中断。
+                {REAZONSPEECH_NEMO_DESCRIPTION}。不使用 VAD；短音频整段推理，取消在当前块推理完成后生效。
               </p>
             )}
           </Labeled>
