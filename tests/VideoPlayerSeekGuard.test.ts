@@ -16,21 +16,28 @@ describe("VideoPlayer seek and decode fallback guards", () => {
     // 外部 seek effect 在未就绪时应监听 loadedmetadata，而不是立刻写 currentTime
     const seekEffectStart = source.indexOf("外部跳转到指定时间");
     expect(seekEffectStart).toBeGreaterThan(-1);
-    const seekEffect = source.slice(seekEffectStart, seekEffectStart + 2200);
+    const seekEffect = source.slice(seekEffectStart, seekEffectStart + 3000);
     expect(seekEffect).toContain("readyState");
     expect(seekEffect).toContain("loadedmetadata");
   });
 
+  it("is driven by explicit seekRequest, not per-frame currentTimeMs echo", () => {
+    const seekEffectStart = source.indexOf("外部跳转到指定时间");
+    const seekEffect = source.slice(seekEffectStart, seekEffectStart + 3000);
+    expect(seekEffect).toContain("seekRequest");
+    expect(seekEffect).toMatch(/\}, \[seekRequest, videoSrc/);
+  });
+
   it("clamps external seek into [0, duration] to avoid out-of-range decode errors", () => {
     const seekEffectStart = source.indexOf("外部跳转到指定时间");
-    const seekEffect = source.slice(seekEffectStart, seekEffectStart + 2800);
+    const seekEffect = source.slice(seekEffectStart, seekEffectStart + 3000);
     expect(seekEffect).toMatch(/duration/);
     expect(seekEffect).toMatch(/Math\.min|Math\.max/);
   });
 
   it("writes clamped seek time back to playback store when out of range", () => {
     const seekEffectStart = source.indexOf("外部跳转到指定时间");
-    const seekEffect = source.slice(seekEffectStart, seekEffectStart + 3200);
+    const seekEffect = source.slice(seekEffectStart, seekEffectStart + 3000);
     expect(seekEffect).toContain("setCurrentTime");
   });
 

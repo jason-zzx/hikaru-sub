@@ -35,6 +35,7 @@ import type {
   StartVideoDownloadArgs,
   DownloadMediaProbe,
   VideoSession,
+  WaveformData,
 } from "../types";
 
 export const VIDEO_EXTENSIONS = [
@@ -361,6 +362,14 @@ export async function saveStyleLibraryText(content: string): Promise<void> {
 /** 获取视频信息（分辨率、时长）。 */
 export async function getVideoInfo(videoPath: string): Promise<import("../types").VideoInfo> {
   return invoke<import("../types").VideoInfo>("get_video_info", { videoPath });
+}
+
+/** 提取音频波形峰值；samples 为目标桶数，返回峰值数组与实际解码覆盖时长。 */
+export async function extractWaveform(
+  videoPath: string,
+  samples: number,
+): Promise<WaveformData> {
+  return invoke<WaveformData>("extract_waveform", { videoPath, samples });
 }
 
 /** 枚举系统字体与额外字体目录，并返回本地 HTTP 可读 URL。 */

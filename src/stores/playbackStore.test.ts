@@ -11,6 +11,8 @@ describe("playbackStore playUntil 语义", () => {
       selectedCueIds: [],
       fps: null,
       playUntilMs: null,
+      activeCueIds: [],
+      seekRequest: null,
     });
   });
 
@@ -54,5 +56,29 @@ describe("playbackStore playUntil 语义", () => {
 
     expect(usePlaybackStore.getState().selectedCueId).toBeNull();
     expect(usePlaybackStore.getState().selectedCueIds).toEqual([]);
+  });
+
+  it("requestSeek 同步写 currentTimeMs 并递增 seq", () => {
+    usePlaybackStore.getState().requestSeek(1500);
+    let state = usePlaybackStore.getState();
+    expect(state.currentTimeMs).toBe(1500);
+    expect(state.seekRequest).toEqual({ ms: 1500, seq: 1 });
+
+    // 同一目标时间的重复请求也必须产生新的 seq（seek-to-same-time 仍要触发 video seek）
+    usePlaybackStore.getState().requestSeek(1500);
+    state = usePlaybackStore.getState();
+    expect(state.seekRequest).toEqual({ ms: 1500, seq: 2 });
+  });
+
+  it("setCurrentTime（播放回写）不产生 seekRequest", () => {
+    usePlaybackStore.getState().setCurrentTime(2000);
+    const state = usePlaybackStore.getState();
+    expect(state.currentTimeMs).toBe(2000);
+    expect(state.seekRequest).toBeNull();
+  });
+
+  it("setActiveCueIds 记录当前命中集合", () => {
+    usePlaybackStore.getState().setActiveCueIds(["a", "b"]);
+    expect(usePlaybackStore.getState().activeCueIds).toEqual(["a", "b"]);
   });
 });

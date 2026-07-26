@@ -4,6 +4,7 @@ import { fireEvent, renderHook } from "@testing-library/react";
 import { useEditorHotkeys, buildEditorActions } from "./useEditorHotkeys";
 import { applySelectedCueToggle } from "../services/editorActions";
 import { makeTextOp } from "../services/editorTextHistory";
+import { playSelectedCueSegment } from "../services/playbackActions";
 import { useProjectStore } from "../stores/projectStore";
 import { usePlaybackStore } from "../stores/playbackStore";
 import { useUiStore } from "../stores/uiStore";
@@ -61,6 +62,8 @@ beforeEach(() => {
     selectedCueIds: [],
     fps: 25,
     playUntilMs: null,
+    activeCueIds: [],
+    seekRequest: null,
   });
   useUiStore.setState({ editorFocusNonce: 0 });
 });
@@ -91,12 +94,15 @@ describe("播放头动作", () => {
   it("frame-next 按 25fps 前进到下一帧中心", () => {
     make_actions()["frame-next"]!();
     expect(usePlaybackStore.getState().currentTimeMs).toBeCloseTo(60);
+    // 帧步进是用户意图 seek：走 requestSeek
+    expect(usePlaybackStore.getState().seekRequest?.ms).toBeCloseTo(60);
   });
 
   it("boundary-next 跳到下一个字幕边界", () => {
     usePlaybackStore.setState({ currentTimeMs: 500 });
     make_actions()["boundary-next"]!();
     expect(usePlaybackStore.getState().currentTimeMs).toBe(1000);
+    expect(usePlaybackStore.getState().seekRequest?.ms).toBe(1000);
   });
 
   it("boundary-prev 无边界时不动", () => {
@@ -113,23 +119,9 @@ describe("播放头动作", () => {
     expect(usePlaybackStore.getState().isPlaying).toBe(false);
   });
 
-  it("play-segment 从选中 cue 起点播放到终点；再按中断", () => {
-    usePlaybackStore.setState({ selectedCueId: "b", currentTimeMs: 0 });
-    const actions = make_actions();
-    actions["play-segment"]!();
-    let pb = usePlaybackStore.getState();
-    expect(pb.currentTimeMs).toBe(2000);
-    expect(pb.playUntilMs).toBe(3000);
-    expect(pb.isPlaying).toBe(true);
-    actions["play-segment"]!();
-    pb = usePlaybackStore.getState();
-    expect(pb.isPlaying).toBe(false);
-    expect(pb.playUntilMs).toBeNull();
-  });
-
-  it("play-segment 无选中时 no-op", () => {
-    make_actions()["play-segment"]!();
-    expect(usePlaybackStore.getState().isPlaying).toBe(false);
+  // 段播行为用例已迁移至 services/playbackActions.test.ts；此处只保证 hotkey 接线到共享实现
+  it("play-segment 接线到共享的 playSelectedCueSegment", () => {
+    expect(make_actions()["play-segment"]).toBe(playSelectedCueSegment);
   });
 });
 

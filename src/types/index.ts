@@ -335,6 +335,16 @@ export interface VideoInfo {
   fps: number | null;
 }
 
+/**
+ * extract_waveform 返回：波形峰值数组 + 实际解码覆盖时长（毫秒）。
+ * coveredMs 由 PCM 样本数换算，在 HLS 合并产物上可能小于容器标称时长；
+ * 波形绘制映射必须用 coveredMs 而非视频 durationMs，否则随时间线性漂移。
+ */
+export interface WaveformData {
+  peaks: number[];
+  coveredMs: number;
+}
+
 export interface VideoPlaybackProbe {
   videoCodec: string;
   audioCodec?: string;

@@ -48,7 +48,7 @@ export const SubtitleFindPanel = forwardRef<
   const replaceCues = useProjectStore((s) => s.replaceCues);
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
-  const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
+  const requestSeek = usePlaybackStore((s) => s.requestSeek);
   const durationMs = usePlaybackStore((s) => s.durationMs);
 
   const [open, setOpen] = useState(false);
@@ -121,7 +121,7 @@ export const SubtitleFindPanel = forwardRef<
     setSelectedCueId(cueId);
     // 与 SubtitleList 选中行为一致：定位同时移动播放头
     const cue = cues.find((c) => c.id === cueId);
-    if (cue) setCurrentTime(cue.startMs);
+    if (cue) requestSeek(cue.startMs);
   };
 
   const goAdjacent = (dir: 1 | -1) => {

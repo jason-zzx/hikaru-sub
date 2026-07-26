@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { extractWaveform } from "../../services/tauri";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import {
@@ -15,12 +15,17 @@ import {
 import {
   clipVisibleCueRect,
   hitTestTimelineCue,
-  isCueActiveAtTime,
   revealTimelineTime,
   type TimelineCueRect,
 } from "./timelineModel";
 import { resolveTimelineColors, type TimelineColors } from "./timelineColors";
-import type { SubtitleCue } from "../../types";
+import {
+  aggregatePixelPeak,
+  applyGain,
+  buildWaveformTransform,
+  stepWaveformGain,
+} from "./waveformDisplay";
+import type { SubtitleCue, WaveformData } from "../../types";
 
 const RULER_HEIGHT = 22;
 const WAVE_TOP = 24;
@@ -33,6 +38,8 @@ const EDGE_HANDLE_WIDTH = 6;
 const DRAG_THRESHOLD_PX = 4;
 const STRONG_SNAP_THRESHOLD_PX = 12;
 const FRAME_SNAP_THRESHOLD_PX = 4;
+
+const EMPTY_WAVEFORM: WaveformData = { peaks: [], coveredMs: 0 };
 
 type GestureGeometry = {
   viewStartMs: number;
@@ -104,10 +111,14 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
   const laneGestureRef = useRef<LaneGesture | null>(null);
   const waveGestureRef = useRef<WaveGesture | null>(null);
   const dragPreviewRef = useRef<DragPreview | null>(null);
-  const previousTimeMsRef = useRef(0);
-  const previousSelectedCueIdRef = useRef<string | null>(null);
+  const playheadRef = useRef<HTMLDivElement>(null);
+  const containerWidthRef = useRef(0);
 
-  const [waveform, setWaveform] = useState<number[]>([]);
+  const [waveform, setWaveform] = useState<WaveformData>(EMPTY_WAVEFORM);
+  // 容器宽度 state：驱动两层 canvas 在面板 resize 后重绘；瞬态播放头继续读 ref
+  const [containerWidth, setContainerWidth] = useState(0);
+  // 手动纵向增益：会话级（组件 state），不写入设置
+  const [waveformGain, setWaveformGain] = useState(1);
   const [viewStartMs, setViewStartMs] = useState(0);
   const [msPerPixel, setMsPerPixel] = useState(10);
   const [dragPreviewState, setDragPreviewState] = useState<DragPreview | null>(null);
@@ -118,21 +129,31 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
   const cues = useProjectStore((s) => s.cues);
   const videoPath = useProjectStore((s) => s.videoPath);
   const updateCue = useProjectStore((s) => s.updateCue);
-  const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
   const durationMs = usePlaybackStore((s) => s.durationMs);
-  const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
-  const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
+  const activeCueIds = usePlaybackStore((s) => s.activeCueIds);
+  const requestSeek = usePlaybackStore((s) => s.requestSeek);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
 
+  const ready = durationMs > 0;
+
   useEffect(() => {
-    if (videoPath && durationMs > 0) {
-      const samples = 4000;
-      invoke<number[]>("extract_waveform", { videoPath, samples })
-        .then(setWaveform)
-        .catch(console.error);
-    }
+    // 进入效应先重置：换视频后不残留上一支视频的波形（新请求返回前显示空白）
+    setWaveform(EMPTY_WAVEFORM);
+    if (!videoPath || durationMs <= 0) return;
+    // 10ms/桶，分辨率与时长解耦；短素材保底 4000 桶，超长素材封顶 720k
+    const samples = Math.min(Math.max(4000, Math.ceil(durationMs / 10)), 720_000);
+    // 快速换片时旧请求可能后完成：cleanup 置 stale，迟到响应直接丢弃
+    let stale = false;
+    extractWaveform(videoPath, samples)
+      .then((data) => {
+        if (!stale) setWaveform(data);
+      })
+      .catch(console.error);
+    return () => {
+      stale = true;
+    };
   }, [videoPath, durationMs]);
 
   useEffect(() => {
@@ -144,42 +165,130 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
     return () => observer.disconnect();
   }, []);
 
+  // getComputedStyle 强制样式重算成本高：按主题版本缓存，不再每次重绘解析
+  const colors = useMemo(
+    () => resolveTimelineColors(document.documentElement),
+    // themeVersion 仅作缓存失效信号
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [themeVersion],
+  );
+
+  // 自动对比度映射：波形数据加载后一次性计算并缓存，不在每次重绘/每列重算 percentile
+  const waveformTransform = useMemo(
+    () => buildWaveformTransform(waveform.peaks),
+    [waveform],
+  );
+
+  // 容器宽度：state 驱动两层 canvas 重绘依赖（面板 resize 后重铺，宽度未变不 set）；
+  // ref 供瞬态播放头订阅每帧读取（避免每帧 getBoundingClientRect 强制布局）
   useEffect(() => {
+    if (!ready) return;
     const container = containerRef.current;
     if (!container) return;
+    const syncWidth = () => {
+      const width = container.getBoundingClientRect().width;
+      containerWidthRef.current = width;
+      setContainerWidth((prev) => (prev === width ? prev : width));
+    };
+    syncWidth();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(syncWidth);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [ready]);
 
-    const timeChanged = previousTimeMsRef.current !== currentTimeMs;
-    const cueChanged =
-      selectedCueId !== null &&
-      previousSelectedCueIdRef.current !== selectedCueId;
-    previousTimeMsRef.current = currentTimeMs;
-    previousSelectedCueIdRef.current = selectedCueId;
-    if (!isPlaying && !timeChanged && !cueChanged) return;
-    if (laneGestureRef.current || waveGestureRef.current) return;
+  // 播放头瞬态直连 DOM：不经 React 渲染，每帧只写 transform（纯合成层属性）。
+  // 同一订阅内做翻页判定（播放头出视区才 setViewStartMs → 静态层每屏一次重绘）。
+  useEffect(() => {
+    if (!ready) return;
 
-    const width = container.getBoundingClientRect().width;
-    const nextViewStartMs = revealTimelineTime(
-      viewStartMs,
-      width,
-      msPerPixel,
-      currentTimeMs,
-    );
-    if (nextViewStartMs !== viewStartMs) setViewStartMs(nextViewStartMs);
-  }, [currentTimeMs, viewStartMs, msPerPixel, isPlaying, selectedCueId]);
+    const positionPlayhead = (timeMs: number) => {
+      const playhead = playheadRef.current;
+      if (!playhead) return;
+      const x = (timeMs - viewStartMs) / msPerPixel;
+      if (x < 0 || x > containerWidthRef.current) {
+        playhead.style.visibility = "hidden";
+        return;
+      }
+      playhead.style.visibility = "visible";
+      // 竖线宽 2px，取中对齐时间点（与原 canvas stroke 居中一致）
+      playhead.style.transform = `translateX(${x - 1}px)`;
+    };
 
+    positionPlayhead(usePlaybackStore.getState().currentTimeMs);
+
+    return usePlaybackStore.subscribe((state, prev) => {
+      const timeChanged = state.currentTimeMs !== prev.currentTimeMs;
+      const seekChanged = state.seekRequest !== prev.seekRequest;
+      if (!timeChanged && !seekChanged) return;
+      positionPlayhead(state.currentTimeMs);
+      // 拖拽手势进行中跳过自动翻页（沿用既有 guard 语义）
+      if (laneGestureRef.current || waveGestureRef.current) return;
+      const width = containerWidthRef.current;
+      if (width <= 0) return;
+      const nextViewStartMs = revealTimelineTime(
+        viewStartMs,
+        width,
+        msPerPixel,
+        state.currentTimeMs,
+      );
+      if (nextViewStartMs !== viewStartMs) setViewStartMs(nextViewStartMs);
+    });
+    // containerWidth：resize 后立即按新宽度重定位/恢复可见性（每帧读取仍走 ref）
+  }, [ready, viewStartMs, msPerPixel, containerWidth]);
+
+  // fixed 层（刻度+波形+增益标签）：不依赖 activeCueIds / cues / 拖拽预览。
+  // 字幕边界或 cue 高亮变化绝不触发波形逐像素聚合循环重绘。
+  // 宽度读 containerWidth state（并入依赖）：面板 resize 后本层随之重绘。
   useEffect(() => {
     const fixedCanvas = fixedCanvasRef.current;
-    const laneCanvas = laneCanvasRef.current;
-    const laneViewport = laneViewportRef.current;
-    const container = containerRef.current;
-    if (!fixedCanvas || !laneCanvas || !laneViewport || !container || durationMs === 0) {
-      return;
-    }
+    if (!fixedCanvas || durationMs === 0 || containerWidth <= 0) return;
 
-    const width = container.getBoundingClientRect().width;
+    const width = containerWidth;
     const fixedCtx = prepareCanvas(fixedCanvas, width, FIXED_LAYER_HEIGHT);
     if (!fixedCtx) return;
 
+    drawFixedLayer(
+      fixedCtx,
+      width,
+      waveform,
+      viewStartMs,
+      msPerPixel,
+      waveformTransform,
+      waveformGain,
+      colors,
+    );
+    drawSnapGuide(
+      fixedCtx,
+      snapTargetMs,
+      viewStartMs,
+      msPerPixel,
+      FIXED_LAYER_HEIGHT,
+      colors,
+    );
+  }, [
+    colors,
+    containerWidth,
+    durationMs,
+    msPerPixel,
+    snapTargetMs,
+    viewStartMs,
+    waveform,
+    waveformGain,
+    waveformTransform,
+  ]);
+
+  // lane 层（cue 矩形+播放高亮）：边界变化（activeCueIds）只重绘本层；
+  // cueRectsRef 由本效应维护，供指针命中检测使用。
+  // 宽度读 containerWidth state（并入依赖）：resize 后重铺，cueRects 命中不再错位。
+  useEffect(() => {
+    const laneCanvas = laneCanvasRef.current;
+    const laneViewport = laneViewportRef.current;
+    if (!laneCanvas || !laneViewport || durationMs === 0 || containerWidth <= 0) {
+      return;
+    }
+
+    const width = containerWidth;
     const renderedCues = dragPreviewState
       ? cues.map((cue) =>
           cue.id === dragPreviewState.id ? { ...cue, ...dragPreviewState } : cue,
@@ -196,26 +305,6 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
     const laneCtx = prepareCanvas(laneCanvas, width, laneCanvasHeight);
     if (!laneCtx) return;
 
-    const colors = resolveTimelineColors(document.documentElement);
-
-    drawFixedLayer(
-      fixedCtx,
-      width,
-      waveform,
-      durationMs,
-      viewStartMs,
-      msPerPixel,
-      currentTimeMs,
-      colors,
-    );
-    drawSnapGuide(
-      fixedCtx,
-      snapTargetMs,
-      viewStartMs,
-      msPerPixel,
-      FIXED_LAYER_HEIGHT,
-      colors,
-    );
     const viewEndMs = viewStartMs + width * msPerPixel;
     cueRectsRef.current = laneItems
       .filter((item) => item.cue.endMs >= viewStartMs && item.cue.startMs <= viewEndMs)
@@ -234,19 +323,10 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       laneCanvasHeight,
       cueRectsRef.current,
       selectedCueId,
-      currentTimeMs,
+      activeCueIds,
       colors,
     );
 
-    const pointerX = (currentTimeMs - viewStartMs) / msPerPixel;
-    if (pointerX >= 0 && pointerX <= width) {
-      laneCtx.strokeStyle = colors.playhead;
-      laneCtx.lineWidth = 2;
-      laneCtx.beginPath();
-      laneCtx.moveTo(pointerX, 0);
-      laneCtx.lineTo(pointerX, laneCanvasHeight);
-      laneCtx.stroke();
-    }
     drawSnapGuide(
       laneCtx,
       snapTargetMs,
@@ -256,16 +336,16 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       colors,
     );
   }, [
+    activeCueIds,
+    colors,
+    containerWidth,
     cues,
-    currentTimeMs,
     dragPreviewState,
     durationMs,
     msPerPixel,
     selectedCueId,
     snapTargetMs,
-    themeVersion,
     viewStartMs,
-    waveform,
   ]);
 
   useEffect(() => {
@@ -287,9 +367,16 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
     const handleFixedWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const rect = fixedCanvas.getBoundingClientRect();
       if (e.ctrlKey || e.metaKey) {
-        zoomAt(e.clientX, rect, e.deltaY);
+        zoomAt(e.clientX, fixedCanvas.getBoundingClientRect(), e.deltaY);
+        return;
+      }
+      if (e.shiftKey) {
+        // Shift+滚轮：波形纵向增益，不触发平移（部分平台会把 deltaY 折到 deltaX）
+        const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        if (delta !== 0) {
+          setWaveformGain((gain) => stepWaveformGain(gain, delta < 0 ? 1 : -1));
+        }
         return;
       }
       const scrollAmount = e.deltaY * msPerPixel * 0.5;
@@ -454,7 +541,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       local.viewportWidth,
     );
     if (hit.kind === "empty") {
-      setCurrentTime(timeAtX(local.x, geometry, durationMs));
+      requestSeek(timeAtX(local.x, geometry, durationMs));
       return;
     }
 
@@ -466,7 +553,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
         cueId: hit.cue.id,
         downX: local.x,
         downTimeMs: timeAtX(local.x, geometry, durationMs),
-        playheadMs: currentTimeMs,
+        playheadMs: usePlaybackStore.getState().currentTimeMs,
         geometry,
       };
       return;
@@ -483,7 +570,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       pointerId: e.pointerId,
       cue,
       edge: hit.edge,
-      snap: makeSnapSnapshot(cue.id, currentTimeMs),
+      snap: makeSnapSnapshot(cue.id, usePlaybackStore.getState().currentTimeMs),
       geometry,
     };
     laneGestureRef.current = active;
@@ -526,7 +613,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       );
       if (cue) {
         setSelectedCueId(cue.id);
-        setCurrentTime(cue.startMs);
+        requestSeek(cue.startMs);
         setPlayUntil(null);
       }
       return;
@@ -618,7 +705,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       .cues.some((cue) => cue.id === cueId);
     const inWaveform = local.y >= WAVE_TOP && local.y <= WAVE_TOP + WAVE_HEIGHT;
     if (!inWaveform || !cueId || !hasSelectedCue) {
-      setCurrentTime(clickedTime);
+      requestSeek(clickedTime);
       return;
     }
 
@@ -629,7 +716,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       cueId,
       downX: local.x,
       anchorTimeMs: clickedTime,
-      playheadMs: currentTimeMs,
+      playheadMs: usePlaybackStore.getState().currentTimeMs,
       geometry,
     };
   };
@@ -649,7 +736,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
     const preview = dragPreviewRef.current;
     clearWaveGesture(e.pointerId, e.currentTarget);
     if (completed?.kind === "pending") {
-      setCurrentTime(completed.anchorTimeMs);
+      requestSeek(completed.anchorTimeMs);
     } else if (completed && preview?.id === completed.cue.id) {
       updateCue(completed.cue.id, {
         startMs: preview.startMs,
@@ -717,12 +804,28 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
           onLostPointerCapture={cancelLaneGesture}
         />
       </div>
+      {/* 播放头：瞬态订阅直写 transform，贯穿 fixed 层与 lane 视口，不参与 React 渲染 */}
+      <div
+        ref={playheadRef}
+        data-testid="timeline-playhead"
+        className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[2px]"
+        style={{
+          backgroundColor: "var(--timeline-playhead, #ef4444)",
+          visibility: "hidden",
+        }}
+      />
       <div className="pointer-events-none absolute bottom-1 right-2 text-xs text-text-muted">
-        波形区滚轮平移 · 字幕区滚轮上下滚动 · Ctrl+滚轮缩放
+        波形区滚轮平移 · Shift+滚轮波形增益 · Ctrl+滚轮缩放
       </div>
     </div>
   );
 }
+
+/** 记忆上次画布尺寸：尺寸未变时只 clearRect，避免重设 canvas.width 的重分配开销 */
+const canvasSizeCache = new WeakMap<
+  HTMLCanvasElement,
+  { width: number; height: number; dpr: number }
+>();
 
 function prepareCanvas(
   canvas: HTMLCanvasElement,
@@ -730,10 +833,14 @@ function prepareCanvas(
   height: number,
 ): CanvasRenderingContext2D | null {
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.floor(width * dpr));
-  canvas.height = Math.max(1, Math.floor(height * dpr));
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
+  const last = canvasSizeCache.get(canvas);
+  if (!last || last.width !== width || last.height !== height || last.dpr !== dpr) {
+    canvas.width = Math.max(1, Math.floor(width * dpr));
+    canvas.height = Math.max(1, Math.floor(height * dpr));
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    canvasSizeCache.set(canvas, { width, height, dpr });
+  }
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -765,11 +872,11 @@ function drawSnapGuide(
 function drawFixedLayer(
   ctx: CanvasRenderingContext2D,
   width: number,
-  waveform: number[],
-  durationMs: number,
+  waveform: WaveformData,
   viewStartMs: number,
   msPerPixel: number,
-  currentTimeMs: number,
+  transform: (v: number) => number,
+  gain: number,
   colors: TimelineColors,
 ) {
   const viewEndMs = viewStartMs + width * msPerPixel;
@@ -789,46 +896,56 @@ function drawFixedLayer(
 
   ctx.fillStyle = colors.waveBg;
   ctx.fillRect(0, WAVE_TOP, width, WAVE_HEIGHT);
-  if (waveform.length > 0) {
+  const { peaks, coveredMs } = waveform;
+  if (peaks.length > 0 && coveredMs > 0) {
     ctx.strokeStyle = colors.wave;
     ctx.lineWidth = 1;
-    const samplesPerMs = waveform.length / durationMs;
+    // 时间映射用实际解码覆盖时长 coveredMs，而非容器标称 durationMs：
+    // HLS 合并产物二者可差数十秒，按 durationMs 均摊会产生随时间线性放大的漂移
+    const samplesPerMs = peaks.length / coveredMs;
+    // 波形只画到实际音频末尾（coveredMs 之后留空白）；每像素列聚合桶区间 max，
+    // 缩小时不跳桶丢峰
+    const columns = Math.max(
+      0,
+      Math.min(width, Math.ceil((coveredMs - viewStartMs) / msPerPixel)),
+    );
+    const amps = new Float32Array(columns);
+    for (let x = 0; x < columns; x += 1) {
+      const startMs = viewStartMs + x * msPerPixel;
+      const peak = aggregatePixelPeak(
+        peaks,
+        startMs,
+        startMs + msPerPixel,
+        samplesPerMs,
+      );
+      amps[x] = applyGain(transform(peak), gain) * WAVE_HEIGHT * 0.45;
+    }
 
     ctx.beginPath();
-    for (let x = 0; x < width; x += 1) {
-      const ms = viewStartMs + x * msPerPixel;
-      const idx = Math.floor(ms * samplesPerMs);
-      if (idx >= 0 && idx < waveform.length) {
-        const amp = waveform[idx] * WAVE_HEIGHT * 0.45;
-        const y = WAVE_TOP + WAVE_HEIGHT / 2 - amp;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
+    for (let x = 0; x < columns; x += 1) {
+      const y = WAVE_TOP + WAVE_HEIGHT / 2 - amps[x];
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
     ctx.stroke();
 
     ctx.beginPath();
-    for (let x = 0; x < width; x += 1) {
-      const ms = viewStartMs + x * msPerPixel;
-      const idx = Math.floor(ms * samplesPerMs);
-      if (idx >= 0 && idx < waveform.length) {
-        const amp = waveform[idx] * WAVE_HEIGHT * 0.45;
-        const y = WAVE_TOP + WAVE_HEIGHT / 2 + amp;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
+    for (let x = 0; x < columns; x += 1) {
+      const y = WAVE_TOP + WAVE_HEIGHT / 2 + amps[x];
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
 
-  const pointerX = (currentTimeMs - viewStartMs) / msPerPixel;
-  if (pointerX >= 0 && pointerX <= width) {
-    ctx.strokeStyle = colors.playhead;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(pointerX, 0);
-    ctx.lineTo(pointerX, FIXED_LAYER_HEIGHT);
-    ctx.stroke();
+  if (gain !== 1) {
+    // 手动增益激活时在波形区右上角画小标签
+    ctx.save();
+    ctx.fillStyle = colors.tick;
+    ctx.font = "10px monospace";
+    ctx.textAlign = "right";
+    ctx.fillText(`×${gain.toFixed(1)}`, width - 4, WAVE_TOP + 12);
+    ctx.restore();
   }
 }
 
@@ -838,7 +955,7 @@ function drawLaneLayer(
   height: number,
   rects: TimelineCueRect[],
   selectedCueId: string | null,
-  activeTimeMs: number,
+  activeCueIds: string[],
   colors: TimelineColors,
 ) {
   ctx.fillStyle = colors.bg;
@@ -850,7 +967,7 @@ function drawLaneLayer(
 
     const isSelected = rect.cue.id === selectedCueId;
     const isPlaybackActive =
-      !isSelected && isCueActiveAtTime(rect.cue, activeTimeMs);
+      !isSelected && activeCueIds.includes(rect.cue.id);
     ctx.fillStyle = isSelected ? colors.cueSelected : colors.cue;
     const drawWidth = Math.max(2, clipped.width);
     ctx.fillRect(clipped.x, rect.y, drawWidth, rect.height);

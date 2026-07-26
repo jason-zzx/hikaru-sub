@@ -46,6 +46,26 @@ pub struct VideoInfo {
     pub fps: Option<f64>,
 }
 
+/// `extract_waveform` 返回值：峰值数组 + 实际解码覆盖时长（毫秒）。
+///
+/// `covered_ms` 由解码出的 PCM 样本数换算（16kHz → 16 样本/ms），可能不等于容器
+/// 标称时长；前端波形绘制映射必须用它而非 `<video>.duration`，否则在音频帧总时长
+/// 与时间戳跨度不一致的素材（HLS 合并产物）上产生随时间线性放大的漂移。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WaveformData {
+    pub peaks: Vec<f32>,
+    pub covered_ms: u64,
+}
+
+/// 按时间戳补齐音频流内的静音间隙并对齐起始时间戳。
+///
+/// HLS 合并产物的 AAC 流时间戳跨度可大于实际音频帧总时长（分段间静音间隙），
+/// 顺序解码会把间隙“挤掉”，输出 PCM 比标称时长短（实测 4144s 素材少 36s）；
+/// 波形/转录时间轴随之整体前移且越往后偏越多。`aresample=async=1` 按时间戳
+/// 插入静音补齐，`first_pts=0` 锚定起点，输出与播放时间轴对齐。
+const ARESAMPLE_SYNC_FILTER: &str = "aresample=async=1:first_pts=0";
+
 /// 与 `resolve_ffmpeg` 同目录解析 ffprobe 可执行路径。
 pub fn resolve_ffprobe(app: &AppHandle, settings: &AppSettings) -> String {
     resolve_ffmpeg_paths(app, settings).ffprobe
@@ -165,6 +185,29 @@ pub async fn extract_audio(
     Ok(audio_out)
 }
 
+/// ASR 音轨提取的 ffmpeg 参数（16kHz 单声道 PCM WAV）。
+///
+/// `-af` 为输出选项，须位于输入之后；除新增时间戳补齐 filter 外，
+/// 采样率/声道等参数与历史行为一致。
+fn audio_decode_args<'a>(video_path: &'a str, audio_path: &'a str) -> [&'a str; 14] {
+    [
+        "-hide_banner",
+        "-y",
+        "-i",
+        video_path,
+        "-vn",
+        "-af",
+        ARESAMPLE_SYNC_FILTER,
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        audio_path,
+    ]
+}
+
 fn run_extract(
     app: &AppHandle,
     ffmpeg: &str,
@@ -172,20 +215,7 @@ fn run_extract(
     audio_path: &str,
 ) -> Result<(), String> {
     let mut child = hidden_command(ffmpeg)
-        .args([
-            "-hide_banner",
-            "-y",
-            "-i",
-            video_path,
-            "-vn",
-            "-acodec",
-            "pcm_s16le",
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            audio_path,
-        ])
+        .args(audio_decode_args(video_path, audio_path))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -333,13 +363,13 @@ pub async fn get_video_info(app: AppHandle, video_path: String) -> Result<VideoI
     parse_video_info_output(&String::from_utf8_lossy(&output.stdout))
 }
 
-/// 提取音频波形数据（峰值数组），用于 Timeline 渲染
+/// 提取音频波形数据（峰值数组 + 实际覆盖时长），用于 Timeline 渲染
 #[tauri::command]
 pub async fn extract_waveform(
     app: AppHandle,
     video_path: String,
     samples: usize,
-) -> Result<Vec<f32>, String> {
+) -> Result<WaveformData, String> {
     let settings = load_settings(&app).unwrap_or_default();
     let (ffmpeg, _) = resolve_ffmpeg(&app, &settings);
 
@@ -350,27 +380,37 @@ pub async fn extract_waveform(
     .map_err(|e| format!("任务执行失败: {e}"))?
 }
 
+/// 波形提取的 ffmpeg 解码参数（裸 s16le PCM 到 stdout）。
+///
+/// `-af` 为输出选项，须位于输入之后；除新增时间戳补齐 filter 外，
+/// 采样率/声道等参数与历史行为一致。
+fn waveform_decode_args(video_path: &str) -> [&str; 14] {
+    [
+        "-i",
+        video_path,
+        "-vn",
+        "-af",
+        ARESAMPLE_SYNC_FILTER,
+        "-f",
+        "s16le",
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        "-",
+    ]
+}
+
 fn run_extract_waveform(
     ffmpeg: &str,
     video_path: &str,
     samples: usize,
-) -> Result<Vec<f32>, String> {
+) -> Result<WaveformData, String> {
     // FFmpeg 提取 16bit PCM，单声道，16kHz
     let mut child = hidden_command(ffmpeg)
-        .args([
-            "-i",
-            video_path,
-            "-vn",
-            "-f",
-            "s16le",
-            "-acodec",
-            "pcm_s16le",
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            "-",
-        ])
+        .args(waveform_decode_args(video_path))
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
@@ -394,24 +434,39 @@ fn run_extract_waveform(
         audio_samples.push(sample);
     }
 
-    // 下采样计算峰值
-    let chunk_size = audio_samples.len() / samples.max(1);
+    Ok(WaveformData {
+        peaks: downsample_waveform_peaks(&audio_samples, samples),
+        // 16kHz → 16 样本/ms
+        covered_ms: (audio_samples.len() / 16) as u64,
+    })
+}
+
+/// 下采样计算归一化峰值；圆整到 3 位小数以压缩 JSON 载荷（720k 桶量级）
+///
+/// 均匀边界分桶：桶 i 覆盖 `[i*len/samples, (i+1)*len/samples)`，覆盖全部样本。
+/// 不能用整除截尾的固定 chunk_size：那会丢弃尾部 `len % samples` 个样本，
+/// 前端把波形均摊到完整时长后产生随时间线性放大的漂移（24 分钟素材尾部可漂 ~9 秒）。
+/// usize 为 64 位时乘法不会溢出（len ≤ ~2 亿样本，samples ≤ 720_000，乘积 < 2^63）。
+fn downsample_waveform_peaks(audio_samples: &[i16], samples: usize) -> Vec<f32> {
+    let len = audio_samples.len();
     let mut peaks = Vec::with_capacity(samples);
 
     for i in 0..samples {
-        let start = i * chunk_size;
-        let end = ((i + 1) * chunk_size).min(audio_samples.len());
-        if start >= audio_samples.len() {
+        let start = i * len / samples;
+        let end = (i + 1) * len / samples;
+        // 空桶（len < samples 时出现）补 0
+        if start >= end {
             peaks.push(0.0);
             continue;
         }
 
         let chunk = &audio_samples[start..end];
         let max = chunk.iter().map(|&s| s.abs_diff(0)).max().unwrap_or(0);
-        peaks.push(max as f32 / 32768.0); // 归一化到 0-1
+        let normalized = max as f32 / 32768.0; // 归一化到 0-1
+        peaks.push((normalized * 1000.0).round() / 1000.0);
     }
 
-    Ok(peaks)
+    peaks
 }
 
 fn handle_stderr_line(app: &AppHandle, text: &str, duration_ms: &mut i64, tail: &mut String) {
@@ -472,5 +527,113 @@ mod tests {
     #[test]
     fn parse_video_info_missing_dimensions_errors() {
         assert!(parse_video_info_output("duration=1.0\n").is_err());
+    }
+
+    /// 断言 args 中 `-af aresample=async=1:first_pts=0` 存在、成对、且位于输入之后
+    /// （输出选项归属）。
+    fn assert_aresample_sync(args: &[&str], input: &str) {
+        let af = args
+            .iter()
+            .position(|&a| a == "-af")
+            .expect("解码参数必须包含 -af");
+        assert_eq!(
+            args[af + 1],
+            ARESAMPLE_SYNC_FILTER,
+            "-af 后必须紧跟时间戳补齐 filter"
+        );
+        let input_pos = args
+            .iter()
+            .position(|&a| a == input)
+            .expect("解码参数必须包含输入路径");
+        assert!(af > input_pos, "-af 是输出选项，必须位于输入之后");
+        // 既有采样率/声道参数不变
+        let ar = args.iter().position(|&a| a == "-ar").unwrap();
+        assert_eq!(args[ar + 1], "16000");
+        let ac = args.iter().position(|&a| a == "-ac").unwrap();
+        assert_eq!(args[ac + 1], "1");
+    }
+
+    #[test]
+    fn waveform_decode_args_fill_timestamp_gaps() {
+        let args = waveform_decode_args("in.mp4");
+        assert_aresample_sync(&args, "in.mp4");
+        assert_eq!(*args.last().unwrap(), "-", "波形解码输出到 stdout");
+    }
+
+    #[test]
+    fn audio_decode_args_fill_timestamp_gaps() {
+        let args = audio_decode_args("in.mp4", "out.wav");
+        assert_aresample_sync(&args, "in.mp4");
+        assert_eq!(*args.last().unwrap(), "out.wav");
+    }
+
+    #[test]
+    fn downsample_peaks_rounds_to_three_decimals() {
+        // 12345 / 32768 = 0.376739... → 0.377
+        let audio = vec![12345i16; 4];
+        let peaks = downsample_waveform_peaks(&audio, 2);
+        assert_eq!(peaks, vec![0.377, 0.377]);
+    }
+
+    #[test]
+    fn downsample_peaks_uses_abs_max_per_bucket() {
+        // 桶 1 峰值来自负样本；i16::MIN 绝对值 32768 → 恰好 1.0
+        let audio = vec![100, -16384, i16::MIN, 200];
+        let peaks = downsample_waveform_peaks(&audio, 2);
+        assert_eq!(peaks, vec![0.5, 1.0]);
+    }
+
+    #[test]
+    fn downsample_peaks_distributes_short_audio_into_matching_buckets() {
+        // 音频短于请求桶数：均匀边界分桶把少量样本落到对应位置的桶，空桶补 0。
+        // （旧实现 chunk_size 整除为 0 时输出全零，属丢样本缺陷；此处语义随修复更新）
+        // 3 样本 / 8 桶：样本 0/1/2 分别落在桶 2/5/7；1000/32768 ≈ 0.031
+        let peaks = downsample_waveform_peaks(&[1000i16; 3], 8);
+        assert_eq!(peaks, vec![0.0, 0.0, 0.031, 0.0, 0.0, 0.031, 0.0, 0.031]);
+
+        let peaks = downsample_waveform_peaks(&[], 4);
+        assert_eq!(peaks, vec![0.0; 4]);
+    }
+
+    #[test]
+    fn downsample_peaks_covers_all_requested_buckets() {
+        let mut audio = vec![0i16; 100];
+        audio[95] = 3277; // ≈ 0.1，落在最后一个桶
+        let peaks = downsample_waveform_peaks(&audio, 10);
+        assert_eq!(peaks.len(), 10);
+        assert!(peaks[..9].iter().all(|&p| p == 0.0));
+        assert_eq!(peaks[9], 0.1);
+    }
+
+    #[test]
+    fn downsample_peaks_keeps_tail_samples_when_length_is_not_divisible() {
+        // 防漂移回归：len=1003 不被 samples=10 整除。旧实现 chunk_size=100 只覆盖
+        // 到样本 999，尾样本 1002 被丢弃；均匀边界分桶最后一桶覆盖 [902, 1003)。
+        let mut audio = vec![0i16; 1003];
+        audio[1002] = i16::MAX;
+        let peaks = downsample_waveform_peaks(&audio, 10);
+        assert_eq!(peaks.len(), 10);
+        assert_eq!(peaks[9], 1.0, "尾样本峰值必须出现在最后一桶");
+        assert!(peaks[..9].iter().all(|&p| p == 0.0));
+    }
+
+    #[test]
+    fn downsample_peaks_localizes_pulse_without_cumulative_drift() {
+        // 防漂移回归：长度不整除时，90% 位置的脉冲必须落在 index ≈ samples*0.9 的桶。
+        // len=100_997、samples=1000：旧实现 chunk_size=100 会把样本 90_897 放进
+        // 桶 908（漂移 +8 桶）；均匀边界分桶应落在桶 900（±1）。
+        let mut audio = vec![0i16; 100_997];
+        audio[90_897] = i16::MAX;
+        let peaks = downsample_waveform_peaks(&audio, 1000);
+        assert_eq!(peaks.len(), 1000);
+        let hit = peaks
+            .iter()
+            .position(|&p| p > 0.0)
+            .expect("脉冲峰值必须存在");
+        assert!(
+            (899..=901).contains(&hit),
+            "脉冲应落在桶 900±1，实际 {hit}"
+        );
+        assert_eq!(peaks.iter().filter(|&&p| p > 0.0).count(), 1);
     }
 }

@@ -25,7 +25,7 @@ describe("Timeline fixed waveform lane behavior", () => {
     expect(source).toContain("e.stopPropagation()");
     expect(source).toContain("overscroll-contain");
     expect(source).toContain("波形区滚轮平移");
-    expect(source).toContain("字幕区滚轮上下滚动");
+    expect(source).toContain("Shift+滚轮波形增益");
   });
 
   it("prevents native page zoom and touch gestures while editing the timeline", () => {

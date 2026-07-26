@@ -20,6 +20,13 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const transcodeFallbackRef = useRef(false);
   const recoverAttemptRef = useRef(0);
   const isSeekingRef = useRef(false);
+  /**
+   * 已消费的 seekRequest.seq；用于区分「新 seek 意图」与「videoSrc 变化后的恢复」。
+   * 以挂载时的 seq 起步：重挂载不重放挂载前的旧请求（恢复位置以 store 当前时间为准）。
+   */
+  const appliedSeekSeqRef = useRef(
+    usePlaybackStore.getState().seekRequest?.seq ?? 0,
+  );
   /** 「播放当前句」到点时记录终点，供 rAF cleanup 使用该精确值而非 frame-snap 后的视频时间 */
   const segmentEndRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,12 +37,27 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const [previewFonts, setPreviewFonts] = useState<PreviewFontFile[]>([]);
   const [previewFontError, setPreviewFontError] = useState<string | null>(null);
 
-  const currentTimeMs = usePlaybackStore((s) => s.currentTimeMs);
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
+  const seekRequest = usePlaybackStore((s) => s.seekRequest);
+  // 播放中不订阅 60Hz 时间（libass 走 rVFC 直连视频帧）；暂停/seek 时才需要精确时间定帧。
+  // null 哨兵期间沿用上一次非空值，保证 SubtitlePreview 接口不变。
+  const pausedTimeMs = usePlaybackStore((s) =>
+    s.isPlaying ? null : s.currentTimeMs,
+  );
+  // 播放中 CSS 兜底与字形懒检测按 activeCueIds（字幕边界频率）取当前句
+  const playingActiveCueId = usePlaybackStore((s) =>
+    s.isPlaying ? (s.activeCueIds[0] ?? null) : null,
+  );
   const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime);
   const setDuration = usePlaybackStore((s) => s.setDuration);
   const setPlaying = usePlaybackStore((s) => s.setPlaying);
+
+  // 播放中传 -1 哨兵：此时字幕选择完全由 activeCueId 驱动（有句给句、空档为 null），
+  // 不得让 findPreviewCue / getLibassRenderTimeMs 拿暂停时的陈旧时间兜底命中字幕
+  // （否则 CSS 兜底会在字幕空档整段误显旧句）；-1 命中不了任何 cue，空档即空白。
+  // 暂停/seek 时传精确时间做 libass 定帧。
+  const previewTimeMs = pausedTimeMs ?? -1;
 
   const cues = useProjectStore((s) => s.cues);
   const assStyles = useProjectStore((s) => s.assStyles);
@@ -210,11 +232,13 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     // seek 时 WebKit 可能中止旧 Range 请求并误报网络/中止错误，尝试恢复播放
     if ((code === 1 || code === 2) && videoSrc && recoverAttemptRef.current < 3) {
       recoverAttemptRef.current += 1;
-      const resumeSec = currentTimeMs / 1000;
+      const resumeSec = usePlaybackStore.getState().currentTimeMs / 1000;
       console.warn(
         `Transient video error during seek, recovering (attempt ${recoverAttemptRef.current})`,
       );
       setError(null);
+      // 元素重载会中止进行中的 seek（seeked 不再到来），复位门闩防止回写永久跳过
+      isSeekingRef.current = false;
       video.src = videoSrc;
       video.load();
       const onLoaded = () => {
@@ -244,7 +268,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     }
 
     setError(errorMsg);
-  }, [videoPath, videoSrc, currentTimeMs, isPlaying, waitForTranscodedVideo, setPlaying]);
+  }, [videoPath, videoSrc, isPlaying, waitForTranscodedVideo, setPlaying]);
 
   // 同步播放状态
   useEffect(() => {
@@ -262,6 +286,10 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
+
+    // videoSrc 变化 / 元素重载后，进行中 seek 的 seeked 可能永远不来：
+    // 先复位回写门闩，避免 rAF/timeupdate 回写被永久跳过（播放头冻结）
+    isSeekingRef.current = false;
 
     const handleTimeUpdate = () => {
       if (isSeekingRef.current) return;
@@ -284,6 +312,13 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     const handlePause = () => setPlaying(false);
     const handleEnded = () => setPlaying(false);
 
+    // seek 完成后复位回写门闩。常驻监听（随 videoSrc 生命周期），不由 seek 效应挂卸：
+    // 连续 seek 时旧效应 cleanup 会摘掉一次性监听，若第二次请求落入死区早退，
+    // isSeekingRef 将永久悬挂——rAF/timeupdate 回写全跳、播放头冻结。
+    const handleSeeked = () => {
+      isSeekingRef.current = false;
+    };
+
     // 如果视频已经加载了元数据，立即设置时长
     if (video.duration && !isNaN(video.duration)) {
       setDuration(Math.floor(video.duration * 1000));
@@ -294,6 +329,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handlePause);
     video.addEventListener("ended", handleEnded);
+    video.addEventListener("seeked", handleSeeked);
 
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate);
@@ -301,6 +337,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("ended", handleEnded);
+      video.removeEventListener("seeked", handleSeeked);
     };
   }, [videoSrc, setCurrentTime, setDuration, setPlaying]);
 
@@ -343,18 +380,26 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     };
   }, [isPlaying, videoSrc, setCurrentTime]);
 
-  // 外部跳转到指定时间（拖动进度条 / 时间轴 / 进入编辑页选首条）
+  // 外部跳转到指定时间（拖动进度条 / 时间轴 / 进入编辑页选首条）——由显式
+  // seekRequest 驱动，播放回写（rAF/timeupdate）不再触发本效应的每帧重执行。
+  // videoSrc 变化（转码回退/换片）时按当前 store 时间恢复位置，与旧行为一致。
   // 必须等 HAVE_METADATA，否则对未就绪的 <video> 写 currentTime 会在 WebView2 触发
   // PIPELINE_ERROR_DECODE（code 3），且此前不会回退转码。
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
 
+    // seq 未变说明本次重执行来自 videoSrc 变化：目标取 store 当前时间（恢复位置）；
+    // seq 变化才是新的用户意图 seek，目标取 seekRequest.ms（播放中 rAF 可能已覆盖
+    // currentTimeMs，不能从 store 读目标）。
+    const isNewRequest =
+      seekRequest !== null && seekRequest.seq !== appliedSeekSeqRef.current;
+    if (isNewRequest) appliedSeekSeqRef.current = seekRequest.seq;
+    const requestedMs = isNewRequest
+      ? seekRequest.ms
+      : usePlaybackStore.getState().currentTimeMs;
+
     let cancelled = false;
-    const onSeeked = () => {
-      isSeekingRef.current = false;
-      video.removeEventListener("seeked", onSeeked);
-    };
 
     const applySeek = () => {
       if (cancelled) return;
@@ -362,7 +407,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       // 越界 seek 会在 WebView2 触发 PIPELINE_ERROR_DECODE。
       const durationSec =
         Number.isFinite(video.duration) && video.duration > 0 ? video.duration : null;
-      const rawTargetSec = currentTimeMs / 1000;
+      const rawTargetSec = requestedMs / 1000;
       const targetSec =
         durationSec === null
           ? Math.max(0, rawTargetSec)
@@ -370,17 +415,18 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       const targetMs = Math.round(targetSec * 1000);
 
       // 越界时同步回写 store，避免时间轴/列表仍停在超大 currentTimeMs
-      if (Math.abs(targetMs - currentTimeMs) > 1) {
+      if (Math.abs(targetMs - requestedMs) > 1) {
         setCurrentTime(targetMs);
       }
 
       // 暂停时收小死区以放行逐帧步进（一帧约 16-42ms）；播放时保留较大死区压制
       // rAF/timeupdate 回写残差（≤~16ms）避免播放中误 seek。播放中逐帧步进为既有限制。
-      const deadbandMs = isPlaying ? 100 : 5;
+      const deadbandMs = usePlaybackStore.getState().isPlaying ? 100 : 5;
       if (Math.abs(video.currentTime * 1000 - targetMs) < deadbandMs) return;
 
+      // seeked 复位由常驻监听（视频事件效应）负责，本效应重执行不会摘掉它；
+      // 连续 seek + 第二次落入死区早退时门闩不再永久悬挂
       isSeekingRef.current = true;
-      video.addEventListener("seeked", onSeeked);
 
       // 不用 fastSeek：WebView2 上对代理片/Range 请求更不稳定，统一走 currentTime
       video.currentTime = targetSec;
@@ -390,7 +436,6 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       applySeek();
       return () => {
         cancelled = true;
-        video.removeEventListener("seeked", onSeeked);
       };
     }
 
@@ -402,9 +447,8 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     return () => {
       cancelled = true;
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
-      video.removeEventListener("seeked", onSeeked);
     };
-  }, [currentTimeMs, videoSrc, isPlaying, setCurrentTime]);
+  }, [seekRequest, videoSrc, setCurrentTime]);
 
   return (
     <div
@@ -447,10 +491,10 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
           {videoDisplayRect.width > 0 && videoDisplayRect.height > 0 && (
             <SubtitlePreview
               cues={cues}
-              activeCueId={isPlaying ? null : selectedCueId}
+              activeCueId={isPlaying ? playingActiveCueId : selectedCueId}
               styles={assStyles}
               scriptInfo={assScriptInfo}
-              currentTimeMs={currentTimeMs}
+              currentTimeMs={previewTimeMs}
               videoElement={videoElement}
               followVideoFrames={isPlaying}
               fontUrls={previewFontSelection.fontUrls}

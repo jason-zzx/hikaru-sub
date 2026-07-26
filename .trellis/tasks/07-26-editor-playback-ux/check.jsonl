@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "前端改动质量门槛：测试覆盖、类型安全、渲染性能回归检查"}
+{"file": ".trellis/spec/tauri/quality-guidelines.md", "reason": "Rust 波形提取改动的测试与质量要求（cargo test）"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "波形 samples 参数横跨前端请求与 Rust 提取，seek 意图横跨 store/组件/video 元素，需跨层一致性检查"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "复查 requestSeek/setCurrentTime 语义分界与 activeCueIds 派生态写入频率是否符合 store 约定"}
