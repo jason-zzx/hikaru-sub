@@ -2,7 +2,7 @@ export const KOTOBA_FASTER_WHISPER_DESCRIPTION =
   "基于 faster-whisper 的日语优化模型";
 
 export const REAZONSPEECH_NEMO_DESCRIPTION =
-  "ReazonSpeech NeMo v2 日语模型：原生整段推理，取消在当前推理返回后生效";
+  "ReazonSpeech NeMo v2 日语模型：长音频按 45 秒分块转录，逐块更新进度并可取消";
 
 export const ASR_ENGINE_OPTIONS = [
   { value: "faster-whisper", label: "faster-whisper" },

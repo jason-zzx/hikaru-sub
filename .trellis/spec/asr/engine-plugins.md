@@ -19,7 +19,7 @@ Register in `_REGISTRY` inside `engines/registry.py`. `list_engines()` returns `
 | `kotoba-faster-whisper` | `kotoba_faster_whisper.py` | Reuses faster-whisper runtime; needs `faster-whisper>=1.1.1`; single model id `kotoba-tech/kotoba-whisper-v2.0-faster` |
 | `parakeet` | `parakeet.py` | Optional / large — install only when explicitly requested |
 | `qwen3-asr` | `qwen3_asr.py` | Optional / large — same |
-| `reazonspeech-nemo` | `reazonspeech_nemo.py` | Optional NeMo whole-audio engine; CPU/CUDA profiles |
+| `reazonspeech-nemo` | `reazonspeech_nemo.py` | Optional NeMo engine; whole-audio under 60 s, 45 s chunks (2 s overlap) beyond — built-in ALSD beam search is O(T²) on whole-audio input; CPU/CUDA profiles |
 
 Setup scripts distinguish `parakeet-cpu|parakeet-cuda|qwen3-cpu|qwen3-cuda|reazonspeech-cpu|reazonspeech-cuda` from the default faster-whisper install (see `/AGENTS.md`). ReazonSpeech's CPU/CUDA profiles share `requirements-reazonspeech.txt`; the profile selects the PyTorch wheel source.
 

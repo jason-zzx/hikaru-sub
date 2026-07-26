@@ -14,7 +14,13 @@ import os
 from typing import Callable, Iterator, List, Optional, Tuple
 
 from diagnostics import debug_exception, debug_log
-from .base import AsrEngine, AsrError, AsrSegment, Transcription
+from .base import (
+    AsrEngine,
+    AsrError,
+    AsrSegment,
+    Transcription,
+    TranscriptSegmentRefresh,
+)
 from .chunking import (
     DEFAULT_MAX_CHARS,
     DEFAULT_MAX_DURATION_MS,
@@ -337,7 +343,8 @@ class Qwen3AsrEngine(AsrEngine):
         """逐块转录：切 wav → 调 qwen-asr → 组装段 → 加 chunk_start 偏移 → overlap 去重合并 → 惰性产出。
 
         每块完成上报真实进度（processed_ms = 该块 end_ms），并惰性 yield 去重后的新段，
-        使 jobs.py 边迭代边更新进度，实现真实渐进进度。
+        使 jobs.py 边迭代边更新进度，实现真实渐进进度。收尾以 TranscriptSegmentRefresh
+        下发最终合并列表整体替换预览片段。
         """
         import tempfile
         from pathlib import Path
@@ -378,5 +385,7 @@ class Qwen3AsrEngine(AsrEngine):
 
         if cancel_check and cancel_check():
             return
+        # 后块可能把前块已产出的 overlap 片段合并成新 key，增量流里会同时存在新旧两版；
+        # 收尾以最终合并列表整体替换预览片段（jobs.py 的 TranscriptSegmentRefresh 语义）
         merged = merge_chunk_segments(chunk_results, overlap_ms=CHUNK_OVERLAP_MS)
-        yield from yield_unseen_segments(yielded, merged)
+        yield TranscriptSegmentRefresh(tuple(merged))

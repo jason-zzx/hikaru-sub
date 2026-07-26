@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from engines.base import AsrError, AsrSegment
+from engines.base import AsrError, AsrSegment, TranscriptSegmentRefresh
 from engines.reazonspeech_nemo import (
     MODEL_FILE,
     MODEL_ID,
@@ -87,6 +87,19 @@ class ReazonSpeechDecodeTests(unittest.TestCase):
         hyp = _FakeHyp(y_sequence=_ListTensor([1, 2]), timestamp=_ListTensor([1]))
         with self.assertRaises(AsrError):
             decode_hypothesis_to_segments(_FakeTokenizer(), hyp, duration_ms=1000)
+
+    def test_decode_drops_zero_length_clamped_tail(self):
+        # 时间戳越过音频末尾 → 钳制后 start==end，应丢弃该段而非抛错
+        hyp = _FakeHyp(
+            y_sequence=_ListTensor([1, 2, 3]),
+            timestamp=_ListTensor([100, 101, 102]),
+        )
+        segments = decode_hypothesis_to_segments(
+            _FakeTokenizer(),
+            hyp,
+            duration_ms=1000,
+        )
+        self.assertEqual(segments, [])
 
 
 class ReazonSpeechEngineTests(unittest.TestCase):
@@ -225,18 +238,21 @@ class ReazonSpeechEngineTests(unittest.TestCase):
             def cancel_check():
                 return cancelled["value"]
 
-            # First call: cancel before NeMo runs
+            # First call: cancel before NeMo runs（首块前取消，不应触发推理）
             cancelled["value"] = True
             transcription = engine.transcribe(str(audio), cancel_check=cancel_check)
             self.assertEqual(list(transcription.segments), [])
             self.assertEqual(transcription.language, "ja")
+            self.assertEqual(fake_model.transcribe.call_count, 0)
 
             cancelled["value"] = False
             transcription = engine.transcribe(str(audio), cancel_check=cancel_check)
-            segs = list(transcription.segments)
-            self.assertGreaterEqual(len(segs), 1)
+            stream = list(transcription.segments)
             self.assertEqual(transcription.language, "ja")
-            self.assertTrue(all(isinstance(s, AsrSegment) for s in segs))
+            # 短音频 = 单块：预览段 + 收尾 refresh
+            self.assertIsInstance(stream[-1], TranscriptSegmentRefresh)
+            previews = [s for s in stream if isinstance(s, AsrSegment)]
+            self.assertGreaterEqual(len(previews), 1)
             self.assertGreaterEqual(fake_model.transcribe.call_count, 1)
             kwargs = fake_model.transcribe.call_args.kwargs
             self.assertTrue(kwargs.get("return_hypotheses"))
@@ -270,6 +286,116 @@ class ReazonSpeechEngineTests(unittest.TestCase):
             )
             self.assertEqual(list(transcription.segments), [])
 
+    def test_transcribe_long_audio_chunks_shifts_and_reports_progress(self):
+        engine = ReazonSpeechNemoEngine(device="cpu")
+        fake_model = MagicMock()
+        fake_model.tokenizer = _FakeTokenizer()
+        hyp = _FakeHyp(
+            y_sequence=_ListTensor([1, 2, 3, 4]),
+            timestamp=_ListTensor([2, 3, 4, 5]),
+        )
+        fake_model.transcribe.return_value = [hyp]
+        engine._model = fake_model
+        torch_mod = MagicMock()
+        torch_mod.int16 = "int16"
+        torch_mod.float32 = "float32"
+
+        progress_calls = []
+        with patch.dict(sys.modules, {"torch": torch_mod}), tempfile.TemporaryDirectory() as tmp:
+            audio = Path(tmp) / "audio.wav"
+            _write_silence_wav(audio, 61_000)
+            transcription = engine.transcribe(
+                str(audio),
+                progress_callback=progress_calls.append,
+            )
+            stream = list(transcription.segments)
+
+        # 61s → 两块：(0, 45000) 与 (43000, 61000)
+        self.assertEqual(fake_model.transcribe.call_count, 2)
+        self.assertEqual(progress_calls, [45_000, 61_000])
+        self.assertEqual(transcription.duration_ms, 61_000)
+        # 收尾必须是 TranscriptSegmentRefresh，最终列表含两块的偏移结果
+        self.assertIsInstance(stream[-1], TranscriptSegmentRefresh)
+        final = list(stream[-1].segments)
+        self.assertEqual(len(final), 2)
+        starts = sorted(seg.start_ms for seg in final)
+        self.assertEqual(starts[0], 0)
+        self.assertEqual(starts[1], 43_000)  # 第二块相对时间 + chunk_start 偏移
+        previews = [item for item in stream if isinstance(item, AsrSegment)]
+        self.assertEqual(len(previews), 2)
+
+    def test_transcribe_long_audio_cancel_between_chunks(self):
+        engine = ReazonSpeechNemoEngine(device="cpu")
+        fake_model = MagicMock()
+        fake_model.tokenizer = _FakeTokenizer()
+        hyp = _FakeHyp(
+            y_sequence=_ListTensor([1, 2, 3, 4]),
+            timestamp=_ListTensor([2, 3, 4, 5]),
+        )
+        state = {"cancelled": False}
+
+        def fake_transcribe(*_args, **_kwargs):
+            state["cancelled"] = True  # 第一块推理结束后触发取消
+            return [hyp]
+
+        fake_model.transcribe.side_effect = fake_transcribe
+        engine._model = fake_model
+        torch_mod = MagicMock()
+        torch_mod.int16 = "int16"
+        torch_mod.float32 = "float32"
+
+        with patch.dict(sys.modules, {"torch": torch_mod}), tempfile.TemporaryDirectory() as tmp:
+            audio = Path(tmp) / "audio.wav"
+            _write_silence_wav(audio, 61_000)
+            transcription = engine.transcribe(
+                str(audio),
+                cancel_check=lambda: state["cancelled"],
+            )
+            stream = list(transcription.segments)
+
+        self.assertEqual(fake_model.transcribe.call_count, 1)
+        # 块内推理期间取消：该块结果不得产出（取消契约）
+        self.assertEqual(stream, [])
+
+    def test_transcribe_overlap_extension_refreshes_final_segments(self):
+        # 第二块把第一块已产出的 overlap 片段合并成新 key（时间轴扩展）：
+        # 增量流会先后出现旧版与合并版，收尾 TranscriptSegmentRefresh 必须
+        # 以最终列表整体替换，JobManager 语义下只保留一条
+        engine = ReazonSpeechNemoEngine(device="cpu")
+        fake_model = MagicMock()
+        fake_model.tokenizer = _FakeTokenizer()
+        hyp_chunk1 = _FakeHyp(  # 块 1 尾部 [43820, 43900] "こんにちは"
+            y_sequence=_ListTensor([1, 2, 3]),
+            timestamp=_ListTensor([555, 556, 557]),
+        )
+        hyp_chunk2 = _FakeHyp(  # 块 2 相对 [860, 940] → 绝对 [43860, 43940] 同文本
+            y_sequence=_ListTensor([1, 2, 3]),
+            timestamp=_ListTensor([18, 19, 20]),
+        )
+        fake_model.transcribe.side_effect = [[hyp_chunk1], [hyp_chunk2]]
+        engine._model = fake_model
+        torch_mod = MagicMock()
+        torch_mod.int16 = "int16"
+        torch_mod.float32 = "float32"
+
+        with patch.dict(sys.modules, {"torch": torch_mod}), tempfile.TemporaryDirectory() as tmp:
+            audio = Path(tmp) / "audio.wav"
+            _write_silence_wav(audio, 61_000)
+            stream = list(engine.transcribe(str(audio)).segments)
+
+        self.assertIsInstance(stream[-1], TranscriptSegmentRefresh)
+        # 模拟 jobs.py 语义：普通段追加，TranscriptSegmentRefresh 整体替换
+        accumulated: list[AsrSegment] = []
+        for item in stream:
+            if isinstance(item, TranscriptSegmentRefresh):
+                accumulated = list(item.segments)
+            else:
+                accumulated.append(item)
+        self.assertEqual(len(accumulated), 1)
+        self.assertEqual(accumulated[0].text, "こんにちは")
+        self.assertEqual(accumulated[0].start_ms, 43_820)
+        self.assertEqual(accumulated[0].end_ms, 43_940)
+
     def test_bad_wav_contract_raises(self):
         engine = ReazonSpeechNemoEngine()
         engine._model = MagicMock()
@@ -281,7 +407,7 @@ class ReazonSpeechEngineTests(unittest.TestCase):
                 wav.setframerate(44100)
                 wav.writeframes(b"\0\0\0\0" * 100)
             with self.assertRaises(AsrError):
-                engine.transcribe(str(path))
+                list(engine.transcribe(str(path)).segments)
 
 
 class RegistryTests(unittest.TestCase):

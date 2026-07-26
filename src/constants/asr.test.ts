@@ -61,6 +61,6 @@ describe("reazonspeech-nemo constants", () => {
       },
     ]);
     expect(defaultAsrModel(REAZON_ENGINE)).toBe(REAZON_MODEL);
-    expect(REAZONSPEECH_NEMO_DESCRIPTION).toContain("原生整段推理");
+    expect(REAZONSPEECH_NEMO_DESCRIPTION).toContain("分块转录");
   });
 });
