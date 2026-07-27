@@ -50,8 +50,9 @@ interface PlaybackState {
    */
   segmentStop: SegmentStop | null;
   /**
-   * 当前时间命中的全部 cue id（含重叠），由 activeCueTracker 在命中集合变化时写入
-   * （字幕边界频率，非 60Hz），供列表/时间轴等重订阅者做边界频率渲染。
+   * 播放高亮命中 cue id（含重叠），由 activeCueTracker 在集合变化时写入：
+   * 普通时间为闭区间；所选 cue 行首排除恰在此结束的前一条；段播停点使用左极限。
+   * 写入频率为字幕边界或离散选择变化频率，供列表/时间轴等重订阅者渲染。
    */
   activeCueIds: string[];
   /** 用户意图跳转；播放回写（rAF/timeupdate/暂停收尾/段播终点）不经过此字段 */
