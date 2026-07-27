@@ -1,34 +1,62 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { usePlaybackStore } from "./playbackStore";
 
-describe("playbackStore playUntil 语义", () => {
+describe("playbackStore 段播语义", () => {
   beforeEach(() => {
+    usePlaybackStore.setState({ ...usePlaybackStore.getInitialState() });
+  });
+
+  it("atomically completes segment playback at the captured stop", () => {
+    const segment = { cueId: "a", stopMs: 3000 };
     usePlaybackStore.setState({
-      currentTimeMs: 0,
-      durationMs: 60000,
-      isPlaying: false,
-      selectedCueId: null,
-      selectedCueIds: [],
-      fps: null,
-      playUntilMs: null,
+      currentTimeMs: 2990,
+      isPlaying: true,
+      segmentPlayback: segment,
       activeCueIds: [],
-      seekRequest: null,
     });
-  });
+    const snapshots: Array<{
+      currentTimeMs: number;
+      isPlaying: boolean;
+      segmentPlayback: typeof segment | null;
+      segmentStop: typeof segment | null;
+      activeCueIds: string[];
+    }> = [];
+    const unsubscribe = usePlaybackStore.subscribe((state) => {
+      snapshots.push({
+        currentTimeMs: state.currentTimeMs,
+        isPlaying: state.isPlaying,
+        segmentPlayback: state.segmentPlayback,
+        segmentStop: state.segmentStop,
+        activeCueIds: state.activeCueIds,
+      });
+    });
 
-  it("setPlayUntil 设置与清除", () => {
-    usePlaybackStore.getState().setPlayUntil(3000);
-    expect(usePlaybackStore.getState().playUntilMs).toBe(3000);
-    usePlaybackStore.getState().setPlayUntil(null);
-    expect(usePlaybackStore.getState().playUntilMs).toBeNull();
-  });
-
-  it("暂停（setPlaying(false)）清除 playUntilMs——覆盖所有手动暂停路径", () => {
-    usePlaybackStore.getState().setPlayUntil(3000);
-    usePlaybackStore.getState().setPlaying(true);
-    expect(usePlaybackStore.getState().playUntilMs).toBe(3000);
+    usePlaybackStore
+      .getState()
+      .completeSegmentPlayback(segment, ["a", "overlap"]);
+    usePlaybackStore.getState().setCurrentTime(3000);
     usePlaybackStore.getState().setPlaying(false);
-    expect(usePlaybackStore.getState().playUntilMs).toBeNull();
+    unsubscribe();
+
+    expect(snapshots).toEqual([
+      {
+        currentTimeMs: 3000,
+        isPlaying: false,
+        segmentPlayback: null,
+        segmentStop: segment,
+        activeCueIds: ["a", "overlap"],
+      },
+    ]);
+  });
+
+  it("暂停（setPlaying(false)）清除段播——覆盖所有手动暂停路径", () => {
+    usePlaybackStore
+      .getState()
+      .setSegmentPlayback({ cueId: "a", stopMs: 3000 });
+    usePlaybackStore.getState().setPlaying(true);
+    expect(usePlaybackStore.getState().segmentPlayback).not.toBeNull();
+    usePlaybackStore.getState().setPlaying(false);
+    expect(usePlaybackStore.getState().segmentPlayback).toBeNull();
   });
 
   it("setFps 记录帧率", () => {
@@ -58,11 +86,19 @@ describe("playbackStore playUntil 语义", () => {
     expect(usePlaybackStore.getState().selectedCueIds).toEqual([]);
   });
 
-  it("requestSeek 同步写 currentTimeMs 并递增 seq", () => {
+  it("requestSeek 同步写时间、递增 seq，并退出段播但保持播放", () => {
+    usePlaybackStore.setState({
+      isPlaying: true,
+      segmentPlayback: { cueId: "a", stopMs: 3000 },
+      segmentStop: { cueId: "a", stopMs: 3000 },
+    });
     usePlaybackStore.getState().requestSeek(1500);
     let state = usePlaybackStore.getState();
     expect(state.currentTimeMs).toBe(1500);
     expect(state.seekRequest).toEqual({ ms: 1500, seq: 1 });
+    expect(state.segmentPlayback).toBeNull();
+    expect(state.segmentStop).toBeNull();
+    expect(state.isPlaying).toBe(true);
 
     // 同一目标时间的重复请求也必须产生新的 seq（seek-to-same-time 仍要触发 video seek）
     usePlaybackStore.getState().requestSeek(1500);
@@ -80,5 +116,63 @@ describe("playbackStore playUntil 语义", () => {
   it("setActiveCueIds 记录当前命中集合", () => {
     usePlaybackStore.getState().setActiveCueIds(["a", "b"]);
     expect(usePlaybackStore.getState().activeCueIds).toEqual(["a", "b"]);
+  });
+
+  it("segmentStop 驻留：停点等值回写保留，移动或显式 seek 清除", () => {
+    const stop = { cueId: "a", stopMs: 3000 };
+    usePlaybackStore.getState().setSegmentStop(stop);
+    usePlaybackStore.getState().setCurrentTime(3000);
+    expect(usePlaybackStore.getState().segmentStop).toEqual(stop);
+
+    // 停点上的等值回写（rAF cleanup / 暂停后 timeupdate）不清除驻留
+    usePlaybackStore.getState().setCurrentTime(3000);
+    expect(usePlaybackStore.getState().segmentStop).toEqual(stop);
+
+    // 回写移动到其他时间即清除
+    usePlaybackStore.getState().setCurrentTime(3200);
+    expect(usePlaybackStore.getState().segmentStop).toBeNull();
+
+    // 显式 seek 无条件清除（即使目标恰为停点时间）
+    usePlaybackStore.getState().setSegmentStop(stop);
+    usePlaybackStore.getState().requestSeek(3000);
+    expect(usePlaybackStore.getState().segmentStop).toBeNull();
+  });
+
+  it("segmentStop 驻留：相同的归一化选择不会清除", () => {
+    const stop = { cueId: "a", stopMs: 3000 };
+    usePlaybackStore.setState({
+      selectedCueId: "a",
+      selectedCueIds: ["a"],
+      segmentStop: stop,
+    });
+
+    usePlaybackStore.getState().setSelectedCueId("a");
+    expect(usePlaybackStore.getState().segmentStop).toEqual(stop);
+
+    usePlaybackStore.getState().setSelectedCueIds(["a", "a"]);
+    expect(usePlaybackStore.getState().segmentStop).toEqual(stop);
+  });
+
+  it("segmentStop 驻留：恢复播放或选中变化即清除", () => {
+    const stop = { cueId: "a", stopMs: 3000 };
+
+    // 恢复普通播放：驻留立即失效，不等第一帧时间回写
+    usePlaybackStore.getState().setSegmentStop(stop);
+    usePlaybackStore.getState().setPlaying(true);
+    expect(usePlaybackStore.getState().segmentStop).toBeNull();
+    usePlaybackStore.getState().setPlaying(false);
+
+    // 选中变化 = 焦点移动：单选/多选/清空均解除驻留
+    usePlaybackStore.getState().setSegmentStop(stop);
+    usePlaybackStore.getState().setSelectedCueId("b");
+    expect(usePlaybackStore.getState().segmentStop).toBeNull();
+
+    usePlaybackStore.getState().setSegmentStop(stop);
+    usePlaybackStore.getState().setSelectedCueIds(["a", "b"]);
+    expect(usePlaybackStore.getState().segmentStop).toBeNull();
+
+    usePlaybackStore.getState().setSegmentStop(stop);
+    usePlaybackStore.getState().clearCueSelection();
+    expect(usePlaybackStore.getState().segmentStop).toBeNull();
   });
 });

@@ -41,7 +41,7 @@ function reset(cues: SubtitleCue[] = [cue("a", "ab")]) {
     selectedCueId: cues[0]?.id ?? null,
     selectedCueIds: cues[0] ? [cues[0].id] : [],
     fps: 25,
-    playUntilMs: null,
+    segmentPlayback: null,
   });
 }
 

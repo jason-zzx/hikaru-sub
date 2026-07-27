@@ -22,17 +22,7 @@ beforeEach(() => {
     ...useProjectStore.getInitialState(),
     cues: CUES,
   });
-  usePlaybackStore.setState({
-    currentTimeMs: 0,
-    durationMs: 60000,
-    isPlaying: false,
-    selectedCueId: null,
-    selectedCueIds: [],
-    fps: 25,
-    playUntilMs: null,
-    activeCueIds: [],
-    seekRequest: null,
-  });
+  usePlaybackStore.setState({ ...usePlaybackStore.getInitialState() });
 });
 
 describe("playSelectedCueSegment", () => {
@@ -44,12 +34,33 @@ describe("playSelectedCueSegment", () => {
     expect(pb.currentTimeMs).toBe(2000);
     // 跳行首是用户意图 seek：必须产生 seekRequest 供 VideoPlayer 消费
     expect(pb.seekRequest?.ms).toBe(2000);
-    expect(pb.playUntilMs).toBe(3000);
+    expect(pb.segmentPlayback).toEqual({ cueId: "b", stopMs: 3000 });
     expect(pb.isPlaying).toBe(true);
     playSelectedCueSegment();
     pb = usePlaybackStore.getState();
     expect(pb.isPlaying).toBe(false);
-    expect(pb.playUntilMs).toBeNull();
+    expect(pb.segmentPlayback).toBeNull();
+  });
+
+  it("当前段播冻结启动范围，下一次段播读取编辑后的起止", () => {
+    usePlaybackStore.setState({ selectedCueId: "b" });
+    playSelectedCueSegment();
+
+    useProjectStore.getState().updateCue("b", {
+      startMs: 2500,
+      endMs: 3500,
+    });
+    let pb = usePlaybackStore.getState();
+    expect(pb.currentTimeMs).toBe(2000);
+    expect(pb.segmentPlayback).toEqual({ cueId: "b", stopMs: 3000 });
+
+    pb.setPlaying(false);
+    playSelectedCueSegment();
+    pb = usePlaybackStore.getState();
+    expect(pb.currentTimeMs).toBe(2500);
+    expect(pb.seekRequest?.ms).toBe(2500);
+    expect(pb.segmentPlayback).toEqual({ cueId: "b", stopMs: 3500 });
+    expect(pb.isPlaying).toBe(true);
   });
 
   it("无选中时 no-op", () => {
@@ -57,17 +68,17 @@ describe("playSelectedCueSegment", () => {
     expect(usePlaybackStore.getState().isPlaying).toBe(false);
   });
 
-  it("普通播放中（无 playUntilMs）触发时按段播重新定位而非中断", () => {
+  it("普通播放中（无 segmentPlayback）触发时按段播重新定位而非中断", () => {
     usePlaybackStore.setState({
       selectedCueId: "b",
       currentTimeMs: 4000,
       isPlaying: true,
-      playUntilMs: null,
+      segmentPlayback: null,
     });
     playSelectedCueSegment();
     const pb = usePlaybackStore.getState();
     expect(pb.currentTimeMs).toBe(2000);
-    expect(pb.playUntilMs).toBe(3000);
+    expect(pb.segmentPlayback).toEqual({ cueId: "b", stopMs: 3000 });
     expect(pb.isPlaying).toBe(true);
   });
 });

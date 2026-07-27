@@ -130,6 +130,20 @@ describe("SubtitleList", () => {
     expect(order).toEqual(["commit:a", "request:b"]);
   });
 
+  it("right-click selection changes preserve in-flight segment playback", () => {
+    const segment = { cueId: "a", stopMs: 1000 };
+    usePlaybackStore.setState({ segmentPlayback: segment });
+    render(<SubtitleList />);
+
+    fireEvent.contextMenu(rowFor("A text"), { clientX: 10, clientY: 10 });
+    expect(usePlaybackStore.getState().segmentPlayback).toEqual(segment);
+
+    usePlaybackStore.getState().setSegmentPlayback(segment);
+    fireEvent.contextMenu(rowFor("B text"), { clientX: 10, clientY: 10 });
+    expect(usePlaybackStore.getState().selectedCueId).toBe("b");
+    expect(usePlaybackStore.getState().segmentPlayback).toEqual(segment);
+  });
+
   it("commits the old row's visible time draft before switching rows", async () => {
     const user = userEvent.setup();
     const editorRef = createRef<SubtitleEditorHistoryHandle>();
@@ -165,7 +179,7 @@ describe("SubtitleList", () => {
 
   it("gates split availability on the strict open interval at menu-open time", () => {
     // splitCueAtTime 要求分割点严格位于 (startMs, endMs)：播放头恰在行首/行尾时
-    // 菜单必须禁用（inclusive 的 activeCueIds 口径会「可点但必失败」）
+    // 菜单必须禁用（闭区间 activeCueIds 在行首/行尾仍命中，会「可点但必失败」）
     const splitButton = () =>
       screen.getByRole("button", {
         name: "在当前帧后分割行",

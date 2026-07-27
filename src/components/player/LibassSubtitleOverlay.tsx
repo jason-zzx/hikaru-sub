@@ -160,7 +160,7 @@ export function LibassSubtitleOverlay({
     activeRef.current?.controller.render(renderTimeMs, width, height).catch((err) => {
       onUnavailable(String(err));
     });
-  }, [height, onUnavailable, renderTimeMs, width]);
+  }, [followVideoFrames, height, onUnavailable, renderTimeMs, width]);
 
   useEffect(() => {
     const controller = activeRef.current?.controller;

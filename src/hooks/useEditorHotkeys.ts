@@ -87,7 +87,7 @@ export function buildEditorActions(
     if (!result) return false;
     useProjectStore.getState().replaceCues(result.cues);
     usePlaybackStore.getState().setSelectedCueIds(result.selectedCueIds);
-    usePlaybackStore.getState().setPlayUntil(null);
+    usePlaybackStore.getState().setSegmentPlayback(null);
     return true;
   };
 
@@ -104,7 +104,7 @@ export function buildEditorActions(
     }
     useProjectStore.getState().addCue(created);
     pb.setSelectedCueId(created.id);
-    pb.setPlayUntil(null);
+    pb.setSegmentPlayback(null);
     useUiStore.getState().requestEditorFocus();
   };
 
@@ -156,7 +156,6 @@ export function buildEditorActions(
     if (cues.length === 0) return;
     const pb = usePlaybackStore.getState();
     pb.setSelectedCueIds(cues.map((cue) => cue.id));
-    pb.setPlayUntil(null);
   };
 
   const deleteSelectedCues = () => {

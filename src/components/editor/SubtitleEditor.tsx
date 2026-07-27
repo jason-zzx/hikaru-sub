@@ -120,7 +120,7 @@ export const SubtitleEditor = forwardRef<
   const selectedCueIds = usePlaybackStore((s) => s.selectedCueIds);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const requestSeek = usePlaybackStore((s) => s.requestSeek);
-  const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
+  const setSegmentPlayback = usePlaybackStore((s) => s.setSegmentPlayback);
   const editorFocusNonce = useUiStore((s) => s.editorFocusNonce);
 
   const selectedCue = cues.find((c) => c.id === selectedCueId);
@@ -324,7 +324,6 @@ export const SubtitleEditor = forwardRef<
     const followUp = nextAfterCommit(committedCues, selectedCue.id);
     if (followUp.kind === "none") return;
 
-    setPlayUntil(null);
     if (followUp.kind === "select") {
       setSelectedCueId(followUp.cue.id);
       requestSeek(followUp.cue.startMs);
@@ -706,7 +705,7 @@ export const SubtitleEditor = forwardRef<
     const next = selectCueAfterDelete(before, selectedCue.id);
     deleteCue(selectedCue.id);
     setSelectedCueId(next ? next.id : null);
-    setPlayUntil(null);
+    setSegmentPlayback(null);
     onNotify?.("info", "已删除字幕，可撤销");
   };
 

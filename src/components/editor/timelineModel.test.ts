@@ -90,7 +90,7 @@ describe("revealTimelineTime", () => {
 });
 
 describe("isCueActiveAtTime", () => {
-  it("includes cue boundaries and excludes times outside the cue", () => {
+  it("includes both cue boundaries and excludes times outside", () => {
     expect(isCueActiveAtTime(cue, 0)).toBe(true);
     expect(isCueActiveAtTime(cue, 1000)).toBe(true);
     expect(isCueActiveAtTime(cue, -1)).toBe(false);

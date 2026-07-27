@@ -134,7 +134,6 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
   const activeCueIds = usePlaybackStore((s) => s.activeCueIds);
   const requestSeek = usePlaybackStore((s) => s.requestSeek);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
-  const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
 
   const ready = durationMs > 0;
 
@@ -503,7 +502,6 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
     };
     laneGestureRef.current = active;
     setSelectedCueId(cue.id);
-    setPlayUntil(null);
     setLaneCursorClass("cursor-grabbing");
     updateLanePreview(active, x);
   };
@@ -575,7 +573,6 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
     };
     laneGestureRef.current = active;
     setSelectedCueId(cue.id);
-    setPlayUntil(null);
     setLaneCursorClass("cursor-ew-resize");
     updateLanePreview(active, local.x);
   };
@@ -614,7 +611,6 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       if (cue) {
         setSelectedCueId(cue.id);
         requestSeek(cue.startMs);
-        setPlayUntil(null);
       }
       return;
     }
@@ -679,7 +675,6 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       };
       waveGestureRef.current = active;
       setSelectedCueId(cue.id);
-      setPlayUntil(null);
       updateWavePreview(active, local.x);
       return;
     }

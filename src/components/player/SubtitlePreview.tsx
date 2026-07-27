@@ -19,6 +19,7 @@ import {
   findPreviewCue,
   getLibassFontKey,
   getLibassRenderTimeMs,
+  resolveSegmentStopPreview,
   shouldUseCssFallback,
   type SubtitlePreviewRendererMode,
 } from "./subtitlePreviewModel";
@@ -46,6 +47,22 @@ interface SubtitlePreviewProps {
   defaultFont?: string;
   glyphFallbackFont?: string;
   showFallbackNotice?: boolean;
+  /** null/undefined 为普通预览；非 null 时是 activeCueTracker 的停点命中集合。 */
+  segmentStopCueIds?: string[] | null;
+}
+
+interface GlyphCoverageState {
+  contextKey: string;
+  coverage: LibassGlyphCoverageMap;
+}
+
+const EMPTY_GLYPH_COVERAGE: LibassGlyphCoverageMap = {};
+
+function getGlyphCoverageContextKey(
+  fontKey: string,
+  fontFiles: PreviewFontFile[],
+): string {
+  return JSON.stringify([fontKey, fontFiles]);
 }
 
 function mergeGlyphCoverage(
@@ -89,34 +106,71 @@ export function SubtitlePreview({
   defaultFont,
   glyphFallbackFont,
   showFallbackNotice = true,
+  segmentStopCueIds,
 }: SubtitlePreviewProps) {
-  const [fallbackReason, setFallbackReason] = useState<string | null>(null);
-  const [glyphCoverage, setGlyphCoverage] = useState<LibassGlyphCoverageMap>(
-    {},
+  const fontKey = useMemo(
+    () =>
+      getLibassFontKey({
+        defaultFont,
+        glyphFallbackFont,
+        fontUrls,
+        availableFonts,
+      }),
+    [availableFonts, defaultFont, fontUrls, glyphFallbackFont],
   );
-  const glyphCoverageRef = useRef(glyphCoverage);
+  const glyphContextKey = useMemo(
+    () => getGlyphCoverageContextKey(fontKey, fontFiles),
+    [fontFiles, fontKey],
+  );
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null);
+  const [glyphCoverageState, setGlyphCoverageState] =
+    useState<GlyphCoverageState>(() => ({
+      contextKey: glyphContextKey,
+      coverage: EMPTY_GLYPH_COVERAGE,
+    }));
+  const glyphCoverage =
+    glyphCoverageState.contextKey === glyphContextKey
+      ? glyphCoverageState.coverage
+      : EMPTY_GLYPH_COVERAGE;
+  const glyphCoverageRef = useRef({
+    contextKey: glyphContextKey,
+    coverage: glyphCoverage,
+  });
+  glyphCoverageRef.current = {
+    contextKey: glyphContextKey,
+    coverage: glyphCoverage,
+  };
   const pendingGlyphChecksRef = useRef(new Set<string>());
   const activeCue = findPreviewCue(cues, activeCueId, currentTimeMs);
+  const segmentStopPreview = useMemo(
+    () =>
+      resolveSegmentStopPreview(
+        cues,
+        segmentStopCueIds ?? null,
+        currentTimeMs,
+      ),
+    [cues, currentTimeMs, segmentStopCueIds],
+  );
+  const previewCues = segmentStopPreview?.cues ?? cues;
+  const cssCues = segmentStopPreview?.cues ?? (activeCue ? [activeCue] : []);
   const glyphCheckCues = useMemo(
-    () => (activeCue ? [activeCue] : []),
-    [activeCue],
+    () => segmentStopPreview?.cues ?? (activeCue ? [activeCue] : []),
+    [activeCue, segmentStopPreview],
   );
-  const libassRenderTimeMs = getLibassRenderTimeMs(
-    cues,
-    activeCueId,
-    currentTimeMs,
-  );
+  const libassRenderTimeMs =
+    segmentStopPreview?.renderTimeMs ??
+    getLibassRenderTimeMs(cues, activeCueId, currentTimeMs);
   const assText = useMemo(
     () =>
       buildPreviewAssText({
-        cues,
+        cues: previewCues,
         styles,
         scriptInfo,
         libassFallbackFontName: glyphFallbackFont ?? defaultFont,
         libassGlyphCoverage: glyphCoverage,
       }),
     [
-      cues,
+      previewCues,
       styles,
       scriptInfo,
       defaultFont,
@@ -133,16 +187,6 @@ export function SubtitlePreview({
         fallbackFontName: glyphFallbackFont ?? defaultFont,
       }),
     [defaultFont, glyphCheckCues, glyphFallbackFont, styles],
-  );
-  const fontKey = useMemo(
-    () =>
-      getLibassFontKey({
-        defaultFont,
-        glyphFallbackFont,
-        fontUrls,
-        availableFonts,
-      }),
-    [availableFonts, defaultFont, fontUrls, glyphFallbackFont],
   );
   const hasDisplayRect = displayRect.width > 0 && displayRect.height > 0;
   const libassAvailable = rendererMode !== "css" && hasDisplayRect;
@@ -163,26 +207,20 @@ export function SubtitlePreview({
   }, [assText, fontKey, rendererMode]);
 
   useEffect(() => {
-    setGlyphCoverage({});
-    pendingGlyphChecksRef.current.clear();
-  }, [fontKey]);
-
-  useEffect(() => {
-    glyphCoverageRef.current = glyphCoverage;
-  }, [glyphCoverage]);
-
-  useEffect(() => {
-    let cancelled = false;
+    const requestContextKey = glyphContextKey;
 
     for (const check of glyphChecks) {
       const font = findBestPreviewFontFile(fontFiles, check.fontName);
       if (!font) continue;
 
       const key = libassGlyphCoverageKey(check.fontName);
-      const coverage = glyphCoverageRef.current[key];
+      const coverage =
+        glyphCoverageRef.current.contextKey === requestContextKey
+          ? glyphCoverageRef.current.coverage[key]
+          : undefined;
       const checked = new Set(coverage?.checkedCodePoints ?? []);
       const pendingCodePoints = check.codePoints.filter((codePoint) => {
-        const pendingKey = `${key}:${codePoint}`;
+        const pendingKey = `${requestContextKey}\0${key}:${codePoint}`;
         return (
           !checked.has(codePoint) &&
           !pendingGlyphChecksRef.current.has(pendingKey)
@@ -191,13 +229,24 @@ export function SubtitlePreview({
       if (pendingCodePoints.length === 0) continue;
 
       for (const codePoint of pendingCodePoints) {
-        pendingGlyphChecksRef.current.add(`${key}:${codePoint}`);
+        pendingGlyphChecksRef.current.add(
+          `${requestContextKey}\0${key}:${codePoint}`,
+        );
       }
 
       checkPreviewFontGlyphs(font, check.fontName, pendingCodePoints)
         .then((result) => {
-          if (!cancelled) {
-            setGlyphCoverage((current) => mergeGlyphCoverage(current, result));
+          // 卸载后 setState 是 no-op；只需拦截过期上下文的检测结果
+          if (glyphCoverageRef.current.contextKey === requestContextKey) {
+            setGlyphCoverageState((current) => ({
+              contextKey: requestContextKey,
+              coverage: mergeGlyphCoverage(
+                current.contextKey === requestContextKey
+                  ? current.coverage
+                  : EMPTY_GLYPH_COVERAGE,
+                result,
+              ),
+            }));
           }
         })
         .catch((err) => {
@@ -205,15 +254,13 @@ export function SubtitlePreview({
         })
         .finally(() => {
           for (const codePoint of pendingCodePoints) {
-            pendingGlyphChecksRef.current.delete(`${key}:${codePoint}`);
+            pendingGlyphChecksRef.current.delete(
+              `${requestContextKey}\0${key}:${codePoint}`,
+            );
           }
         });
     }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fontFiles, glyphChecks]);
+  }, [fontFiles, glyphChecks, glyphContextKey]);
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -235,15 +282,20 @@ export function SubtitlePreview({
         </div>
       )}
 
-      {useCss && activeCue && (
-        <AssSubtitleOverlay
-          cue={activeCue}
-          styles={styles}
-          scriptInfo={scriptInfo}
-          mergeMode="inline"
-          style={overlayStyle}
-        />
-      )}
+      {useCss &&
+        // 按 ASS Layer 升序排 DOM：高层级后排绘制在上层，与 libass 层叠一致
+        [...cssCues]
+          .sort((a, b) => a.layer - b.layer)
+          .map((cue) => (
+            <AssSubtitleOverlay
+              key={cue.id}
+              cue={cue}
+              styles={styles}
+              scriptInfo={scriptInfo}
+              mergeMode="inline"
+              style={overlayStyle}
+            />
+          ))}
 
       {useCss && showFallbackNotice && (
         <LibassFallbackNotice reason={fallbackReason ?? undefined} />

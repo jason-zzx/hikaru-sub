@@ -59,7 +59,7 @@ describe("selectCueAndSeek", () => {
       selectedCueId: "old",
       selectedCueIds: ["old"],
       currentTimeMs: 9999,
-      playUntilMs: 8888,
+      segmentPlayback: { cueId: "old", stopMs: 8888 },
     });
   });
 
@@ -68,16 +68,16 @@ describe("selectCueAndSeek", () => {
     const pb = usePlaybackStore.getState();
     expect(pb.selectedCueId).toBe("old");
     expect(pb.currentTimeMs).toBe(9999);
-    expect(pb.playUntilMs).toBe(8888);
+    expect(pb.segmentPlayback).toEqual({ cueId: "old", stopMs: 8888 });
   });
 
-  it("选中 cue 并 seek 到 startMs，清除 playUntilMs", () => {
+  it("选中 cue 并 seek 到 startMs，清除段播", () => {
     selectCueAndSeek(CUES[1]);
     const pb = usePlaybackStore.getState();
     expect(pb.selectedCueId).toBe("b");
     expect(pb.selectedCueIds).toEqual(["b"]);
     expect(pb.currentTimeMs).toBe(2000);
-    expect(pb.playUntilMs).toBeNull();
+    expect(pb.segmentPlayback).toBeNull();
   });
 });
 
