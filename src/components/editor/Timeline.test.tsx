@@ -447,6 +447,44 @@ describe("Timeline waveform gain", () => {
 });
 
 describe("Timeline pointer gestures", () => {
+  it.each([
+    {
+      field: "segmentPlayback" as const,
+      setup: {
+        isPlaying: true,
+        segmentPlayback: { cueId: "a", stopMs: 2000 },
+      },
+      expectPlaying: true,
+    },
+    {
+      field: "segmentStop" as const,
+      setup: {
+        currentTimeMs: 2000,
+        segmentStop: { cueId: "a", stopMs: 2000 },
+      },
+      expectPlaying: false,
+    },
+  ])(
+    "preserves the $field boundary while resizing its cue",
+    ({ field, setup, expectPlaying }) => {
+      usePlaybackStore.setState(setup);
+      const { lane } = renderTimeline();
+
+      pointer("down", lane, 200, 10);
+      pointer("move", lane, 250, 10);
+      pointer("up", lane, 250, 10);
+
+      expect(useProjectStore.getState().cues[0].endMs).not.toBe(2000);
+      expect(usePlaybackStore.getState()[field]).toEqual({
+        cueId: "a",
+        stopMs: 2000,
+      });
+      if (expectPlaying) {
+        expect(usePlaybackStore.getState().isPlaying).toBe(true);
+      }
+    },
+  );
+
   it("keeps body clicks as selection and seek without creating history", () => {
     reset(["b"]);
     const { lane, updateCue, onCommitPendingTimeDraft } = renderTimeline();

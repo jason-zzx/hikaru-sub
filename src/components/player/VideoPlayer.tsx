@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { resolveActiveCueIds } from "@/services/activeCueTracker";
 import { selectLibassPreviewFonts } from "../../services/libassFontSelection";
 import { useVideoDisplayRect } from "../../hooks/useVideoDisplayRect";
 import { getPreviewFonts } from "../../services/previewFontDiscovery";
 import { getVideoInfo } from "../../services/tauri";
-import { usePlaybackStore } from "../../stores/playbackStore";
+import {
+  usePlaybackStore,
+  type SegmentStop,
+} from "@/stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { PreviewFontFile, VideoPlaybackProbe } from "../../types";
 import { SubtitlePreview } from "./SubtitlePreview";
+import { resolvePausedPreviewCueId } from "./subtitlePreviewModel";
 
 interface VideoPlayerProps {
   videoPath: string;
@@ -39,6 +44,10 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
 
   const isPlaying = usePlaybackStore((s) => s.isPlaying);
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
+  const segmentStop = usePlaybackStore((s) => s.segmentStop);
+  const segmentStopCueIds = usePlaybackStore((s) =>
+    s.segmentStop === null ? null : s.activeCueIds,
+  );
   const seekRequest = usePlaybackStore((s) => s.seekRequest);
   // 播放中不订阅 60Hz 时间（libass 走 rVFC 直连视频帧）；暂停/seek 时才需要精确时间定帧。
   // null 哨兵期间沿用上一次非空值，保证 SubtitlePreview 接口不变。
@@ -60,6 +69,32 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   const previewTimeMs = pausedTimeMs ?? -1;
 
   const cues = useProjectStore((s) => s.cues);
+  // 暂停时仅当播放头仍在选中句渲染区间内（或段播停点驻留于选中句 endMs）
+  // 才按选中句钉帧预览（抗厘秒取整）；播放头移出选中句（如点击波形 seek）
+  // 后回归按播放头时间命中渲染，空档即空白
+  const previewActiveCueId = isPlaying
+    ? playingActiveCueId
+    : resolvePausedPreviewCueId(cues, selectedCueId, previewTimeMs, segmentStop);
+
+  // 段播（播放当前句）到点收尾：rAF 帧循环与 timeupdate 兜底竞速时共用同一实现，
+  // 并消费启动段播时捕获的 cue 快照，不能改读收尾时的当前选择。
+  const completeSegmentStop = useCallback(
+    (video: HTMLVideoElement, segment: SegmentStop) => {
+      segmentEndRef.current = segment.stopMs;
+      const activeCueIds = resolveActiveCueIds(
+        useProjectStore.getState().cues,
+        segment.stopMs,
+        segment,
+      );
+      // 先一次发布完整停点，再操作媒体元素；同步/异步 pause 事件都只会 no-op。
+      usePlaybackStore
+        .getState()
+        .completeSegmentPlayback(segment, activeCueIds);
+      video.currentTime = segment.stopMs / 1000;
+      video.pause();
+    },
+    [],
+  );
   const assStyles = useProjectStore((s) => s.assStyles);
   const assScriptInfo = useProjectStore((s) => s.assScriptInfo);
   const previewFontSelection = useMemo(
@@ -294,14 +329,15 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     const handleTimeUpdate = () => {
       if (isSeekingRef.current) return;
       recoverAttemptRef.current = 0;
+      // 「播放当前句」到点：timeupdate 可能先于下一帧 rAF 越界，必须走与 rAF
+      // 分支相同的收尾（精确 snap + 驻留标记），且不得把 overshoot 时间写进 store
+      const { segmentPlayback } = usePlaybackStore.getState();
       const ms = Math.floor(video.currentTime * 1000);
-      setCurrentTime(ms);
-
-      // 「播放当前句」到点自动暂停；pause 事件链会经 setPlaying(false) 清除 playUntilMs
-      const { playUntilMs } = usePlaybackStore.getState();
-      if (playUntilMs !== null && ms >= playUntilMs) {
-        video.pause();
+      if (segmentPlayback !== null && ms >= segmentPlayback.stopMs) {
+        completeSegmentStop(video, segmentPlayback);
+        return;
       }
+      setCurrentTime(ms);
     };
 
     const handleLoadedMetadata = () => {
@@ -339,7 +375,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       video.removeEventListener("ended", handleEnded);
       video.removeEventListener("seeked", handleSeeked);
     };
-  }, [videoSrc, setCurrentTime, setDuration, setPlaying]);
+  }, [videoSrc, setCurrentTime, setDuration, setPlaying, completeSegmentStop]);
 
   // 播放时高频同步播放时间并在片段终点及时停止。
   // timeupdate 仅 ~4Hz，会导致时间轴指针跳动（bug 4）与 R 段落播放越界（bug 3）。
@@ -349,14 +385,14 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     if (!video) return;
     let rafId = 0;
     const tick = () => {
-      const { playUntilMs } = usePlaybackStore.getState();
-      // 「播放当前句」到点：暂停并把播放头精确 snap 到片段终点（cue.endMs），
-      // 避免越界进入下一条字幕导致选中切换；pause 事件链会经 setPlaying(false) 清除 playUntilMs
-      if (playUntilMs !== null && video.currentTime * 1000 >= playUntilMs) {
-        video.pause();
-        video.currentTime = playUntilMs / 1000;
-        setCurrentTime(playUntilMs);
-        segmentEndRef.current = playUntilMs;
+      const { segmentPlayback } = usePlaybackStore.getState();
+      // 「播放当前句」到点：暂停并把播放头精确 snap 到启动时捕获的 cue.endMs，
+      // 避免选择在播放中变化后把停点驻留错误绑定到另一句。
+      if (
+        segmentPlayback !== null &&
+        video.currentTime * 1000 >= segmentPlayback.stopMs
+      ) {
+        completeSegmentStop(video, segmentPlayback);
         return;
       }
       if (!isSeekingRef.current) {
@@ -378,7 +414,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
         setCurrentTime(Math.floor(video.currentTime * 1000));
       }
     };
-  }, [isPlaying, videoSrc, setCurrentTime]);
+  }, [isPlaying, videoSrc, setCurrentTime, completeSegmentStop]);
 
   // 外部跳转到指定时间（拖动进度条 / 时间轴 / 进入编辑页选首条）——由显式
   // seekRequest 驱动，播放回写（rAF/timeupdate）不再触发本效应的每帧重执行。
@@ -491,10 +527,11 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
           {videoDisplayRect.width > 0 && videoDisplayRect.height > 0 && (
             <SubtitlePreview
               cues={cues}
-              activeCueId={isPlaying ? playingActiveCueId : selectedCueId}
+              activeCueId={previewActiveCueId}
               styles={assStyles}
               scriptInfo={assScriptInfo}
               currentTimeMs={previewTimeMs}
+              segmentStopCueIds={segmentStopCueIds}
               videoElement={videoElement}
               followVideoFrames={isPlaying}
               fontUrls={previewFontSelection.fontUrls}

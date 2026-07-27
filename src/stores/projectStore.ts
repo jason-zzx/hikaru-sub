@@ -229,6 +229,13 @@ function applyPlaybackContext(context: EditorContextSnapshot): void {
   });
 }
 
+function clearPlaybackDocumentContext(): void {
+  usePlaybackStore.setState({
+    segmentPlayback: null,
+    segmentStop: null,
+  });
+}
+
 function isDirtyFrom(h: HistoryRuntime): boolean {
   if (h.compositionPreview) return true;
   return (
@@ -448,7 +455,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     history: initialHistory(0),
     documentEpoch: 0,
 
-    setSession: (session) =>
+    setSession: (session) => {
+      clearPlaybackDocumentContext();
       set((state) => ({
         session,
         activeSubtitlePath: null,
@@ -459,7 +467,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         isDirty: false,
         history: initialHistory(0),
         documentEpoch: state.documentEpoch + 1,
-      })),
+      }));
+    },
 
     setActiveSubtitle: (kind, path) =>
       set({
@@ -467,7 +476,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         activeSubtitlePath: path,
       }),
 
-    clearSession: () =>
+    clearSession: () => {
+      clearPlaybackDocumentContext();
       set((state) => ({
         session: null,
         activeSubtitlePath: null,
@@ -478,9 +488,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         isDirty: false,
         history: initialHistory(0),
         documentEpoch: state.documentEpoch + 1,
-      })),
+      }));
+    },
 
-    loadAssDocument: (doc, active) =>
+    loadAssDocument: (doc, active) => {
+      clearPlaybackDocumentContext();
       set((state) => ({
         cues: doc.cues,
         assScriptInfo: doc.scriptInfo,
@@ -491,7 +503,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         isDirty: false,
         history: initialHistory(0),
         documentEpoch: state.documentEpoch + 1,
-      })),
+      }));
+    },
 
     setAssMetadata: (scriptInfo, styles) =>
       set({
@@ -499,7 +512,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         assStyles: styles,
       }),
 
-    setCues: (cues) =>
+    setCues: (cues) => {
+      clearPlaybackDocumentContext();
       set((state) => {
         const accepted = acceptEditingState(state);
         const revision = accepted.history.nextCueRevision;
@@ -516,7 +530,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           isDirty: isDirtyFrom(h),
           documentEpoch: state.documentEpoch + 1,
         };
-      }),
+      });
+    },
 
     replaceCues: (cues) =>
       set((state) => {

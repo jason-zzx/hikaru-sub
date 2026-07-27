@@ -34,13 +34,13 @@ function resetStore(partial: Record<string, unknown> = {}) {
     ...partial,
   });
   usePlaybackStore.setState({
+    ...usePlaybackStore.getInitialState(),
     currentTimeMs: 1000,
     durationMs: 60000,
     isPlaying: true,
     selectedCueId: null,
     selectedCueIds: [],
     fps: 25,
-    playUntilMs: 5000,
   });
 }
 
@@ -588,6 +588,31 @@ describe("projectStore unified history", () => {
     expect(useProjectStore.getState().documentEpoch).toBe(initial + 4);
   });
 
+  it("document lifecycle clears segment playback even when cue ids are reused", () => {
+    usePlaybackStore.setState({
+      segmentPlayback: { cueId: "a", stopMs: 1000 },
+      segmentStop: { cueId: "a", stopMs: 1000 },
+    });
+
+    useProjectStore.getState().loadAssDocument({
+      scriptInfo: {
+        title: "same ids",
+        scriptType: "v4.00+",
+        playResX: 1920,
+        playResY: 1080,
+        wrapStyle: 0,
+        scaledBorderAndShadow: true,
+        extra: {},
+      },
+      styles: createDefaultStyles(),
+      cues: [cue("a", 0, 1000)],
+    });
+
+    const playback = usePlaybackStore.getState();
+    expect(playback.segmentPlayback).toBeNull();
+    expect(playback.segmentStop).toBeNull();
+  });
+
   it("setSession/loadAssDocument clear history and grouping state", () => {
     applyInsert("a", 2, 3, "abc", 1000);
     useProjectStore.getState().setSession({
@@ -673,7 +698,7 @@ describe("projectStore unified history", () => {
       selectedCueIds: ["a"],
       currentTimeMs: 1234,
       isPlaying: true,
-      playUntilMs: 9999,
+      segmentPlayback: { cueId: "a", stopMs: 9999 },
     });
     useProjectStore.getState().updateCue("a", { primaryText: "x" });
     usePlaybackStore.setState({
@@ -681,7 +706,8 @@ describe("projectStore unified history", () => {
       selectedCueIds: [],
       currentTimeMs: 5555,
       isPlaying: false,
-      playUntilMs: null,
+      segmentPlayback: null,
+      segmentStop: { cueId: "a", stopMs: 1000 },
     });
 
     // Force a known context on the past snapshot
@@ -694,7 +720,8 @@ describe("projectStore unified history", () => {
     expect(pb.selectedCueIds).toEqual(["a"]);
     expect(pb.currentTimeMs).toBe(5555);
     expect(pb.isPlaying).toBe(false);
-    expect(pb.playUntilMs).toBeNull();
+    expect(pb.segmentPlayback).toBeNull();
+    expect(pb.segmentStop).toEqual({ cueId: "a", stopMs: 1000 });
   });
 
   it("setAssMetadata does not advance revisions", () => {

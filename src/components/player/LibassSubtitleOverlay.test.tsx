@@ -122,6 +122,50 @@ describe("LibassSubtitleOverlay", () => {
     expect(controller.setAssText).not.toHaveBeenCalledWith("text-3");
   });
 
+  it("re-renders at the static pinned time when frame sync stops", async () => {
+    const controller = fakeController();
+    mocks.createDefaultLibassController.mockResolvedValue(controller);
+    // 只验证注销/重绘时序：rVFC 存根不派发帧回调
+    const video = document.createElement("video");
+    Object.defineProperty(video, "requestVideoFrameCallback", {
+      configurable: true,
+      value: vi.fn(() => 1),
+    });
+    Object.defineProperty(video, "cancelVideoFrameCallback", {
+      configurable: true,
+      value: vi.fn(),
+    });
+
+    const overlay = (followVideoFrames: boolean) => (
+      <LibassSubtitleOverlay
+        assText={DEFAULT_ASS}
+        fontUrls={["https://example.com/font.woff2"]}
+        availableFonts={{ ...DEFAULT_FONTS }}
+        defaultFont="Noto Sans CJK JP"
+        width={1920}
+        height={1080}
+        renderTimeMs={1}
+        videoElement={video}
+        followVideoFrames={followVideoFrames}
+        onUnavailable={stableOnUnavailable}
+      />
+    );
+
+    const { rerender } = render(overlay(true));
+    await vi.waitFor(() =>
+      expect(vi.mocked(controller.render)).toHaveBeenCalledTimes(1),
+    );
+
+    // 暂停（followVideoFrames 翻 false）：帧同步注销后画布停留在最后视频帧
+    // （段播停点的边界帧已属于下一句），且钉帧 renderTimeMs 未变、静态渲染
+    // 效应不触发——必须在此时按静态时间补一次重绘
+    rerender(overlay(false));
+    await vi.waitFor(() =>
+      expect(vi.mocked(controller.render).mock.calls.length).toBeGreaterThan(1),
+    );
+    expect(vi.mocked(controller.render)).toHaveBeenLastCalledWith(1, 1920, 1080);
+  });
+
   it("reports setTrack failures from the coalescing loop", async () => {
     let rejectSetTrack: ((err: Error) => void) | null = null;
     const controller = fakeController();

@@ -106,7 +106,7 @@ export function SubtitleList({
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
   const setSelectedCueIds = usePlaybackStore((s) => s.setSelectedCueIds);
   const requestSeek = usePlaybackStore((s) => s.requestSeek);
-  const setPlayUntil = usePlaybackStore((s) => s.setPlayUntil);
+  const setSegmentPlayback = usePlaybackStore((s) => s.setSegmentPlayback);
   // 边界频率重渲染（activeCueIds 变化）不重算样式集合与列可见性
   const knownStyleNames = useMemo(
     () => new Set(assStyles.map((style) => style.name)),
@@ -162,7 +162,7 @@ export function SubtitleList({
       result.selectedCueIds.includes(cue.id),
     );
     if (nextSelected) requestSeek(nextSelected.startMs);
-    setPlayUntil(null);
+    else setSegmentPlayback(null);
     return true;
   };
 
@@ -213,13 +213,11 @@ export function SubtitleList({
       }
 
       requestSeek(cue.startMs);
-      setPlayUntil(null);
     },
     [
       requestSeek,
       selectCueRange,
       selectedCueIds,
-      setPlayUntil,
       setSelectedCueId,
       setSelectedCueIds,
     ],
@@ -237,7 +235,6 @@ export function SubtitleList({
         setSelectedCueId(cue.id);
       }
       setSelectionAnchorId(cue.id);
-      setPlayUntil(null);
       // 分割动作（splitCueAtTime）要求分割点严格位于 (startMs, endMs) 开区间；
       // activeCueIds 是闭区间命中口径，播放头恰在行首/行尾时会「可点但必失败」。
       // 菜单打开是离散事件，直接读即时播放时间做同口径判定即可（无性能问题）。
@@ -251,7 +248,7 @@ export function SubtitleList({
         canSplitTarget: playheadMs > cue.startMs && playheadMs < cue.endMs,
       });
     },
-    [onCommitPendingTimeDraft, selectedCueIds, setPlayUntil, setSelectedCueId],
+    [onCommitPendingTimeDraft, selectedCueIds, setSelectedCueId],
   );
 
   const getActionSelectionIds = () => {

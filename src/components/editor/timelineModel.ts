@@ -22,6 +22,7 @@ export interface ClippedCueRect {
   showEndHandle: boolean;
 }
 
+/** 普通播放/暂停使用闭区间；段播停点的左极限口径由 activeCueTracker 处理。 */
 export function isCueActiveAtTime(cue: SubtitleCue, timeMs: number): boolean {
   return timeMs >= cue.startMs && timeMs <= cue.endMs;
 }

@@ -61,7 +61,7 @@ beforeEach(() => {
     selectedCueId: null,
     selectedCueIds: [],
     fps: 25,
-    playUntilMs: null,
+    segmentPlayback: null,
     activeCueIds: [],
     seekRequest: null,
   });
@@ -70,12 +70,15 @@ beforeEach(() => {
 
 describe("导航动作", () => {
   it("select-next 选中下一条并 seek 到起点、中断片段播放", () => {
-    usePlaybackStore.setState({ selectedCueId: "a", playUntilMs: 9000 });
+    usePlaybackStore.setState({
+      selectedCueId: "a",
+      segmentPlayback: { cueId: "a", stopMs: 9000 },
+    });
     make_actions()["select-next"]!();
     const pb = usePlaybackStore.getState();
     expect(pb.selectedCueId).toBe("b");
     expect(pb.currentTimeMs).toBe(2000);
-    expect(pb.playUntilMs).toBeNull();
+    expect(pb.segmentPlayback).toBeNull();
   });
 
   it("select-first / select-last / 翻页", () => {
@@ -157,11 +160,14 @@ describe("编辑动作", () => {
 
   it("delete-cue 删除选中后清除片段播放并通知可撤销", () => {
     const onNotify = vi.fn();
-    usePlaybackStore.setState({ selectedCueId: "b", playUntilMs: 3000 });
+    usePlaybackStore.setState({
+      selectedCueId: "b",
+      segmentPlayback: { cueId: "b", stopMs: 3000 },
+    });
     make_actions(onNotify)["delete-cue"]!();
     expect(useProjectStore.getState().cues.map((c) => c.id)).toEqual(["a", "c"]);
     expect(usePlaybackStore.getState().selectedCueId).toBe("c");
-    expect(usePlaybackStore.getState().playUntilMs).toBeNull();
+    expect(usePlaybackStore.getState().segmentPlayback).toBeNull();
     expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可撤销");
   });
 
@@ -219,14 +225,14 @@ describe("编辑动作", () => {
     usePlaybackStore.setState({
       selectedCueId: "c",
       selectedCueIds: ["b", "c"],
-      playUntilMs: 3000,
+      segmentPlayback: { cueId: "c", stopMs: 3000 },
     });
 
     make_actions(onNotify)["delete-cue"]!();
 
     expect(useProjectStore.getState().cues.map((cue) => cue.id)).toEqual(["a"]);
     expect(usePlaybackStore.getState().selectedCueIds).toEqual(["a"]);
-    expect(usePlaybackStore.getState().playUntilMs).toBeNull();
+    expect(usePlaybackStore.getState().segmentPlayback).toBeNull();
     expect(onNotify).toHaveBeenCalledWith("info", "已删除字幕，可撤销");
   });
 
@@ -234,7 +240,7 @@ describe("编辑动作", () => {
     usePlaybackStore.setState({
       selectedCueId: "a",
       selectedCueIds: ["a"],
-      playUntilMs: 9000,
+      segmentPlayback: { cueId: "a", stopMs: 9000 },
     });
 
     make_actions()["select-all-cues"]!();
@@ -242,7 +248,7 @@ describe("编辑动作", () => {
     const pb = usePlaybackStore.getState();
     expect(pb.selectedCueIds).toEqual(["a", "b", "c"]);
     expect(pb.selectedCueId).toBe("c");
-    expect(pb.playUntilMs).toBeNull();
+    expect(pb.segmentPlayback).toEqual({ cueId: "a", stopMs: 9000 });
   });
 
   it("select-all-cues 无字幕时 no-op", () => {

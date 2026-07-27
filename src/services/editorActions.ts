@@ -18,7 +18,6 @@ export function selectCueAndSeek(cue: SubtitleCue | null) {
   const pb = usePlaybackStore.getState();
   pb.setSelectedCueId(cue.id);
   pb.requestSeek(cue.startMs);
-  pb.setPlayUntil(null);
 }
 
 /**
