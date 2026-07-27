@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { selectCueAndSeek } from "./editorActions";
 import {
   __resetActiveCueTrackerForTests,
   initActiveCueTracker,
@@ -69,6 +70,33 @@ describe("activeCueTracker", () => {
     // 普通播放/暂停沿用闭区间，endMs 时刻仍命中已结束的 a
     usePlaybackStore.getState().setCurrentTime(2000);
     expect(usePlaybackStore.getState().activeCueIds).toEqual(["a", "overlap"]);
+  });
+
+  it("选择共享边界后的 cue 时排除前一条并保留同起点 cue", () => {
+    const previous = cue("previous", 1000, 2000);
+    const overlap = cue("overlap", 1500, 2500);
+    const selected = cue("selected", 2000, 3000);
+    const sharedStart = cue("shared-start", 2000, 3000);
+    useProjectStore.setState({
+      cues: [previous, overlap, selected, sharedStart],
+    });
+    usePlaybackStore.setState({ currentTimeMs: 2000 });
+    initActiveCueTracker();
+    expect(usePlaybackStore.getState().activeCueIds).toEqual([
+      "previous",
+      "overlap",
+      "selected",
+      "shared-start",
+    ]);
+
+    // 即使播放头已经位于共享边界，选行也必须立即解除前一条的播放高亮。
+    selectCueAndSeek(selected);
+
+    expect(usePlaybackStore.getState().activeCueIds).toEqual([
+      "overlap",
+      "selected",
+      "shared-start",
+    ]);
   });
 
   it("段播停点驻留：保留跨界重叠 cue，不点亮恰从停点开始的下一句", () => {
