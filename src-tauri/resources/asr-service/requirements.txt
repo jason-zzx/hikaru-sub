@@ -1,5 +1,6 @@
 # faster-whisper / kotoba-faster-whisper 依赖及 sidecar 运行依赖
-faster-whisper>=1.1.1
+faster-whisper==1.2.1
+ctranslate2==4.8.0
 fastapi>=0.110.0
 uvicorn>=0.29.0
 pydantic>=2.0.0

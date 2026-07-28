@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/asr/index.md", "reason": "Apply the ASR sidecar ownership boundary and packaged-template rules."}
+{"file": ".trellis/spec/asr/engine-plugins.md", "reason": "Preserve engine contracts, session-only VAD settings, model readiness, and Kotoba isolation."}
+{"file": ".trellis/spec/asr/quality-guidelines.md", "reason": "Use focused unittest coverage and honest private-corpus validation reporting."}
+{"file": ".trellis/tasks/07-27-faster-whisper-long-audio-segmentation/research/diagnosis.md", "reason": "Keep the confirmed prompt-state fragmentation and VAD-restoration root causes in view."}
+{"file": ".trellis/tasks/07-27-faster-whisper-long-audio-segmentation/research/semantic-segmentation.md", "reason": "Implement only the accepted duration-gated V4/int8/carried-prompt candidate and retain its full-corpus metrics."}
+{"file": ".trellis/tasks/07-27-faster-whisper-long-audio-segmentation/research/validation.md", "reason": "Do not reintroduce the rejected global word-timestamp/short-gap candidate."}

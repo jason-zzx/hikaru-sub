@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Callable, Optional
 
-from .base import AsrError
+from .base import AsrError, Transcription
 from .faster_whisper import FasterWhisperEngine
 
 MODEL_ID = "kotoba-tech/kotoba-whisper-v2.0-faster"
@@ -91,6 +91,21 @@ class KotobaFasterWhisperEngine(FasterWhisperEngine):
         FasterWhisperEngine.download_model(
             _validate_model(model),
             progress=progress,
+        )
+
+    def transcribe(
+        self,
+        audio_path: str,
+        *,
+        language: Optional[str] = None,
+        cancel_check: Optional[Callable[[], bool]] = None,
+        progress_callback: Optional[Callable[[int], None]] = None,
+    ) -> Transcription:
+        return self._transcribe_direct(
+            audio_path,
+            language=language,
+            cancel_check=cancel_check,
+            progress_callback=progress_callback,
         )
 
     def _transcribe_options(self) -> dict:
