@@ -618,7 +618,8 @@ export function EditorView() {
             gridTemplateRows: `minmax(${EDITOR_LIST_PANE_MIN_PX}px, ${preferredPaneLayout.listPercent}fr) ${EDITOR_PANE_SEPARATOR_SIZE_PX}px minmax(${EDITOR_SUBTITLE_PANE_MIN_PX}px, ${100 - preferredPaneLayout.listPercent}fr)`,
           }}
         >
-          <div className="min-h-0 overflow-hidden bg-surface-raised">
+          {/* 不设 overflow-hidden：查找/质检浮窗需越过下方编辑区绘制 */}
+          <div className="min-h-0 bg-surface-raised">
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-border px-3 py-2">
                 <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">

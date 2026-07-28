@@ -237,9 +237,9 @@ export const SubtitleFindPanel = forwardRef<
           </Button>
 
           {open && (
-            <div className="min-h-0 overflow-y-auto border-t border-border px-3 pb-2 pt-1.5">
+            <div className="min-h-0 overflow-y-auto border-t border-border px-3 pb-2">
               <Tabs value={tab} onValueChange={setTab} className="min-w-0 w-full flex-col">
-            <TabsList className="h-7 w-full">
+            <TabsList className="sticky top-0 z-10 h-7 w-full bg-popover">
               <TabsTrigger value="find" className="flex-1 text-xs">
                 查找替换
               </TabsTrigger>
