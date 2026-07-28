@@ -12,7 +12,10 @@ asr-service/
 ├── schemas.py         # HTTP 请求模型
 ├── engines/
 │   ├── base.py        # AsrEngine 抽象、AsrSegment、Transcription
-│   ├── faster_whisper.py  # 首个适配器
+│   ├── faster_whisper.py  # 长/短路径路由、模型下载与转录适配
+│   ├── faster_whisper_model.py  # faster-whisper 1.2.1 长音频生成循环 fork
+│   ├── silero_v4.py   # large-v2 长音频使用的受管 Silero V4 资产与 VAD
+│   ├── whisper_runtime.py  # Whisper-family 推理锁、seed 所有权与故障门禁
 │   ├── kotoba_faster_whisper.py  # Kotoba Whisper v2.0 的 faster-whisper 薄适配器
 │   ├── parakeet.py    # NVIDIA NeMo Parakeet 日语适配器（re-export chunking）
 │   ├── qwen3_asr.py   # Qwen3-ASR 日语适配器（自带 ForcedAligner 字级时间戳）
@@ -64,7 +67,7 @@ pnpm asr:setup -- parakeet-cuda
 | 无 GPU 但想试 ReazonSpeech（CPU，慢） | `./scripts/setup-asr.sh reazonspeech-cpu` |
 | 让脚本按 GPU 选择 ReazonSpeech 的 torch | `./scripts/setup-asr.sh reazonspeech` |
 
-`faster-whisper / kotoba-faster-whisper` 共用该依赖；Kotoba 使用 `kotoba-tech/kotoba-whisper-v2.0-faster`，无需安装额外 Python 依赖。`requirements.txt` 要求 `faster-whisper>=1.1.1`，旧版本会被 Kotoba 的运行时可用性检查拒绝。
+`faster-whisper / kotoba-faster-whisper` 共用该依赖；Kotoba 使用 `kotoba-tech/kotoba-whisper-v2.0-faster`，无需安装额外 Python 依赖。普通 faster-whisper 的项目自维护生成循环以 `faster-whisper==1.2.1` 为兼容基线，并固定使用已验证的 `ctranslate2==4.8.0`；Kotoba 自身的最低运行时能力要求仍为 `>=1.1.1`。
 
 使用自定义 ASR 服务目录时，应先确保目录中的 `engines/registry.py` 已注册 Kotoba 且包含 `engines/kotoba_faster_whisper.py`。依赖配置结束时会验证实际选择的引擎；只有 faster-whisper 可用、但 Kotoba 缺失时，配置任务会明确失败。
 
@@ -99,7 +102,7 @@ GPU 加速（faster-whisper / kotoba-faster-whisper CUDA）需另行安装匹配
 
 桌面端启动 sidecar 时会把 `HF_HOME` 指向受管模型缓存目录，安装版通常为 `deps/models/huggingface`。当用户在设置页选择中国大陆镜像时，sidecar 还会接收 `HF_ENDPOINT=https://hf-mirror.com`；官方源则不设置 `HF_ENDPOINT`。
 
-faster-whisper 系列模型只有在缓存目录包含 `config.json`、`model.bin`、`tokenizer.json` 和 `vocabulary.*` 时才视为已下载。Kotoba 还必须包含 `preprocessor_config.json`（128 维特征配置）；手动复制或下载中断导致该文件缺失时，模型状态会保持“未下载”，以避免到推理阶段才因特征维度不匹配失败。普通 faster-whisper 模型不强制要求该文件。
+faster-whisper 系列模型只有在缓存目录包含 `config.json`、`model.bin`、`tokenizer.json` 和 `vocabulary.*` 时才视为已下载。普通 `large-v2` 还要求受管缓存 `$HF_HOME/hikaru-sub/silero-vad-v4/silero_vad.onnx` 存在并通过固定 SHA-256 校验；模型下载确认流程会从 Silero VAD `v4.0` 的固定提交下载该约 1.8 MiB 资产，中国大陆源使用项目配置的 GitHub 代理。资产不会进入 git 或应用资源。Kotoba 还必须包含 `preprocessor_config.json`（128 维特征配置）；手动复制或下载中断导致该文件缺失时，模型状态会保持“未下载”，以避免到推理阶段才因特征维度不匹配失败。其他普通 faster-whisper 模型不强制要求 `preprocessor_config.json` 或 V4 资产。
 
 模型下载进度快照会返回 `hfEndpoint`、`hfHome` 和 `debugLogPath`，桌面端「模型状态」区域会显示下载源与诊断日志路径。`hf-mirror.com` 可能按出口 IP 重定向到 Hugging Face 原站；如果用户选择中国大陆镜像但仍下载失败，应查看 `asr-debug.log` 中的 `model_download_*` 事件，并考虑切换官方源、自定义稳定 endpoint，或确保模型下载流量全程走中国大陆出口。
 
@@ -153,9 +156,11 @@ python main.py --host 127.0.0.1 --port 0
 
 - `device`：`auto` / `cpu` / `cuda`
 - `language`：`auto` 或 `null` 表示自动检测
-- `computeType`：留空时按设备推导（cpu→int8，cuda→float16）
-- `useVad` / `vadConfig`：可选 VAD 高级配置。faster-whisper / kotoba-faster-whisper 透传到内置 Silero VAD；Parakeet / Qwen3-ASR 用 `engines/vad.py` 先切分语音段，再逐段转录。`reazonspeech-nemo` 忽略 VAD；短音频整段推理，≥60s 音频固定 45s 分块。
-- `kotoba-faster-whisper` 仅支持 `kotoba-tech/kotoba-whisper-v2.0-faster`，要求 `faster-whisper>=1.1.1`，复用 faster-whisper 的下载、缓存、CPU/CUDA、VAD 与 segment 时间戳；转录固定传入 `chunk_length=15` 和 `condition_on_previous_text=False`。
+- `computeType`：普通短音频通常在留空时按设备推导（cpu→int8，cuda→float16）；唯一例外是普通 `faster-whisper` 的日语 `large-v2`、WAV 时长不足 10 分钟、且值为留空/`auto`/`default` 时，有效非 CPU 设备使用已验证的 `int8_float16`，CPU 使用 `int8`。显式值始终保留。若调用方先执行了无法得知语言/时长的公共 `load()`，转录时仅在计算精度不匹配时释放旧模型并重载一次。日语 `large-v2` 长音频路径固定使用 CUDA/auto `int8_float16`，CPU 与 auto 回退使用 `int8`。
+- `useVad` / `vadConfig`：可选 VAD 高级配置。普通 faster-whisper 的短音频路径与 Kotoba 继续透传到上游 Silero V6；日语 `large-v2` 且 WAV 时长至少 10 分钟时使用受管 Silero V4，默认 threshold `0.45`、最短语音 `250ms`、最短静音 `3000ms`、padding `900ms`，启用会话 VAD 后以请求值覆盖。Parakeet / Qwen3-ASR 用 `engines/vad.py` 先切分语音段，再逐段转录。`reazonspeech-nemo` 忽略 VAD；短音频整段推理，≥60s 音频固定 45s 分块。
+- 普通 `faster-whisper` 仅对日语、模型 key `large-v2`、WAV 时长 `>=600000ms` 启用长音频语义路径：在长模型加载前固定调用 `ctranslate2.set_random_seed(0)`，V4 压缩后只执行一次 decode/alignment，使用项目维护的生成循环携带日语 blend/标点 prompt，并仅修复对齐词证实的 30 秒硬空洞。短音频继续使用上游 `WhisperModel`、V6、原有 prompt 与 segment 选项，不启用 V4、长 prompt 或全局词时间戳，也不调用随机种子 API；其中只有上述日语 `large-v2` 默认非 CPU 计算精度改为 `int8_float16`。其他模型、其他语言与 Kotoba 的计算精度和转录行为不变。
+- 产品 HTTP 转录路径由 `JobManager` 强制使用 `whisper_inference_session`，锁定 `faster-whisper` / `kotoba-faster-whisper` 的 handle 创建与完整惰性迭代。直接 Python 调用这些引擎时，调用方也必须用该 session 包住 handle 创建和完整迭代；长音频未包裹时会在设置 seed `0` 前明确失败。若长音频结束后的非零 seed 恢复失败，当前 sidecar 的 Whisper 运行时会进入 poisoned 状态，后续两种 Whisper 引擎均拒绝推理，必须重启 sidecar；非 Whisper 引擎不受影响。
+- `kotoba-faster-whisper` 仅支持 `kotoba-tech/kotoba-whisper-v2.0-faster`，自身要求 `faster-whisper>=1.1.1`；共享 `requirements.txt` 因普通 faster-whisper 的长音频生成循环兼容性固定安装 `faster-whisper==1.2.1` 与 `ctranslate2==4.8.0`。Kotoba 复用下载、缓存、CPU/CUDA、上游 VAD 与 segment 时间戳，但不要求 V4 资产并继续使用上游原生生成循环；转录固定传入 `chunk_length=15` 和 `condition_on_previous_text=False`。
 - `reazonspeech-nemo` 仅支持 `reazon-research/reazonspeech-nemo-v2`。输入须为项目约定的 16 kHz / 16-bit / mono PCM WAV。<60s 音频整段交给 NeMo RNN-T，按官方 subword 时间戳规则分段；≥60s 音频按 45 秒块（2 秒重叠）逐块解码（模型内置 ALSD beam search 的整段耗时随时长二次增长，且整段激活显存在 8GB 显卡约 20 分钟即溢出），复用 `engines/chunking.py` 合并去重，每块完成后上报进度并检查取消，收尾以 `TranscriptSegmentRefresh` 下发最终列表替换预览片段。缓存完成标记为 `reazonspeech-nemo-v2.nemo`。
 - `parakeet` 引擎当前针对日语模型，语言固定按 `ja` 返回；会优先读取 NeMo char timestamps，再按日语标点、长度和停顿重新切分字幕段（`engines/chunking.py`）。长音频分块合并时会合并重叠文本而非简单取长弃短。
 

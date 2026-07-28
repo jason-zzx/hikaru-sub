@@ -18,6 +18,7 @@ from diagnostics import debug_log, debug_segments_in_range
 from engines.base import AsrError, AsrSegment, TranscriptSegmentRefresh
 from engines.chunking import _duration_ms
 from engines.registry import create_engine
+from engines.whisper_runtime import whisper_inference_session
 
 
 class JobStatus(str, Enum):
@@ -215,70 +216,87 @@ class JobManager:
                     job.processed_ms = next_processed
                     job.progress = min(next_processed / job.duration_ms, 1.0)
 
-            transcription = engine.transcribe(
-                job.audio_path,
-                language=job.language,
-                cancel_check=job._cancel.is_set,
-                progress_callback=report_progress,
-            )
-            debug_log(
-                "job_transcribe_handle_ready",
-                jobId=job.id,
-                durationMs=transcription.duration_ms,
-                language=transcription.language,
-            )
-            with job._lock:
-                job.duration_ms = transcription.duration_ms
-                job.detected_language = transcription.language
-
-            for item in transcription.segments:
+            cancelled_during_segments = False
+            with whisper_inference_session(job.engine):
                 if job._cancel.is_set():
                     with job._lock:
                         job.status = JobStatus.CANCELLED
                     self._persist_terminal_outputs(job)
                     return
-                if isinstance(item, TranscriptSegmentRefresh):
-                    with job._lock:
-                        job.segments = list(item.segments)
-                        if job.segments:
-                            last_end_ms = job.segments[-1].end_ms
-                            if job.duration_ms > 0:
-                                job.processed_ms = max(job.processed_ms, min(last_end_ms, job.duration_ms))
-                                job.progress = min(job.processed_ms / job.duration_ms, 1.0)
-                            else:
-                                job.processed_ms = max(job.processed_ms, last_end_ms)
-                        count = len(job.segments)
-                    debug_log(
-                        "job_segment_refresh",
-                        jobId=job.id,
-                        segmentCount=count,
-                    )
-                    debug_segments_in_range(
-                        "job_segment_refresh_in_trace",
-                        item.segments,
-                        jobId=job.id,
-                    )
-                    continue
-                seg = item
+                transcription = engine.transcribe(
+                    job.audio_path,
+                    language=job.language,
+                    cancel_check=job._cancel.is_set,
+                    progress_callback=report_progress,
+                )
+                debug_log(
+                    "job_transcribe_handle_ready",
+                    jobId=job.id,
+                    durationMs=transcription.duration_ms,
+                    language=transcription.language,
+                )
                 with job._lock:
-                    job.segments.append(seg)
-                    if job.duration_ms > 0:
-                        next_processed = max(
-                            job.processed_ms,
-                            min(seg.end_ms, job.duration_ms),
-                        )
-                        job.processed_ms = next_processed
-                        job.progress = min(next_processed / job.duration_ms, 1.0)
-                    else:
-                        job.processed_ms = max(job.processed_ms, seg.end_ms)
-                    count = len(job.segments)
-                if count == 1 or count % 20 == 0:
-                    debug_log(
-                        "job_segment",
-                        jobId=job.id,
-                        segmentCount=count,
-                        processedMs=seg.end_ms,
-                    )
+                    job.duration_ms = transcription.duration_ms
+                    job.detected_language = transcription.language
+
+                segment_iterator = transcription.segments
+                try:
+                    for item in segment_iterator:
+                        if job._cancel.is_set():
+                            with job._lock:
+                                job.status = JobStatus.CANCELLED
+                            cancelled_during_segments = True
+                            break
+                        if isinstance(item, TranscriptSegmentRefresh):
+                            with job._lock:
+                                job.segments = list(item.segments)
+                                if job.segments:
+                                    last_end_ms = job.segments[-1].end_ms
+                                    if job.duration_ms > 0:
+                                        job.processed_ms = max(job.processed_ms, min(last_end_ms, job.duration_ms))
+                                        job.progress = min(job.processed_ms / job.duration_ms, 1.0)
+                                    else:
+                                        job.processed_ms = max(job.processed_ms, last_end_ms)
+                                count = len(job.segments)
+                            debug_log(
+                                "job_segment_refresh",
+                                jobId=job.id,
+                                segmentCount=count,
+                            )
+                            debug_segments_in_range(
+                                "job_segment_refresh_in_trace",
+                                item.segments,
+                                jobId=job.id,
+                            )
+                            continue
+                        seg = item
+                        with job._lock:
+                            job.segments.append(seg)
+                            if job.duration_ms > 0:
+                                next_processed = max(
+                                    job.processed_ms,
+                                    min(seg.end_ms, job.duration_ms),
+                                )
+                                job.processed_ms = next_processed
+                                job.progress = min(next_processed / job.duration_ms, 1.0)
+                            else:
+                                job.processed_ms = max(job.processed_ms, seg.end_ms)
+                            count = len(job.segments)
+                        if count == 1 or count % 20 == 0:
+                            debug_log(
+                                "job_segment",
+                                jobId=job.id,
+                                segmentCount=count,
+                                processedMs=seg.end_ms,
+                            )
+                finally:
+                    close_segments = getattr(segment_iterator, "close", None)
+                    if close_segments is not None:
+                        close_segments()
+
+            if cancelled_during_segments:
+                self._persist_terminal_outputs(job)
+                return
 
             cancelled_after_segments = False
             with job._lock:

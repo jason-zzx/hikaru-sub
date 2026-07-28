@@ -13,8 +13,11 @@
 | `diagnostics.py` | JSONL debug log when `HIKARU_ASR_DEBUG_LOG` is set |
 | `engines/base.py` | `AsrEngine`, `AsrSegment`, `Transcription` |
 | `engines/registry.py` | Name → engine class; `list_engines` / `create_engine` / download helpers |
-| `engines/faster_whisper.py` | Default Whisper runtime |
-| `engines/kotoba_faster_whisper.py` | Kotoba Japanese model on faster-whisper |
+| `engines/faster_whisper.py` | Ordinary Whisper routing, V4 long pipeline, hard-hole/bounds adapter |
+| `engines/faster_whisper_model.py` | Pinned faster-whisper 1.2.1 generation-loop fork for long Japanese mode |
+| `engines/silero_v4.py` | Managed official V4 asset, ONNX inference, speech-timestamp state machine |
+| `engines/whisper_runtime.py` | Process-wide faster-whisper/Kotoba inference lock + long-seed cleanup |
+| `engines/kotoba_faster_whisper.py` | Kotoba Japanese model on upstream faster-whisper path |
 | `engines/parakeet.py` | Optional Parakeet engine |
 | `engines/qwen3_asr.py` | Optional Qwen3-ASR engine |
 | `engines/vad.py` / `chunking.py` | VAD + chunking helpers |
