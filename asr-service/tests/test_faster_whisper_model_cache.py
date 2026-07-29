@@ -7,7 +7,15 @@ from unittest.mock import ANY, MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import engines
 from engines.faster_whisper import FasterWhisperEngine
+
+
+def _fake_silero_v4(*, ready: bool = False) -> ModuleType:
+    module = ModuleType("engines.silero_v4")
+    module.is_silero_v4_ready = MagicMock(return_value=ready)
+    module.download_silero_v4 = MagicMock()
+    return module
 
 
 def _fake_faster_whisper(model_path: str) -> ModuleType:
@@ -56,32 +64,37 @@ class FasterWhisperModelCacheTests(unittest.TestCase):
             (snapshot / "tokenizer.json").write_text("{}", encoding="utf-8")
             (snapshot / "vocabulary.txt").write_text("token", encoding="utf-8")
 
-            with patch.dict(
-                sys.modules,
-                {"faster_whisper": _fake_faster_whisper(directory)},
+            silero_v4 = _fake_silero_v4()
+            with (
+                patch.dict(
+                    sys.modules,
+                    {
+                        "faster_whisper": _fake_faster_whisper(directory),
+                        "engines.silero_v4": silero_v4,
+                    },
+                ),
+                patch.object(engines, "silero_v4", silero_v4, create=True),
             ):
-                with patch(
-                    "engines.silero_v4.is_silero_v4_ready",
-                    return_value=False,
-                ):
-                    self.assertFalse(
-                        FasterWhisperEngine.is_model_downloaded("large-v2")
-                    )
-                with patch(
-                    "engines.silero_v4.is_silero_v4_ready",
-                    return_value=True,
-                ):
-                    self.assertTrue(
-                        FasterWhisperEngine.is_model_downloaded("large-v2")
-                    )
+                self.assertFalse(
+                    FasterWhisperEngine.is_model_downloaded("large-v2")
+                )
+                silero_v4.is_silero_v4_ready.return_value = True
+                self.assertTrue(
+                    FasterWhisperEngine.is_model_downloaded("large-v2")
+                )
 
     def test_large_v2_download_includes_v4_without_resetting_main_progress(self):
         progress = MagicMock()
+        silero_v4 = _fake_silero_v4()
         with (
             patch(
                 "engines.faster_whisper.snapshot_download_repo"
             ) as download_snapshot,
-            patch("engines.silero_v4.download_silero_v4") as download_v4,
+            patch.dict(
+                sys.modules,
+                {"engines.silero_v4": silero_v4},
+            ),
+            patch.object(engines, "silero_v4", silero_v4, create=True),
         ):
             FasterWhisperEngine.download_model("large-v2", progress=progress)
 
@@ -90,11 +103,11 @@ class FasterWhisperModelCacheTests(unittest.TestCase):
                 progress=progress,
                 allow_patterns=ANY,
             )
-            download_v4.assert_called_once_with()
-            download_v4.reset_mock()
+            silero_v4.download_silero_v4.assert_called_once_with()
+            silero_v4.download_silero_v4.reset_mock()
 
             FasterWhisperEngine.download_model("base", progress=progress)
-            download_v4.assert_not_called()
+            silero_v4.download_silero_v4.assert_not_called()
 
     def test_validates_local_model_directories_too(self):
         with tempfile.TemporaryDirectory() as directory:

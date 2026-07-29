@@ -9,23 +9,25 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import numpy as np
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import engines.silero_v4 as silero_v4_module
-from engines.silero_v4 import (
-    SILERO_V4_SHA256,
-    SILERO_V4_WINDOW_SAMPLES,
-    SileroV4Cancelled,
-    SileroV4Options,
-    _infer_speech_probabilities,
-    _speech_timestamps_from_probabilities,
-    download_silero_v4,
-    is_silero_v4_ready,
-    silero_v4_asset_path,
-    silero_v4_url,
-)
+try:
+    import numpy as np
+    import engines.silero_v4 as silero_v4_module
+    from engines.silero_v4 import (
+        SILERO_V4_SHA256,
+        SILERO_V4_WINDOW_SAMPLES,
+        SileroV4Cancelled,
+        SileroV4Options,
+        _infer_speech_probabilities,
+        _speech_timestamps_from_probabilities,
+        download_silero_v4,
+        is_silero_v4_ready,
+        silero_v4_asset_path,
+        silero_v4_url,
+    )
+except ModuleNotFoundError as exc:
+    raise unittest.SkipTest("requires Silero V4 runtime dependencies") from exc
 
 
 class SileroV4AssetTests(unittest.TestCase):
