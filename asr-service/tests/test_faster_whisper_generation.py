@@ -10,8 +10,11 @@ from pathlib import Path
 from types import MethodType, ModuleType, SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import numpy as np
-from faster_whisper.transcribe import TranscriptionOptions, WhisperModel
+try:
+    import numpy as np
+    from faster_whisper.transcribe import TranscriptionOptions, WhisperModel
+except ModuleNotFoundError as exc:
+    raise unittest.SkipTest("requires faster-whisper runtime dependencies") from exc
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
