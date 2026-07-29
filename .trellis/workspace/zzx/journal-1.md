@@ -504,3 +504,36 @@ Fixed waveform readability (duration-scaled sampling, per-pixel peak aggregation
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: Stabilize long-audio Whisper segmentation
+
+**Date**: 2026-07-30
+**Task**: Stabilize long-audio Whisper segmentation
+**Branch**: `dev`
+
+### Summary
+
+Implemented and validated a duration-gated Japanese large-v2 long-audio path with managed Silero V4, deterministic CTranslate2 runtime isolation, decoder prompt-state stabilization, timestamp safety, short/Kotoba isolation, lazy dependency loading, and queued cancellation handling. Sanitized private fixture identifiers and synchronized packaged sidecar resources.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cdbe46d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
