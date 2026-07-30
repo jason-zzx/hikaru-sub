@@ -2,7 +2,7 @@
 {"file":".trellis/spec/asr/engine-plugins.md","reason":"Review current product behavior and Kotoba readiness as compatibility/diagnostic context, not quality authority."}
 {"file":".trellis/spec/asr/quality-guidelines.md","reason":"Review CTests, diagnostic Python checks, model limitations, and forbidden artifacts."}
 {"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Check fixed routes, authoritative source hierarchy, ground-truth gates, runtime budget, and Gate 0 scope."}
-{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check retained ground-truth material facts and planning provenance against the published handoff."}
-{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Check the PoC against the published ground-truth authority, shared metrics, privacy boundary, and non-gating Python reference policy."}
-{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/python-reference-report.md","reason":"Check any comparison to large-v3/Kotoba short diagnostics remains sanitized, supplemental, and non-gating."}
+{"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check retained ground-truth material facts and planning provenance against the published handoff."}
+{"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Check the PoC against the published ground-truth authority, shared metrics, privacy boundary, and non-gating Python reference policy."}
+{"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/python-reference-report.md","reason":"Check any comparison to large-v3/Kotoba short diagnostics remains sanitized, supplemental, and non-gating."}
 {"file":".trellis/tasks/07-25-native-asr-ctranslate2-poc/research/planning-evidence.md","reason":"Check task-local evidence against ground-truth authority, current implementation diagnostics, and stated non-goals."}
