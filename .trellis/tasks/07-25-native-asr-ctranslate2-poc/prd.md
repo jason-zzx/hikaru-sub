@@ -2,85 +2,82 @@
 
 ## Goal
 
-在不改动 Hikaru Sub 生产路径的前提下，证明固定版本的 Windows x64 CPU CTranslate2 C++ 路径能够加载 `large-v3` 和 Kotoba v2.0，完成原生 tokenizer、log-mel、timestamp token 解码与最小分段，并产出可审核的日语时间轴和 runtime 可行性证据。
+在不改动 Hikaru Sub 生产路径的前提下，证明 pinned Windows x64 CPU CTranslate2 C++ 路径能够加载 `large-v3` 和 Kotoba v2.0，按权威来源完成最小 tokenizer/log-mel/timestamp/segment 链路，并直接对 T01 ground truth 产出可审核的质量、时间轴、性能与资源可行性证据。
 
-本任务的输出是 Gate 0 的可行性结论，不是最终 worker、发布 runtime 或产品化 Whisper 实现。
+本任务是 Gate 0 PoC，不是最终 worker、发布 runtime 或产品化 Whisper 实现。
 
 ## Background
 
-- 本任务是父任务 T02，显式依赖 T01 `native-asr-benchmark-baseline`。
-- 当前 Python faster-whisper 基线固定了 CPU int8、beam size 5、日语和 VAD 行为；Kotoba 额外固定 15 秒分块、`condition_on_previous_text=false` 与 `preprocessor_config.json` 就绪规则。
-- CTranslate2 C++ API 只提供底层 Whisper 能力。音频特征、tokenizer、prompt、timestamp token、窗口推进和最终重叠处理都不能假定已经由 API 完成。
-- T04 负责 protocol v1 和 fake worker；T05 负责 Rust job host；T06/T07 才负责可发布的 Whisper/Kotoba 管线。本任务不得提前占用这些职责。
+- 本任务是 T02，显式依赖 T01 ground-truth contract。
+- 当前 Hikaru Sub 使用 `faster-whisper==1.2.1`、`ctranslate2==4.8.0`。Python CPU int8/beam/VAD 与 Kotoba 15 秒/no-context 行为仅是 current-implementation diagnostics。
+- 当前 `large-v2` + `ja` + `>=600000ms` 有 V4/seed/session/语义分段特殊路径；它是 T06 必须覆盖的产品回归案例，不是原生算法模板。T02 仍聚焦 large-v3 + Kotoba 的通用 CT2 可行性。
+- CTranslate2 C++ API 只提供底层 Whisper 能力；特征、tokenizer、prompt、timestamp、窗口和 merge 必须由 PoC 证明。
+- T04/T05/T06/T07 分别拥有 protocol、Rust host 与产品化管线；本任务不得提前占用。
 
-## Dependency Gate
+## Dependency And Authority Gate
 
-- 启动模型实测前，T01 必须已完成并提供受评审的 corpus/result contract、至少一个可再分发短 case、一个超过 30 秒的边界 case、文件哈希、参考标注、Python faster-whisper/Kotoba 基线和比较命令。
-- T01 缺少某个模型的 Python 基线时，T02 可以在保持 `planning` 的前提下完成静态资料/构建准备；不得启动模型实测或宣称该模型质量/性能可比较。
-- T02 的实现前必须把 T01 的最终 `research/benchmark-contract.md` 与 `research/python-baseline-report.md` 加入 context manifests，替换仅作规划参考的 T01 证据。
+- T01 必须提供受评审的 `benchmark-contract.md`、权威 short/medium/long case identities、WAV+ASS hashes/reference annotations、共享指标和比较命令。
+- 实现来源顺序：官方 CTranslate2/Whisper 文档和稳定 API、pinned 模型卡、当前维护良好的社区推荐实践，再由 T01 ground truth 实测选择。
+- Python faster-whisper/Kotoba reference 可缺失且只用于诊断；不阻塞 native run 或 ground-truth comparison。
+- 当前 manifests 已保留 planning evidence，并加入 `benchmark-contract.md` 与由有效五引擎 short runs 确定性生成的 `python-reference-report.md`；后者仅是 non-gating current implementation reference，medium/long claims 仍 blocked。
 
 ## Requirements
 
 ### R1 - Isolated And Pinned PoC
 
-- 所有实验源码位于本任务 `research/poc-src/`；构建、模型、运行日志和原始结果位于 ignored local 目录。不得创建生产 `native-asr/` 项目或修改 `src/`、`src-tauri/`、`asr-service/`、发布脚本或 package 配置。
-- 在编译前生成 `research/inputs.lock.json`，锁定 Windows/CPU、MSVC、Windows SDK、CMake、Ninja、CTranslate2 commit/archive SHA-256、JSON/tokenizer/FFT 依赖的版本与许可证，以及两个模型 snapshot 的 immutable revision、所需文件、精确大小和 SHA-256。
-- 不接受 `main`、`latest`、宽版本范围或模型别名作为唯一锁。模型权重与本地绝对路径不得提交。
-- 使用 CTranslate2 的公开 C++ Whisper API，CPU-only Release x64 构建；CUDA 不参与 PoC。
+- 所有实验源码位于任务 `research/poc-src/`；build/model/raw outputs 位于 ignored local 目录。不得创建生产 `native-asr/` 或修改产品、sidecar、发布脚本。
+- `research/inputs.lock.json` 固定 Windows/CPU toolchain、CTranslate2 commit/archive hash、JSON/tokenizer/FFT 依赖，以及两个 model snapshot immutable revision/files/sizes/hashes/licenses。
+- 不接受 `main`、`latest`、宽版本或 alias 作为唯一锁；不提交模型或绝对路径。
+- 只使用 public C++ Whisper API，CPU-only Release x64；CUDA 不参与 PoC。
 
-### R2 - Model And Tokenizer Proof
+### R2 - Model, Tokenizer And Feature Proof
 
-- 验证 `large-v3` 与 `kotoba-tech/kotoba-whisper-v2.0-faster` 的实际模型目录和 metadata，记录 config、model、tokenizer/vocabulary 与 tokenizer special/language/timestamp token 所需文件的哈希。
-- Kotoba 缺失 `preprocessor_config.json` 必须被拒绝；普通 faster-whisper 模型不得因为缺少该文件被错误拒绝。
-- 对日语、标点、数字、拉丁人名与 Whisper prompt token 的小型 golden set，原生 tokenizer 的 token IDs 与 decode 行为必须和 T01 锁定的 Python oracle 一致。差异是停止/架构评审信号，不能靠输出后处理掩盖。
+- 验证 large-v3 与 Kotoba 实际 metadata/assets；Kotoba 缺 `preprocessor_config.json` 必须失败，普通 Whisper 不扩大该要求。
+- tokenizer golden set 符合 pinned tokenizer assets、官方 contract 和维护良好的实现向量。Python token output 可作诊断；差异需解释，但 Python parity 不是停止 gate。
+- 确定性 WAV 与 T01 cases 的 log-mel shape/frame/numerical tolerance 依据 pinned Whisper preprocessing contract 固定；Python feature 可并列诊断，不是唯一 oracle。
+- timestamp parser 使用官方 token contract、维护良好的 golden vectors 和真实 traces 覆盖 paired/consecutive、leading silence、incomplete/malformed/no-timestamp。
+- 每个 segment 必须非空、`0 <= startMs < endMs <= durationMs`、有序且可追溯到 Whisper timestamp tokens；禁止合成时间轴。
 
-### R3 - Audio Feature And Timestamp Proof
+### R3 - Model-Backed Ground-Truth Feasibility
 
-- 在确定性 WAV 与 T01 short case 上比对 Python 与原生 log-mel 的采样率、mel bins、帧数、规范化/窗口/FFT/hop 约定和数值误差。
-- log-mel shape 与 frame count 必须一致；数值容差须在真实模型推理前写入 evidence，发现差异时先定位约定而不是事后放宽阈值。
-- 原生 timestamp parser 要用已捕获的 Python token 序列测试 paired/consecutive timestamps、leading silence、最终不完整 span 和 malformed/no-timestamp 输入。
-- 每个接受的 segment 必须非空、`0 <= startMs < endMs <= durationMs`、按开始时间非递减，且时间可追溯到 Whisper timestamp token；不能用整段平均分配或其他合成时间轴。
+- large-v3/Kotoba 的 device/compute/decode/window 候选必须记录 authoritative source；在 T01 authoritative cases 上运行并记录 load/inference/total、RTF、peak memory、token trace reference、segments、environment/error。
+- Kotoba 记录窗口、prompt hash、context policy、preprocessor 使用和边界观察；不得为通过 PoC 复制 Python 分块/VAD/backfill。
+- 在 clean PATH/GPU-disabled 环境证明只依赖列出的 native DLL；该结论只覆盖测试机。
+- 文本/时间轴直接与 T01 reference 比较；性能/资源记录绝对值。Python reference 可并列但不是 expected output、relative gate 或 annotation substitute。
+- T01 绝对预算已获用户评审并冻结；PoC 必须按更新后的 manifest identity 报告 `measured`/`pass`/`fail`/`blocked`，但不得把 Gate 0 结果冒充 T06/T07 产品化完成，也不得使用 Python parity。
 
-### R4 - Model-Backed Feasibility
+### R4 - Evidence And Decision
 
-- `large-v3` 使用 CPU int8、beam size 5、日语，在 T01 short 和 boundary cases 上运行；记录 model load、inference、RTF、峰值内存、raw token trace 引用、最终 segments、环境和错误。
-- Kotoba 使用固定模型、CPU int8、日语、15 秒窗口和无前文条件；记录每个窗口起止、prompt hash、preprocessor 使用情况、边界重复/缺段与最终合法 timeline。
-- PoC 必须在移除 Python 路径/禁用 GPU 可见性的清洁运行环境中证明只依赖已列出的原生 runtime DLL。该证明只覆盖记录的测试机，不声明 T12 的安装包兼容性。
-- 报告必须将文本/时间轴与 T01 基线进行比较，但不在本任务宣称已满足 T06/T07 的最终 CER、RTF、长音频或缓存兼容门槛。
-
-### R5 - Evidence And Decision
-
-- 生成 machine-readable evidence：inputs lock、model contract、tokenizer/mel/timestamp golden results、build/runtime inventory、per-case runs 与 Kotoba obligations。
-- 生成 `research/ctranslate2-poc-report.md`，每项显示 pass/fail/blocked、证据路径、许可证状态、资源测量和一个明确结论：`proceed`、`proceed-with-named-risks` 或 `stop/revise`。
-- 若任一模型无法以合法时间轴运行、tokenizer/timestamp 行为无法解释、许可证/二进制分发存在未解决阻塞，必须作出 `stop/revise` 或具名阻塞结论并反馈父任务。
+- 生成 inputs lock、model contract、tokenizer/mel/timestamp goldens、build/runtime inventory、per-case runs 与 Kotoba obligations。
+- `research/ctranslate2-poc-report.md` 对每项给出 pass/fail/blocked、evidence、license、resources 和 `proceed`/`proceed-with-named-risks`/`stop-revise`。
+- 合法时间轴、authority contract、license 或 binary distribution 出现 blocker 时反馈父任务，不扩大 PoC 范围。
 
 ## Acceptance Criteria
 
-- [ ] T01 已交付并评审两模型可用的 corpus/baseline/compare contract；任务 context 已更新为最终 T01 交付物。
-- [ ] `inputs.lock.json` 固定 toolchain、CTranslate2、依赖和两模型的 immutable inputs、哈希和许可证；无浮动唯一来源。
-- [ ] Release x64 CPU PoC 可在记录的 Windows 主机编译，CTests 覆盖 request-free parsing/feature/timestamp/segment self-checks。
-- [ ] 两个模型 metadata 通过实际文件检查；Kotoba-only `preprocessor_config.json` negative case 与普通模型 positive case 均有证据。
-- [ ] 两个模型的 tokenizer golden set 与 Python oracle 一致；log-mel shape/frame contract 一致，数值差异得到预先记录容差或明确阻塞结论。
-- [ ] timestamp golden tests 和 model-backed runs 都只产生合法、非空、token-derived segments；malformed token 输入受控失败。
-- [ ] large-v3 与 Kotoba 都在 T01 指定 case 上产生非空日语 timeline，或给出可复现的失败/资源/许可证阻塞证据。
-- [ ] Kotoba 输出证明 15 秒窗口、日语 prompt、无前文条件和 `preprocessor_config.json` 使用；任何边界缺陷未被产品化修补。
-- [ ] runtime inventory 记录 x64/DLL 依赖、文件大小、清洁启动结果和 Python/CUDA 依赖缺失情况。
-- [ ] `ctranslate2-poc-report.md` 给出可审计的 Gate 0 结论，不混入 T04-T12 的实现或质量声明。
-- [ ] 不提交模型、私有音频、local build、绝对路径、生产代码或发布资源改动。
+- [ ] T01 ground-truth contract 已评审，context 已加入 `benchmark-contract.md`；optional reference report 不构成 gate。
+- [ ] `inputs.lock.json` 固定 toolchain/CTranslate2/dependencies/models immutable provenance、hash 和 license。
+- [ ] CPU Release x64 PoC 可构建，CTests 覆盖 parser/feature/timestamp/segment self-checks。
+- [ ] Kotoba-only preprocessor negative case 与 ordinary Whisper positive case 有证据。
+- [ ] tokenizer/log-mel/timestamp goldens 符合 authoritative contracts；Python 差异只作为诊断记录。
+- [ ] model runs 只产生合法、非空、token-derived segments；malformed input controlled failure。
+- [ ] large-v3 与 Kotoba 在 T01 cases 上产出 ground-truth absolute measurements，或给出可复现 native blocker。
+- [ ] Kotoba 报告记录配置及其 authoritative source，边界问题未被 Python-parity patch 掩盖。
+- [ ] runtime inventory 记录 x64/DLL/hash/size/clean launch，且无 Python/CUDA runtime dependency。
+- [ ] Gate 0 报告不混入 T04-T12 产品实现，按冻结 T01 gate 给出可审计状态且不把 Python diagnostics 当作 pass evidence。
+- [ ] 不提交 model/private audio/ASS text/build/absolute path/production code。
 
 ## Out Of Scope
 
-- Worker JSONL protocol、stdin/stdout 事件、进程取消、Rust host、恢复快照和 Tauri command。
-- 生产 Whisper 30 秒窗口、VAD 映射、no-speech/fallback、overlap merge、language detection 或最终质量调优。
-- Kotoba 旧 Hugging Face cache 复用、long-audio 修正与正式 readiness 实现。
-- 模型 manifest/downloader、mirror、managed `deps/`、安装/portable runtime、UI 或设置迁移。
-- 证明最终 setup/portable size 或所有 Windows/CPU 兼容性。
+- Worker protocol、Rust host、cancel/recovery/Tauri command。
+- 产品化全模型/large-v2 long-audio、VAD、fallback、merge、cache compatibility 和最终质量调优。
+- Downloader/runtime package/UI/settings。
+- 证明最终安装体积或全 Windows 兼容性。
 
 ## Rollback
 
-删除 task-local PoC source 与 local build/model/result directories；保留 inputs lock 和报告作为架构证据。任务不修改生产默认值、用户缓存、设置或项目数据，因此不需要迁移/回滚代码。
+删除 task-local PoC source 与 ignored build/model/results；保留 inputs lock/report。任务不修改生产配置、用户缓存或 ground-truth material。
 
 ## Planning State
 
-- 任务需求已收敛；唯一执行前置是 T01 的真实交付物。
-- 任务保持 `planning`，必须在 T01 完成、artifacts/manifests 更新并经评审后才可 `task.py start`。
+- T02 保持 `planning`。
+- 唯一执行前置是 T01 ground-truth handoff、manifest refresh、immutable inputs 与评审；Python reference 成功不是前置。

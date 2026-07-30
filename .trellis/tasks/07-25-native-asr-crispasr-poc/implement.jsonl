@@ -1,6 +1,8 @@
-{"file":".trellis/spec/asr/index.md","reason":"Keep the PoC separate from current production inference ownership while retaining Python behavior as baseline evidence."}
-{"file":".trellis/spec/asr/engine-plugins.md","reason":"Understand the five-engine contracts, VAD expectation, Kotoba scope boundary, and existing optional-engine reality."}
-{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Use focused Python oracle tests and report unavailable model-backed validation truthfully."}
-{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Parent CrispASR routes, C ABI direction, Qwen3 aligner rule, model variants, quality gates, and supply-chain constraints."}
-{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Preliminary shared corpus/metric decisions; replace with final T01 handoff artifacts before activation."}
-{"file":".trellis/tasks/07-25-native-asr-crispasr-poc/research/planning-evidence.md","reason":"Current engine evidence, task boundaries, and required downstream handoffs."}
+{"file":".trellis/spec/asr/index.md","reason":"Keep the PoC separate from production inference ownership while retaining Python behavior as current implementation diagnostics only."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Understand product contracts, refresh behavior, VAD expectations, and optional-engine reality without making Python output quality truth."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Use focused current-implementation checks diagnostically and report unavailable model runs truthfully."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Parent CrispASR routes, authoritative implementation hierarchy, ForcedAligner rule, model variants, ground-truth gates, and supply-chain constraints."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Ground-truth material facts and planning decisions retained as provenance for the final handoff."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Consume the published ground-truth authority, shared metric semantics, result contract, privacy boundary, and non-gating Python reference policy."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/python-reference-report.md","reason":"Use the sanitized Parakeet/Qwen3/Reazon short diagnostics only for current-implementation context, never as expected output or a relative gate."}
+{"file":".trellis/tasks/07-25-native-asr-crispasr-poc/research/planning-evidence.md","reason":"Current implementation diagnostics, ground-truth authority, task boundaries, and downstream handoffs."}

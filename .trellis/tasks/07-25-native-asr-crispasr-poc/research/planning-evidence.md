@@ -1,25 +1,29 @@
 # T03 Planning Evidence
 
-## Confirmed Repository Facts
+## Confirmed Current Implementation Facts
 
-- The parent fixes Parakeet/Reazon/Qwen3 to CrispASR and requires Qwen3 ForcedAligner timestamps; text-only Qwen3 success is insufficient.
-- `asr-service/engines/qwen3_asr.py` can call `build_segments_from_text` when alignment is absent. This is a current Python fallback and is prohibited for native results.
-- `asr-service/engines/parakeet.py` contains multiple long-audio gap/backfill stages and emits a final `TranscriptSegmentRefresh`; native upstream output must be measured before copying any compensation.
-- `asr-service/engines/reazonspeech_nemo.py` is whole-audio. Callback/progress behavior in the native ABI needs direct evidence rather than product assumptions.
-- Current Python engine tests cover local mocked/behavioral paths; they do not prove native CrispASR ABI behavior or model quality.
-- Parent technical research names CrispASR public C ABI as the intended boundary, but exact pinned header signatures and ownership rules remain execution-time evidence requirements.
+- Qwen3 current Python may synthesize timing when alignment is absent; native results prohibit this.
+- Parakeet current Python has long-audio gap/backfill and can emit final `TranscriptSegmentRefresh`.
+- ReazonSpeech current Python uses 45s chunks with 2s overlap at `>=60s`; this is diagnostic regression evidence only.
+- Parakeet, Qwen3 and ReazonSpeech may all final-refresh preview segments; refresh reduction is not Parakeet-only.
+- These facts are diagnostics and regression inputs, not native algorithm authority or quality gates.
 
-## Planning Decisions
+## Authority And Planning Decisions
 
-- Use a child-task-local C++ harness and public C ABI only; no CLI scraping and no production worker skeleton.
-- Lock SDK/toolchain/models before first load; retain only small metadata/evidence in Git.
-- Test lifecycle and callback ownership separately before model quality/coverage runs.
-- Keep decisions independent for Parakeet, ReazonSpeech and Qwen3.
-- Reuse T01 metric/comparison logic; do not duplicate CER/gap/timing tools.
+- T01 user WAV+ASS ground truth is the only text/speech/timing authority; its per-case coverage and absolute CER/RTF/cold-wall/RSS/timeline budgets are user-reviewed and frozen.
+- CrispASR official docs/pinned stable public ABI and model cards rank first, maintained community recommendations second, then ground-truth measurement selects candidates.
+- Python results may be absent and cannot repair references or establish relative CER/RTF gates.
+- Use task-local public-C-ABI harness only; lock SDK/toolchain/models before load.
+- Test lifecycle/callback ownership before model quality; keep three route decisions independent.
+- Reuse T01 metrics; no duplicate CER/gap/P95/time scorer.
+
+## Manifest Handoff
+
+Planning evidence remains as provenance, and both manifests now include T01 `research/benchmark-contract.md`. Add `research/python-reference-report.md` only if it exists, explicitly as non-gating current implementation reference.
 
 ## Required Handoff
 
-- T08 consumes `abi-contract.md`, callback/ownership results and runtime inventory.
-- T09 consumes Parakeet/Reazon legal timeline, speech gap and subtitle-length evidence.
-- T10 consumes Qwen3 aligner success/negative cases, provenance and time-error evidence.
-- Parent Gate 0 consumes all per-route decisions and unresolved size/license blockers.
+- T08 consumes ABI/callback/ownership/final-refresh/runtime evidence.
+- T09 consumes Parakeet/Reazon ground-truth CER/gaps/timeline/resources and algorithm-source evidence.
+- T10 consumes Qwen aligner positive/negative/provenance/time-error evidence.
+- Parent Gate 0 consumes per-route native feasibility, absolute measurements, size and license blockers, not Python parity.

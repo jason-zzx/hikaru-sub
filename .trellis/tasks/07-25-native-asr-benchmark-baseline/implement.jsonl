@@ -1,7 +1,8 @@
-{"file":".trellis/spec/asr/index.md","reason":"ASR layer ownership, pre-development checklist, and current Python sidecar baseline."}
+{"file":".trellis/spec/asr/index.md","reason":"ASR layer ownership and current Python sidecar implementation context; not a quality authority."}
 {"file":".trellis/spec/asr/directory-structure.md","reason":"Place the benchmark harness and tests without creating a parallel product structure."}
-{"file":".trellis/spec/asr/engine-plugins.md","reason":"Reuse AsrEngine/registry, preserve Kotoba-only readiness, and understand optional-engine behavior."}
-{"file":".trellis/spec/asr/api-and-jobs.md","reason":"Match final segment refresh and current job/snapshot semantics while avoiding HTTP duplication."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Reuse AsrEngine/registry and understand current implementation behavior as optional diagnostic reference."}
+{"file":".trellis/spec/asr/api-and-jobs.md","reason":"Match final segment refresh and current job/snapshot product contracts while avoiding HTTP duplication."}
 {"file":".trellis/spec/asr/quality-guidelines.md","reason":"Run the correct unittest suite and report unavailable optional models honestly."}
-{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Parent engine routes, benchmark categories, migration thresholds, and privacy constraints."}
-{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Repository evidence and frozen benchmark planning decisions for implementation."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Parent engine routes, product contracts, ground-truth authority, migration gates, and privacy constraints."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Authoritative local-material facts, current implementation diagnostics, and ground-truth planning decisions."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/python-reference-report.md","reason":"Consume the deterministic five-engine short-case Python diagnostics without treating them as quality truth or a relative gate."}

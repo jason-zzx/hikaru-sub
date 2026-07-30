@@ -1,6 +1,6 @@
 # 原生 ASR 迁移实施总计划
 
-> 状态：父任务总体规划完成，等待评审。当前不创建子任务、不启动实现。
+> 状态：父任务保持 `planning`；T01 已进入 `in_progress`，T02/T03 保持 `planning`。父任务不直接启动实现。
 
 ## Execution Policy
 
@@ -40,33 +40,36 @@ Allowed parallel groups:
 
 ## Task Map
 
-### Phase 0 - Baseline And Feasibility
+### Phase 0 - Ground Truth And Feasibility
 
-#### T01 - Establish Native ASR Benchmark Baseline
+#### T01 - Establish Native ASR Benchmark Ground Truth
 
 Suggested slug: `native-asr-benchmark-baseline`
 
 Deliverables:
 
-- Define short (<30s), medium (5-15m) and long (>60m) Japanese corpus categories, including silence, background audio, rapid dialogue, long continuous speech and named entities.
-- Use only redistributable fixtures in the repository; keep private/large local corpus paths ignored and record reproducible metadata rather than media contents.
-- Capture current Python engine output, segment timing, CER inputs, RTF, peak RAM/VRAM and cold-start measurements.
-- Add a repeatable comparison/report format consumed by later tasks.
+- Freeze the user-provided `.asr-benchmark` short/medium/long WAV+ASS identities, reference semantics, privacy rules and metric schema as the only quality truth.
+- Record the confirmed 24.102s/8, 498.872s/165 and 4144.235s/908 Dialogue metadata without copying local subtitle text or media.
+- Implement shared absolute CER, confirmed-speech-gap, timeline, Qwen alignment, timing, performance and resource scoring.
+- Publish the user-reviewed frozen absolute budgets: CER `<=0.35` per engine/case; CPU RTF `<=1.0`; GPU-accelerated RTF `<=0.5`; short cold wall `<=120s`; CTranslate2 RSS `<=6 GiB`; CrispASR RSS `<=12 GiB`; no VRAM gate.
+- Capture current Python engine results only as optional diagnostic/current-implementation references; publish `python-reference-report.md` only after valid runs.
 
 Depends on: none.
 
 Exit criteria:
 
-- All five current Python engines have a documented baseline or an explicit dependency/model limitation.
-- Quality calculations and timing comparison are repeatable.
-- No private media, credentials or model weights enter source control.
+- Ground-truth manifest/reference/metrics and deterministic comparison are reviewed and reusable by T02/T03.
+- Hard gates retain 0 invalid timeline, 0 confirmed gap `>=1.5s`, and Qwen median/P95 limits.
+- Python limitations are documented but do not block native quality comparison.
+- No private media, ASS text, credentials, absolute paths or model weights enter source control.
 
 Validation:
 
 ```text
 Existing Python sidecar tests
-Baseline harness self-checks
-Manual model-backed benchmark report
+Ground-truth harness self-checks
+Local authoritative manifest validation
+Optional Python reference report
 ```
 
 Rollback point: no production path changes.
@@ -78,16 +81,18 @@ Suggested slug: `native-asr-ctranslate2-poc`
 Deliverables:
 
 - Minimal pinned CMake build using CTranslate2 C++ Whisper API.
-- Run large-v3 and Kotoba v2.0 on representative Japanese audio.
-- Prove tokenizer, mel, timestamp decode and segment output direction.
+- Run large-v3 and Kotoba v2.0 on T01 authoritative cases; T02 remains a general CT2 feasibility scope.
+- Choose tokenizer/mel/timestamp/decode direction from official APIs/model cards and maintained community practice, then measure against ground truth.
+- Record current Python outputs only as optional diagnostics; their absence or parity does not decide feasibility.
 - Measure CPU runtime footprint, RTF and memory without changing application defaults.
 
-Depends on: T01.
+Depends on: T01 ground-truth contract and metric handoff; optional Python reference is not required.
 
 Exit criteria:
 
-- Both engines produce legal Japanese segment timelines.
-- Kotoba-specific files and 15-second behavior are understood.
+- Both engines produce legal Japanese segment timelines and ground-truth measurements.
+- Kotoba model-card/readiness obligations are understood without treating current Python chunking as the native template.
+- PoC reports measured/pass/fail/blocked against the frozen T01 gates, without treating Python diagnostics as expected output or claiming later productization gates are complete.
 - No unresolved licensing or binary-distribution blocker.
 
 Rollback point: discard PoC without touching production ASR.
@@ -99,16 +104,18 @@ Suggested slug: `native-asr-crispasr-poc`
 Deliverables:
 
 - Pin CrispASR and exercise its public C ABI.
-- Run Parakeet JA Q8_0, ReazonSpeech Q8_0 and Qwen3-ASR Q4_K with ForcedAligner Q4_K.
-- Record segment/progress callback behavior, long-audio limits, runtime footprint and model licenses.
+- Run Parakeet JA Q8_0, ReazonSpeech Q8_0 and Qwen3-ASR Q4_K with ForcedAligner Q4_K on T01 authoritative cases.
+- Record segment/progress/final-refresh behavior, long-audio limits, runtime footprint and model licenses; current Parakeet, Qwen3 and ReazonSpeech refresh behavior is diagnostic only.
+- Select chunking/VAD/segmentation from official/model-card/maintained community guidance and ground-truth results, not Python parity.
 
-Depends on: T01.
+Depends on: T01 ground-truth contract and metric handoff; optional Python reference is not required.
 
 Exit criteria:
 
-- All three engines produce legal Japanese timelines.
+- All three engines produce legal Japanese timelines and direct ground-truth measurements or explicit native blockers.
 - Qwen3 timing comes from the aligner, not synthetic averaging.
-- Known long-audio coverage gaps and required compensation are evidence-backed.
+- Known long-audio coverage gaps and required compensation are ground-truth and authoritative-source backed.
+- Each route reports measured/pass/fail/blocked against the frozen T01 gates without claiming later productization work is complete.
 
 Rollback point: discard PoC without affecting CT2 work or production ASR.
 
@@ -175,18 +182,18 @@ Suggested slug: `native-asr-ctranslate2-whisper`
 
 Deliverables:
 
-- Implement WAV validation, log-mel extraction, tokenizer/prompt loading, 30-second windowing, timestamp-token parsing, no-speech/failure handling and optional alignment.
-- Preserve beam size 5, CPU int8, language detection and VAD time restoration.
-- Normalize chunk overlap into stable segments and emit monotonic progress.
-- Add tokenizer/timestamp golden tests and model-backed quality/performance report.
+- Implement product-model WAV/features/tokenizer/prompt/window/timestamp/no-speech/alignment behavior from official CTranslate2/Whisper sources and maintained recommendations.
+- Validate all supported product models against T01 ground truth, explicitly including `large-v2` Japanese audio over 10 minutes and the current V4/seed/session special-path regression cases.
+- Treat current Python parameters and private fork as diagnostics, not required native algorithms.
+- Normalize overlap into stable segments, emit monotonic progress, and publish model-backed absolute quality/performance/resource results.
 
 Depends on: T02, T05.
 
 Exit criteria:
 
-- CER degradation <=0.5 absolute percentage points.
-- CPU RTF degradation <=10% against baseline.
-- No invalid/overflow timeline segments on the corpus.
+- All required product-model cases meet T01 user-reviewed absolute CER/RTF/resource budgets.
+- No invalid/overflow timeline segments or confirmed speech gaps `>=1.5s`.
+- Large-v2 long-audio behavior is validated even if the selected native algorithm differs from Python.
 
 Rollback point: retain Python faster-whisper as development default.
 
@@ -196,16 +203,16 @@ Suggested slug: `native-asr-kotoba-compatibility`
 
 Deliverables:
 
-- Add Kotoba's 15-second chunks, Japanese language and no-previous-text conditioning.
+- Implement Kotoba behavior from its pinned model card/stable APIs and T01 ground-truth results; current Python 15-second/no-context behavior remains diagnostic reference.
 - Keep `preprocessor_config.json` readiness Kotoba-only.
 - Resolve valid old Hugging Face CTranslate2 snapshots without copying them.
-- Verify overlap merge and long-audio behavior against baseline.
+- Verify overlap and long-audio behavior directly against ground truth.
 
 Depends on: T06.
 
 Exit criteria:
 
-- Kotoba meets CT2 quality/timing gates.
+- Kotoba meets T01 user-reviewed absolute quality/timing/resource gates.
 - Ordinary faster-whisper readiness is not tightened accidentally.
 - Old valid CT2 caches are reusable and malformed caches fail safely.
 
@@ -221,7 +228,7 @@ Deliverables:
 
 - Wrap the pinned public session/result/progress/segment/alignment C ABI subset.
 - Map callbacks to protocol events with cancellation and safe ownership.
-- Share audio/VAD/result normalization without engine-specific product hacks.
+- Share audio/VAD/result normalization selected from stable CrispASR APIs and ground-truth evidence, without Python-parity product hacks.
 - Record ABI/library commit in runtime manifest.
 
 Depends on: T03, T05.
@@ -240,16 +247,16 @@ Suggested slug: `native-asr-parakeet-reazon`
 Deliverables:
 
 - Route Parakeet JA Q8_0 and ReazonSpeech Q8_0 through the shared backend.
-- Validate native timestamps, subtitle segment size and long-audio coverage.
-- Port only the minimum gap detection/backfill or Japanese segmentation proven necessary by T01/T03 corpus failures.
-- Use `segmentsReplace` for any final correction pass.
+- Validate native timestamps, subtitle segment size and short/medium/long coverage against T01 truth.
+- Start from official/model-card/maintained community guidance; add only compensation demonstrated necessary by ground-truth failures.
+- Support final `segmentsReplace` when the selected pipeline performs a final correction; do not assume refresh is Parakeet-only. Current Reazon `>=60s` 45s/2s-overlap behavior is a diagnostic regression case, not a required native algorithm.
 
 Depends on: T08.
 
 Exit criteria:
 
-- Each engine has CER degradation <=1 absolute percentage point.
-- No new confirmed speech gap >=1.5 seconds.
+- Each engine meets T01 user-reviewed absolute CER/RTF/resource budgets.
+- No confirmed speech gap `>=1.5s` and no invalid/out-of-bounds timeline.
 - No Q4 Parakeet repeated-loop default is introduced.
 
 Rollback point: engines switch independently; one failure does not disable the other.
@@ -261,17 +268,17 @@ Suggested slug: `native-asr-qwen3-aligner`
 Deliverables:
 
 - Treat Qwen3 1.7B Q4_K and ForcedAligner 0.6B Q4_K as one model product.
-- Chunk long audio, run text inference, align words/characters, restore global offsets and deduplicate overlap.
-- Fail when alignment is missing/invalid; never synthesize whole-audio timestamps.
-- Aggregate progress from completed audio blocks.
+- Select chunking/alignment/segmentation from official/model-card/maintained community guidance and ground-truth results; Python synthetic or refresh behavior is diagnostic only.
+- Fail when alignment is missing/invalid; never synthesize timestamps.
+- Aggregate progress and allow a final `segmentsReplace` when required by the chosen pipeline.
 
 Depends on: T08.
 
 Exit criteria:
 
-- CER degradation <=1 absolute percentage point.
-- Start-time median <=150 ms and P95 <=500 ms.
-- Missing companion, alignment failure, leading silence and chunk-boundary cases are tested.
+- Qwen3 meets T01 user-reviewed absolute CER/RTF/resource budgets.
+- Start-time median <=150 ms and P95 <=500 ms against authoritative ASS timing.
+- Missing companion, alignment failure, leading silence and chunk-boundary cases are tested; timeline remains legal.
 
 Rollback point: disable only Qwen3 native routing.
 
@@ -392,7 +399,7 @@ This task is a release gate, not a place to finish missing engine implementation
 
 Deliverables:
 
-- Run the complete five-engine short/medium/long corpus matrix and publish quality/performance/ memory results.
+- Run the complete five-engine short/medium/long authoritative ground-truth matrix and publish absolute quality/performance/resource results plus optional Python diagnostics.
 - Verify cancel, crash, recovery, offline cached-model use, installed and portable behavior.
 - Switch production packaging/default routes only for qualified engines; stop bundling Python sidecar/runtime/venv.
 - Verify setup/portable/runtime size, third-party licenses and zero bundled model weights.
@@ -426,7 +433,7 @@ Rollback point: restore the previous production package inputs and per-engine ro
 
 - [ ] Command/state/type names remain aligned across worker, Rust and TypeScript.
 - [ ] Parent engine-route table matches model manifest and UI metadata.
-- [ ] Every engine has model-backed quality evidence and legal timestamps.
+- [ ] Every engine has model-backed quality evidence directly against T01 ground truth and legal timestamps; Python parity is not used as a gate.
 - [ ] Qwen3 readiness and execution always include the ForcedAligner.
 - [ ] Portable/installed roots and cleanup boundaries are covered.
 - [ ] Probe performs no recursive storage scan.
@@ -443,4 +450,4 @@ Stage 0 child-task creation:
 - [x] User reviewed and approved the parent `prd.md`, `design.md` and task map.
 - [x] T01-T03 are confirmed as the first creation batch and now exist as planning children.
 - [x] Each child has independently reviewable `prd.md`, `design.md`, `implement.md`, `implement.jsonl` and `check.jsonl`.
-- [ ] Keep parent status at `planning`; start only T01 after this child batch receives final user review. T02/T03 remain blocked on T01's benchmark handoff.
+- [x] Keep parent status at `planning`; T01 is `in_progress`. T02/T03 remain `planning` until T01 ground-truth handoff and manifest refresh are reviewed.

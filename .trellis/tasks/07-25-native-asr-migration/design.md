@@ -6,6 +6,12 @@
 
 核心变化只有一条：用独立原生 C++ worker 替代生产版 Python FastAPI sidecar。React 的转录工作流和 Tauri command 表面保持稳定，Tauri 从 HTTP 代理升级为原生任务与进程管理者。
 
+## Evidence And Implementation Authority
+
+Algorithm decisions follow this order: validated user `.asr-benchmark` WAV+ASS ground truth; official documentation/stable public APIs/model cards; current well-maintained community recommendations; measured selection against the same ground truth. Current Python code/output is diagnostic and historical reference only, not expected output or a relative quality/performance gate.
+
+This algorithm hierarchy does not weaken product compatibility. React/Tauri commands, `AsrJobSnapshot`, cancellation, recovery, paths, cleanup and security remain mandatory contracts.
+
 ## Architecture
 
 ```text
@@ -63,7 +69,8 @@ The worker is single-request and may exit after each job. Long-lived HTTP servic
 
 ### Python Legacy
 
-- Remain in the source tree during migration as a baseline and developer-only diagnostic fallback.
+- Remain in the source tree during migration as a current-implementation diagnostic and developer-only fallback.
+- Never supply or repair reference text/timestamps, and never be required for native quality comparison.
 - Never be required by the production package after cutover.
 - Remain removable per engine: failure of one CrispASR route does not require reverting completed CTranslate2 work.
 
@@ -118,19 +125,21 @@ The worker does not create `SubtitleCue`, bilingual structure or ASS styles.
 
 | Engine ID | Backend | Product-specific rule |
 |---|---|---|
-| `faster-whisper` | CTranslate2 | Preserve beam size 5, CPU int8, timestamps, VAD mapping and language detection |
-| `kotoba-faster-whisper` | CTranslate2 | 15-second chunks, no previous-text conditioning, Kotoba-only preprocessor readiness |
-| `parakeet` | CrispASR | Q8_0 default; validate long-audio TDT coverage before porting Python backfill |
-| `reazonspeech-nemo` | CrispASR | Q8_0 default; validate RNNT timestamps and subtitle segment length |
+| `faster-whisper` | CTranslate2 | Support product model IDs and legal timestamps; algorithm/config selected from official/community guidance against ground truth |
+| `kotoba-faster-whisper` | CTranslate2 | Follow pinned model-card requirements; retain Kotoba-only preprocessor readiness |
+| `parakeet` | CrispASR | Q8_0 default; evaluate official upstream long-audio behavior against confirmed speech regions |
+| `reazonspeech-nemo` | CrispASR | Q8_0 default; evaluate official RNNT timestamps/chunking against ground truth |
 | `qwen3-asr` | CrispASR | Q4_K text model plus required Q4_K ForcedAligner; no synthetic timestamps |
 
-CTranslate2 productization includes the faster-whisper layer that CTranslate2 itself does not provide: log-mel extraction, tokenizer loading, prompts, timestamp-token parsing, window advancement, no-speech handling, VAD time restoration and overlap merge. The migration freezes current decode parameters before attempting optimization.
+CTranslate2 productization supplies the native Whisper layers that CTranslate2 itself does not provide. Their tokenizer, feature, prompt, decoding, windowing, VAD and merge algorithms begin from official APIs/model cards and maintained community practice, then are selected by T01 ground-truth measurements. Current Python behavior is a diagnostic regression input, not a template.
 
-CrispASR productization first uses upstream long-audio behavior. Existing Python gap detection, Japanese segmentation or backfill is ported only when a repeatable corpus failure proves it necessary.
+The current `faster-whisper==1.2.1` / `ctranslate2==4.8.0` `large-v2` + `ja` + `>=600000ms` V4/seed/session/semantic path must be included in T06 product-model validation, but T06 may replace it with an authoritative, better-performing algorithm.
+
+CrispASR productization likewise starts with documented upstream behavior. Python gap detection, chunking, Japanese segmentation, backfill and refresh patterns are copied only when ground-truth evidence and authoritative implementation guidance justify them, never to achieve Python parity.
 
 ## VAD Design
 
-The CPU runtime may reuse CrispASR's public VAD capability for CTranslate2 jobs, avoiding Python Silero/ONNX packaging. `useVad=true` applies the current session-scoped UI configuration. VAD loading or detection failure falls back to fixed-window processing and emits a nonfatal diagnostic; it must not abort transcription.
+The CPU runtime may reuse CrispASR's public VAD capability for CTranslate2 jobs when supported by official/stable APIs and ground-truth evaluation. `useVad=true` remains a product input contract, but the native algorithm need not copy Python VAD internals or fallback policy. Any fallback must remain observable, legal on the timeline, and pass the same authoritative corpus gates.
 
 A small shared VAD companion model may be downloaded under `deps/models/shared/vad`. It remains separate from engine weights and follows the same manifest/hash rules.
 
@@ -217,7 +226,7 @@ Existing specs that state "inference stays in Python" are current-state document
 
 The migration is capability-gated rather than a single irreversible switch:
 
-1. Establish Python baselines and native PoCs without changing defaults.
+1. Establish authoritative ground-truth measurements and optional Python diagnostics, then run native PoCs without changing defaults.
 2. Introduce protocol and Rust host behind development-only native selection.
 3. Promote CTranslate2 engines after their independent quality gate.
 4. Promote each CrispASR engine independently after its gate.
@@ -233,7 +242,7 @@ Rollback is per engine. A failed native route can return to Python legacy in dev
 - Model-backed suites run manually or in dedicated cached CI; ordinary CI remains dependency-free.
 - Rust tests cover routing, model readiness, download integrity, process lifecycle, paths and cleanup boundaries.
 - Frontend tests cover stable defaults, migrated settings, device availability and removal of Python setup UI.
-- The final matrix combines short, medium and long Japanese audio with quality, timing, memory, performance, cancel and crash criteria from the PRD.
+- The final model-backed matrix scores short, medium and long Japanese audio directly against T01 ground truth for CER, confirmed speech gaps, timeline, Qwen alignment, performance and resources. Python results are supplemental diagnostics only.
 
 ## Design Decisions
 
@@ -243,5 +252,5 @@ Rollback is per engine. A failed native route can return to Python legacy in dev
 - **D4:** CPU runtime is bundled, models are not.
 - **D5:** GPU packs are a separate project.
 - **D6:** Preserve product IPC before optimizing internal APIs.
-- **D7:** Port Python compensation logic only when corpus evidence requires it.
+- **D7:** Prefer official/model-card/stable API and maintained community algorithms; add compensation only when ground-truth evidence requires it.
 - **D8:** No Qwen3 result without ForcedAligner timestamps.

@@ -1,6 +1,8 @@
-{"file":".trellis/spec/asr/index.md","reason":"Keep the PoC outside production sidecar ownership while using current engine behavior as an oracle."}
-{"file":".trellis/spec/asr/engine-plugins.md","reason":"Preserve current faster-whisper and Kotoba behavior, especially the Kotoba-only preprocessor rule."}
-{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Keep model-backed validation optional/explicit and retain focused Python oracle tests."}
-{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Parent CTranslate2 route, decode parameters, VAD direction, runtime limits, and Gate 0 obligations."}
-{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Preliminary T01 corpus/metrics decisions; replace with T01 final handoff artifacts before activation."}
-{"file":".trellis/tasks/07-25-native-asr-ctranslate2-poc/research/planning-evidence.md","reason":"Current Python evidence, task boundaries, and unresolved feasibility risks."}
+{"file":".trellis/spec/asr/index.md","reason":"Keep the PoC outside production sidecar ownership while treating Python behavior as current implementation diagnostics only."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Understand current faster-whisper/Kotoba product behavior and Kotoba-only readiness without making it native algorithm authority."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Keep model-backed validation explicit and focused Python checks diagnostic only."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Parent CTranslate2 route, authoritative implementation hierarchy, product contracts, runtime limits, and Gate 0 obligations."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Ground-truth material facts and planning decisions retained as provenance for the final handoff."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Consume the published ground-truth authority, shared metric semantics, result contract, privacy boundary, and non-gating Python reference policy."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/python-reference-report.md","reason":"Use the sanitized large-v3/Kotoba short diagnostics only for current-implementation context, never as expected output or a relative gate."}
+{"file":".trellis/tasks/07-25-native-asr-ctranslate2-poc/research/planning-evidence.md","reason":"Current implementation diagnostics, ground-truth authority, task boundaries, and unresolved feasibility risks."}
