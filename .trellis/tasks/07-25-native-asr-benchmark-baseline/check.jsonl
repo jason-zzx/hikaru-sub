@@ -1,5 +1,7 @@
-{"file":".trellis/spec/asr/index.md","reason":"Review ASR ownership and ensure the task remains baseline-only."}
-{"file":".trellis/spec/asr/engine-plugins.md","reason":"Check all five registry routes, refresh behavior, Kotoba readiness, and optional dependencies."}
-{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Verify focused tests, full sidecar tests, and honest model-backed limitations."}
-{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Check corpus coverage, quantitative metrics, engine routes, and security/privacy requirements against the parent proposal."}
-{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check implementation against the repository facts and benchmark decisions discovered during planning."}
+{"file":".trellis/spec/asr/index.md","reason":"Review ASR ownership and ensure the task remains benchmark-contract only."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Check all five registry routes and current implementation refresh/dependency behavior without treating Python output as quality truth."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Verify focused tests, full sidecar tests, and honest model-backed diagnostic limitations."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Check authoritative corpus, absolute metrics, engine routes, product contracts, and privacy requirements against the parent proposal."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check implementation against authoritative material facts and ground-truth decisions."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Check the published ground-truth authority, shared metric semantics, optional Python reference boundary, and T02/T03 handoff."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/python-reference-report.md","reason":"Verify the deterministic five-engine short diagnostics are sanitized, limitation-aware, and explicitly non-gating."}

@@ -14,6 +14,12 @@
 - 现有 portable、受管 `deps/`、模型缓存、任务取消、恢复快照和应用退出清理语义必须继续成立。
 - 当前 `.trellis/spec/asr/` 和部分 Tauri 规范描述的是 Python 架构。在原生路径实际落地并验证前，它们仍是当前实现基线；对应子任务完成后再更新规范，不能提前制造规范与代码漂移。
 
+## Evidence And Implementation Authority
+
+冲突按以下层级解决：用户 `.asr-benchmark` WAV+ASS 真值；官方文档/稳定 API/模型卡；维护良好的社区推荐实践；同一真值上的实测选择；当前 Python 实现诊断参考。Python 不得生成或修补 reference，也不构成相对 CER/RTF gate。
+
+React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同是独立的产品兼容权威，不因算法来源层级变化而降级。
+
 ## Requirements
 
 ### R1 - 平台与交付范围
@@ -27,7 +33,7 @@
 ### R2 - 固定引擎路由
 
 - `faster-whisper` 使用 CTranslate2。
-- `kotoba-faster-whisper` 使用 CTranslate2，并保留 15 秒分块、`condition_on_previous_text=false` 和 Kotoba 专属 `preprocessor_config.json` 就绪规则。
+- `kotoba-faster-whisper` 使用 CTranslate2；算法与解码配置依据官方模型卡、稳定 API 和 ground-truth 实测选择，Kotoba 专属 `preprocessor_config.json` 就绪规则保持产品兼容。
 - `parakeet` 使用 CrispASR Parakeet JA GGUF。
 - `reazonspeech-nemo` 使用 CrispASR ReazonSpeech GGUF。
 - `qwen3-asr` 使用 CrispASR Qwen3-ASR 1.7B GGUF，并强制配套 Qwen3 ForcedAligner；对齐器缺失或失败时任务失败，不生成伪造时间戳。
@@ -89,16 +95,16 @@
 
 ### R8 - 质量、发布与回退
 
-- 建立固定的短、中、长日语语料基线，记录文本、分段、时间戳、RTF、RAM/VRAM 和冷启动时间。
-- CTranslate2 Whisper CER 相比当前 faster-whisper 不劣化超过 0.5 个绝对百分点。
-- CrispASR 引擎 CER 相比对应 Python 引擎不劣化超过 1 个绝对百分点。
-- 不新增持续 1.5 秒以上、经确认含语音的漏段；不得产生 `endMs <= startMs` 或越界片段。
-- Qwen3 起始时间误差中位数不高于 150 ms，P95 不高于 500 ms。
-- CTranslate2 CPU RTF 不比当前 Python faster-whisper 慢超过 10%。
+- 用户提供的 `.asr-benchmark` WAV+ASS 是唯一质量真值；Python 输出只作为可选诊断/历史参考，不能作为期望输出、相对 CER/RTF gate 或缺失标注替代。
+- 原生算法按官方文档、稳定 API、模型卡、当前维护良好的社区推荐实践排序选择，再以同一 ground truth 实测；不以复刻 Python 参数、分块、VAD、backfill 或私有 fork 为目标。
+- T01 用户评审后冻结的绝对门槛为：每个 engine/case CER `<=0.35`；纯 CPU inference RTF `<=1.0`；CUDA/Vulkan 等 GPU 加速 inference RTF `<=0.5`；short cold process wall `<=120s`；CTranslate2 RSS `<=6 GiB`；CrispASR RSS `<=12 GiB`；不定义 VRAM gate。T02/T03 必须直接对 ground truth 评估，不得凭 Python parity 宣称通过。
+- 不得产生 `endMs <= startMs`、负起点或越界片段；直接对 ground truth 评估时，不得存在持续 `>=1.5s`、经参考标注确认含语音的漏段。
+- Qwen3 起始时间误差中位数不高于 150 ms，P95 不高于 500 ms，且时间戳必须来自 ForcedAligner。
+- Python reference 缺失或失败只减少诊断覆盖，不阻塞原生实现直接对 ground truth 的质量判断。
 - 发出取消后 2 秒内 worker 退出；异常退出后可读取最后保存的恢复快照。
 - Windows setup 不超过 80 MB，portable ZIP 不超过 90 MB，解压后的 CPU ASR runtime 不超过 250 MB。
 - 迁移期间保留 `python-legacy` 源码开发/诊断路径；发布包不携带 Python runtime 或 venv。
-- 每个引擎分别通过质量门槛后才能切换；单个 CrispASR 引擎失败不阻塞已达标的 CTranslate2 路径。
+- 每个引擎分别通过用户真值和产品合同门槛后才能切换；单个 CrispASR 引擎失败不阻塞已达标的 CTranslate2 路径。
 
 ### R9 - 父子任务治理
 
@@ -118,7 +124,7 @@
 - [ ] 模型 manifest、固定来源、大小、SHA-256、断点续传和多文件原子安装通过测试。
 - [ ] installed 与 portable 的 runtime/model/download 路径、probe/measure/cleanup 行为通过测试。
 - [ ] 运行依赖和转录 UI 不再暴露 Python/venv，旧设置可安全加载并迁移。
-- [ ] 五引擎质量、长音频覆盖、性能、取消和恢复矩阵达到 R8 门槛。
+- [ ] 五引擎质量、长音频覆盖、性能与资源矩阵直接对 T01 用户真值达到用户评审后冻结的绝对门槛；Python 数值只作为可选参考。
 - [ ] setup、portable 和解压 runtime 体积达到 R8 预算，安装包内模型权重为 0。
 - [ ] `pnpm test`、`pnpm build`、`cargo test --manifest-path src-tauri/Cargo.toml` 和 worker CTest 全部通过。
 - [ ] 第三方许可证、attribution、`THIRD_PARTY_NOTICES.md`、`AGENTS.md` 和相关 Trellis specs 与最终架构一致。
@@ -137,7 +143,7 @@
 
 ## Planning State
 
-- 总体 PRD、设计与实施任务地图已于本轮获得用户评审确认。
-- T01 `native-asr-benchmark-baseline`、T02 `native-asr-ctranslate2-poc` 与 T03 `native-asr-crispasr-poc` 已创建为独立 `planning` 子任务，并各自具备 PRD、设计、实施计划和 context manifests。
-- 三个子任务均未启动；T01 是唯一可在当前 Gate 0 阶段进入实施的候选任务。T02/T03 的模型实测明确依赖 T01 的正式 benchmark handoff。
-- 父任务继续保持 `planning`，不直接承载实现。下一评审点是确认并单独启动 T01，而不是并行启动所有 Gate 0 工作。
+- 总体 PRD、设计与实施任务地图已获评审；本轮同步新的 ground-truth 权威和 v0.4.1 实现事实。
+- T01 `native-asr-benchmark-baseline` 已处于 `in_progress`；T02 `native-asr-ctranslate2-poc` 与 T03 `native-asr-crispasr-poc` 保持 `planning`。
+- T01 ground-truth contract、per-case coverage 与绝对预算已获用户评审并冻结；T02/T03 模型实测依赖更新后的 manifest identity 和共享指标实现，不依赖 Python reference 成功。
+- 父任务继续保持 `planning` 且不直接承载实现。

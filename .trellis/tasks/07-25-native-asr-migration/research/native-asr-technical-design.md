@@ -14,7 +14,7 @@ Hikaru Sub 的发布版 ASR 从 Python sidecar 迁移为原生进程，保留当
 | 当前引擎 | 原生运行时 | 原因 |
 |---|---|---|
 | `faster-whisper` | CTranslate2 | 当前模型本身就是 CTranslate2 格式；最容易保持速度、模型缓存和解码行为 |
-| `kotoba-faster-whisper` | CTranslate2 | 继续使用 `kotoba-whisper-v2.0-faster`，保留 15 秒分块与无前文条件设置 |
+| `kotoba-faster-whisper` | CTranslate2 | 继续使用 `kotoba-whisper-v2.0-faster`，按官方模型卡与真值实测选择分块/解码算法 |
 | `parakeet` | CrispASR | 直接运行 Parakeet JA GGUF，避免 PyTorch/NeMo |
 | `qwen3-asr` | CrispASR + Qwen3 ForcedAligner | 保留 Qwen3-ASR 1.7B 文本质量与强制对齐时间轴 |
 | `reazonspeech-nemo` | CrispASR | 直接运行 ReazonSpeech NeMo v2 GGUF，避免 PyTorch/NeMo |
@@ -28,6 +28,16 @@ Hikaru Sub 的发布版 ASR 从 Python sidecar 迁移为原生进程，保留当
 5. **移除生产版 Python 3.11、venv、pip、PyTorch、NeMo 和 FastAPI 依赖。**
 6. **CPU runtime 随安装包发布；Vulkan/CUDA 作为可选受管 runtime pack 按需下载。**
 7. **首期保持现有 `start_asr` / `get_asr_progress` / `cancel_asr` 等前端接口。**
+
+### 1.1 证据与实现来源层级
+
+1. 用户提供的 `.asr-benchmark` WAV+ASS 及其校验 manifest 是文本、语音区间和时间轴的唯一质量真值。
+2. 原生算法优先采用官方文档、稳定 public API 和模型卡，其次采用当前维护良好的社区推荐实践。
+3. 候选算法通过同一真值的绝对 CER、confirmed speech gap、时间轴、Qwen 对齐、性能和资源实测选择。
+4. 当前 Python 实现和输出仅用于理解产品合同、发现已知问题与诊断/历史对照；不作为期望输出、相对 CER/RTF gate 或 reference 修补来源。
+5. React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同是独立且必须保持的产品权威。
+
+T01 的绝对预算已获用户评审并冻结：CER `<=0.35` per engine/case；CPU inference RTF `<=1.0`；GPU-accelerated inference RTF `<=0.5`；short cold process wall `<=120s`；CTranslate2 RSS `<=6 GiB`；CrispASR RSS `<=12 GiB`；无 VRAM gate。T02/T03 必须直接对 ground truth 评估，不得以 Python parity 宣称通过。
 
 ---
 
@@ -92,7 +102,7 @@ React TranscribeView
 | `src-tauri/src/asr.rs` | Python sidecar + HTTP 代理 | 改为原生任务管理和 worker 进程协议 |
 | `src-tauri/src/asr_setup.rs` | Python/venv/pip 一键配置 | 生产路径删除；由原生 runtime 状态替代 |
 | `src-tauri/src/dependencies.rs` | FFmpeg/Python/venv/模型缓存管理 | 改为 FFmpeg、原生 runtime pack、模型和缓存管理 |
-| `asr-service/` | Python 推理实现 | 迁移期间作为行为基线和开发回退保留 |
+| `asr-service/` | Python 推理实现 | 迁移期间作为当前实现诊断参考和开发回退保留，不作为 native 算法模板或质量真值 |
 | `src/constants/asr.ts` | 引擎与模型列表 | 保留引擎 ID，模型描述改为原生模型清单 |
 | `src/components/workflow/AsrEngineSetupPanel.tsx` | Python 引擎依赖配置 | 替换为原生 runtime 状态与可选 GPU pack 管理 |
 | `src/components/workflow/TranscribeView.tsx` | 转录 UI 和任务轮询 | 尽量不改任务协议，只调整设备选项和提示 |
@@ -327,15 +337,11 @@ Tauri 启动 worker 后，通过 stdin 写入一行 JSON：
 
 ### 7.1 目标
 
-原生 CTranslate2 路径不是重新实现一个近似 Whisper，而是尽量复刻当前 faster-whisper 的关键行为：
+原生 CTranslate2 路径实现 Whisper 所需的完整上层链路，但算法权威不是当前 faster-whisper 私有实现。实现顺序为官方 CTranslate2/Whisper 文档与稳定 API、模型卡、维护良好的社区实践，再由 `.asr-benchmark` ground truth 实测选择。
 
-- 同一 CTranslate2 模型；
-- beam size 5；
-- CPU int8 / CUDA float16；
-- segment timestamps；
-- VAD 后时间轴还原；
-- language detection；
-- Kotoba 特殊分块参数。
+当前 Python 参数、VAD、分块、backfill 与私有 fork 只作为诊断和回归案例。当前 `faster-whisper==1.2.1`、`ctranslate2==4.8.0` 中 `large-v2` + `ja` + `>=600000ms` 的 V4/seed/session/语义路径必须在 T06 被覆盖，但不要求原生复刻。
+
+原生结果仍须提供合法 segment timestamps、language detection 与可追溯的时间轴。
 
 ### 7.2 原生管线
 
@@ -369,47 +375,17 @@ Tauri 启动 worker 后，通过 stdin 写入一行 JSON：
 - tokenizer：使用能直接读取 Hugging Face `tokenizer.json` 的固定版本原生库，不自行重写 BPE。
 - JSON：worker 使用单一轻量 JSON 库处理 request/config/tokenizer metadata。
 
-### 7.3 faster-whisper 参数
+### 7.3 faster-whisper 配置来源
 
-当前项目默认行为：
+当前项目的 beam 5、VAD、CPU int8、CUDA float16 与日语配置只作为 current-implementation reference 记录。原生默认值依据官方 API/模型卡和维护良好的社区推荐提出，并用 T01 真值评估绝对质量、性能与资源后选择；不以参数一致或 Python 输出一致为 gate。
 
-```text
-beam_size = 5
-vad_filter = true
-CPU compute_type = int8
-CUDA compute_type = float16
-language = ja
-```
+### 7.4 Kotoba 配置来源
 
-原生路径必须先以这些参数建立基线，不在迁移时顺手更改准确率/速度策略。
-
-### 7.4 Kotoba 参数
-
-```text
-model = kotoba-tech/kotoba-whisper-v2.0-faster
-chunk_length = 15 seconds
-condition_on_previous_text = false
-language = ja
-```
-
-Kotoba 模型就绪检查继续额外要求：
-
-```text
-preprocessor_config.json
-```
-
-普通 faster-whisper 模型不扩大该要求。
+固定模型仍为 `kotoba-tech/kotoba-whisper-v2.0-faster`，Kotoba-only readiness 继续要求 `preprocessor_config.json`。15 秒分块、无前文条件和日语 prompt 是当前 Python 诊断事实；原生实现以 pinned model card/stable API 为首要来源，并通过 T01 ground truth 选择。普通 faster-whisper 模型不得扩大 preprocessor 要求。
 
 ### 7.5 VAD
 
-由于 CPU runtime 同时包含 CrispASR，可复用 CrispASR 公共 VAD C ABI 为 CTranslate2 生成语音切片，避免再携带 Python Silero/ONNX runtime。
-
-规则：
-
-- 默认行为先保持当前 faster-whisper 的“始终启用 VAD”。
-- `useVad=true` 时应用 UI 自定义参数。
-- VAD 模型加载或检测失败时降级为固定窗口，不中断转录。
-- VAD companion 模型可作为小型共享模型按需下载，不与任一 ASR 权重重复。
+由于 CPU runtime 同时包含 CrispASR，可在其稳定 public VAD API 适用时复用该能力。`useVad` 和 VAD config 仍是产品输入合同，但算法与 fallback 不复制 Python：按官方/社区实践提出候选，并对 T01 真值验证 legal timeline、confirmed speech coverage、质量和性能。共享 VAD companion 模型仍按 model manifest/hash 管理。
 
 ---
 
@@ -442,19 +418,16 @@ worker 只使用 CrispASR 公共 C ABI，不依赖 CLI 文本输出：
   - 按时间排序；
   - 去除完全重复片段。
 
-当前 Python `parakeet.py` 含大量自定义分块、gap backfill 和日语分段逻辑。首期不应盲目整段移植：
-
-1. 先用真实日语长音频比较 CrispASR 自带长音频路径；
-2. 只有出现可重复的漏句/边界问题时，才迁移对应的最小补偿逻辑；
-3. 若需要 backfill，继续使用 `segmentsReplace` 事件替换最终结果。
+当前 Python Parakeet 含自定义分块/gap backfill/日语分段，Parakeet、Qwen3 与 ReazonSpeech 都可能通过 `TranscriptSegmentRefresh` 最终替换 preview；这些是诊断事实，不是原生模板。先按 CrispASR 官方/模型卡/维护良好社区路径对 ground truth 实测，只有真值证明存在系统缺口且来源层级支持时才增加最小补偿。任何最终修正统一使用 `segmentsReplace`。
 
 ### 8.3 ReazonSpeech
 
 - backend：`reazonspeech`
 - 默认模型：Q8_0
 - 使用 CrispASR 的 RNNT 结果和原生时间戳。
-- 对长音频按 CrispASR 推荐路径测试 VAD/分块，不继续依赖 Python 整段 NeMo tensor。
-- 保留当前日语标点和最大片段长度的质量对比，避免输出超长整段字幕。
+- 按 CrispASR 官方/模型卡推荐路径对短、中、长 ground truth 选择 VAD/分块/分段。
+- 当前 Python 在 `<60s` 使用 whole audio、`>=60s` 使用 45s chunk/2s overlap，并可能以 final refresh 替换 preview；这些仅作为诊断回归案例。
+- 直接对参考文本、speech regions 和字幕时间轴评估质量与片段长度，不追求 Python 输出一致。
 
 ### 8.4 Qwen3-ASR
 
@@ -856,28 +829,17 @@ scripts/prepare-asr-resource.mjs
 
 ## 14. 分阶段实施
 
-### 阶段 0：基线与原生 PoC
+### 阶段 0：基准真值与原生 PoC
 
-目标：先证明核心模型可用，不改产品默认路径。
+目标：先冻结用户权威材料和共享指标，再证明核心模型可用，不改产品默认路径。
 
-- 固定一组短/长日语音频基线。
-- 记录每个 Python 引擎的：
-  - 文本；
-  - 分段；
-  - 时间戳；
-  - RTF；
-  - RAM/VRAM；
-  - 冷启动时间。
-- 构建 CPU 原生 worker PoC。
-- 跑通：
-  - CTranslate2 large-v3；
-  - Kotoba v2.0；
-  - Parakeet JA Q8_0；
-  - ReazonSpeech Q8_0；
-  - Qwen3 1.7B Q4_K + ForcedAligner。
-- 测量实际 runtime 与安装包体积。
+- 校验 `.asr-benchmark` short/medium/long WAV+ASS identity、参考标注和隐私边界。
+- 以真值计算绝对 CER、confirmed speech gap、时间轴、Qwen 对齐、性能和资源；T01 的预算与 per-case coverage 已经用户评审冻结。
+- 可选记录每个 Python 引擎的当前实现输出/时间/资源作为诊断，不因缺失而阻塞 native comparison。
+- 构建 CPU 原生 PoC，跑通 CT2 large-v3/Kotoba 与 CrispASR Parakeet/Reazon/Qwen3+Aligner。
+- 算法方向依据官方/模型卡/维护良好社区实践，并用同一 ground truth 实测选择。
 
-退出门槛：五个引擎均能产生有效日语时间轴，且 Qwen3 不使用伪造时间戳。
+退出门槛：五个引擎均有合法原生时间轴或明确 native blocker；Qwen3 不使用伪造时间戳；PoC 对冻结预算报告 measured/pass/fail/blocked，但不冒充后续产品化 gate 完成。
 
 ### 阶段 1：Worker 协议与 Rust 任务管理
 
@@ -891,12 +853,12 @@ scripts/prepare-asr-resource.mjs
 
 ### 阶段 2：CTranslate2 Whisper 正式接入
 
-- 实现音频、mel、tokenizer、窗口、timestamp decode。
-- 接入 faster-whisper 模型和旧缓存探测。
-- 接入 Kotoba 特殊参数。
-- 对比当前 faster-whisper/Kotoba 输出与速度。
+- 从官方/模型卡/维护良好社区实践实现并选择 audio/mel/tokenizer/window/timestamp/VAD/decode 链路。
+- 接入 faster-whisper 产品模型和旧缓存探测，T06 显式验证 large-v2 日语长音频特殊路径对应的回归材料。
+- 接入 Kotoba 模型卡要求。
+- 直接对 T01 ground truth 评估绝对质量、时间轴、性能和资源；Python 仅诊断。
 
-退出门槛：CTranslate2 路径达到当前默认引擎可替换质量。
+退出门槛：CTranslate2 路径达到 T01 用户评审后冻结的绝对门槛和产品合同，不要求复刻 Python 算法。
 
 ### 阶段 3：CrispASR 三个引擎正式接入
 
@@ -958,19 +920,20 @@ GPU pack 不阻塞 CPU 原生版发布。
 
 ### 15.2 质量指标
 
-| 指标 | 初始门槛 |
+| 指标 | 门槛来源/状态 |
 |---|---|
-| CTranslate2 Whisper CER | 相比当前 faster-whisper 不劣化超过 0.5 个绝对百分点 |
-| CrispASR 引擎 CER | 相比对应 Python 引擎不劣化超过 1 个绝对百分点 |
-| 长音频覆盖 | 不新增持续 1.5 秒以上、确认含语音的漏段 |
-| 无效时间轴 | 0 个 `end <= start` 片段 |
+| 各引擎 CER | 每个 engine/case `<=0.35`，直接对用户 reference |
+| 推理 RTF | 纯 CPU `<=1.0`；CUDA/Vulkan 等 GPU 加速路径 `<=0.5` |
+| Short cold process wall | `<=120s` |
+| Peak RSS | CTranslate2 `<=6 GiB`；CrispASR `<=12 GiB`；无 VRAM gate |
+| 长音频覆盖 | 0 个持续 `>=1.5s`、reference 确认含语音的漏段 |
+| 无效时间轴 | 0 个 `end <= start`、负起点或非单调片段 |
 | 越界时间轴 | 0 个超出音频时长的片段 |
 | Qwen3 起始时间误差 | 中位数不高于 150 ms，P95 不高于 500 ms |
-| CT2 CPU RTF | 不比当前 Python faster-whisper 慢超过 10% |
 | 取消响应 | 发出取消后 2 秒内 worker 退出 |
 | 崩溃恢复 | worker 异常退出后可读到最后一次已保存快照 |
 
-初始门槛可在阶段 0 获取真实基线后收紧，但不能为了过门槛而降低当前产品质量。
+T01 预算已获用户评审并冻结。T02/T03 必须按更新后的 manifest identity 直接报告 measured/pass/fail/blocked；Python reference 继续仅作 current diagnostics。
 
 ### 15.3 自动化测试
 
@@ -1028,9 +991,10 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 缓解：
 
-- 先冻结当前参数和输出基线；
+- 从官方 CTranslate2/Whisper 文档、稳定 API、模型卡和维护良好社区实现锁定候选算法；
 - 为 timestamp token、窗口推进和 Kotoba 写 golden tests；
-- 不在迁移同时改变解码策略；
+- 用 T01 ground truth 比较候选，不用 Python 参数或输出 parity 作 gate；
+- 将当前 large-v2 长音频特殊路径保留为 T06 regression case；
 - 阶段 2 不通过就不替换当前默认引擎。
 
 ### 16.2 CrispASR API 变化快

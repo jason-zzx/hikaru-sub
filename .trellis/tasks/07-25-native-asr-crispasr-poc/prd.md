@@ -2,85 +2,86 @@
 
 ## Goal
 
-在不改变 Hikaru Sub 生产代码、运行依赖或默认路由的前提下，验证固定版本的 Windows x64 CPU CrispASR 公共 C ABI 能否运行 Parakeet JA Q8_0、ReazonSpeech Q8_0，以及 Qwen3-ASR 1.7B Q4_K 加必需 ForcedAligner 0.6B Q4_K，并产出合法日语时间轴、ABI 生命周期、长音频覆盖、资源和许可证的可审计证据。
+在不改变生产代码、运行依赖或默认路由的前提下，验证 pinned Windows x64 CPU CrispASR public C ABI 能否运行 Parakeet JA Q8_0、ReazonSpeech Q8_0、Qwen3-ASR 1.7B Q4_K + required ForcedAligner，并直接对 T01 authoritative WAV+ASS ground truth 产出合法时间轴、质量、ABI lifecycle、长音频、性能、资源和许可证证据。
 
-本任务只回答三条原生路径是否具备继续产品化的基础；不实现最终 worker、协议、下载器或字幕补偿。
+本任务只回答三条 native path 的 Gate 0 可行性，不实现 worker/protocol/downloader/字幕补偿。
 
 ## Background
 
-- 本任务是父任务 T03，显式依赖 T01 `native-asr-benchmark-baseline`。
-- 父任务固定路由：Parakeet、ReazonSpeech 与 Qwen3 都使用 CrispASR；Qwen3 必须配套 ForcedAligner，缺失或失败时不得生成伪造时间轴。
-- 现有 Python Parakeet 包含长音频 gap/backfill 和最终 `TranscriptSegmentRefresh`；这些是风险证据，不是应在 PoC 中直接迁移的代码。
-- 现有 Python ReazonSpeech 是 whole-audio 路径；CrispASR callback/progress 是否逐引擎可用必须实测，不得假定相同。
-- 现有 Python Qwen3 在 aligner 不可用时可走文本平均分段回退；该行为是 native target 明确禁止的反例。
+- 本任务是 T03，显式依赖 T01 ground-truth contract。
+- Qwen3 必须配套 ForcedAligner；缺失/失败不得生成 timed output。
+- 当前 Python Parakeet 有 gap/backfill，Qwen3 有 synthetic timing fallback；这些是已知问题诊断，不是 native 模板。
+- 当前 Python ReazonSpeech 在 `>=60s` 使用 45s chunks/2s overlap；这是诊断回归事实，不定义 native 算法。
+- 当前 Parakeet、Qwen3、ReazonSpeech 都可能通过 `TranscriptSegmentRefresh` 最终替换 preview；refresh 是通用结果合同，不是 Parakeet-only 行为。
 
-## Dependency Gate
+## Dependency And Authority Gate
 
-- 启动模型实测前，T01 必须已完成并提供受评审的 corpus/result contract、short/medium/long case IDs、文件哈希、参考文本/语音区间、Python baseline 和比较命令。
-- T01 相关引擎基线缺失时，T03 可以完成 SDK/header/input research；不得宣称该引擎质量、长音频覆盖或时间精度可比较。
-- T03 激活前，两个 context manifests 必须用 T01 最终 `benchmark-contract.md` 与 `python-baseline-report.md` 替换/补充当前 planning evidence。
+- T01 提供 reviewed `benchmark-contract.md`、short/medium/long case identities、WAV+ASS hashes/reference text/speech regions/timing 和 shared comparator。
+- 实现来源顺序：CrispASR official docs/pinned stable public ABI、模型卡、当前维护良好的社区推荐实践，再由 T01 ground truth 实测选择。
+- Python reference 可缺失且只用于 diagnostics；不阻塞 native quality/coverage/timing comparison，也不能修补 reference。
+- 当前 manifests 已保留 planning evidence，并加入 `benchmark-contract.md` 与由有效五引擎 short runs 确定性生成的 `python-reference-report.md`；后者仅是 non-gating current implementation reference，medium/long claims 仍 blocked。
 
 ## Requirements
 
-### R1 - Pinned, Disposable Native Boundary
+### R1 - Pinned Disposable Native Boundary
 
-- PoC source 仅位于本任务 `research/poc-src/`；SDK、模型、build、raw run output 位于 ignored local 目录。不得新建生产 `native-asr/`、改动 Rust/Tauri/React/Python 引擎、发布脚本或资源。
-- 在编译前生成 `research/crispasr-input-lock.json`，锁定 CrispASR release/commit、public header/API version、runtime archive URL/SHA-256、Windows toolchain，及四个 GGUF 的 immutable revision、文件名、精确 size/SHA-256、许可证/attribution 来源。
-- 固定模型为 Parakeet JA Q8_0、ReazonSpeech Q8_0、Qwen3 1.7B Q4_K 和 Qwen3 ForcedAligner 0.6B Q4_K。不接受 floating branch、`latest`、近似 size 或未校验模型。
-- harness 只使用经 pinned headers 确认的 CrispASR public C ABI；任何 API 名称/ownership 假设必须从该版本 header 证明，不依赖 CLI 文本输出。
+- PoC source 仅在 `research/poc-src/`；SDK/models/build/raw output 位于 ignored local。不得改产品、Python engine 或 release inputs。
+- `research/crispasr-input-lock.json` 固定 CrispASR release/commit/public ABI/runtime archive hash/toolchain，以及四个 GGUF immutable revision/name/size/hash/license/attribution。
+- 固定 Parakeet Q8_0、Reazon Q8_0、Qwen3 Q4_K、Aligner Q4_K；不接受 floating aliases。
+- 只使用 pinned headers 证明的 public C ABI，不解析 CLI text。
 
 ### R2 - ABI Lifecycle And Callback Evidence
 
-- harness 必须验证本地 audio/model paths、打开 session、注册可用的 progress/segment callbacks、运行、读取 final result 并在所有分支关闭资源。
-- callback context、result pointer 和 text/segment data 的 lifetime 必须明确；任何 borrowed result 在释放 result/session 前复制。重复 open/transcribe/read/close、invalid paths 和 failure paths 必须受控，不可崩溃。
-- 对每个引擎记录 callback count/order/thread identity、reported progress、monotonicity、segment callback 与最终 getter 的关系、session/result cleanup outcome，以及 public ABI 是否公开 cooperative cancellation。
-- 本任务不虚构未提供的 cancellation API；若没有可用回调取消，记录为 T08/T05 通过进程终止解决的设计输入。callback after context release、close-time crash 或无法确定 ownership 是停止条件。
+- 验证 paths/input、session open、available callbacks、transcribe、final result copy 和 exact-once cleanup。
+- 明确 callback context/result/string/segment ownership；borrowed data 在 owner release 前复制。
+- 每引擎记录 callback count/order/thread/progress monotonicity、preview/final getter/refresh relationship、cleanup 和 cooperative cancellation capability。
+- 无 cancellation API 时记录并交 T05/T08 用 process termination；undefined ownership/late callback/close crash 是 blocker。
 
-### R3 - Legal Timelines And Long-Audio Evidence
+### R3 - Ground-Truth Timeline And Long Audio
 
-- Parakeet 和 ReazonSpeech 在 T01 short/medium/long cases 上运行，保留 raw upstream result 供本地检查，报告最终 legal segments、native timestamp source、subtitle length distribution、RTF、memory 与任何失败。
-- 每个接受的 segment 必须非空、`0 <= startMs < endMs <= durationMs`、按时间排序；不在 PoC 中加入 VAD fallback、Japanese resegmentation、gap backfill 或 `segmentsReplace` 修正来使结果通过。
-- 使用 T01 reference speech regions 列出所有 `>=1500ms` confirmed speech gaps。Parakeet 的 short-audio 成功不能替代 medium/long 覆盖结论。
-- ReazonSpeech 缺少增量 callback 是可报告的发现；无法安全完成/读取/关闭或在长音频稳定运行则是阻塞。
+- 三引擎在 T01 short/medium/long cases 运行，保留 ignored raw upstream result，报告 legal segments、timestamp provenance、subtitle-length distribution、CER、confirmed gaps、RTF、memory 和 failures。
+- 每个 segment 非空、`0 <= startMs < endMs <= durationMs`、排序；PoC 不添加 Python VAD/backfill/resegmentation/chunk fixes 来使结果通过。
+- 使用 ASS-derived reference speech regions 列出所有 `>=1500ms` confirmed gaps。
+- 算法/分块/VAD/merge 依据 official/model-card/community sources，按 ground truth 选择。当前 Reazon 45s/2s-overlap 与三引擎 final refresh 仅作为 diagnostics/regression evidence。
 
 ### R4 - Qwen3 Forced Alignment
 
-- Qwen3 的模型状态和运行请求必须同时包含 ASR GGUF 与 ForcedAligner GGUF。
-- 在 normal、leading-silence 与 long/boundary T01 cases 上，最终 segments 的每个时间戳都必须来自 aligner word/character result，记录 timestamp provenance 和匹配误差。
-- 对 missing/corrupt/unloadable aligner、empty alignment、malformed ranges 和 aligner error 提供 negative cases。所有此类情况必须失败，且不输出接受的 timed segments。
-- 不得调用或复刻 Python `build_segments_from_text` 等均分/合成时间逻辑。Qwen3 文本成功不等于 PoC 成功。
+- Qwen3 request/model state 同时包含 ASR+Aligner GGUF。
+- normal/leading-silence/boundary/long cases 的 accepted timestamps 全部来自 aligner word/character results；记录 provenance/unmatched/start errors。
+- missing/corrupt/unloadable/empty/malformed/error aligner cases 必须 controlled failure，accepted timed segments 为零。
+- 禁止调用/复刻 Python synthetic timing。
 
-### R5 - Evidence, Resources And Licenses
+### R5 - Evidence And Decision
 
-- machine-readable evidence 至少包含 input lock、ABI/header contract、lifecycle/callback result、per-engine/per-case run JSON、Qwen negative-case results、runtime inventory 和 license table。
-- 统一复用 T01 计算 RTF、peak memory、CER、gap 和时间误差的合同；T03 不创建第二套评分实现。
-- 记录 cold/load/inference/total 时间、runtime executable/DLL sizes、模型 sizes、CPU/RAM/可用 VRAM 与测量方法。不可用指标写 `null` 和原因。
-- `research/crispasr-poc-report.md` 对三条路线独立给出 `proceed`、`proceed-with-named-risks` 或 `stop/revise`，并把需要后续 T08/T09/T10 处理的风险明确移交。
+- Evidence 包含 input lock、ABI contract、lifecycle/callback、per-engine/case JSON、Qwen negative cases、runtime inventory、licenses 和 authoritative source citations。
+- 统一复用 T01 CER/gap/P95/time/RTF/resource contract，不创建第二套 scorer。
+- `research/crispasr-poc-report.md` 按 route 给出 `proceed`/`proceed-with-named-risks`/`stop-revise`。
+- T01 absolute budgets 已获用户评审并冻结；PoC 必须按更新后的 manifest identity 报告 measured/pass/fail/blocked，不能用 Python parity 宣称通过，也不能把 Gate 0 冒充 T08-T10 产品化完成。
 
 ## Acceptance Criteria
 
-- [ ] T01 已交付三类 case 的正式 corpus/baseline/compare contract，且 T03 manifests 已更新为最终交付物。
-- [ ] `crispasr-input-lock.json` 固定 SDK/toolchain/public ABI 与四个模型的 immutable provenance、hash、size 和许可证；无浮动唯一来源。
-- [ ] CMake Release x64 harness 使用 pinned public C ABI 构建，CTests 覆盖 invalid input、重复 lifecycle、callback capture、result copying 和 controlled error paths。
-- [ ] 三个引擎分别记录 session/result ownership、callback/progress 行为及 cleanup outcome；无 callback-lifetime/close crash/未定义 ownership 问题。
-- [ ] Parakeet 和 ReazonSpeech 在 T01 short/medium/long matrix 上各有合法 native result 或可复现的资源/API/模型阻塞记录；所有 confirmed `>=1500ms` speech gaps 被列出而非修补。
-- [ ] Qwen3 只在 ASR 加 aligner 成功且时间戳可追溯时产生最终 timeline；所有 aligner negative cases 失败且没有合成 timed output。
-- [ ] 所有被接受的 segments 均非空、合法、排序且不越界；raw output/diagnostic evidence 可追溯但私有正文不进入提交产物。
-- [ ] report 记录资源、runtime/model sizes、license/attribution、per-engine decision 与对后续子任务的明确交接。
-- [ ] 不提交模型、私有/大型媒体、绝对路径、SDK/build tree、生产运行时、UI/设置/下载器/发布改动。
+- [ ] T01 ground-truth contract 已评审，manifests 加入 `benchmark-contract.md`；optional Python reference 不构成 gate。
+- [ ] input lock 固定 SDK/toolchain/public ABI/four models immutable provenance/hash/size/license。
+- [ ] CPU Release x64 harness/CTests 覆盖 invalid input、repeat lifecycle、callback capture、copy-before-release 和 controlled errors。
+- [ ] 三引擎 ownership/callback/final-refresh/cleanup 有 route-specific evidence，无 unsafe lifecycle。
+- [ ] 三引擎 short/medium/long 各有 ground-truth metrics 或 reproducible native blocker；all confirmed gaps reported, not patched。
+- [ ] Qwen3 只在 aligner success/provenance 时有 timeline；negative cases zero accepted timed output。
+- [ ] 所有 accepted segments legal/sorted/in-bounds；private text stays ignored。
+- [ ] report 记录 resources/runtime/model sizes/licenses/decisions/downstream handoff，按冻结 T01 gates 给出可审计状态且不以 Python diagnostics 作为 pass evidence。
+- [ ] 不提交 models/private media/ASS text/absolute paths/SDK/build/product changes。
 
 ## Out Of Scope
 
-- `hikaru-asr-worker.exe`、JSONL protocol、Rust job host、process-tree cancellation、recovery snapshots 或 Tauri commands。
-- 生产 VAD、audio normalization、result normalization、progress normalization、Parakeet backfill、Reazon chunking、Qwen overlap merge 或字幕分段策略。
-- 模型 manifest/downloader、镜像、旧 cache、managed `deps/`、runtime package、installer/portable、UI/设置迁移。
-- 将 CrispASR CLI 解析输出当作 C ABI 接口，或宣称当前 PoC 达到最终 CER/RTF/size/release 门槛。
+- Worker protocol/Rust host/cancel/recovery/Tauri commands。
+- 产品 VAD/normalization/progress/Parakeet backfill/Reazon chunking/Qwen merge/refresh strategy。
+- Downloader/runtime package/UI/settings。
+- Python parity 或最终 release qualification。
 
 ## Rollback
 
-删除 task-local PoC source 与 local SDK/model/build/result files；保留 lock/report 作为 Gate 0 证据。任务不会改动生产默认值、用户 cache、设置或项目数据。
+删除 task-local source 与 ignored SDK/model/build/results；保留 lock/report。任务不修改 production config、user cache 或 ground truth。
 
 ## Planning State
 
-- 需求已收敛；执行唯一硬前提是 T01 的完成交接与 inputs lock。
-- 任务保持 `planning`，在 T01 和 artifacts/manifests 评审完成前不得启动。
+- T03 保持 `planning`。
+- 执行前置为 T01 ground-truth handoff、manifest refresh、immutable inputs 和 ABI/license review；Python reference 成功不是前置。

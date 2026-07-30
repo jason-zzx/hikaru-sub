@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "corpusId": "hikaru-asr-parser-fixture-v1",
+  "description": "Repository-safe parser and hash fixture only; synthetic tones are not ASR quality evidence.",
+  "cases": [
+    {
+      "id": "synthetic-parser-fixture-v1",
+      "audio": "fixtures/synthetic-parser-fixture.wav",
+      "ass": "fixtures/synthetic-parser-fixture.ass",
+      "audioSha256": "242f6ea7cf7034ac6682df93b121f383262d760dbcf57777602ae4277ddcf585",
+      "assSha256": "07aba63cad4fa83059e86000cea94c7c810829d13a6a8b1904c74ddf73d51b41",
+      "durationMs": 1000,
+      "sampleRate": 16000,
+      "channels": 1,
+      "sampleWidthBits": 16,
+      "durationClass": "short",
+      "dialogueCount": 1,
+      "tags": [
+        "clear-japanese"
+      ],
+      "source": "Task-authored standard-library synthetic 440 Hz PCM and trivial ASS parser fixture.",
+      "license": "CC0-1.0",
+      "authorizationStatus": "redistributable",
+      "referenceDerivation": {
+        "type": "ass-dialogue-v1",
+        "speechConfirmation": "confirmed"
+      }
+    }
+  ]
+}

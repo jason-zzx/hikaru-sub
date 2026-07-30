@@ -1,6 +1,8 @@
 {"file":".trellis/spec/asr/index.md","reason":"Check that a feasibility harness did not become a second production ASR path."}
-{"file":".trellis/spec/asr/engine-plugins.md","reason":"Review current engine behavior, output contracts, and optional dependency limitations against the PoC evidence."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Review current product contracts and optional dependency behavior as compatibility/diagnostic context."}
 {"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check focused tests, model-backed limitation reporting, and absence of forbidden artifacts."}
-{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Check fixed CrispASR routes, ForcedAligner rules, long-audio risks, licenses, and parent Gate 0 constraints."}
-{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check that T03 consumes shared metrics rather than recreating them; refresh before start."}
-{"file":".trellis/tasks/07-25-native-asr-crispasr-poc/research/planning-evidence.md","reason":"Check lifecycle, Qwen3 fallback prohibition, long-audio evidence, and handoff boundaries."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Check fixed CrispASR routes, authoritative source hierarchy, ForcedAligner rules, ground-truth long-audio gates, licenses, and Gate 0 scope."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check retained ground-truth material facts and planning provenance against the published handoff."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Check T03 against the published ground-truth authority, shared metrics, privacy boundary, and non-gating Python reference policy."}
+{"file":".trellis/tasks/07-25-native-asr-benchmark-baseline/research/python-reference-report.md","reason":"Check any comparison to Parakeet/Qwen3/Reazon short diagnostics remains sanitized, supplemental, and non-gating."}
+{"file":".trellis/tasks/07-25-native-asr-crispasr-poc/research/planning-evidence.md","reason":"Check lifecycle, refresh, Qwen fallback prohibition, ground-truth evidence, and handoff boundaries."}
