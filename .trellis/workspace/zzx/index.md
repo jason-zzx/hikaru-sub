@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
-- **Last Active**: 2026-07-30
+- **Total Sessions**: 17
+- **Last Active**: 2026-07-31
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~539 | Active |
+| `journal-1.md` | ~572 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-07-31 | Establish native ASR benchmark ground truth | `a9e31cb` | `dev-crisp-asr` |
 | 16 | 2026-07-30 | Stabilize long-audio Whisper segmentation | `cdbe46d` | `dev` |
 | 15 | 2026-07-27 | Editor playback UX: waveform alignment, smooth playhead, play-current-line | `6acc3a4`, `f094111` | `dev` |
 | 14 | 2026-07-23 | 最近工作视频与首页续接 | `ff27cbc` | `dev` |

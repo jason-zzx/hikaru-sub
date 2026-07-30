@@ -537,3 +537,36 @@ Implemented and validated a duration-gated Japanese large-v2 long-audio path wit
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: Establish native ASR benchmark ground truth
+
+**Date**: 2026-07-31
+**Task**: Establish native ASR benchmark ground truth
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented the authoritative WAV+ASS benchmark contract, shared CER/timeline/gap/Qwen timing metrics, deterministic sanitized reporting, and five-engine short Python diagnostics. Froze user-reviewed absolute quality/performance/resource gates, recorded per-case coverage, archived T01, and refreshed T02/T03 handoff paths.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a9e31cb` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
