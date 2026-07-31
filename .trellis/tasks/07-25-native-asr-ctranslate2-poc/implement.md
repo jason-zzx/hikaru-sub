@@ -1,6 +1,6 @@
 # CTranslate2 PoC 实施计划
 
-> 状态：`planning`，等待 T01 ground-truth handoff 与评审；不得提前运行 `task.py start`。
+> 状态：`in_progress`；实现、六格模型实测、独立 review 与 spec update 已完成。CTranslate2 runtime 可行，但当前最小 long-form 算法未通过全部 ground-truth gates。
 
 ## Hard Dependencies
 
@@ -12,34 +12,34 @@
 
 ### 1. Lock Disposable Environment
 
-- [ ] 引用 T01 case identity/schema，不复制 metrics。
-- [ ] 写 `research/inputs.lock.json`，锁定 official API/model-card references、Windows toolchain、CTranslate2、JSON/tokenizer/FFT dependencies 与 model revisions/files/hashes/licenses。
-- [ ] 建 task-local CPU CMake preset；build/model/raw outputs 写 ignored `research/local/`。
+- [x] 引用 T01 case identity/schema，不复制 metrics。
+- [x] 写 `research/inputs.lock.json`，锁定 official API/model-card references、Windows toolchain、CTranslate2、JSON/tokenizer/FFT dependencies 与 model revisions/files/hashes/licenses。
+- [x] 建 task-local CPU CMake preset；build/model/raw outputs 写 ignored `research/local/`。
 
 ### 2. Prove Authoritative Model/Algorithm Contracts
 
-- [ ] 验证 large-v3/Kotoba snapshot metadata/assets 与 Kotoba-only preprocessor rule。
-- [ ] tokenizer/prompt golden vectors 依据 pinned assets、official contract 和 maintained community vectors；Python output 仅附作 diagnostics。
-- [ ] deterministic WAV/log-mel contract 与 numerical tolerance 在 model run 前固定。
-- [ ] timestamp vectors 覆盖 valid/malformed/no-timestamp，禁止 synthetic timing。
+- [x] 验证 large-v3/Kotoba snapshot metadata/assets 与 Kotoba-only preprocessor rule。
+- [x] tokenizer/prompt golden vectors 依据 pinned assets、official contract 和 maintained community vectors；Python output 仅附作 diagnostics。
+- [x] deterministic WAV/log-mel contract 与 numerical tolerance 在 model run 前固定。
+- [x] timestamp vectors 覆盖 valid/malformed/no-timestamp，禁止 synthetic timing。
 
 ### 3. Build Minimum Native CLI
 
-- [ ] 实现 WAV validation、log-mel、tokenizer/prompt、CTranslate2 encode/generate 与 timestamp parser。
-- [ ] CTests/self-check 覆盖 format/parser/feature/timeline legality；stdout JSON/stderr diagnostics bounded。
-- [ ] 记录 exe/DLL inventory/hash/size/clean-PATH launch。
+- [x] 实现 WAV validation、log-mel、tokenizer/prompt、CTranslate2 encode/generate 与 timestamp parser。
+- [x] CTests/self-check 覆盖 format/parser/feature/timeline legality；stdout JSON/stderr diagnostics bounded。
+- [x] 记录 exe/DLL inventory/hash/size/clean-PATH launch。
 
 ### 4. Run Ground-Truth Matrix
 
-- [ ] large-v3 与 Kotoba 在 T01 authoritative cases 上运行，记录 config authority、load/inference/total、RTF、memory、trace hashes 和 final segments。
-- [ ] 用 T01 comparator 计算绝对 CER/gaps/timeline/timing；不得使用 Python result 生成 reference 或 relative gate。
-- [ ] Kotoba 记录 window/context/prompt/preprocessor 及来源；发现边界缺陷只报告。
-- [ ] 按已冻结 T01 budgets 和更新后的 manifest identity 报告 measured/pass/fail/blocked；不以 Python diagnostics 作为 gate evidence。
+- [x] large-v3 与 Kotoba 已在 T01 short/medium/long 六格运行，记录 config authority、load/inference/total、RTF、memory、trace hashes 和 final segments；short 为 1 cold + 3 warm，其余各 1 次。
+- [x] 使用 T01 comparator 计算绝对 CER/gaps/timeline/timing；large-v3 short CER 失败，两条 route 的 medium/long confirmed-gap 失败，未使用 Python result 生成 reference 或 relative gate。
+- [x] Kotoba 记录 window/context/prompt/preprocessor 及来源；short 全通过，medium/long 边界与覆盖问题按实报告。
+- [x] 按已冻结 T01 budgets 和更新后的 manifest identity 报告 measured/pass/fail；不以 Python diagnostics 作为 gate evidence。
 
 ### 5. Publish Gate 0 Evidence
 
-- [ ] 写 `research/ctranslate2-poc-report.md`，逐 route 给出 evidence/license/resources 和 `proceed`/`proceed-with-named-risks`/`stop-revise`。
-- [ ] 明确 T02 只证明 large-v3+Kotoba 通用 CT2；T06 负责包括 large-v2 long-audio 在内的产品模型验证。
+- [x] 写 `research/ctranslate2-poc-report.md`，逐 route 给出 evidence/license/resources 和 `proceed`/`proceed-with-named-risks`/`stop-revise`。
+- [x] 明确 T02 只证明 large-v3+Kotoba 通用 CT2；T06 负责包括 large-v2 long-audio 在内的产品模型验证。
 
 ## Planned Files
 
@@ -75,14 +75,14 @@ Before start:
 
 - [x] `benchmark-contract.md` added to both manifests; planning evidence retained.
 - [x] `python-reference-report.md` was deterministically generated from valid five-engine short runs and added to both manifests with a non-gating diagnostic reason; medium/long claims remain blocked.
-- [ ] Inputs/licenses lockable and task docs/manifests validate.
+- [x] Inputs/licenses lockable and task docs/manifests validate。
 
 Before completion:
 
-- [ ] Goldens/CTests pass or explicit authoritative-contract blocker is evidenced.
-- [ ] Both routes have ground-truth measurement or reproducible native blocker.
-- [ ] No private/large/local artifact or product code escaped task scope.
-- [ ] Report applies the frozen T01 gates without claiming T06/T07 productization is complete.
+- [x] Goldens/CTests pass or explicit authoritative-contract blocker is evidenced.
+- [x] Both routes have complete short/medium/long ground-truth measurements；runtime feasibility proven，current algorithm failures recorded as absolute CER/confirmed-gap failures。
+- [x] No private/large/local artifact or product code escaped task scope.
+- [x] Report applies the frozen T01 gates without claiming T06/T07 productization is complete.
 
 ## Stop Conditions
 

@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "scope": "Windows x64 CPU-only task-local CTranslate2 PoC",
+  "lockStatus": "complete",
+  "blockedReason": null,
+  "toolchain": {
+    "os": "Windows 10.0.26200.8875 x64",
+    "visualStudio": {
+      "product": "Visual Studio Community 2026",
+      "version": "18.2.0+11408.102",
+      "license": "Microsoft Visual Studio Community license"
+    },
+    "msvc": {
+      "compilerVersion": "19.50.35722.0",
+      "toolsVersion": "14.50.35717",
+      "target": "x64"
+    },
+    "cmake": {
+      "version": "4.1.1-msvc1",
+      "generator": "Ninja",
+      "policyVersionMinimum": "3.5"
+    },
+    "rust": {
+      "version": "1.96.0",
+      "commit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+      "target": "x86_64-pc-windows-msvc"
+    }
+  },
+  "dependencies": [
+    {
+      "name": "CTranslate2",
+      "version": "4.8.0",
+      "tagObject": "36da6fbd9431286ccb4e7dee2e036bfc0a926aa0",
+      "commit": "54a546cec4262f9770d4674a0bfb4ac3c4f05698",
+      "archive": "CTranslate2-v4.8.0.tar.gz",
+      "archiveSizeBytes": 3429274,
+      "archiveSha256": "cd142054c14aa7f7a4b20674d6b5e4bb7ff9c63b919e6491d3df261b214fcfa5",
+      "archiveSource": "https://github.com/OpenNMT/CTranslate2/archive/refs/tags/v4.8.0.tar.gz",
+      "source": "https://github.com/OpenNMT/CTranslate2/tree/54a546cec4262f9770d4674a0bfb4ac3c4f05698",
+      "api": "include/ctranslate2/models/whisper.h",
+      "license": "MIT",
+      "build": {
+        "shared": true,
+        "cuda": false,
+        "mkl": false,
+        "dnnl": true,
+        "openmpRuntime": "COMP",
+        "cpuDispatch": true,
+        "openmpRuntimeLicense": {
+          "runtime": "Microsoft VCOMP140 / Visual C++ Redistributable",
+          "source": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/",
+          "releaseReview": "required in T12"
+        }
+      }
+    },
+    {
+      "name": "oneDNN",
+      "version": "3.1.1",
+      "archive": "oneDNN-v3.1.1.tar.gz",
+      "sizeBytes": 7562169,
+      "sha256": "d1cd58f57b2308d362a9bc474acbc21524cb879cf5d8779b460c718f0fac82d6",
+      "source": "https://github.com/oneapi-src/oneDNN/archive/refs/tags/v3.1.1.tar.gz",
+      "license": "Apache-2.0",
+      "staticLibrary": {
+        "sizeBytes": 385595736,
+        "sha256": "9104b04662d354793e593bb1b162740e7047c9ce3aa8c2b532049504d678c005"
+      },
+      "status": "linked statically into the CTranslate2 CPU runtime"
+    },
+    {
+      "name": "Hugging Face tokenizers",
+      "version": "0.22.1",
+      "source": "https://crates.io/crates/tokenizers/0.22.1",
+      "lockFile": "research/poc-src/tokenizer-ffi/Cargo.lock",
+      "lockFileSha256": "4e9f34532140d96835ad72af9e03f655b609ccaf60d9e7bcdbcf750867db83e7",
+      "license": "mixed locked dependency graph",
+      "licenseInventory": "research/evidence/tokenizer-licenses.json"
+    },
+    {
+      "name": "pocketfft-cpp",
+      "commit": "c90e55b3d529f8efa40ed01a20de22405f45fc65",
+      "headerSha256": "3e9a05318d8e3b1446bda1c4617e6a103cdd23599ae0a776a92a6e8800e92fdc",
+      "source": "https://github.com/mreineck/pocketfft/tree/c90e55b3d529f8efa40ed01a20de22405f45fc65",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "nlohmann/json",
+      "provenance": "bundled by the pinned CTranslate2 source tree",
+      "headerSha256": "665fa14b8af3837966949e8eb0052d583e2ac105d3438baba9951785512cf921",
+      "source": "https://github.com/OpenNMT/CTranslate2/blob/54a546cec4262f9770d4674a0bfb4ac3c4f05698/include/nlohmann/json.hpp",
+      "license": "MIT"
+    }
+  ],
+  "models": [
+    {
+      "engine": "faster-whisper",
+      "repository": "Systran/faster-whisper-large-v3",
+      "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "source": "https://huggingface.co/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "license": "MIT",
+      "files": [
+        {
+          "name": "config.json",
+          "sizeBytes": 2394,
+          "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9"
+        },
+        {
+          "name": "model.bin",
+          "sizeBytes": 3087284237,
+          "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1"
+        },
+        {
+          "name": "preprocessor_config.json",
+          "sizeBytes": 340,
+          "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"
+        },
+        {
+          "name": "tokenizer.json",
+          "sizeBytes": 2480617,
+          "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca"
+        },
+        {
+          "name": "vocabulary.json",
+          "sizeBytes": 1068114,
+          "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
+        }
+      ]
+    },
+    {
+      "engine": "kotoba-faster-whisper",
+      "repository": "kotoba-tech/kotoba-whisper-v2.0-faster",
+      "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+      "source": "https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster/tree/f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+      "license": "MIT",
+      "files": [
+        {
+          "name": "config.json",
+          "sizeBytes": 2394,
+          "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9"
+        },
+        {
+          "name": "model.bin",
+          "sizeBytes": 1512927867,
+          "sha256": "60d2bc2e33de9d43f2745be09caefe1161acab670f6796d4a750d8d848382b36"
+        },
+        {
+          "name": "preprocessor_config.json",
+          "sizeBytes": 340,
+          "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"
+        },
+        {
+          "name": "tokenizer.json",
+          "sizeBytes": 2481381,
+          "sha256": "f70c9740a90657b489cf05b0fa0605c1d497db542f11a70a8cc80a025c94c7d8"
+        },
+        {
+          "name": "vocabulary.json",
+          "sizeBytes": 1068114,
+          "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
+        }
+      ],
+      "licenseEvidence": "https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster/raw/f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc/README.md"
+    }
+  ],
+  "authorities": [
+    "https://opennmt.net/CTranslate2/guides/transformers.html#whisper",
+    "https://github.com/OpenNMT/CTranslate2/blob/54a546cec4262f9770d4674a0bfb4ac3c4f05698/include/ctranslate2/models/whisper.h",
+    "https://github.com/openai/whisper/blob/25639fc/whisper/audio.py",
+    "https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster/tree/f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc"
+  ],
+  "goldenSources": {
+    "openaiWhisper": {
+      "commit": "25639fc17ddc013d56c594bfbf7644f2185fad84",
+      "audioPySha256": "d93b25bda8d701630764f348d3023d1f6db4f4ea5e1708d556ed2b11d2b01df2",
+      "melFiltersSha256": "7450ae70723a5ef9d341e3cee628c7cb0177f36ce42c44b7ed2bf3325f0f6d4c",
+      "evidence": "research/evidence/log-mel-golden.json"
+    }
+  }
+}

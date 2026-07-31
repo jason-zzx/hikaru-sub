@@ -1,0 +1,12 @@
+[package]
+name = "poc-tokenizer"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+tokenizers = { version = "=0.22.1", default-features = false, features = ["onig"] }

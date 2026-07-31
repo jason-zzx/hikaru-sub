@@ -1,6 +1,6 @@
 # 原生 ASR 迁移实施总计划
 
-> 状态：父任务保持 `planning`；T01 已进入 `in_progress`，T02/T03 保持 `planning`。父任务不直接启动实现。
+> 状态：父任务保持 `planning`；T01 已归档，T02 已完成实现/实测/review 并保持 `in_progress`，T03 保持 `planning`。父任务不直接启动实现。
 
 ## Execution Policy
 
@@ -96,6 +96,12 @@ Exit criteria:
 - No unresolved licensing or binary-distribution blocker.
 
 Rollback point: discard PoC without touching production ASR.
+
+Verified T02 Gate 0 result:
+
+- Pinned CTranslate2 4.8.0 + oneDNN 3.1.1 Windows x64 CPU runtime is viable for both large-v3 and Kotoba without Python/CUDA; all six short/medium/long runs have legal token-derived timelines and stay within CPU RTF/RSS budgets.
+- Current minimal fixed-window algorithm is `stop-revise`: large-v3 short misses CER (`0.3583 > 0.35`), and both routes fail medium/long confirmed-speech-gap gates. Only Kotoba short passes every gate.
+- T06 may continue with CTranslate2 as backend candidate, but must revise long-form seek/VAD/segmentation/decode behavior and remeasure against T01 before productization.
 
 #### T03 - Prove CrispASR Three-Engine PoC
 
@@ -450,4 +456,6 @@ Stage 0 child-task creation:
 - [x] User reviewed and approved the parent `prd.md`, `design.md` and task map.
 - [x] T01-T03 are confirmed as the first creation batch and now exist as planning children.
 - [x] Each child has independently reviewable `prd.md`, `design.md`, `implement.md`, `implement.jsonl` and `check.jsonl`.
-- [x] Keep parent status at `planning`; T01 is `in_progress`. T02/T03 remain `planning` until T01 ground-truth handoff and manifest refresh are reviewed.
+- [x] Keep parent status at `planning`; T01 is archived and its ground-truth handoff remains authoritative.
+- [x] T02 completed implementation, six-cell measurements and independent review; CTranslate2 backend is viable but the current algorithm is recorded as `stop-revise`.
+- [ ] T03 remains `planning`; overall Gate 0 cannot close until its three CrispASR routes are measured/reviewed.
