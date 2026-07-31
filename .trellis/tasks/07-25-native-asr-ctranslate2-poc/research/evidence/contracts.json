@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "modelContracts": {
+    "largeV3": {
+      "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "assets": "pass",
+      "fileSizeAndSha256Lock": "pass",
+      "ordinaryWhisperWithoutPreprocessor": "pass"
+    },
+    "kotoba": {
+      "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+      "assets": "pass",
+      "fileSizeAndSha256Lock": "pass",
+      "preprocessorPresent": "pass",
+      "missingPreprocessorControlledFailure": "pass"
+    }
+  },
+  "tokenizerPrompt": {
+    "implementation": "Hugging Face tokenizers 0.22.1 native Rust C ABI",
+    "lockedDependencyLicenseInventory": "evidence/tokenizer-licenses.json",
+    "specialTokenIds": {
+      "startOfTranscript": 50258,
+      "japanese": 50266,
+      "transcribe": 50360,
+      "endOfText": 50257,
+      "timestampBegin": 50365,
+      "timestampEnd": 51865
+    },
+    "textGolden": {
+      "input": " Hello",
+      "ids": [
+        2425
+      ],
+      "roundTrip": "pass"
+    }
+  },
+  "logMel": {
+    "implementation": "pocketfft c90e55b3d529f8efa40ed01a20de22405f45fc65",
+    "contract": {
+      "sampleRate": 16000,
+      "nFft": 400,
+      "hopLength": 160,
+      "melBins": 128,
+      "paddingSamples": 160,
+      "frames": 101
+    },
+    "officialGolden": "evidence/log-mel-golden.json",
+    "officialSources": [
+      {
+        "url": "https://github.com/openai/whisper/blob/25639fc17ddc013d56c594bfbf7644f2185fad84/whisper/audio.py",
+        "sha256": "d93b25bda8d701630764f348d3023d1f6db4f4ea5e1708d556ed2b11d2b01df2"
+      },
+      {
+        "url": "https://github.com/openai/whisper/blob/25639fc17ddc013d56c594bfbf7644f2185fad84/whisper/assets/mel_filters.npz",
+        "sha256": "7450ae70723a5ef9d341e3cee628c7cb0177f36ce42c44b7ed2bf3325f0f6d4c"
+      }
+    ],
+    "tolerance": 0.0005,
+    "status": "pass"
+  },
+  "timestamps": {
+    "resolutionMs": 20,
+    "modelTimestampWindowMs": 30000,
+    "paired": "pass",
+    "consecutive": "pass",
+    "leadingSilence": "pass",
+    "incomplete": "controlled failure",
+    "malformedNonPositive": "controlled failure",
+    "noTimestamp": "controlled failure",
+    "timestampAfterAudioStart": "controlled failure",
+    "sourceEndBound": {
+      "rule": "A token-derived end within the padded 30 s model window is bounded to the verified WAV duration; the raw timestamp and bound flag remain in ignored evidence. A segment starting after audio end still fails.",
+      "regressionVector": "pass"
+    },
+    "syntheticTiming": false,
+    "windowEvidence": {
+      "largeV3FullSourceWindowMs": 30000,
+      "kotobaFullSourceWindowMs": 15000,
+      "modelTimestampWindowMs": 30000,
+      "shorterFinalSourceWindowPreserved": true
+    }
+  },
+  "segments": {
+    "rules": "non-empty; 0 <= startMs < endMs <= verified durationMs; monotonic starts; timestamp token provenance required",
+    "status": "pass"
+  },
+  "failedEvidence": {
+    "tokenTraceRetained": true,
+    "traceHashRetained": true,
+    "windowAndModelBoundsRetained": true,
+    "validatorAcceptsControlledFailedEnvelope": true,
+    "validatorRequiresTokenIdsHashSourceAndModelBounds": true
+  },
+  "privacy": {
+    "rawOutputCanonicalRoot": "task research/local",
+    "rejectsSiblingTaskResearchLocal": true,
+    "adapterRequiresRawAndOutputGitIgnored": true,
+    "trackedEvidenceContainsPrivateText": false,
+    "trackedEvidenceContainsAbsolutePath": false
+  }
+}

@@ -1,0 +1,315 @@
+{
+  "schemaVersion": 1,
+  "decision": "stop-revise",
+  "decisionReason": "Only Kotoba short passes every frozen gate. Large-v3 short misses CER, and both routes have confirmed speech gaps on medium/long cases.",
+  "manifest": {
+    "corpusId": "hikaru-user-ja-ground-truth-v1",
+    "sha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+  },
+  "environment": {
+    "architecture": "x86_64",
+    "cpu": "AMD64 Family 25 Model 33 Stepping 0, AuthenticAMD",
+    "gpu": {
+      "devices": null,
+      "method": null,
+      "unavailableReason": "CPU-only PoC"
+    },
+    "logicalCores": 16,
+    "os": "Windows",
+    "osRelease": "10.0.26200",
+    "runtime": "CTranslate2 C++ public Whisper API",
+    "totalMemoryBytes": 34306834432,
+    "totalMemoryUnavailableReason": null
+  },
+  "runtime": {
+    "backend": "CTranslate2 4.8.0 plus statically linked oneDNN 3.1.1",
+    "cpuInt8": "supported",
+    "cleanPathLaunch": "pass",
+    "pythonDependency": false,
+    "cudaDependency": false,
+    "binary": {
+      "sizeBytes": 443904,
+      "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2"
+    }
+  },
+  "inputLock": {
+    "sha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+    "key": "research/inputs.lock.json"
+  },
+  "nativeMatrix": [
+    {
+      "engine": "faster-whisper",
+      "route": "large-v3",
+      "case": "short-v1",
+      "status": "fail",
+      "samples": {
+        "cold": 1,
+        "warm": 3
+      },
+      "measurements": {
+        "cer": 0.35833333333333334,
+        "timelineErrors": 0,
+        "confirmedSpeechGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.8294180939341134,
+        "warmInferenceRtfMedian": 0.7773676167952868,
+        "processWallMs": 32548.8993,
+        "peakProcessRssBytes": 3435057152,
+        "segmentCount": 4,
+        "audioBoundedTimestampSegmentCount": 4
+      },
+      "windowEvidence": {
+        "firstSourceWindowMs": 24102,
+        "modelWindowMs": 30000,
+        "lastSourceWindowMs": 24102,
+        "traceCount": 4
+      },
+      "gates": {
+        "cerAtMost0_35": "fail",
+        "cpuInferenceRtfAtMost1_0": "pass",
+        "peakRssAtMost6GiB": "pass",
+        "timelineErrorsZero": "pass",
+        "confirmedSpeechGapsZero": "pass",
+        "shortColdWallAtMost120s": "pass"
+      },
+      "evidence": {
+        "rawKey": "final-large-v3-short.json",
+        "rawSha256": "2f7d38ecbcc1d5853b47f51c9468e7e949ac1b410d8aecc27e52a6e271af99e5",
+        "benchmarkResultKey": "final-large-v3-short.json",
+        "benchmarkResultSha256": "3f1c192cd0ef588ec3c6ea2bb5dd9cc488a3ed5d8371f17032cf3bc9ffdb3d29",
+        "inputLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+        "runtimeBinary": {
+          "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2",
+          "sizeBytes": 443904
+        }
+      }
+    },
+    {
+      "engine": "faster-whisper",
+      "route": "large-v3",
+      "case": "medium-v1",
+      "status": "fail",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "measurements": {
+        "cer": 0.17450549450549452,
+        "timelineErrors": 0,
+        "confirmedSpeechGapsAtLeast1500Ms": 10,
+        "inferenceRtf": 0.7173253385638,
+        "warmInferenceRtfMedian": null,
+        "processWallMs": 369745.5247,
+        "peakProcessRssBytes": 3465654272,
+        "segmentCount": 135,
+        "audioBoundedTimestampSegmentCount": 1
+      },
+      "windowEvidence": {
+        "firstSourceWindowMs": 30000,
+        "modelWindowMs": 30000,
+        "lastSourceWindowMs": 18872,
+        "traceCount": 17
+      },
+      "gates": {
+        "cerAtMost0_35": "pass",
+        "cpuInferenceRtfAtMost1_0": "pass",
+        "peakRssAtMost6GiB": "pass",
+        "timelineErrorsZero": "pass",
+        "confirmedSpeechGapsZero": "fail"
+      },
+      "evidence": {
+        "rawKey": "final-large-v3-medium.json",
+        "rawSha256": "453e2fe380bd3e2e809a9c6cc26533fca91c3ae1b1d37c666b5315e7d1704d74",
+        "benchmarkResultKey": "final-large-v3-medium.json",
+        "benchmarkResultSha256": "7d15bbc96ab191c22132dfc27ad67d488f5898fec5c86d56725408081e48def9",
+        "inputLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+        "runtimeBinary": {
+          "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2",
+          "sizeBytes": 443904
+        }
+      }
+    },
+    {
+      "engine": "faster-whisper",
+      "route": "large-v3",
+      "case": "long-v1",
+      "status": "fail",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "measurements": {
+        "cer": 0.31237496427550726,
+        "timelineErrors": 0,
+        "confirmedSpeechGapsAtLeast1500Ms": 71,
+        "inferenceRtf": 0.7064852691992611,
+        "warmInferenceRtfMedian": null,
+        "processWallMs": 2940521.6139,
+        "peakProcessRssBytes": 3698872320,
+        "segmentCount": 800,
+        "audioBoundedTimestampSegmentCount": 1
+      },
+      "windowEvidence": {
+        "firstSourceWindowMs": 30000,
+        "modelWindowMs": 30000,
+        "lastSourceWindowMs": 4235,
+        "traceCount": 139
+      },
+      "gates": {
+        "cerAtMost0_35": "pass",
+        "cpuInferenceRtfAtMost1_0": "pass",
+        "peakRssAtMost6GiB": "pass",
+        "timelineErrorsZero": "pass",
+        "confirmedSpeechGapsZero": "fail"
+      },
+      "evidence": {
+        "rawKey": "final-large-v3-long.json",
+        "rawSha256": "7f29ee9be534739e20d7f1d0f802a48a39844023c3c89c08d933cac6f7c2d3ca",
+        "benchmarkResultKey": "final-large-v3-long.json",
+        "benchmarkResultSha256": "a270a7673f2d36c20d00ddcc98711a330281c8ae568f2a86843834fb3705305f",
+        "inputLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+        "runtimeBinary": {
+          "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2",
+          "sizeBytes": 443904
+        }
+      }
+    },
+    {
+      "engine": "kotoba-faster-whisper",
+      "route": "kotoba-v2.0",
+      "case": "short-v1",
+      "status": "pass",
+      "samples": {
+        "cold": 1,
+        "warm": 3
+      },
+      "measurements": {
+        "cer": 0.3416666666666667,
+        "timelineErrors": 0,
+        "confirmedSpeechGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.5927330304539042,
+        "warmInferenceRtfMedian": 0.5556914446933865,
+        "processWallMs": 20136.7858,
+        "peakProcessRssBytes": 1857740800,
+        "segmentCount": 9,
+        "audioBoundedTimestampSegmentCount": 0
+      },
+      "windowEvidence": {
+        "firstSourceWindowMs": 15000,
+        "modelWindowMs": 30000,
+        "lastSourceWindowMs": 9102,
+        "traceCount": 8
+      },
+      "gates": {
+        "cerAtMost0_35": "pass",
+        "cpuInferenceRtfAtMost1_0": "pass",
+        "peakRssAtMost6GiB": "pass",
+        "timelineErrorsZero": "pass",
+        "confirmedSpeechGapsZero": "pass",
+        "shortColdWallAtMost120s": "pass"
+      },
+      "evidence": {
+        "rawKey": "final-kotoba-short.json",
+        "rawSha256": "71db6d0572cc079588f65f87ed96b77acc3637ded8280bf6bad6961c527e4cc9",
+        "benchmarkResultKey": "final-kotoba-short.json",
+        "benchmarkResultSha256": "46bf7e1f249eeb68d9ba0b3da627f979ccb878f3354d996583e2d8e0d3050d41",
+        "inputLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+        "runtimeBinary": {
+          "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2",
+          "sizeBytes": 443904
+        }
+      }
+    },
+    {
+      "engine": "kotoba-faster-whisper",
+      "route": "kotoba-v2.0",
+      "case": "medium-v1",
+      "status": "fail",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "measurements": {
+        "cer": 0.22241758241758242,
+        "timelineErrors": 0,
+        "confirmedSpeechGapsAtLeast1500Ms": 5,
+        "inferenceRtf": 0.5150998223993329,
+        "warmInferenceRtfMedian": null,
+        "processWallMs": 262759.0996,
+        "peakProcessRssBytes": 1888260096,
+        "segmentCount": 178,
+        "audioBoundedTimestampSegmentCount": 0
+      },
+      "windowEvidence": {
+        "firstSourceWindowMs": 15000,
+        "modelWindowMs": 30000,
+        "lastSourceWindowMs": 3872,
+        "traceCount": 34
+      },
+      "gates": {
+        "cerAtMost0_35": "pass",
+        "cpuInferenceRtfAtMost1_0": "pass",
+        "peakRssAtMost6GiB": "pass",
+        "timelineErrorsZero": "pass",
+        "confirmedSpeechGapsZero": "fail"
+      },
+      "evidence": {
+        "rawKey": "final-kotoba-medium.json",
+        "rawSha256": "bca05b36ab4898e552b75e2c90d28453792259e9738ce2e0af698ef195acf7cc",
+        "benchmarkResultKey": "final-kotoba-medium.json",
+        "benchmarkResultSha256": "7791da7f971c46eeac3c59a4a73e49ba6b71bbf9566460f4bddba555089de297",
+        "inputLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+        "runtimeBinary": {
+          "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2",
+          "sizeBytes": 443904
+        }
+      }
+    },
+    {
+      "engine": "kotoba-faster-whisper",
+      "route": "kotoba-v2.0",
+      "case": "long-v1",
+      "status": "fail",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "measurements": {
+        "cer": 0.31654758502429264,
+        "timelineErrors": 0,
+        "confirmedSpeechGapsAtLeast1500Ms": 36,
+        "inferenceRtf": 0.45872816459491317,
+        "warmInferenceRtfMedian": null,
+        "processWallMs": 1907374.231,
+        "peakProcessRssBytes": 2121338880,
+        "segmentCount": 1219,
+        "audioBoundedTimestampSegmentCount": 0
+      },
+      "windowEvidence": {
+        "firstSourceWindowMs": 15000,
+        "modelWindowMs": 30000,
+        "lastSourceWindowMs": 4235,
+        "traceCount": 277
+      },
+      "gates": {
+        "cerAtMost0_35": "pass",
+        "cpuInferenceRtfAtMost1_0": "pass",
+        "peakRssAtMost6GiB": "pass",
+        "timelineErrorsZero": "pass",
+        "confirmedSpeechGapsZero": "fail"
+      },
+      "evidence": {
+        "rawKey": "final-kotoba-long.json",
+        "rawSha256": "4d661771477bbc7cf4e6d257885babae8c399371e0810583bcac58a5346f0086",
+        "benchmarkResultKey": "final-kotoba-long.json",
+        "benchmarkResultSha256": "c43ceca2c5a8a7a7663236c4633ea3de35a2505ab728dbfdefc65a68158c1ad7",
+        "inputLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+        "runtimeBinary": {
+          "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2",
+          "sizeBytes": 443904
+        }
+      }
+    }
+  ],
+  "pythonParityUsed": false,
+  "privacy": "Sanitized aggregates and file hashes only; no raw segments, transcript, WAV/ASS content, model path, cache path, or absolute path."
+}

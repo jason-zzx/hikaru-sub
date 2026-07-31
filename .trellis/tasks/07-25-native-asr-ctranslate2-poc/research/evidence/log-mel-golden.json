@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "authority": "OpenAI Whisper official preprocessing",
+  "commit": "25639fc17ddc013d56c594bfbf7644f2185fad84",
+  "sources": [
+    {
+      "url": "https://github.com/openai/whisper/blob/25639fc17ddc013d56c594bfbf7644f2185fad84/whisper/audio.py",
+      "sha256": "d93b25bda8d701630764f348d3023d1f6db4f4ea5e1708d556ed2b11d2b01df2"
+    },
+    {
+      "url": "https://github.com/openai/whisper/blob/25639fc17ddc013d56c594bfbf7644f2185fad84/whisper/assets/mel_filters.npz",
+      "sha256": "7450ae70723a5ef9d341e3cee628c7cb0177f36ce42c44b7ed2bf3325f0f6d4c"
+    }
+  ],
+  "contract": {
+    "sampleRate": 16000,
+    "nFft": 400,
+    "hopLength": 160,
+    "melBins": 128,
+    "paddingSamples": 160,
+    "frames": 101
+  },
+  "fixture": {
+    "kind": "generated-1khz-sine",
+    "durationSamples": 16000,
+    "amplitudePcm16": 8192
+  },
+  "goldens": {
+    "mel0Frame0": 0.5734528303146362,
+    "mel40Frame0": 1.256591558456421,
+    "mel30Frame10": -0.6760846376419067,
+    "silenceMel0Frame0": -1.5
+  },
+  "tolerance": 0.0005,
+  "pythonRuntime": "diagnostic executor only; oracle is the pinned official algorithm/assets and retained hashes"
+}

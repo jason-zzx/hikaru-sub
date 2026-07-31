@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "status": "pass",
+  "build": {
+    "platform": "Windows x64",
+    "configuration": "Release",
+    "generator": "Ninja",
+    "compiler": "MSVC 19.50.35722.0",
+    "cpuOnly": true,
+    "cuda": false,
+    "mkl": false,
+    "dnnl": "oneDNN 3.1.1 static",
+    "command": "build.cmd all"
+  },
+  "ctest": {
+    "status": "pass",
+    "lockAware": true,
+    "tests": [
+      {
+        "name": "poc-self-check",
+        "status": "pass"
+      },
+      {
+        "name": "large-v3-contract",
+        "status": "pass",
+        "checks": "model file sizes/SHA-256, tokenizer, prompt"
+      },
+      {
+        "name": "kotoba-contract",
+        "status": "pass",
+        "checks": "model file sizes/SHA-256, preprocessor, tokenizer, prompt"
+      }
+    ],
+    "summary": "100% tests passed, 0 tests failed out of 3"
+  },
+  "runtimeFiles": [
+    {
+      "name": "hikaru-ct2-poc.exe",
+      "sizeBytes": 443904,
+      "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2"
+    },
+    {
+      "name": "ctranslate2.dll",
+      "sizeBytes": 22417408,
+      "sha256": "c67192a432f1485ea15bd65d860047e160839d0aa384fa11a027559658a65477"
+    },
+    {
+      "name": "poc_tokenizer.dll",
+      "sizeBytes": 3931136,
+      "sha256": "5d8450472178afa2c73d2e4e8aaa6078b7964faae1ea08878b8595862e767a41"
+    }
+  ],
+  "peDependencies": {
+    "taskLocal": [
+      "ctranslate2.dll",
+      "poc_tokenizer.dll"
+    ],
+    "managedOrSystem": [
+      "VCOMP140.DLL",
+      "MSVCP140.dll",
+      "VCRUNTIME140.dll",
+      "VCRUNTIME140_1.dll",
+      "bcrypt.dll",
+      "bcryptprimitives.dll",
+      "KERNEL32.dll",
+      "ntdll.dll",
+      "api-ms-win-crt-*"
+    ],
+    "python": false,
+    "cuda": false,
+    "redistributionNote": "VCOMP140/MSVC runtime redistribution is governed by Microsoft Visual C++ Redistributable license terms and remains a T12 release review item."
+  },
+  "cleanLaunch": {
+    "status": "pass",
+    "pathPolicy": "PATH contained only the task-local Release build directory",
+    "checks": [
+      "self-check",
+      "Kotoba immutable model/hash/tokenizer/prompt contract"
+    ]
+  },
+  "privacy": "sanitized tracked summary; binaries and generated CTest files remain under ignored research/local",
+  "modelEvidenceIdentity": {
+    "runtimeBinary": {
+      "name": "hikaru-ct2-poc.exe",
+      "sizeBytes": 443904,
+      "sha256": "f8ee5060a384438da4a5fac2e7951ff6004cd15935b65dfd90ee79d208d5d1e2"
+    },
+    "inputLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+    "allSixRunsMatch": true
+  }
+}

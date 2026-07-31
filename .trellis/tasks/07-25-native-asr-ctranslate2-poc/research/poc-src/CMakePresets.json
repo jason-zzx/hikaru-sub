@@ -1,0 +1,32 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "windows-x64-cpu-poc",
+      "displayName": "Windows x64 CPU CTranslate2 PoC",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../local/build/windows-x64-cpu-poc-dnnl",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-x64-cpu-poc-release",
+      "configurePreset": "windows-x64-cpu-poc",
+      "configuration": "Release",
+      "jobs": 4
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-x64-cpu-poc-release",
+      "configurePreset": "windows-x64-cpu-poc",
+      "configuration": "Release",
+      "output": {"outputOnFailure": true}
+    }
+  ]
+}

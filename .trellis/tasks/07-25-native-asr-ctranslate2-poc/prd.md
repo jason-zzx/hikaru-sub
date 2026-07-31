@@ -54,17 +54,17 @@
 
 ## Acceptance Criteria
 
-- [ ] T01 ground-truth contract 已评审，context 已加入 `benchmark-contract.md`；optional reference report 不构成 gate。
-- [ ] `inputs.lock.json` 固定 toolchain/CTranslate2/dependencies/models immutable provenance、hash 和 license。
-- [ ] CPU Release x64 PoC 可构建，CTests 覆盖 parser/feature/timestamp/segment self-checks。
-- [ ] Kotoba-only preprocessor negative case 与 ordinary Whisper positive case 有证据。
-- [ ] tokenizer/log-mel/timestamp goldens 符合 authoritative contracts；Python 差异只作为诊断记录。
-- [ ] model runs 只产生合法、非空、token-derived segments；malformed input controlled failure。
-- [ ] large-v3 与 Kotoba 在 T01 cases 上产出 ground-truth absolute measurements，或给出可复现 native blocker。
-- [ ] Kotoba 报告记录配置及其 authoritative source，边界问题未被 Python-parity patch 掩盖。
-- [ ] runtime inventory 记录 x64/DLL/hash/size/clean launch，且无 Python/CUDA runtime dependency。
-- [ ] Gate 0 报告不混入 T04-T12 产品实现，按冻结 T01 gate 给出可审计状态且不把 Python diagnostics 当作 pass evidence。
-- [ ] 不提交 model/private audio/ASS text/build/absolute path/production code。
+- [x] T01 ground-truth contract 已评审，context 已加入 `benchmark-contract.md`；optional reference report 不构成 gate。
+- [x] `inputs.lock.json` 固定 toolchain/CTranslate2/dependencies/models immutable provenance、hash 和 license。
+- [x] CPU Release x64 PoC 可构建，CTests 覆盖 parser/feature/timestamp/segment self-checks。
+- [x] Kotoba-only preprocessor negative case 与 ordinary Whisper positive case 有证据。
+- [x] tokenizer/log-mel/timestamp goldens 符合 authoritative contracts；Python 差异只作为诊断记录。
+- [x] model runs 只产生合法、非空、token-derived segments；malformed input controlled failure。失败 envelope 保留 trace hash/token/window bounds，T01 adapter 拒绝评分。
+- [x] large-v3 与 Kotoba 已覆盖 T01 short/medium/long 六格 ground-truth absolute measurements；不再把 PoC parser 缺陷误报为 native blocker。
+- [x] Kotoba 报告记录配置及其 authoritative source；short 全门槛通过，medium/long confirmed-gap 失败未被 Python-parity patch 掩盖。
+- [x] runtime inventory 记录 x64/DLL/hash/size/clean launch，且无 Python/CUDA runtime dependency。
+- [x] Gate 0 报告不混入 T04-T12 产品实现，按冻结 T01 gate 给出可审计状态且不把 Python diagnostics 当作 pass evidence。
+- [x] 不提交 model/private audio/ASS text/build/absolute path/production code。
 
 ## Out Of Scope
 
@@ -79,5 +79,7 @@
 
 ## Planning State
 
-- T02 保持 `planning`。
-- 唯一执行前置是 T01 ground-truth handoff、manifest refresh、immutable inputs 与评审；Python reference 成功不是前置。
+- T02 已激活为 `in_progress`，实现、六格模型实测、独立 review 与 spec update 已完成；Gate 0 结论为 `stop-revise` 当前算法。
+- oneDNN 3.1.1 CPU int8 runtime、lock-aware Release CTest、clean-PATH、immutable model hashes、official log-mel golden 和 fail-closed evidence 已通过。
+- large-v3/Kotoba 均完成 short/medium/long：CPU RTF、RSS、合法时间轴均可行；large-v3 short CER `0.3583` 失败，两条 route 的 medium/long confirmed speech gap 硬门槛失败，只有 Kotoba short 全通过。
+- 结论允许 CTranslate2 作为 native runtime candidate 继续，但 T06 必须修订 long-form seek/VAD/segmentation/decode 算法后按同一 ground truth 重测；Python reference 未用于任何 pass/fail 结论。

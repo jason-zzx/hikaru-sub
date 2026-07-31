@@ -144,6 +144,7 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 ## Planning State
 
 - 总体 PRD、设计与实施任务地图已获评审；本轮同步新的 ground-truth 权威和 v0.4.1 实现事实。
-- T01 `native-asr-benchmark-baseline` 已处于 `in_progress`；T02 `native-asr-ctranslate2-poc` 与 T03 `native-asr-crispasr-poc` 保持 `planning`。
-- T01 ground-truth contract、per-case coverage 与绝对预算已获用户评审并冻结；T02/T03 模型实测依赖更新后的 manifest identity 和共享指标实现，不依赖 Python reference 成功。
-- 父任务继续保持 `planning` 且不直接承载实现。
+- T01 `native-asr-benchmark-baseline` 已完成并归档；T02 `native-asr-ctranslate2-poc` 已完成实现、六格实测和独立 review，保持 `in_progress`；T03 `native-asr-crispasr-poc` 保持 `planning`。
+- T01 ground-truth contract、per-case coverage 与绝对预算已获用户评审并冻结；T02/T03 模型实测直接复用该 manifest identity 和共享指标实现，不依赖 Python reference 成功。
+- T02 已证明 CTranslate2 + oneDNN native CPU backend/runtime 可行，但当前最小 fixed-window 算法为 `stop-revise`：large-v3 short CER 略超门槛，large-v3/Kotoba 中长音频均有 confirmed speech gaps。T06 必须修订算法并重测，不能把 runtime 可执行等同于产品质量通过。
+- 父任务继续保持 `planning` 且不直接承载实现；整体 Gate 0 仍等待 T03。
