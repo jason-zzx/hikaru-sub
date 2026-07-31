@@ -40,4 +40,4 @@ docs/superpowers/
 /asr-service/benchmarks/local/
 /asr-service/benchmarks/models/
 /asr-service/benchmarks/*.tmp
-/.trellis/tasks/07-25-native-asr-ctranslate2-poc/research/local/
+/.trellis/tasks/**/07-25-native-asr-ctranslate2-poc/research/local/
