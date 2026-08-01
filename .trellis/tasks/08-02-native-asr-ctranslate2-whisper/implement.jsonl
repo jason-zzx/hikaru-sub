@@ -1,0 +1,8 @@
+{"file":".trellis/spec/asr/index.md","reason":"Apply ASR ownership boundaries and sidecar/native transition quality expectations."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Preserve current faster-whisper product models, large-v2 long regression context and Kotoba boundary without copying Python as algorithm authority."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Reuse the authoritative benchmark, timestamp-window provenance, identity, privacy and frozen native gate contracts."}
+{"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Use the sole ground-truth identity, shared comparator semantics and user-frozen absolute budgets."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-ctranslate2-poc/research/inputs.lock.json","reason":"Carry forward the pinned CT2/oneDNN/toolchain/model inputs and immutable PoC provenance."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-ctranslate2-poc/research/ctranslate2-poc-report.md","reason":"Start from proven backend primitives and the measured fixed-window quality blockers rather than repeating PoC work."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Preserve the target worker/CT2/model/runtime architecture and product compatibility boundaries."}
+{"file":".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/planning-evidence.md","reason":"Use the user-approved model policy, minimal candidate ladder and downstream ownership map."}

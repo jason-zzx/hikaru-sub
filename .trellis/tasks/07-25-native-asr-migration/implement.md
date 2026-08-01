@@ -1,11 +1,11 @@
 # 原生 ASR 迁移实施总计划
 
-> 状态：父任务保持 `planning`；T01 已归档，T02 已完成实现/实测/review 并保持 `in_progress`，T03 保持 `planning`。父任务不直接启动实现。
+> 状态：父任务保持 `planning`；T01～T03 均已完成并归档，Gate 0 backend/runtime feasibility 已关闭；T04～T06 已创建并进入规划。父任务不直接启动实现。
 
 ## Execution Policy
 
 - 本父任务保存总需求、总体设计、任务地图和跨任务门禁，通常不执行 `task.py start`。
-- 子任务按阶段及时创建，不一次性把 15 个任务全部置为活跃；创建近期任务时使用 `--parent <parent-dir> --no-start`。
+- 子任务按阶段及时创建，不一次性把 17 个任务全部置为活跃；创建近期任务时使用 `--parent <parent-dir> --no-start`。
 - 每个子任务在启动前必须完成自己的 `prd.md`、`design.md`、`implement.md` 和上下文清单。
 - 任务树不表达依赖。下表的 `Depends on` 必须复制到对应子任务规划。
 - 一个子任务只有在自己的验收和相关质量检查通过后才能归档。
@@ -21,22 +21,27 @@ Gate 1: native task foundation
   T02 + T03 -> T04 -> T05
 
 Gate 2: engine productization
-  T05 -> (T06 -> T07) + (T08 -> T09 + T10)
+  T05 -> T06 -> T07 + (T08 -> T09 + T10)
 
-Gate 3: distribution and UI
-  T02 + T03 -> T11 + T12
-  T05 + T11 + T12 -> T13 -> T14
+Gate 3: models, CPU/GPU runtime and UI
+  T02 + T03 -> T11
+  T06 -> T12
+  T06 + T08 + T12 -> T13
+  T07 + T09 + T10 + T13 -> T14
+  T05 + T11 + T12 + T14 -> T15 -> T16
 
 Gate 4: release cutover
-  T06..T14 -> T15
+  T06..T16 -> T17
 ```
 
 Allowed parallel groups:
 
 - T02 and T03 after T01.
-- T06 and T08 after T05.
-- T07, T09 and T10 after their shared backends stabilize.
-- T11 and T12 after model/runtime formats are proven; they may overlap engine productization.
+- T06 after T05; T07 and T08 may overlap after T06 creates the production worker entry point.
+- T09 and T10 may overlap after T08 stabilizes the CrispASR core.
+- T11 may start from the proven model formats and overlap engine productization; T12 waits for T06 to create the production worker target, then may overlap T07/T08～T10.
+- T13 after the shared CT2/CrispASR cores and CPU package contract stabilize; T14 after engine pipelines and GPU packs are measurable.
+- GPU pack failure records `stop-revise` and omits that pack from release without blocking the qualified CPU route.
 
 ## Task Map
 
@@ -125,7 +130,14 @@ Exit criteria:
 
 Rollback point: discard PoC without affecting CT2 work or production ASR.
 
-**Gate 0:** Stop the migration and revise the architecture if any required engine has no viable native CPU path, Qwen3 alignment is unusable, or runtime/package limits are clearly unattainable.
+Verified T03 Gate 0 result:
+
+- CrispASR v0.8.22 public CPU C ABI, callback/reset/cleanup lifecycle and all three model routes are executable under one immutable Windows x64 binary/runtime identity.
+- Reazon passes frozen text/performance/timeline/gap gates through the public `parakeet` backend but remains `proceed-with-named-risks` because its top-level output is one oversized segment and native words are mostly zero-duration.
+- Parakeet is `stop-revise` after all three cases fail CER and top-level output remains one giant segment, despite useful native word getters.
+- Qwen is `stop-revise`: short text/performance pass but ForcedAligner start timing fails severely; medium/long upstream-grouped zero-duration source segments fail closed. Synthetic timing remains prohibited.
+
+**Gate 0:** Closed for backend/runtime feasibility. T04/T05 may proceed because CT2 and CrispASR can execute safely in isolated native processes. Route quality blockers are mandatory inputs to T06/T07/T09/T10 and still prevent production promotion; a future finding of fundamental ABI, license or package non-viability reopens Gate 0.
 
 ### Phase 1 - Worker Protocol And Rust Task Foundation
 
@@ -188,17 +200,19 @@ Suggested slug: `native-asr-ctranslate2-whisper`
 
 Deliverables:
 
+- Create the production `hikaru-asr-worker` CMake executable/entry point on top of T04's protocol library; fake worker remains a separate test-only target.
 - Implement product-model WAV/features/tokenizer/prompt/window/timestamp/no-speech/alignment behavior from official CTranslate2/Whisper sources and maintained recommendations.
-- Validate all supported product models against T01 ground truth, explicitly including `large-v2` Japanese audio over 10 minutes and the current V4/seed/session special-path regression cases.
+- Enumerate and measure every current ordinary faster-whisper model (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`) against T01 ground truth; `large-v3` and `large-v2` Japanese audio over 10 minutes are hard promotion gates, including the current V4/seed/session special-path regression cases.
 - Treat current Python parameters and private fork as diagnostics, not required native algorithms.
 - Normalize overlap into stable segments, emit monotonic progress, and publish model-backed absolute quality/performance/resource results.
 
-Depends on: T02, T05.
+Depends on: T02, T04, T05.
 
 Exit criteria:
 
-- All required product-model cases meet T01 user-reviewed absolute CER/RTF/resource budgets.
-- No invalid/overflow timeline segments or confirmed speech gaps `>=1.5s`.
+- `large-v3` and the required `large-v2` long-audio cases meet T01 user-reviewed absolute CER/RTF/resource budgets.
+- Every other current model receives a measured `qualified`, `stop-revise` or `unsupported-for-native-release` disposition; failure of a non-default model does not block a qualified native faster-whisper route.
+- No invalid/overflow timeline segments or confirmed speech gaps `>=1.5s` on qualified models.
 - Large-v2 long-audio behavior is validated even if the selected native algorithm differs from Python.
 
 Rollback point: retain Python faster-whisper as development default.
@@ -237,7 +251,7 @@ Deliverables:
 - Share audio/VAD/result normalization selected from stable CrispASR APIs and ground-truth evidence, without Python-parity product hacks.
 - Record ABI/library commit in runtime manifest.
 
-Depends on: T03, T05.
+Depends on: T03, T05, T06.
 
 Exit criteria:
 
@@ -320,38 +334,91 @@ Suggested slug: `native-asr-cpu-runtime-package`
 Deliverables:
 
 - Pin CTranslate2, CrispASR, compiler, CMake, Ninja and native dependencies.
-- Produce a Windows x64 CPU runtime artifact with worker, DLLs, manifest, licenses and SHA-256.
-- Add verified preparation to `pnpm release:local` and portable packaging.
-- Compile only required ASR capabilities and measure setup/portable/unpacked size.
+- Build the reproducible CPU runtime packaging pipeline and a provisional integration artifact with worker/DLL/manifest/license/SHA-256 shape; do not claim its executable identity is final before T06～T10 land.
+- Add verified artifact preparation hooks for `pnpm release:local` and portable packaging without switching production inputs.
+- Compile only required ASR capabilities and measure provisional setup/portable/unpacked size.
+- Define the T17 final rebuild/attestation input contract so accepted T06～T10 source identities produce the immutable release artifact.
 
-Depends on: T02, T03, T04.
+Depends on: T04, T06.
 
 Exit criteria:
 
 - End-user packaging never invokes CMake.
-- Setup <=80 MB, portable <=90 MB and unpacked CPU runtime <=250 MB.
-- CPU runtime works in installed and portable layouts with zero bundled model weights.
+- The packaging pipeline is reproducible and a provisional protocol/backend smoke artifact works in installed and portable layouts with zero bundled model weights.
+- Provisional size measurement demonstrates the CPU budget is plausible; T17 must rebuild and re-attest the final worker after all accepted engine code lands.
+- No provisional hash or executable is represented as the final release identity.
 
 Rollback point: do not alter production packaging until artifact verification and size gates pass.
 
-#### T13 - Migrate Runtime Dependency And Settings Backend
+#### T13 - Build Optional GPU Runtime Packs
+
+Suggested slug: `native-asr-gpu-runtime-packs`
+
+Deliverables:
+
+- Produce separately versioned Windows x64 CUDA and Vulkan runtime packs from the pinned native worker/backends without placing either pack in the main installer or portable ZIP.
+- Keep CT2 CUDA and CrispASR CUDA/Vulkan dependencies isolated under `deps/asr-runtime/{cuda,vulkan}/current` with exact manifest, DLL, compiler, driver-floor, size, SHA-256, license and attribution identities.
+- Reuse protocol v1 resolved device values (`cpu`, `cuda`, `vulkan`); do not introduce a second worker protocol or backend-specific host executable.
+- Add deterministic pack preparation/verification suitable for managed download; end-user machines never compile native dependencies.
+
+Depends on: T06, T08, T12.
+
+Exit criteria:
+
+- CUDA and Vulkan are each attempted and independently recorded as `candidate-built` or `stop-revise` with immutable build/load/license evidence; one failed candidate does not prevent T13 completion.
+- Every `candidate-built` pack is reproducible, hash-verified, contains no models, and can load its intended backend on a declared target machine.
+- CUDA/Vulkan DLL discovery cannot shadow unrelated system/application binaries or escape the managed pack root.
+- Main setup/portable artifacts remain CPU-only and within their existing size budgets.
+- Missing, invalid or `stop-revise` pack identity fails closed before worker launch.
+
+Rollback point: remove the affected optional pack artifact/manifest; the bundled CPU runtime remains unchanged.
+
+#### T14 - Qualify GPU Routing And Acceleration
+
+Suggested slug: `native-asr-gpu-qualification`
+
+Deliverables:
+
+- Rebuild each T13 `candidate-built` pack from the final accepted T06～T10 source/config identities, freeze executable/DLL/manifest hashes, and use only that exact identity for qualification.
+- Implement capability probing and resolved routing for the rebuilt candidate packs: CTranslate2 uses qualified CUDA or CPU; CrispASR uses qualified CUDA, then qualified Vulkan, then CPU.
+- Record T13 `stop-revise`/unbuilt candidates as omitted without attempting to route them.
+- Validate actual loaded modules and device execution rather than trusting a requested device string.
+- Run the applicable T01 short/medium/long engine matrix on explicit hardware/driver identities; preserve the same CER/timeline/gap/Qwen gates and require accelerated inference RTF `<=0.5`.
+- Verify pack-load/runtime failure produces one nonfatal notice and automatically retries the bundled CPU path without losing job/recovery semantics.
+- Publish an independent `qualified`, `stop-revise` or `omitted-no-candidate` decision for CUDA and Vulkan; no non-qualified pack blocks CPU cutover.
+
+Depends on: T07, T09, T10, T13.
+
+Exit criteria:
+
+- Every publishable pack is rebuilt from final accepted engine sources and meets its quality, timeline, accelerated RTF, fallback, immutable identity and license gates on the declared matrix.
+- No VRAM gate is invented; measured VRAM may be reported as diagnostic metadata.
+- CPU results remain unchanged in kind and CPU fallback passes lifecycle tests.
+- Unsupported hardware/driver combinations are explicit and never presented as accelerated.
+
+Rollback point: mark only the failing pack `stop-revise` and remove it from the release manifest; keep CPU and other qualified packs available.
+
+#### T15 - Migrate Runtime Dependency And Settings Backend
 
 Suggested slug: `native-asr-runtime-settings-backend`
 
 Deliverables:
 
-- Replace production Python/venv dependency kinds with CPU runtime, future GPU placeholders, models, downloads and app cache.
-- Keep CPU runtime built-in/non-cleanable; preserve probe vs measure and async `spawn_blocking` cleanup.
-- Migrate settings by ignoring legacy Python paths and mapping known engine/model/device values.
+- Replace production Python/venv dependency kinds with built-in CPU runtime, qualified optional GPU packs, models, downloads and app cache.
+- Integrate only the exact T14-qualified GPU pack hashes into the trusted runtime-source manifest and existing managed downloader: `.part`/resume where supported, exact size/SHA-256 verification, atomic activation under `deps/asr-runtime/{cuda,vulkan}/current`, and rollback that preserves the prior valid pack.
+- Keep CPU runtime built-in/non-cleanable; keep GPU packs managed/downloadable/cleanable; preserve probe vs measure and async `spawn_blocking` cleanup.
+- Migrate settings by ignoring legacy Python paths and mapping known engine/model/device values; unavailable GPU selections resolve to CPU with one nonfatal notice.
+- Expose per-model native qualification metadata without removing any current model identity.
 - Update command/types/wrappers as one cross-layer contract where required.
 
-Depends on: T05, T11, T12.
+Depends on: T05, T11, T12, T14.
 
 Exit criteria:
 
-- Installed/portable path, legacy settings, probe, measure and cleanup tests pass.
-- Production dependency probe no longer searches for Python 3.11 or venv.
-- Cleanup remains bounded and does not recursively scan during probe.
+- Installed/portable path, legacy settings, pack source/download/resume/hash/atomic update/rollback, probe, measure and cleanup tests pass.
+- Production dependency probe no longer searches for Python 3.11 or venv and does not recursively measure storage.
+- Cleanup remains bounded under managed `deps/`; built-in CPU cannot be deleted.
+- Failed/uninstalled GPU packs and unqualified models cannot be selected as runnable native routes.
 
 Validation:
 
@@ -364,23 +431,25 @@ Rollback point: preserve old settings fields as ignored input until migration is
 
 ### Phase 5 - Frontend Migration
 
-#### T14 - Migrate ASR Runtime And Model UX
+#### T16 - Migrate ASR Runtime And Model UX
 
 Suggested slug: `native-asr-frontend-migration`
 
 Deliverables:
 
-- Replace Python setup panel with native runtime/model status and actions.
-- Show CPU as built in; expose only devices supported by engine and installed runtime.
+- Replace Python setup panel with native CPU/GPU runtime and model status/actions.
+- Show CPU as built in and qualified GPU packs as optional; expose runnable devices only when the engine, pack and qualification metadata agree.
+- Continue displaying every current model. Show native qualification state and disable or explain unavailable native routes instead of hiding models or silently falling back to Python.
 - Preserve current transcribe polling/document guards and model-download progress flow.
 - Remove production copy referencing Python, venv, pip and service directories.
 - Cover old settings/default fallback and companion download aggregation.
 
-Depends on: T11, T13; engine/device metadata from T06-T10 must be stable.
+Depends on: T11, T15; engine/model/device metadata from T06-T10 and T14 must be stable.
 
 Exit criteria:
 
 - Existing transcription and ASS generation behavior remains intact.
+- Every current model remains visible with accurate runnable/unsupported state.
 - Device/model UI tests and `pnpm build` pass.
 - No raw invoke or duplicate runtime state is introduced.
 
@@ -393,34 +462,34 @@ pnpm build
 
 Rollback point: UI can continue exposing the legacy setup path until backend contracts are stable; do not ship a mixed UI/runtime contract.
 
-**Gate 3:** Do not enter release cutover until native model delivery, CPU runtime packaging, settings migration and frontend UX work together on both installed and portable layouts. Any contract mismatch returns to T11-T14.
+**Gate 3:** Do not enter release cutover until native model delivery, CPU packaging, GPU pack decisions, settings migration and frontend UX work together on installed and portable layouts. A `stop-revise` GPU pack is omitted and does not block this gate; any CPU or shared contract mismatch returns to T11-T16.
 
 ### Phase 6 - Integration And Release Cutover
 
-#### T15 - Qualify And Cut Over Native ASR Release
+#### T17 - Qualify And Cut Over Native ASR Release
 
 Suggested slug: `native-asr-release-cutover`
 
-This task is a release gate, not a place to finish missing engine implementation.
+This task is a release gate, not a place to finish missing engine or GPU implementation.
 
 Deliverables:
 
-- Run the complete five-engine short/medium/long authoritative ground-truth matrix and publish absolute quality/performance/resource results plus optional Python diagnostics.
-- Verify cancel, crash, recovery, offline cached-model use, installed and portable behavior.
-- Switch production packaging/default routes only for qualified engines; stop bundling Python sidecar/runtime/venv.
-- Verify setup/portable/runtime size, third-party licenses and zero bundled model weights.
+- Run the complete five-engine short/medium/long authoritative CPU ground-truth matrix and the publishable GPU pack matrices; publish absolute quality/performance/resource results plus optional Python diagnostics.
+- Verify cancel, crash, recovery, CPU fallback, offline cached-model use, installed and portable behavior.
+- Switch production packaging/default routes only for qualified engines and packs; stop bundling Python sidecar/runtime/venv.
+- Freeze a complete source/dependency/compiler/algorithm-config input lock, rebuild and attest the final immutable CPU runtime from accepted T06～T10 identities, and re-verify every publishable GPU artifact matches the exact T14-qualified hash; then verify setup/portable/runtime sizes, third-party licenses and zero bundled model weights while CUDA/Vulkan remain optional external packs.
 - Remove or stop packaging obsolete production setup resources while retaining source-level legacy baseline for one stable release cycle.
 - Update README/notices and, only after architecture lands, update `AGENTS.md` and `.trellis/spec/{asr,tauri,frontend}`.
 - Run final cross-child contract review against the parent PRD.
 
-Depends on: T06, T07, T09, T10, T11, T12, T13, T14.
+Depends on: T06, T07, T09, T10, T11, T12, T13, T14, T15, T16.
 
 Exit criteria:
 
 - Every parent acceptance criterion is evidenced or explicitly blocks release.
 - All required test commands and worker CTest pass.
-- No unresolved P0/P1 quality, data-loss, path-security or license issue.
-- Any failed engine is returned to its owning child task rather than patched ad hoc here.
+- No unresolved P0/P1 quality, data-loss, path-security or license issue on the CPU baseline or any publishable GPU pack.
+- Failed engines return to their owning child; failed GPU packs are omitted according to T14 rather than patched ad hoc here.
 
 Final validation:
 
@@ -428,12 +497,12 @@ Final validation:
 pnpm test
 pnpm build
 cargo test --manifest-path src-tauri/Cargo.toml
-# Native worker CMake configure/build + CTest commands are fixed by T04/T12.
+# Native worker CMake configure/build + CTest commands are fixed by T04/T12/T13.
 ```
 
-Rollback point: restore the previous production package inputs and per-engine route without rewriting user projects or deleting caches. Never require a destructive settings/model migration for rollback.
+Rollback point: restore the previous production package inputs and per-engine/pack route without rewriting user projects or deleting caches. Never require a destructive settings/model migration for rollback.
 
-**Gate 4:** Archive the parent only after T15 passes and all 15 child tasks are independently archived.
+**Gate 4:** Archive the parent only after T17 passes and all 17 child tasks are independently archived.
 
 ## Cross-Task Review Checklist
 
@@ -444,7 +513,9 @@ Rollback point: restore the previous production package inputs and per-engine ro
 - [ ] Portable/installed roots and cleanup boundaries are covered.
 - [ ] Probe performs no recursive storage scan.
 - [ ] Runtime/model downloads are pinned, hashed and atomically installed.
-- [ ] CPU package contains runtime only, no model weights.
+- [ ] CPU package and optional GPU packs contain runtime only, no model weights; GPU packs are not bundled in the main installer.
+- [ ] GPU routing proves actual loaded acceleration, preserves CPU fallback and omits failed packs without blocking CPU release.
+- [ ] Every current model remains visible in T16 with qualification-driven availability; no unsupported model silently falls back to Python.
 - [ ] Python legacy remains development-only during the agreed rollback window.
 - [ ] Current-state specs are updated only when their owning architecture change lands.
 - [ ] No child was treated as complete with failing or unavailable mandatory checks.
@@ -454,8 +525,10 @@ Rollback point: restore the previous production package inputs and per-engine ro
 Stage 0 child-task creation:
 
 - [x] User reviewed and approved the parent `prd.md`, `design.md` and task map.
-- [x] T01-T03 are confirmed as the first creation batch and now exist as planning children.
-- [x] Each child has independently reviewable `prd.md`, `design.md`, `implement.md`, `implement.jsonl` and `check.jsonl`.
-- [x] Keep parent status at `planning`; T01 is archived and its ground-truth handoff remains authoritative.
-- [x] T02 completed implementation, six-cell measurements and independent review; CTranslate2 backend is viable but the current algorithm is recorded as `stop-revise`.
-- [ ] T03 remains `planning`; overall Gate 0 cannot close until its three CrispASR routes are measured/reviewed.
+- [x] T01-T03 were the first creation batch; all three have independently reviewable artifacts, are completed and archived, and their handoffs remain authoritative.
+- [x] T02 proved the CTranslate2 backend/runtime viable while recording the current fixed-window algorithm as `stop-revise`.
+- [x] T03 proved the CrispASR ABI/runtime viable, with Reazon `proceed-with-named-risks` and Parakeet/Qwen `stop-revise`; Gate 0 backend/runtime feasibility is closed.
+- [x] User approved adding T13/T14 as normal-numbered GPU development tasks while keeping CPU release independent from failed GPU packs.
+- [x] User approved T06 hard gates for `large-v3` and `large-v2` long audio; all models remain visible in T16 even when native qualification fails.
+- [x] T04-T06 are created as the next planning batch and linked to this parent.
+- [x] T04-T06 each have converged `prd.md`, `design.md`, `implement.md`, `implement.jsonl` and `check.jsonl`; keep all three in `planning` until user review selects the next task to start.

@@ -25,9 +25,9 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 ### R1 - 平台与交付范围
 
 - 首期交付平台为 Windows x64。
-- 主安装包和 portable 包内置可直接使用的原生 CPU runtime。
-- 安装包不得包含任何 ASR 模型权重。
-- Vulkan 和 CUDA runtime pack 不属于本父任务的首期交付；CPU 版本稳定后另建后续父任务。
+- 主安装包和 portable 包内置可直接使用的原生 CPU runtime；CPU 是首个原生版本的硬发布基线。
+- 安装包不得包含任何 ASR 模型权重或 CUDA/Vulkan runtime；GPU runtime 以可选受管 pack 交付。
+- CUDA 和 Vulkan 加速纳入本父任务的正常编号开发任务，但按 pack 独立认证和发布：未达到质量、性能、稳定回退或许可证门槛的 pack 标记为 `stop-revise` 并从发布清单移除，不阻塞已通过的 CPU 原生版。
 - 首期同一时间只允许一个活跃 ASR 推理任务。
 
 ### R2 - 固定引擎路由
@@ -97,7 +97,7 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 
 - 用户提供的 `.asr-benchmark` WAV+ASS 是唯一质量真值；Python 输出只作为可选诊断/历史参考，不能作为期望输出、相对 CER/RTF gate 或缺失标注替代。
 - 原生算法按官方文档、稳定 API、模型卡、当前维护良好的社区推荐实践排序选择，再以同一 ground truth 实测；不以复刻 Python 参数、分块、VAD、backfill 或私有 fork 为目标。
-- T01 用户评审后冻结的绝对门槛为：每个 engine/case CER `<=0.35`；纯 CPU inference RTF `<=1.0`；CUDA/Vulkan 等 GPU 加速 inference RTF `<=0.5`；short cold process wall `<=120s`；CTranslate2 RSS `<=6 GiB`；CrispASR RSS `<=12 GiB`；不定义 VRAM gate。T02/T03 必须直接对 ground truth 评估，不得凭 Python parity 宣称通过。
+- T01 用户评审后冻结的绝对门槛为：每个 engine/case CER `<=0.35`；纯 CPU inference RTF `<=1.0`；CUDA/Vulkan 等 GPU 加速 inference RTF `<=0.5`；short cold process wall `<=120s`；CTranslate2 RSS `<=6 GiB`；CrispASR RSS `<=12 GiB`；不定义 VRAM gate。所有 CPU/GPU 候选必须直接对 ground truth 评估，不得凭 Python parity 宣称通过。
 - 不得产生 `endMs <= startMs`、负起点或越界片段；直接对 ground truth 评估时，不得存在持续 `>=1.5s`、经参考标注确认含语音的漏段。
 - Qwen3 起始时间误差中位数不高于 150 ms，P95 不高于 500 ms，且时间戳必须来自 ForcedAligner。
 - Python reference 缺失或失败只减少诊断覆盖，不阻塞原生实现直接对 ground truth 的质量判断。
@@ -105,10 +105,12 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - Windows setup 不超过 80 MB，portable ZIP 不超过 90 MB，解压后的 CPU ASR runtime 不超过 250 MB。
 - 迁移期间保留 `python-legacy` 源码开发/诊断路径；发布包不携带 Python runtime 或 venv。
 - 每个引擎分别通过用户真值和产品合同门槛后才能切换；单个 CrispASR 引擎失败不阻塞已达标的 CTranslate2 路径。
+- ordinary faster-whisper 的 `large-v3` 默认模型和 `large-v2` 日语长音频是 T06 硬门槛；其余现有模型全部实测并标记 `qualified`、`stop-revise` 或 `unsupported-for-native-release`，非默认模型失败不阻塞已通过的原生 faster-whisper。
+- T16 仍展示全部现有模型；资格状态控制原生可用性、禁用状态和说明，而不是从列表隐藏。发布版不得为未通过模型静默回退到 Python。
 
 ### R9 - 父子任务治理
 
-- 父任务不作为日常实现目标；实现工作拆为 15 个独立子任务。
+- 父任务不作为日常实现目标；实现工作拆为 17 个独立子任务。
 - 每个子任务必须有可测试的验收标准、明确前置条件、验证命令和回退点。
 - 父子关系只表达交付物归属；依赖顺序必须写入子任务规划，不能依赖目录顺序推断。
 - PoC、任务框架、引擎产品化、分发/UI 和发布切换之间设置硬门禁。
@@ -123,28 +125,31 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - [ ] Qwen3 的模型就绪状态同时要求 ASR 模型与 ForcedAligner，且对齐失败不会输出伪时间轴。
 - [ ] 模型 manifest、固定来源、大小、SHA-256、断点续传和多文件原子安装通过测试。
 - [ ] installed 与 portable 的 runtime/model/download 路径、probe/measure/cleanup 行为通过测试。
-- [ ] 运行依赖和转录 UI 不再暴露 Python/venv，旧设置可安全加载并迁移。
+- [ ] CUDA/Vulkan pack 具备固定构建身份、哈希、许可证、能力探测和 CPU 回退；只有通过自身 `RTF <=0.5` 与质量门槛的 pack 才进入发布清单，未通过 pack 不阻塞 CPU 发布。
+- [ ] 运行依赖和转录 UI 不再暴露 Python/venv，旧设置可安全加载并迁移；全部现有模型仍可见，但未通过原生资格的模型有明确状态且不能静默走 Python。
 - [ ] 五引擎质量、长音频覆盖、性能与资源矩阵直接对 T01 用户真值达到用户评审后冻结的绝对门槛；Python 数值只作为可选参考。
 - [ ] setup、portable 和解压 runtime 体积达到 R8 预算，安装包内模型权重为 0。
 - [ ] `pnpm test`、`pnpm build`、`cargo test --manifest-path src-tauri/Cargo.toml` 和 worker CTest 全部通过。
 - [ ] 第三方许可证、attribution、`THIRD_PARTY_NOTICES.md`、`AGENTS.md` 和相关 Trellis specs 与最终架构一致。
-- [ ] 15 个子任务均已独立验收并归档，父任务完成最终跨子任务集成审查。
+- [ ] 17 个子任务均已独立验收并归档，父任务完成最终跨子任务集成审查。
 
 ## Out of Scope
 
 - macOS、Linux 和 ARM 支持。
-- Vulkan/CUDA runtime pack 的正式实现和发布。
+- 未列入 T13/T14 资格矩阵的 GPU/驱动/操作系统组合，以及在主安装包内捆绑 CUDA/Vulkan runtime。
 - 多 ASR 任务并发或任务排队。
 - 任意第三方自定义模型导入 UI。
 - 在同一 Whisper 模型上自动切换 CTranslate2/CrispASR。
 - 将原生推理库直接链接进 Tauri 主进程。
 - 要求 CrispASR 输出与现有 Python 引擎逐字节一致。
-- 在主安装包中捆绑任何 ASR 模型或 CUDA runtime。
+- 在主安装包中捆绑任何 ASR 模型或 CUDA/Vulkan runtime。
 
 ## Planning State
 
 - 总体 PRD、设计与实施任务地图已获评审；本轮同步新的 ground-truth 权威和 v0.4.1 实现事实。
-- T01 `native-asr-benchmark-baseline` 与 T02 `native-asr-ctranslate2-poc` 已完成并归档；T03 `native-asr-crispasr-poc` 已完成实现与本地证据，保持 `in_progress` 等待独立 check/finish。
+- T01 `native-asr-benchmark-baseline`、T02 `native-asr-ctranslate2-poc` 与 T03 `native-asr-crispasr-poc` 均已完成、独立检查、提交并归档；Gate 0 的 runtime/ABI 可行性阶段关闭，算法质量风险移交 T06/T07/T09/T10。
 - T01 ground-truth contract、per-case coverage 与绝对预算已获用户评审并冻结；T02/T03 模型实测直接复用该 manifest identity 和共享指标实现，不依赖 Python reference 成功。
 - T02 已证明 CTranslate2 + oneDNN native CPU backend/runtime 可行，但当前最小 fixed-window 算法为 `stop-revise`：large-v3 short CER 略超门槛，large-v3/Kotoba 中长音频均有 confirmed speech gaps。T06 必须修订算法并重测，不能把 runtime 可执行等同于产品质量通过。
-- T03 review 后的 final immutable evidence 修正了两个 harness interpretation：Reazon GGUF 应通过 public `parakeet` session backend，三 case CER/RTF/RSS/timeline/gap 冻结门槛均通过，但单巨段与大量 zero-duration native words 仅支持 `proceed-with-named-risks`；Qwen 使用 pinned upstream grouping 后 short/leading/boundary timeline legal，但 short timing 严重失败且 medium/long grouped source segments 仍 fail closed。Parakeet 与 Qwen 为 `stop-revise`。父任务继续保持 `planning`；没有 T03 route 可据此直接切换 production default。
+- T03 final immutable evidence 修正了两个 harness interpretation：Reazon GGUF 应通过 public `parakeet` session backend，三 case CER/RTF/RSS/timeline/gap 冻结门槛均通过，但单巨段与大量 zero-duration native words 仅支持 `proceed-with-named-risks`；Qwen 使用 pinned upstream grouping 后 short/leading/boundary timeline legal，但 short timing 严重失败且 medium/long grouped source segments 仍 fail closed。Parakeet 与 Qwen 为 `stop-revise`；没有 T03 route 可据此直接切换 production default。
+- GPU 加速不再另建后续父任务：T13 负责可复现 CUDA/Vulkan runtime packs，T14 负责设备路由、CPU 回退和 pack 独立资格矩阵；失败 pack 不阻塞 CPU cutover。
+- T04～T06 已创建为下一批 planning children；父任务继续保持 `planning`，首先评审并启动 T04。

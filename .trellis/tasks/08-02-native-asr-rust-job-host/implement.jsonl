@@ -1,0 +1,7 @@
+{"file":".trellis/spec/tauri/index.md","reason":"Apply the Rust ownership boundary, command lifecycle checklist and project validation expectations."}
+{"file":".trellis/spec/tauri/command-guidelines.md","reason":"Preserve command registration, typed bridge, long-job polling and exit cleanup contracts."}
+{"file":".trellis/spec/tauri/async-and-blocking.md","reason":"Keep blocking process waits and filesystem persistence off the async command runtime."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Apply structured argv, bounded paths/logs, cargo validation and process safety rules."}
+{"file":".trellis/spec/asr/api-and-jobs.md","reason":"Preserve current camelCase snapshot, job state, segment refresh and polling semantics while moving host ownership to Rust."}
+{"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Keep the parent worker/Tauri boundary, recovery lifecycle, legacy rollout and security design."}
+{"file":".trellis/tasks/08-02-native-asr-rust-job-host/research/planning-evidence.md","reason":"Use the repository-backed module boundary, active-slot, terminal and T04 handoff decisions."}

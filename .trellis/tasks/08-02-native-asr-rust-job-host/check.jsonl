@@ -1,0 +1,6 @@
+{"file":".trellis/spec/tauri/command-guidelines.md","reason":"Check stable Tauri commands, wrappers and app-exit process cleanup remain complete."}
+{"file":".trellis/spec/tauri/async-and-blocking.md","reason":"Check worker I/O, waits and persistence do not block the async runtime."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Check process/path/log safety and full Rust validation."}
+{"file":".trellis/spec/asr/api-and-jobs.md","reason":"Check snapshot casing, status, includeSegments and refresh compatibility."}
+{"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Check T05 stays development-only and does not absorb model/backend/settings/UI work."}
+{"file":".trellis/tasks/08-02-native-asr-rust-job-host/research/planning-evidence.md","reason":"Check shared active slot, first-terminal-wins, recovery and T04 final-handoff requirements."}

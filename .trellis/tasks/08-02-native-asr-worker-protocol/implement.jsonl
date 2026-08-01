@@ -1,0 +1,6 @@
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Apply native evidence, legal timeline, canonical ignored-output, bounded failure and frozen comparison contracts without duplicating scorer logic."}
+{"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Preserve the parent worker/Tauri boundary, stable protocol events, GPU-resolved device values and security constraints."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Use only the reviewed process/worker architecture and historical protocol proposal; T04 PRD/design are the authoritative wire schema and supersede its older modelPaths/computeType example."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-ctranslate2-poc/research/ctranslate2-poc-report.md","reason":"Carry forward source/model timestamp window, legal segment and immutable native evidence handoffs without model code."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/crispasr-poc-report.md","reason":"Carry forward public ABI lifecycle, silent progress risk, Qwen companion and process-termination cancellation handoffs."}
+{"file":".trellis/tasks/08-02-native-asr-worker-protocol/research/planning-evidence.md","reason":"Use the repository-backed protocol decisions, minimal file boundary and exact T05 handoff."}
