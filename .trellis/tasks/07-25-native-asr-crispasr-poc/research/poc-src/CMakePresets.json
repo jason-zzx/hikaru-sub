@@ -1,0 +1,26 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "windows-x64-cpu-poc",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../local/build/windows-x64-cpu-poc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-x64-cpu-poc-release",
+      "configurePreset": "windows-x64-cpu-poc"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-x64-cpu-poc-release",
+      "configurePreset": "windows-x64-cpu-poc",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

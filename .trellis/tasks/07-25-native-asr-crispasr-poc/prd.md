@@ -60,15 +60,15 @@
 
 ## Acceptance Criteria
 
-- [ ] T01 ground-truth contract 已评审，manifests 加入 `benchmark-contract.md`；optional Python reference 不构成 gate。
-- [ ] input lock 固定 SDK/toolchain/public ABI/four models immutable provenance/hash/size/license。
-- [ ] CPU Release x64 harness/CTests 覆盖 invalid input、repeat lifecycle、callback capture、copy-before-release 和 controlled errors。
-- [ ] 三引擎 ownership/callback/final-refresh/cleanup 有 route-specific evidence，无 unsafe lifecycle。
-- [ ] 三引擎 short/medium/long 各有 ground-truth metrics 或 reproducible native blocker；all confirmed gaps reported, not patched。
-- [ ] Qwen3 只在 aligner success/provenance 时有 timeline；negative cases zero accepted timed output。
-- [ ] 所有 accepted segments legal/sorted/in-bounds；private text stays ignored。
-- [ ] report 记录 resources/runtime/model sizes/licenses/decisions/downstream handoff，按冻结 T01 gates 给出可审计状态且不以 Python diagnostics 作为 pass evidence。
-- [ ] 不提交 models/private media/ASS text/absolute paths/SDK/build/product changes。
+- [x] T01 ground-truth contract 已评审，manifests 加入 `benchmark-contract.md`；optional Python reference 不构成 gate。
+- [x] input lock 固定 SDK/toolchain/public ABI/four models immutable provenance/hash/size/license。
+- [x] CPU Release x64 harness/CTests 覆盖 public CPU params、identity mismatch、invalid input、repeat lifecycle、callback failure cleanup、Qwen grouping/real negatives、failed evidence 和 canonical ignored-root containment。
+- [x] 三引擎 ownership/callback/final-refresh/cleanup 有 route-specific evidence；每个 success/error transcribe exit 在 context 销毁前 reset 三类 callback，created result/alignment/session exact-once free/close。
+- [x] 单一 final executable/DLL/lock identity 重跑三引擎 short/medium/long；Parakeet/Reazon 有 ground-truth metrics，Qwen short measured、medium/long complete failed evidence unscored。
+- [x] Qwen3 保留 raw character ranges 并按 pinned upstream source-segment grouping；short/leading-silence/boundary accepted timeline legal 且全为 aligner-derived，medium/long fail closed，real negative matrix 全部零 accepted output。
+- [x] 所有 accepted segments legal/sorted/in-bounds；private text stays ignored；failed evidence 包含完整 identity/trace/lifecycle 且 adapter 拒绝评分。
+- [x] report 记录 executable/DLL/audio/model identities、actual CPU module attestation、resources/licenses/decisions/downstream handoff，并正确标注 medium/long cold-wall N/A。
+- [x] 不提交 models/private media/ASS text/absolute paths/SDK/build/product changes。
 
 ## Out Of Scope
 
@@ -83,5 +83,6 @@
 
 ## Planning State
 
-- T03 保持 `planning`。
-- 执行前置为 T01 ground-truth handoff、manifest refresh、immutable inputs 和 ABI/license review；Python reference 成功不是前置。
+- T03 保持 `in_progress`；review findings 已修复，单一 immutable binary 的 clean-PATH matrix 与证据发布已完成，等待独立 check/finish。
+- Parakeet 为 `stop-revise`：三 case CER 失败且 top-level 单巨段；public native words 已单独证明。Reazon 使用正确 public `parakeet` backend 后三 case 冻结质量/性能门槛通过，为 `proceed-with-named-risks`，但单巨段与大量 zero-duration words 尚不具备产品字幕能力。
+- Qwen 为 `stop-revise`：upstream grouping 修复 short/leading/boundary legality，但 short start timing 失败，medium/long grouped source segments 仍出现 zero-duration 并 fail closed。结论只更新 Gate 0，不宣称 T08-T10 或父任务完成。

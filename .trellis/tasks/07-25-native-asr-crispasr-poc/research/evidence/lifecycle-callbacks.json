@@ -1,0 +1,2549 @@
+{
+  "callbackOwnership": "borrowed callback/getter text is copied before callback return or owner release",
+  "evidenceSetIdentity": {
+    "executable": {
+      "fileName": "hikaru-crispasr-poc.exe",
+      "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+      "sizeBytes": 472576
+    },
+    "inputLockSha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+    "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277",
+    "requiredDlls": [
+      {
+        "fileName": "crispasr.dll",
+        "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+        "sizeBytes": 11758080
+      },
+      {
+        "fileName": "ggml-base.dll",
+        "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+        "sizeBytes": 644096
+      },
+      {
+        "fileName": "ggml-cpu.dll",
+        "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+        "sizeBytes": 907264
+      },
+      {
+        "fileName": "ggml.dll",
+        "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+        "sizeBytes": 68608
+      }
+    ]
+  },
+  "routes": [
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "parakeet-ja",
+      "evidenceKey": "parakeet-long",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "49520ba5851050701ae3936e58e5c3e6e3a2ae47c840e2e4bfbd372fa165255d",
+      "resolvedBackend": "parakeet",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "parakeet-ja",
+      "evidenceKey": "parakeet-medium",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "684ee6dbb5ebdeea1ab6e47288d349dcd272fb3132238b66fceeebbf192dfec5",
+      "resolvedBackend": "parakeet",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "parakeet-ja",
+      "evidenceKey": "parakeet-short",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "5e68c20de04c60022550c50664758c43ec71cd48c1564bd8f9c6217b62c0e37c",
+      "resolvedBackend": "parakeet",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        },
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        },
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        },
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "qwen3-asr",
+      "evidenceKey": "qwen-boundary-v1",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "f7dbcb74324322b81ae55069b9cd6dc176c0d80dee7a10df453ab42389ec94bb",
+      "resolvedBackend": "qwen3",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": true,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 1,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 2,
+          "status": "completed",
+          "tokenCallbackCount": 163
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "qwen3-asr",
+      "evidenceKey": "qwen-leading-silence-v1",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "5c5aae1cd643fc301a97efb554fdd32754ef147dedc6721de7d920ff22a76bf8",
+      "resolvedBackend": "qwen3",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": true,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 1,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 83
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "qwen3-asr",
+      "evidenceKey": "qwen3-long",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "33d46de94e42d86c7cd9b315c1b143b306cf2cd12abdbf13ed062f5a53fe8943",
+      "resolvedBackend": "qwen3",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": true,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 1,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 150,
+          "status": "failed",
+          "tokenCallbackCount": 12699
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "failed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "qwen3-asr",
+      "evidenceKey": "qwen3-medium",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "02013002cd133bb3619e18637654a50ec970ba9d7ac5bc7340bed6c677ee0b87",
+      "resolvedBackend": "qwen3",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": true,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 1,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 19,
+          "status": "failed",
+          "tokenCallbackCount": 1522
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "failed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "qwen3-asr",
+      "evidenceKey": "qwen3-short",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "2b7fe38eab319f85e232a6219cb6b48efaff730e5e573683d87ac759fa9022f4",
+      "resolvedBackend": "qwen3",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": true,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 1,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 83
+        },
+        {
+          "alignResultCreated": true,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 1,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 83
+        },
+        {
+          "alignResultCreated": true,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 1,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 83
+        },
+        {
+          "alignResultCreated": true,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 1,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 83
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "reazonspeech",
+      "evidenceKey": "reazonspeech-long",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "967a881a1e9a3c49b017eb54e0bedc251be454f6ec15477fc4bdc189d9e81634",
+      "resolvedBackend": "parakeet",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "reazonspeech",
+      "evidenceKey": "reazonspeech-medium",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "d531864d763ee7f4c010b2e683a4bda578c60a61509f171d7a1063d22681074c",
+      "resolvedBackend": "parakeet",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    },
+    {
+      "cooperativeCancellation": "unsupported-by-pinned-public-session-abi",
+      "engine": "reazonspeech",
+      "evidenceKey": "reazonspeech-short",
+      "loadedLocalModuleNames": [
+        "crispasr.dll",
+        "ggml-base.dll",
+        "ggml-cpu.dll",
+        "ggml.dll",
+        "hikaru-crispasr-poc.exe"
+      ],
+      "openParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "rawEvidenceSha256": "f48b010c50d3d599f35c3ed5658f085469affafd3817039c762ca3d3c45165ef",
+      "resolvedBackend": "parakeet",
+      "restrictedPath": true,
+      "samples": [
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        },
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        },
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        },
+        {
+          "alignResultCreated": false,
+          "alignResultExactOnce": true,
+          "alignResultFreeCount": 0,
+          "callbackContextActiveAfterReset": false,
+          "callbackResetCount": 3,
+          "callbacksOnTranscribeThread": true,
+          "copyBeforeRelease": true,
+          "exactOnce": true,
+          "lateCallbackCount": 0,
+          "previewFinalRelationship": "identical-to-final",
+          "progressCallbackCount": 0,
+          "progressMonotonic": true,
+          "resultCreated": true,
+          "resultExactOnce": true,
+          "resultFreeCount": 1,
+          "segmentCallbackCount": 1,
+          "status": "completed",
+          "tokenCallbackCount": 0
+        }
+      ],
+      "sessionCloseCount": 1,
+      "sessionExactOnce": true,
+      "sessionOpened": true,
+      "status": "completed"
+    }
+  ],
+  "rowIdentityMap": {
+    "negative:corrupt": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "negative-obligation",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "expectedAligner": {
+        "attribution": "Qwen3 ForcedAligner 0.6B by Qwen; GGUF conversion published by cstr",
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "license": "Apache-2.0",
+        "modelCardSha256": "487d5277dda43bd7a8bcd926e852fb80625c5343fa150e8606ce393bc3ac12a9",
+        "quantization": "Q4_K",
+        "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+        "revision": "84beb0c7affb90c55a0c3ee0649c725d291a89ff",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/84beb0c7affb90c55a0c3ee0649c725d291a89ff/qwen3-forced-aligner-0.6b-q4_k.gguf"
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "observedAligner": {
+        "fileName": "corrupt-aligner.gguf",
+        "sha256": "11d510e067d2cdcd7559bd86d27a2f4c20babd43670346b97af99b522c1f0075",
+        "sizeBytes": 7,
+        "state": "regular-file"
+      },
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "negative:empty-transcript": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "negative-obligation",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "expectedAligner": {
+        "attribution": "Qwen3 ForcedAligner 0.6B by Qwen; GGUF conversion published by cstr",
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "license": "Apache-2.0",
+        "modelCardSha256": "487d5277dda43bd7a8bcd926e852fb80625c5343fa150e8606ce393bc3ac12a9",
+        "quantization": "Q4_K",
+        "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+        "revision": "84beb0c7affb90c55a0c3ee0649c725d291a89ff",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/84beb0c7affb90c55a0c3ee0649c725d291a89ff/qwen3-forced-aligner-0.6b-q4_k.gguf"
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "observedAligner": {
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "state": "regular-file"
+      },
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "negative:invalid-audio": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "negative-obligation",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "expectedAligner": {
+        "attribution": "Qwen3 ForcedAligner 0.6B by Qwen; GGUF conversion published by cstr",
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "license": "Apache-2.0",
+        "modelCardSha256": "487d5277dda43bd7a8bcd926e852fb80625c5343fa150e8606ce393bc3ac12a9",
+        "quantization": "Q4_K",
+        "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+        "revision": "84beb0c7affb90c55a0c3ee0649c725d291a89ff",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/84beb0c7affb90c55a0c3ee0649c725d291a89ff/qwen3-forced-aligner-0.6b-q4_k.gguf"
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "observedAligner": {
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "state": "regular-file"
+      },
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "negative:malformed-segment-map": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "negative-obligation",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "expectedAligner": {
+        "attribution": "Qwen3 ForcedAligner 0.6B by Qwen; GGUF conversion published by cstr",
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "license": "Apache-2.0",
+        "modelCardSha256": "487d5277dda43bd7a8bcd926e852fb80625c5343fa150e8606ce393bc3ac12a9",
+        "quantization": "Q4_K",
+        "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+        "revision": "84beb0c7affb90c55a0c3ee0649c725d291a89ff",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/84beb0c7affb90c55a0c3ee0649c725d291a89ff/qwen3-forced-aligner-0.6b-q4_k.gguf"
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "observedAligner": {
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "state": "regular-file"
+      },
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "negative:missing": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "negative-obligation",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "expectedAligner": {
+        "attribution": "Qwen3 ForcedAligner 0.6B by Qwen; GGUF conversion published by cstr",
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "license": "Apache-2.0",
+        "modelCardSha256": "487d5277dda43bd7a8bcd926e852fb80625c5343fa150e8606ce393bc3ac12a9",
+        "quantization": "Q4_K",
+        "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+        "revision": "84beb0c7affb90c55a0c3ee0649c725d291a89ff",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/84beb0c7affb90c55a0c3ee0649c725d291a89ff/qwen3-forced-aligner-0.6b-q4_k.gguf"
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "observedAligner": {
+        "fileName": null,
+        "sha256": null,
+        "sizeBytes": null,
+        "state": "not-supplied"
+      },
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "negative:unloadable": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "negative-obligation",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "expectedAligner": {
+        "attribution": "Qwen3 ForcedAligner 0.6B by Qwen; GGUF conversion published by cstr",
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "license": "Apache-2.0",
+        "modelCardSha256": "487d5277dda43bd7a8bcd926e852fb80625c5343fa150e8606ce393bc3ac12a9",
+        "quantization": "Q4_K",
+        "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+        "revision": "84beb0c7affb90c55a0c3ee0649c725d291a89ff",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216,
+        "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/84beb0c7affb90c55a0c3ee0649c725d291a89ff/qwen3-forced-aligner-0.6b-q4_k.gguf"
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "observedAligner": {
+        "fileName": "qwen3-forced-aligner-unloadable.gguf",
+        "sha256": "ec21232b4c725f9525c981345718bcd887e51b487d4735b7a8b73ae3b6f0cb77",
+        "sizeBytes": 12,
+        "state": "regular-file"
+      },
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "parakeet-long": {
+      "alignerModel": null,
+      "case": {
+        "audio": {
+          "fileName": "long.wav",
+          "sha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+          "sizeBytes": 132615588
+        },
+        "caseId": "long-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "parakeet-ja",
+        "fileName": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+        "role": "primary",
+        "sha256": "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17",
+        "sizeBytes": 673554880
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "parakeet-medium": {
+      "alignerModel": null,
+      "case": {
+        "audio": {
+          "fileName": "medium.wav",
+          "sha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+          "sizeBytes": 15963982
+        },
+        "caseId": "medium-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "parakeet-ja",
+        "fileName": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+        "role": "primary",
+        "sha256": "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17",
+        "sizeBytes": 673554880
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "parakeet-short": {
+      "alignerModel": null,
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "parakeet-ja",
+        "fileName": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+        "role": "primary",
+        "sha256": "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17",
+        "sizeBytes": 673554880
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "qwen-boundary-v1": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "qwen-boundary.wav",
+          "sha256": "de8852fad9fe43083c31e5d9d3be2309faef4d25882cdd534fe9f7bc8e4dad24",
+          "sizeBytes": 1574592
+        },
+        "caseId": "qwen-boundary-v1",
+        "caseSource": "derived-obligation",
+        "derivation": {
+          "id": "concat-source-1000ms-zero-source",
+          "sourceAudio": {
+            "fileName": "short.wav",
+            "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+            "sizeBytes": 771728
+          },
+          "sourceCaseId": "short-v1"
+        },
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "qwen-leading-silence-v1": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "qwen-leading-silence.wav",
+          "sha256": "c9d0002301361265d031cab5b13b007f25fccd38b11492ecf62eaa6cb3978944",
+          "sizeBytes": 835318
+        },
+        "caseId": "qwen-leading-silence-v1",
+        "caseSource": "derived-obligation",
+        "derivation": {
+          "id": "prepend-2000ms-zero-pcm16",
+          "sourceAudio": {
+            "fileName": "short.wav",
+            "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+            "sizeBytes": 771728
+          },
+          "sourceCaseId": "short-v1"
+        },
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "qwen3-long": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "long.wav",
+          "sha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+          "sizeBytes": 132615588
+        },
+        "caseId": "long-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "qwen3-medium": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "medium.wav",
+          "sha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+          "sizeBytes": 15963982
+        },
+        "caseId": "medium-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "qwen3-short": {
+      "alignerModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      },
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "reazonspeech-long": {
+      "alignerModel": null,
+      "case": {
+        "audio": {
+          "fileName": "long.wav",
+          "sha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+          "sizeBytes": 132615588
+        },
+        "caseId": "long-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "reazonspeech",
+        "fileName": "reazonspeech-nemo-v2-q8_0.gguf",
+        "role": "primary",
+        "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+        "sizeBytes": 667147072
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "reazonspeech-medium": {
+      "alignerModel": null,
+      "case": {
+        "audio": {
+          "fileName": "medium.wav",
+          "sha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+          "sizeBytes": 15963982
+        },
+        "caseId": "medium-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "reazonspeech",
+        "fileName": "reazonspeech-nemo-v2-q8_0.gguf",
+        "role": "primary",
+        "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+        "sizeBytes": 667147072
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    },
+    "reazonspeech-short": {
+      "alignerModel": null,
+      "case": {
+        "audio": {
+          "fileName": "short.wav",
+          "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "sizeBytes": 771728
+        },
+        "caseId": "short-v1",
+        "caseSource": "t01-authoritative",
+        "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+      },
+      "cpuOpenParams": {
+        "abiVersion": 2,
+        "flashAttn": 0,
+        "nGpuLayers": 0,
+        "nThreads": 16,
+        "useGpu": 0
+      },
+      "executable": {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      },
+      "inputLock": {
+        "fileName": "crispasr-input-lock.json",
+        "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+        "sizeBytes": 7763
+      },
+      "loadedLocalModules": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        },
+        {
+          "fileName": "hikaru-crispasr-poc.exe",
+          "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+          "sizeBytes": 472576
+        }
+      ],
+      "primaryModel": {
+        "engine": "reazonspeech",
+        "fileName": "reazonspeech-nemo-v2-q8_0.gguf",
+        "role": "primary",
+        "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+        "sizeBytes": 667147072
+      },
+      "requiredDlls": [
+        {
+          "fileName": "crispasr.dll",
+          "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+          "sizeBytes": 11758080
+        },
+        {
+          "fileName": "ggml-base.dll",
+          "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+          "sizeBytes": 644096
+        },
+        {
+          "fileName": "ggml-cpu.dll",
+          "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+          "sizeBytes": 907264
+        },
+        {
+          "fileName": "ggml.dll",
+          "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+          "sizeBytes": 68608
+        }
+      ],
+      "restrictedPath": {
+        "entryCategories": [
+          "harness-directory",
+          "windows-system32"
+        ],
+        "entryCount": 2,
+        "restricted": true
+      }
+    }
+  },
+  "schemaVersion": 3
+}
