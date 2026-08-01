@@ -5,4 +5,4 @@
 {"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/planning-evidence.md","reason":"Check retained ground-truth material facts and planning provenance against the published handoff."}
 {"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Check T03 against the published ground-truth authority, shared metrics, privacy boundary, and non-gating Python reference policy."}
 {"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/python-reference-report.md","reason":"Check any comparison to Parakeet/Qwen3/Reazon short diagnostics remains sanitized, supplemental, and non-gating."}
-{"file":".trellis/tasks/07-25-native-asr-crispasr-poc/research/planning-evidence.md","reason":"Check lifecycle, refresh, Qwen fallback prohibition, ground-truth evidence, and handoff boundaries."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/planning-evidence.md","reason":"Check lifecycle, refresh, Qwen fallback prohibition, ground-truth evidence, and handoff boundaries."}

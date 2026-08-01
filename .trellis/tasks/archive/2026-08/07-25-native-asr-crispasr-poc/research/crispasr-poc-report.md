@@ -139,9 +139,9 @@ Exact identities and attribution are in `crispasr-input-lock.json` and `evidence
 ## Reproduction
 
 ```powershell
-.trellis\tasks\07-25-native-asr-crispasr-poc\research\poc-src\build.cmd all
-python .trellis/tasks/07-25-native-asr-crispasr-poc/research/poc-src/run_evidence.py
-python .trellis/tasks/07-25-native-asr-crispasr-poc/research/poc-src/publish_evidence.py
+.trellis\tasks\archive\2026-08\07-25-native-asr-crispasr-poc\research\poc-src\build.cmd all
+python .trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/poc-src/run_evidence.py
+python .trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/poc-src/publish_evidence.py
 ```
 
 SDK, models, build products, raw transcripts and private references remain below the exact ignored task-local `research/local/` root.
