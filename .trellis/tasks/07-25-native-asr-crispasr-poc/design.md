@@ -30,7 +30,7 @@ Python output cannot repair reference or create a relative gate. T01 absolute bu
 
 ## C ABI And CLI
 
-Required API subset is proved from pinned headers: explicit session config/open, callback registration where available, transcribe/result getters, Qwen alignment and close. Minimal local cleanup guards ensure exact-once release; no wrapper hierarchy.
+Required API subset is proved from pinned headers: `crispasr_session_open_with_params` CPU-forced open, callback registration/reset, transcribe/top-level+nested-word getters, Qwen alignment and close. Minimal local scope guards ensure callback reset before context destruction and exact-once release; no wrapper hierarchy.
 
 ```text
 --engine parakeet-ja|reazonspeech|qwen3-asr
@@ -62,17 +62,17 @@ Use Q8_0 and score native timestamps/coverage against T01 speech regions. Curren
 
 ### ReazonSpeech
 
-Use Q8_0 and score short/medium/long native behavior. Current Python `>=60s` 45s chunk/2s overlap is a regression reference, not the CrispASR algorithm requirement. Observe callbacks, final getter and possible replacement semantics.
+Use Q8_0 and the backend name selected by pinned official CLI/GGUF detection (`parakeet` for this Reazon model), then score short/medium/long native behavior. The separately advertised `reazonspeech` alias is not treated as authoritative when pinned transcribe dispatch does not consume it. Current Python `>=60s` 45s chunk/2s overlap remains diagnostic only.
 
 ### Qwen3
 
-Q4_K ASR + Q4_K Aligner is indivisible. Only copied aligner timestamps become final segments. Missing/failed/empty/malformed alignment returns controlled failure and zero accepted timeline. Current Python synthetic fallback is prohibited.
+Q4_K ASR + Q4_K Aligner is indivisible. Preserve copied raw CJK character ranges, then group them back to copied ASR source segments with semantics equivalent to pinned upstream segment mode (first consumed start, last consumed end). Grouped segments must independently be legal; no duration expansion is permitted. Missing/failed/empty/malformed alignment returns controlled failure and zero accepted timeline. Current Python synthetic fallback is prohibited.
 
 Parakeet, Qwen3 and ReazonSpeech may all final-refresh in current Python; protocol evidence records preview-to-final relationships generically rather than assuming Parakeet-only refresh.
 
 ## Evidence Contract
 
-Evidence inherits T01 schema and adds SDK/header/model hashes, source citations, callback trace/thread/progress, cleanup states, timestamp provenance, Qwen negative-case code, runtime inventory and licenses. Raw result maps to T01 comparator; no duplicated CER/P95/gap/report logic.
+Evidence inherits T01 schema and adds authoritative case/audio, lock, executable, required DLL, model/aligner identities; sanitized environment; public CPU params and loaded modules; callback trace/reset/thread/progress; cleanup states; raw Qwen ranges; negative traces; runtime inventory and licenses. The adapter enforces selected identities before scoring and never scores failed evidence. Raw result maps to T01 comparator; no duplicated CER/P95/gap/report logic.
 
 ## Failure Semantics
 

@@ -1,0 +1,219 @@
+{
+  "crispasr": {
+    "commit": "cf0fdbbe38ad0aa107e3250f6ee5bdc755aced45",
+    "license": "MIT",
+    "release": "https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.22",
+    "releaseAssetImmutableFlag": false,
+    "releaseAssetIntegrityPolicy": "Exact asset name, size and GitHub-published SHA-256 digest are mandatory; a changed asset is a new evidence set.",
+    "source": "https://github.com/CrispStrobe/CrispASR/tree/cf0fdbbe38ad0aa107e3250f6ee5bdc755aced45",
+    "tag": "v0.8.22",
+    "version": "0.8.22"
+  },
+  "evidenceSetIdentity": {
+    "executable": {
+      "fileName": "hikaru-crispasr-poc.exe",
+      "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+      "sizeBytes": 472576
+    },
+    "inputLockSha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f",
+    "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277",
+    "requiredDlls": [
+      {
+        "fileName": "crispasr.dll",
+        "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+        "sizeBytes": 11758080
+      },
+      {
+        "fileName": "ggml-base.dll",
+        "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+        "sizeBytes": 644096
+      },
+      {
+        "fileName": "ggml-cpu.dll",
+        "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+        "sizeBytes": 907264
+      },
+      {
+        "fileName": "ggml.dll",
+        "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+        "sizeBytes": 68608
+      }
+    ]
+  },
+  "harnessBinary": {
+    "fileName": "hikaru-crispasr-poc.exe",
+    "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+    "sizeBytes": 472576
+  },
+  "licenses": [
+    {
+      "component": "CrispASR",
+      "license": "MIT"
+    },
+    {
+      "component": "Parakeet JA model",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "component": "ReazonSpeech model",
+      "license": "Apache-2.0"
+    },
+    {
+      "component": "Qwen3-ASR model",
+      "license": "Apache-2.0"
+    },
+    {
+      "component": "Qwen3 ForcedAligner model",
+      "license": "Apache-2.0"
+    },
+    {
+      "component": "nlohmann/json",
+      "license": "MIT"
+    }
+  ],
+  "models": [
+    {
+      "attribution": "NVIDIA parakeet-tdt_ctc-0.6b-ja; GGUF conversion published by cstr",
+      "engine": "parakeet-ja",
+      "fileName": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+      "license": "CC-BY-4.0",
+      "quantization": "Q8_0",
+      "repository": "cstr/parakeet-tdt-0.6b-ja-GGUF",
+      "revision": "65341fce2b46d25ea51593b1f771ed9a73cf7108",
+      "role": "primary",
+      "sha256": "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17",
+      "sizeBytes": 673554880
+    },
+    {
+      "attribution": "ReazonSpeech NeMo v2 by Reazon Human Interaction Lab; GGUF conversion published by cstr",
+      "engine": "reazonspeech",
+      "fileName": "reazonspeech-nemo-v2-q8_0.gguf",
+      "license": "Apache-2.0",
+      "quantization": "Q8_0",
+      "repository": "cstr/reazonspeech-nemo-v2-GGUF",
+      "revision": "22799a5919ea26e3c5293fe0e68846fe7918a234",
+      "role": "primary",
+      "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+      "sizeBytes": 667147072
+    },
+    {
+      "attribution": "Qwen3-ASR-1.7B by Qwen; GGUF conversion published by cstr",
+      "engine": "qwen3-asr",
+      "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+      "license": "Apache-2.0",
+      "quantization": "Q4_K",
+      "repository": "cstr/qwen3-asr-1.7b-GGUF",
+      "revision": "87e941f6302c55716a120cd8fbfba74f0bfe7cf7",
+      "role": "primary",
+      "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+      "sizeBytes": 1490915200
+    },
+    {
+      "attribution": "Qwen3 ForcedAligner 0.6B by Qwen; GGUF conversion published by cstr",
+      "engine": "qwen3-asr",
+      "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+      "license": "Apache-2.0",
+      "quantization": "Q4_K",
+      "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+      "revision": "84beb0c7affb90c55a0c3ee0649c725d291a89ff",
+      "role": "aligner",
+      "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+      "sizeBytes": 529001216
+    }
+  ],
+  "packagingRisk": "The library archive contains include/crispasr.h but omits crispasr_session.h; the exact pinned source header is therefore required at build time. The DLL exports used by the harness were independently probed.",
+  "requiredDlls": [
+    {
+      "fileName": "crispasr.dll",
+      "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+      "sizeBytes": 11758080
+    },
+    {
+      "fileName": "ggml-base.dll",
+      "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+      "sizeBytes": 644096
+    },
+    {
+      "fileName": "ggml-cpu.dll",
+      "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+      "sizeBytes": 907264
+    },
+    {
+      "fileName": "ggml.dll",
+      "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+      "sizeBytes": 68608
+    }
+  ],
+  "runtimeArchive": {
+    "name": "libcrispasr-windows-x86_64.tar.gz",
+    "role": "Windows x64 CPU public C ABI library/runtime",
+    "sha256": "bebdc63f28e7fcf4ac81913d3dea9eb6e2a52936de2dd02628594ce9cff11f75",
+    "sizeBytes": 37724402,
+    "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.22/libcrispasr-windows-x86_64.tar.gz"
+  },
+  "runtimeFiles": [
+    {
+      "base": "sdk",
+      "path": "bin/crispasr.dll",
+      "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+      "sizeBytes": 11758080
+    },
+    {
+      "base": "sdk",
+      "path": "bin/ggml-base.dll",
+      "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+      "sizeBytes": 644096
+    },
+    {
+      "base": "sdk",
+      "path": "bin/ggml-cpu.dll",
+      "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+      "sizeBytes": 907264
+    },
+    {
+      "base": "sdk",
+      "path": "bin/ggml.dll",
+      "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+      "sizeBytes": 68608
+    },
+    {
+      "base": "sdk",
+      "path": "include/crispasr.h",
+      "sha256": "8920ce8972f75e0813868300f88e56b80c6ccc6e2f62425f6b5f5b2201de1e40",
+      "sizeBytes": 52670
+    },
+    {
+      "base": "source",
+      "path": "include/crispasr.h",
+      "sha256": "38e3a7c28e4dda33bf2705a0d94b0414f00cba434927360a62cb091aecca2ce4",
+      "sizeBytes": 51699
+    },
+    {
+      "base": "source",
+      "path": "include/crispasr_session.h",
+      "sha256": "cdefd19f6f208ed3f77f31c1cc8df19224c1c81ed5e0e6064650a827000c68df",
+      "sizeBytes": 51717
+    }
+  ],
+  "schemaVersion": 3,
+  "toolchain": {
+    "cmake": {
+      "generator": "Ninja",
+      "version": "4.1.1-msvc1"
+    },
+    "msvc": {
+      "compilerVersion": "19.50.35722.0",
+      "target": "x64",
+      "toolsVersion": "14.50.35717"
+    },
+    "ninja": {
+      "version": "1.12.1"
+    },
+    "os": "Windows 10.0.26200.8875 x64",
+    "visualStudio": {
+      "license": "Microsoft Visual Studio Community license",
+      "product": "Visual Studio Community 2026",
+      "version": "18.2.0+11408.102"
+    }
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "scope": "Windows x64 CPU-only task-local CrispASR three-engine public C ABI PoC",
+  "lockStatus": "complete",
+  "crispasr": {
+    "version": "0.8.22",
+    "tag": "v0.8.22",
+    "commit": "cf0fdbbe38ad0aa107e3250f6ee5bdc755aced45",
+    "release": "https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.22",
+    "source": "https://github.com/CrispStrobe/CrispASR/tree/cf0fdbbe38ad0aa107e3250f6ee5bdc755aced45",
+    "license": "MIT",
+    "releaseAssetImmutableFlag": false,
+    "releaseAssetIntegrityPolicy": "Exact asset name, size and GitHub-published SHA-256 digest are mandatory; a changed asset is a new evidence set."
+  },
+  "toolchain": {
+    "os": "Windows 10.0.26200.8875 x64",
+    "visualStudio": {
+      "product": "Visual Studio Community 2026",
+      "version": "18.2.0+11408.102",
+      "license": "Microsoft Visual Studio Community license"
+    },
+    "msvc": {
+      "compilerVersion": "19.50.35722.0",
+      "toolsVersion": "14.50.35717",
+      "target": "x64"
+    },
+    "cmake": {
+      "version": "4.1.1-msvc1",
+      "generator": "Ninja"
+    },
+    "ninja": {
+      "version": "1.12.1"
+    }
+  },
+  "archives": [
+    {
+      "name": "libcrispasr-windows-x86_64.tar.gz",
+      "role": "Windows x64 CPU public C ABI library/runtime",
+      "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.22/libcrispasr-windows-x86_64.tar.gz",
+      "sizeBytes": 37724402,
+      "sha256": "bebdc63f28e7fcf4ac81913d3dea9eb6e2a52936de2dd02628594ce9cff11f75"
+    },
+    {
+      "name": "CrispASR-cf0fdbbe.tar.gz",
+      "role": "Pinned source and public ABI header provenance",
+      "url": "https://github.com/CrispStrobe/CrispASR/archive/cf0fdbbe38ad0aa107e3250f6ee5bdc755aced45.tar.gz",
+      "sizeBytes": 22221230,
+      "sha256": "40fe6158044d760e10832ad924ec40c7b6c1148cfb1922bdde52e8511f3dd633"
+    }
+  ],
+  "runtime": {
+    "archive": "libcrispasr-windows-x86_64.tar.gz",
+    "files": [
+      {
+        "base": "sdk",
+        "path": "bin/crispasr.dll",
+        "sizeBytes": 11758080,
+        "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de"
+      },
+      {
+        "base": "sdk",
+        "path": "bin/ggml-base.dll",
+        "sizeBytes": 644096,
+        "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4"
+      },
+      {
+        "base": "sdk",
+        "path": "bin/ggml-cpu.dll",
+        "sizeBytes": 907264,
+        "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554"
+      },
+      {
+        "base": "sdk",
+        "path": "bin/ggml.dll",
+        "sizeBytes": 68608,
+        "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d"
+      },
+      {
+        "base": "sdk",
+        "path": "include/crispasr.h",
+        "sizeBytes": 52670,
+        "sha256": "8920ce8972f75e0813868300f88e56b80c6ccc6e2f62425f6b5f5b2201de1e40"
+      },
+      {
+        "base": "source",
+        "path": "include/crispasr.h",
+        "sizeBytes": 51699,
+        "sha256": "38e3a7c28e4dda33bf2705a0d94b0414f00cba434927360a62cb091aecca2ce4"
+      },
+      {
+        "base": "source",
+        "path": "include/crispasr_session.h",
+        "sizeBytes": 51717,
+        "sha256": "cdefd19f6f208ed3f77f31c1cc8df19224c1c81ed5e0e6064650a827000c68df"
+      }
+    ],
+    "publicAbiHeader": "include/crispasr_session.h",
+    "packagingObservation": "The library archive contains include/crispasr.h but omits crispasr_session.h; the exact pinned source header is therefore required at build time. The DLL exports used by the harness were independently probed."
+  },
+  "dependencies": [
+    {
+      "name": "nlohmann/json",
+      "version": "3.11.3",
+      "source": "https://github.com/nlohmann/json/releases/tag/v3.11.3",
+      "header": "single_include/nlohmann/json.hpp",
+      "sizeBytes": 919975,
+      "sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6",
+      "license": "MIT"
+    }
+  ],
+  "models": [
+    {
+      "engine": "parakeet-ja",
+      "role": "primary",
+      "repository": "cstr/parakeet-tdt-0.6b-ja-GGUF",
+      "revision": "65341fce2b46d25ea51593b1f771ed9a73cf7108",
+      "fileName": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+      "quantization": "Q8_0",
+      "sizeBytes": 673554880,
+      "sha256": "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17",
+      "url": "https://huggingface.co/cstr/parakeet-tdt-0.6b-ja-GGUF/resolve/65341fce2b46d25ea51593b1f771ed9a73cf7108/parakeet-tdt-0.6b-ja-q8_0.gguf",
+      "license": "CC-BY-4.0",
+      "attribution": "NVIDIA parakeet-tdt_ctc-0.6b-ja; GGUF conversion published by cstr",
+      "modelCardSha256": "c897f3bad64e3cb800b475ce26019053afac909eb74620a9b2bacd40b00745e1"
+    },
+    {
+      "engine": "reazonspeech",
+      "role": "primary",
+      "repository": "cstr/reazonspeech-nemo-v2-GGUF",
+      "revision": "22799a5919ea26e3c5293fe0e68846fe7918a234",
+      "fileName": "reazonspeech-nemo-v2-q8_0.gguf",
+      "quantization": "Q8_0",
+      "sizeBytes": 667147072,
+      "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+      "url": "https://huggingface.co/cstr/reazonspeech-nemo-v2-GGUF/resolve/22799a5919ea26e3c5293fe0e68846fe7918a234/reazonspeech-nemo-v2-q8_0.gguf",
+      "license": "Apache-2.0",
+      "attribution": "ReazonSpeech NeMo v2 by Reazon Human Interaction Lab; GGUF conversion published by cstr",
+      "modelCardSha256": "91f529d4e1a31877f2866e2a924c3983a9c8b35ad4727679842de935029dafa3"
+    },
+    {
+      "engine": "qwen3-asr",
+      "role": "primary",
+      "repository": "cstr/qwen3-asr-1.7b-GGUF",
+      "revision": "87e941f6302c55716a120cd8fbfba74f0bfe7cf7",
+      "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+      "quantization": "Q4_K",
+      "sizeBytes": 1490915200,
+      "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+      "url": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/resolve/87e941f6302c55716a120cd8fbfba74f0bfe7cf7/qwen3-asr-1.7b-q4_k.gguf",
+      "license": "Apache-2.0",
+      "attribution": "Qwen3-ASR-1.7B by Qwen; GGUF conversion published by cstr",
+      "modelCardSha256": "259a632350053f22604b2a8e8dd30d0f32c78ced2fb58bd2c51b874c49060b3f"
+    },
+    {
+      "engine": "qwen3-asr",
+      "role": "aligner",
+      "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+      "revision": "84beb0c7affb90c55a0c3ee0649c725d291a89ff",
+      "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+      "quantization": "Q4_K",
+      "sizeBytes": 529001216,
+      "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+      "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/84beb0c7affb90c55a0c3ee0649c725d291a89ff/qwen3-forced-aligner-0.6b-q4_k.gguf",
+      "license": "Apache-2.0",
+      "attribution": "Qwen3 ForcedAligner 0.6B by Qwen; GGUF conversion published by cstr",
+      "modelCardSha256": "487d5277dda43bd7a8bcd926e852fb80625c5343fa150e8606ce393bc3ac12a9"
+    }
+  ],
+  "authorities": [
+    "https://github.com/CrispStrobe/CrispASR/blob/cf0fdbbe38ad0aa107e3250f6ee5bdc755aced45/include/crispasr_session.h",
+    "https://github.com/CrispStrobe/CrispASR/blob/cf0fdbbe38ad0aa107e3250f6ee5bdc755aced45/src/crispasr_c_api.cpp",
+    "https://github.com/CrispStrobe/CrispASR/blob/cf0fdbbe38ad0aa107e3250f6ee5bdc755aced45/src/crispasr_model_registry.cpp",
+    "https://huggingface.co/cstr/parakeet-tdt-0.6b-ja-GGUF/tree/65341fce2b46d25ea51593b1f771ed9a73cf7108",
+    "https://huggingface.co/cstr/reazonspeech-nemo-v2-GGUF/tree/22799a5919ea26e3c5293fe0e68846fe7918a234",
+    "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/tree/87e941f6302c55716a120cd8fbfba74f0bfe7cf7",
+    "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/tree/84beb0c7affb90c55a0c3ee0649c725d291a89ff"
+  ]
+}

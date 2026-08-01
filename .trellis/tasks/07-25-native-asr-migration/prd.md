@@ -144,7 +144,7 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 ## Planning State
 
 - 总体 PRD、设计与实施任务地图已获评审；本轮同步新的 ground-truth 权威和 v0.4.1 实现事实。
-- T01 `native-asr-benchmark-baseline` 已完成并归档；T02 `native-asr-ctranslate2-poc` 已完成实现、六格实测和独立 review，保持 `in_progress`；T03 `native-asr-crispasr-poc` 保持 `planning`。
+- T01 `native-asr-benchmark-baseline` 与 T02 `native-asr-ctranslate2-poc` 已完成并归档；T03 `native-asr-crispasr-poc` 已完成实现与本地证据，保持 `in_progress` 等待独立 check/finish。
 - T01 ground-truth contract、per-case coverage 与绝对预算已获用户评审并冻结；T02/T03 模型实测直接复用该 manifest identity 和共享指标实现，不依赖 Python reference 成功。
 - T02 已证明 CTranslate2 + oneDNN native CPU backend/runtime 可行，但当前最小 fixed-window 算法为 `stop-revise`：large-v3 short CER 略超门槛，large-v3/Kotoba 中长音频均有 confirmed speech gaps。T06 必须修订算法并重测，不能把 runtime 可执行等同于产品质量通过。
-- 父任务继续保持 `planning` 且不直接承载实现；整体 Gate 0 仍等待 T03。
+- T03 review 后的 final immutable evidence 修正了两个 harness interpretation：Reazon GGUF 应通过 public `parakeet` session backend，三 case CER/RTF/RSS/timeline/gap 冻结门槛均通过，但单巨段与大量 zero-duration native words 仅支持 `proceed-with-named-risks`；Qwen 使用 pinned upstream grouping 后 short/leading/boundary timeline legal，但 short timing 严重失败且 medium/long grouped source segments 仍 fail closed。Parakeet 与 Qwen 为 `stop-revise`。父任务继续保持 `planning`；没有 T03 route 可据此直接切换 production default。
