@@ -51,11 +51,11 @@
 ## Planned Files
 
 ```text
-.trellis/tasks/07-25-native-asr-crispasr-poc/research/poc-src/*
-.trellis/tasks/07-25-native-asr-crispasr-poc/research/crispasr-input-lock.json
-.trellis/tasks/07-25-native-asr-crispasr-poc/research/abi-contract.md
-.trellis/tasks/07-25-native-asr-crispasr-poc/research/evidence/*
-.trellis/tasks/07-25-native-asr-crispasr-poc/research/crispasr-poc-report.md
+.trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/poc-src/*
+.trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/crispasr-input-lock.json
+.trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/abi-contract.md
+.trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/evidence/*
+.trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/crispasr-poc-report.md
 ```
 
 Do not modify product/sidecar/release files.
@@ -63,11 +63,11 @@ Do not modify product/sidecar/release files.
 ## Validation
 
 ```powershell
-cmake -S .trellis/tasks/07-25-native-asr-crispasr-poc/research/poc-src -B .trellis/tasks/07-25-native-asr-crispasr-poc/research/local/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCRISPASR_ROOT=<verified-sdk-root>
-cmake --build .trellis/tasks/07-25-native-asr-crispasr-poc/research/local/build --config Release
-ctest --test-dir .trellis/tasks/07-25-native-asr-crispasr-poc/research/local/build -C Release --output-on-failure
-python .trellis/tasks/07-25-native-asr-crispasr-poc/research/poc-src/run_evidence.py
-python .trellis/tasks/07-25-native-asr-crispasr-poc/research/poc-src/publish_evidence.py
+cmake -S .trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/poc-src -B .trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/local/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCRISPASR_ROOT=<verified-sdk-root>
+cmake --build .trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/local/build --config Release
+ctest --test-dir .trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/local/build -C Release --output-on-failure
+python .trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/poc-src/run_evidence.py
+python .trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/poc-src/publish_evidence.py
 ```
 
 Current Python implementation tests may run as diagnostics only:
