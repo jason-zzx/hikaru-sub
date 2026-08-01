@@ -1,0 +1,5 @@
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Check ordinary faster-whisper scope, model list, large-v2 regression and T07 Kotoba separation."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check shared comparator reuse, per-case gates, source/model windows, identity and privacy remain fail-closed."}
+{"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Check every qualification claim uses the authoritative corpus and frozen absolute budgets."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-ctranslate2-poc/research/ctranslate2-poc-report.md","reason":"Check T06 fixes the measured algorithm blockers without misrepresenting backend feasibility or copying failed fixed-window behavior."}
+{"file":".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/planning-evidence.md","reason":"Check model visibility/disposition policy, candidate minimality and later-task boundaries."}

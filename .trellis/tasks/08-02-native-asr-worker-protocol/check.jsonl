@@ -1,0 +1,5 @@
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check legal timeline, failure evidence, privacy and native identity boundaries remain fail-closed."}
+{"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Check T04 stops at the worker wire boundary and keeps stable parent contracts."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-ctranslate2-poc/research/ctranslate2-poc-report.md","reason":"Check protocol handling does not regress timestamp-window or synthetic-repair prohibitions."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/crispasr-poc-report.md","reason":"Check fake scenarios cover pinned ABI cancellation, lifecycle and Qwen companion risks."}
+{"file":".trellis/tasks/08-02-native-asr-worker-protocol/research/planning-evidence.md","reason":"Check request/event/state/limit decisions and T05 handoff are complete and minimal."}

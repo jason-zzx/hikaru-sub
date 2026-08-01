@@ -21,7 +21,10 @@
   "children": [
     "07-25-native-asr-benchmark-baseline",
     "07-25-native-asr-ctranslate2-poc",
-    "07-25-native-asr-crispasr-poc"
+    "07-25-native-asr-crispasr-poc",
+    "08-02-native-asr-worker-protocol",
+    "08-02-native-asr-rust-job-host",
+    "08-02-native-asr-ctranslate2-whisper"
   ],
   "parent": null,
   "relatedFiles": [],

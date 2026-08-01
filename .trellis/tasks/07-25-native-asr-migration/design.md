@@ -2,7 +2,7 @@
 
 ## Summary
 
-本设计定义原生 ASR 迁移的稳定边界和交付顺序。详细模型、协议示例、体积参考与调研链接继续以 `.trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md` 为依据；本文件不复制全部提案，而是明确父任务需要约束的架构合同、迁移策略和子任务接口。
+本设计定义原生 ASR 迁移的稳定边界和交付顺序。详细模型、体积参考、调研链接与历史协议提案继续保留在 `.trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md`；任务编号/门禁以父任务最新 artifacts 为准，最终 worker wire schema 以 T04 `prd.md`、`design.md` 和其产出的 `native-asr/docs/protocol-v1.md` 为准。
 
 核心变化只有一条：用独立原生 C++ worker 替代生产版 Python FastAPI sidecar。React 的转录工作流和 Tauri command 表面保持稳定，Tauri 从 HTTP 代理升级为原生任务与进程管理者。
 
@@ -148,8 +148,8 @@ A small shared VAD companion model may be downloaded under `deps/models/shared/v
 ```text
 <install>/deps/
 ├─ asr-runtime/
-│  ├─ vulkan/current/       # future follow-up
-│  └─ cuda/current/         # future follow-up
+│  ├─ vulkan/current/       # optional qualified pack
+│  └─ cuda/current/         # optional qualified pack
 ├─ models/
 │  ├─ ctranslate2/
 │  ├─ crispasr/
@@ -163,7 +163,7 @@ application resources/native-asr/windows-x64/cpu/
 └─ licenses/
 ```
 
-The CPU runtime is an application resource replaced with application upgrades. It is probed but cannot be independently cleaned. Future GPU packs override CPU only after load/capability checks; any failure falls back to the built-in CPU runtime with one nonfatal UI notice.
+The CPU runtime is an application resource replaced with application upgrades. It is probed but cannot be independently cleaned. T13 produces optional CUDA/Vulkan packs and T14 qualifies device routing. A GPU pack overrides CPU only after identity, load and capability checks; any failure falls back to the built-in CPU runtime with one nonfatal UI notice. A failed pack is omitted from the release manifest and does not block CPU cutover.
 
 The model manifest is application-owned trusted metadata. Download responses and bytes remain untrusted. Each file is written to a managed `.part`, validated by exact size and SHA-256, and atomically moved. A multi-file model receives its readiness marker only after every required role is valid.
 
@@ -199,6 +199,7 @@ No recovery or model path may be derived directly from untrusted worker output.
 - Keep `asrEngine`, `asrModel`, `asrDevice` and `runtimeSourceMode`.
 - Ignore legacy `pythonPath` and `asrServicePath` on load and stop serializing them after migration.
 - Preserve known engine/model IDs; map unknown models to the selected engine's default.
+- Keep every current model visible in the UI. Qualification metadata controls whether a model is selectable for the native release and explains `qualified` / `stop-revise` / `unsupported-for-native-release`; an unavailable model is never silently routed to Python.
 - Keep official/China mirror selection. The worker never receives remote URLs or credentials.
 - Preserve command registration -> typed Tauri wrapper -> UI wiring for every changed command.
 
@@ -208,10 +209,11 @@ Existing specs that state "inference stays in Python" are current-state document
 
 - Add a focused `native-asr/` CMake project.
 - Pin CTranslate2, CrispASR, compiler and build-tool versions.
-- Produce a Windows CPU runtime artifact with manifest, component versions, licenses and SHA-256.
-- `pnpm release:local` consumes a verified artifact; end-user machines never run CMake.
+- Produce a Windows CPU runtime artifact plus separately versioned CUDA/Vulkan pack artifacts, each with manifest, component versions, licenses and SHA-256.
+- The main installer consumes only the verified CPU artifact; GPU packs are downloaded and installed under managed `deps/asr-runtime/` only when their own qualification result is publishable.
+- `pnpm release:local` consumes verified artifacts; end-user machines never run CMake.
 - Compile only required ASR capabilities and use release/LTO/strip where supported, without weakening structured progress, timestamps or crash isolation.
-- Model revisions and runtime library commits are explicit inputs to release review.
+- Model revisions, runtime library commits, device capability evidence and pack identities are explicit inputs to release review.
 
 ## Security And Privacy
 
@@ -228,12 +230,13 @@ The migration is capability-gated rather than a single irreversible switch:
 
 1. Establish authoritative ground-truth measurements and optional Python diagnostics, then run native PoCs without changing defaults.
 2. Introduce protocol and Rust host behind development-only native selection.
-3. Promote CTranslate2 engines after their independent quality gate.
-4. Promote each CrispASR engine independently after its gate.
-5. Switch model/runtime UI and production packaging only after all required CPU paths are ready.
-6. Retain `python-legacy` for one stable source release cycle; do not bundle its runtime.
+3. Promote CTranslate2 engines after their independent CPU quality gate.
+4. Promote each CrispASR engine independently after its CPU gate.
+5. Build and qualify optional CUDA/Vulkan packs against the already-qualified engine pipelines; omit failed packs without delaying CPU release.
+6. Switch model/runtime UI and production packaging after required CPU paths are ready and GPU qualification outcomes are explicit.
+7. Retain `python-legacy` for one stable source release cycle; do not bundle its runtime.
 
-Rollback is per engine. A failed native route can return to Python legacy in development while unaffected native routes remain testable. The release package removes Python only after the full integration gate passes. GPU work is a separate follow-up and cannot delay CPU cutover.
+Rollback is per engine and per runtime pack. A failed native route can return to Python legacy in development while unaffected native routes remain testable. The release package removes Python only after the full integration gate passes. A failed GPU pack is removed from the release manifest and falls back to CPU; it cannot delay an otherwise qualified CPU cutover.
 
 ## Test Strategy
 
@@ -241,7 +244,8 @@ Rollback is per engine. A failed native route can return to Python legacy in dev
 - CTest covers protocol validation, normalization and backend adapters.
 - Model-backed suites run manually or in dedicated cached CI; ordinary CI remains dependency-free.
 - Rust tests cover routing, model readiness, download integrity, process lifecycle, paths and cleanup boundaries.
-- Frontend tests cover stable defaults, migrated settings, device availability and removal of Python setup UI.
+- GPU qualification runs on an explicit hardware/driver matrix and records actual loaded modules, pack identity, accelerated RTF and CPU fallback; no VRAM gate is invented.
+- Frontend tests cover stable defaults, migrated settings, device availability, visible qualification status for every existing model and removal of Python setup UI.
 - The final model-backed matrix scores short, medium and long Japanese audio directly against T01 ground truth for CER, confirmed speech gaps, timeline, Qwen alignment, performance and resources. Python results are supplemental diagnostics only.
 
 ## Design Decisions
@@ -250,7 +254,7 @@ Rollback is per engine. A failed native route can return to Python legacy in dev
 - **D2:** CTranslate2 remains the Whisper backend; CrispASR Whisper is not an automatic fallback.
 - **D3:** Rust owns orchestration and downloads; the worker is inference-only.
 - **D4:** CPU runtime is bundled, models are not.
-- **D5:** GPU packs are a separate project.
+- **D5:** GPU packs are normal-numbered child deliverables in this parent, but qualification and publication are independent per pack; CPU remains the release baseline.
 - **D6:** Preserve product IPC before optimizing internal APIs.
 - **D7:** Prefer official/model-card/stable API and maintained community algorithms; add compensation only when ground-truth evidence requires it.
 - **D8:** No Qwen3 result without ForcedAligner timestamps.
