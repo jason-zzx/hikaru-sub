@@ -570,3 +570,36 @@ Implemented the authoritative WAV+ASS benchmark contract, shared CER/timeline/ga
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: Native ASR Rust job host
+
+**Date**: 2026-08-02
+**Task**: Native ASR Rust job host
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented and independently reviewed the development-only Rust native ASR worker host with stable product IPC, shared active-slot arbitration, protocol reduction, recovery, bounded diagnostics, process-tree cancellation, legacy fallback, and full fake-worker validation.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `74d1a4e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
