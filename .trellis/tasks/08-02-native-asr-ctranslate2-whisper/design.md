@@ -52,6 +52,7 @@ Task evidence:
 
 ```text
 .trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/
+  start-gate-lock.md
   algorithm-lock.md
   product-model-disposition.md
   ctranslate2-whisper-report.md
@@ -87,7 +88,8 @@ Run large-v3 short/medium/long. If all gates pass, freeze A.
 
 Only if A has confirmed gaps:
 
-- select one official or well-maintained pinned VAD/chunk strategy before measuring;
+- use only the pinned faster-whisper v1.2.1 Silero V6 behavior/ONNX asset from `start-gate-lock.md`;
+- return to planning before implementation to lock the smallest maintained native ONNX executor, license/archive hash/size and packaging impact; this does not authorize a hidden Python/sidecar VAD call;
 - keep mapping from source audio to model windows explicit;
 - VAD failure may use a documented fallback only if fallback independently passes the same gates;
 - no hard-hole reference repair, transcript-driven chunking or multiple hidden fallback ladders.

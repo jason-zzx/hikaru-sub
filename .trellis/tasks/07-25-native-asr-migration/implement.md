@@ -534,4 +534,5 @@ Stage 0 child-task creation:
 - [x] T04 completed protocol/limits/fake-worker implementation, independent check, commit and archive.
 - [x] T05 completed generic Rust host/active gate/reducer/recovery/process-tree lifecycle, independent check, commit and archive; Gate 1 is closed.
 - [x] T06 manifests consume final T04 protocol/limits, T05 durable Tauri host spec and archived host evidence; its scope includes only focused Rust test-module additions for real-worker compatibility.
-- [ ] Keep T06 in `planning` until final input/candidate/model/license lockability is reviewed and the user explicitly starts T06.
+- [x] T06 `start-gate-lock.md` records Candidate A, one conditional Candidate B asset, seven immutable model revisions/weight hashes/MIT licenses, Tiny remote-only status and the ignored active/archive local root.
+- [x] T06 start-gate planning update is reviewed; the user authorized committing it and starting T06 immediately afterwards.
