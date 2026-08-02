@@ -1,16 +1,16 @@
 # Native CTranslate2 Faster-Whisper 产品化实施计划
 
-> 状态：`planning`。Hard-blocked on completed T04 protocol and T05 host. T06 is CPU-only; GPU is T13/T14.
+> 状态：`planning`。T04 protocol 与 T05 Rust host 已完成、提交并归档；final handoff 已可消费。T06 仍为 CPU-only，GPU 属于 T13/T14。
 
 ## Dependencies
 
 - Archived T01 benchmark contract, authoritative manifest identity and shared comparator.
 - Archived T02 `inputs.lock.json`, source, raw-evidence contract and final report.
-- T04 final protocol library, canonical limits and fake-worker executable contract; T06 itself creates the production worker entry point.
-- T05 final native host, cancellation and recovery lifecycle.
+- T04 implementation `96077103e0c3070894b70ffa9fcd888bcc93075d`: final protocol library, canonical limits, `windows-x64-release` preset and fake-worker contract; T06 creates the production worker entry point.
+- T05 implementation `74d1a4e`: generic `NativeAsrHost::new(executable, worker_args, active_gate)`, `ResolvedNativeLaunch::resolve(...)`, active gate, reducer, cancellation and recovery lifecycle; archive `a18509a`.
 - Official/maintained long-form candidate revisions and all seven current model identities must be lockable.
 
-Before start, refresh context manifests to final archived T04/T05 handoffs.
+Context manifests are refreshed to final tracked T04 protocol/limits, T05 durable Tauri spec and archived T05 planning evidence. No active T04/T05 task path remains.
 
 ## Execution Checklist
 
@@ -56,7 +56,8 @@ Before start, refresh context manifests to final archived T04/T05 handoffs.
 
 ### 6. Host/Protocol Compatibility
 
-- [ ] Real backend runs through T05 internal `ResolvedNativeLaunch` using task-local locked model paths/resolved CPU, then T04 request/events, without new product IPC or protocol fields.
+- [ ] Real backend runs through T05 `NativeAsrHost::new(worker, vec![], gate)` and `ResolvedNativeLaunch::resolve(...)` using task-local locked model paths/resolved CPU, then T04 request/events, without new product IPC or protocol fields.
+- [ ] Add a test-only real-worker host case in `src-tauri/src/asr_worker.rs`; it consumes `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH`, copies audio into a temporary managed workspace, and never changes Release/default routing.
 - [ ] success/progress/replace/error/cancel/recovery tests pass with model-backed route.
 - [ ] Completed is impossible after user/process cancellation.
 - [ ] Non-cooperative single-call cancellation remains bounded by T05 process termination.
@@ -86,6 +87,7 @@ native-asr/src/ctranslate2_whisper.hpp
 native-asr/src/ctranslate2_whisper.cpp
 native-asr/tests/ctranslate2_whisper_tests.cpp
 native-asr/CMakeLists.txt                    # production + existing fake targets
+src-tauri/src/asr_worker.rs                  # focused test-module additions only
 ```
 
 Task evidence:
@@ -105,14 +107,21 @@ No T11/T12/T13/T14/T15/T16 files are modified.
 Exact presets come from T04/T12-compatible project setup:
 
 ```powershell
-cmake --preset <windows-x64-cpu-development>
-cmake --build --preset <windows-x64-cpu-release>
-ctest --preset <windows-x64-cpu-release> --output-on-failure
+Push-Location native-asr
+cmake --preset windows-x64-release
+cmake --build --preset windows-x64-release
+ctest --preset windows-x64-release
+Pop-Location
+
+$env:HIKARU_ASR_PRODUCTION_WORKER = (Resolve-Path "native-asr/build/windows-x64-protocol/bin/hikaru-asr-worker.exe").Path
+# HIKARU_ASR_CT2_MODEL_PATH / HIKARU_ASR_CT2_AUDIO_PATH are set by the locked model-backed runner recorded in algorithm-lock.md.
+cargo test --manifest-path src-tauri/Cargo.toml asr_worker
+Remove-Item Env:HIKARU_ASR_PRODUCTION_WORKER
 
 python scripts/asr-benchmark.py self-check
 python scripts/asr-benchmark.py validate --manifest .asr-benchmark/manifest.json --corpus-root .asr-benchmark
 python -m unittest discover -s asr-service/tests -p "test_asr_benchmark.py"
-cargo test --manifest-path src-tauri/Cargo.toml native_asr
+cargo test --manifest-path src-tauri/Cargo.toml
 python ./.trellis/scripts/task.py validate .trellis/tasks/08-02-native-asr-ctranslate2-whisper
 git diff --check
 ```
@@ -123,8 +132,8 @@ Model-backed runner/publisher commands must be fixed in `algorithm-lock.md` befo
 
 Before start:
 
-- [ ] T04/T05 completed/archived; manifests point to final handoffs.
-- [ ] User-reviewed model policy is reflected: large-v3/large-v2 hard, all models visible later.
+- [x] T04/T05 completed/archived; manifests point to final protocol/limits/spec/research handoffs.
+- [x] User-reviewed model policy is reflected: large-v3/large-v2 hard, all models visible later.
 - [ ] Candidate revisions, model identities, local ignored root and license provenance lockable.
 
 Before completion:

@@ -32,6 +32,15 @@
 - Do not add multiple corpus-specific repair passes, reference-derived splits, synthetic timestamps or Python private-fork parity.
 - Freeze one selected algorithm/config before running the seven-model matrix.
 
+## Final T04/T05 Handoff
+
+- T04 code `96077103e0c3070894b70ffa9fcd888bcc93075d` finalized `native-asr/docs/protocol-v1.md`, canonical `protocol-v1-limits.json`, offline nlohmann provenance, `windows-x64-release`, fake-worker scenarios and discovery.
+- T05 code `74d1a4e` plus archive `a18509a` added `src-tauri/src/asr_worker.rs`, shared active gate/process-tree cleanup, recovery/terminal reducer and debug-only host injection while Release/default remains Python legacy.
+- Reusable Rust API is `NativeAsrHost::new(executable, worker_args, active_gate)` plus `ResolvedNativeLaunch::resolve(...)`; production worker uses an empty worker-args vector, unlike the fake `--scenario` path.
+- `ResolvedNativeLaunch` requires the audio to live in a managed workspace, so T06's focused host test copies the selected authoritative WAV into a temporary managed workspace and injects a locked canonical CT2 model path.
+- T06 test-only host variables are `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH`; no Release/product route reads them.
+- The durable Tauri host contract is recorded in `.trellis/spec/tauri/media-ffmpeg-asr.md`; T06 does not create a second reducer, recovery format or process lifecycle.
+
 ## Task Boundaries
 
 - T04 owns protocol and test-only fake worker; T05 owns host/cancel/recovery; T06 creates the production `hikaru-asr-worker` entry/CMake target and first real route.
@@ -41,4 +50,4 @@
 - T13/T14 own CUDA/Vulkan and accelerated RTF.
 - T15/T16 own qualification metadata persistence and all-model-visible UI.
 
-Before T06 starts, its manifests must be refreshed to T04/T05 final archived handoffs.
+T06 manifests now consume the final tracked T04 protocol/limits, durable T05 Tauri spec and archived T05 planning evidence. The remaining start gate is lockability of authoritative algorithm/model/license inputs, not host/protocol availability.

@@ -531,6 +531,7 @@ Stage 0 child-task creation:
 - [x] User approved adding T13/T14 as normal-numbered GPU development tasks while keeping CPU release independent from failed GPU packs.
 - [x] User approved T06 hard gates for `large-v3` and `large-v2` long audio; all models remain visible in T16 even when native qualification fails.
 - [x] T04-T06 were created as the next planning batch and linked to this parent.
-- [x] T04 completed protocol/limits/fake-worker implementation, independent check, commit and archive; Gate 1 may proceed to T05.
-- [x] T05 manifests consume final tracked T04 protocol/limits and its implementation plan records exact preset/executable/scenario handoff.
-- [ ] Keep T05/T06 in `planning` until the user reviews the T05 final-handoff refresh and explicitly starts T05.
+- [x] T04 completed protocol/limits/fake-worker implementation, independent check, commit and archive.
+- [x] T05 completed generic Rust host/active gate/reducer/recovery/process-tree lifecycle, independent check, commit and archive; Gate 1 is closed.
+- [x] T06 manifests consume final T04 protocol/limits, T05 durable Tauri host spec and archived host evidence; its scope includes only focused Rust test-module additions for real-worker compatibility.
+- [ ] Keep T06 in `planning` until final input/candidate/model/license lockability is reviewed and the user explicitly starts T06.
