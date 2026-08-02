@@ -152,4 +152,5 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - T02 已证明 CTranslate2 + oneDNN native CPU backend/runtime 可行，但当前最小 fixed-window 算法为 `stop-revise`：large-v3 short CER 略超门槛，large-v3/Kotoba 中长音频均有 confirmed speech gaps。T06 必须修订算法并重测，不能把 runtime 可执行等同于产品质量通过。
 - T03 final immutable evidence 修正了两个 harness interpretation：Reazon GGUF 应通过 public `parakeet` session backend，三 case CER/RTF/RSS/timeline/gap 冻结门槛均通过，但单巨段与大量 zero-duration native words 仅支持 `proceed-with-named-risks`；Qwen 使用 pinned upstream grouping 后 short/leading/boundary timeline legal，但 short timing 严重失败且 medium/long grouped source segments 仍 fail closed。Parakeet 与 Qwen 为 `stop-revise`；没有 T03 route 可据此直接切换 production default。
 - GPU 加速不再另建后续父任务：T13 负责可复现 CUDA/Vulkan runtime packs，T14 负责设备路由、CPU 回退和 pack 独立资格矩阵；失败 pack 不阻塞 CPU cutover。
-- T04～T06 已创建为下一批 planning children；父任务继续保持 `planning`，首先评审并启动 T04。
+- T04 `native-asr-worker-protocol` 已实现、检查、提交并归档；protocol v1、canonical limits、offline build 和 deterministic fake worker 已成为 T05 final handoff。
+- T05/T06 保持 `planning`；T05 manifests 已切换到最终 tracked protocol/limits，完成本次小型规划刷新与用户复核后应作为下一任务启动。

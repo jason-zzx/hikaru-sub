@@ -6,7 +6,7 @@
 
 ## Background
 
-- T04 将冻结 protocol v1、资源上限、fake worker 场景和 executable 定位合同；T05 在 T04 完成并归档前不得启动。
+- T04 已由 `9607710 feat(asr): Add native worker protocol v1` 实现，并由 `a9ce6e6 chore(task): archive 08-02-native-asr-worker-protocol` 归档。最终合同位于 `native-asr/docs/protocol-v1.md` 与 `native-asr/protocol-v1-limits.json`；Release preset 为 `windows-x64-release`，fake executable 固定在 `native-asr/build/windows-x64-protocol/bin/hikaru-asr-fake-worker.exe`。
 - 当前 `src-tauri/src/asr.rs` 同时管理 Python sidecar、HTTP job 代理、模型 API 和恢复快照；React 依赖现有 command 名称、camelCase 参数与 `AsrJobSnapshot` 字段。
 - 当前 `asr-service/jobs.py` 的 append/refresh/terminal snapshot 行为是产品兼容参考；迁移后 native job 状态和恢复写入由 Rust 持有。
 - CrispASR 当前 pin 无可靠 cooperative cancel；进程树终止是 native host 的必要合同。
@@ -15,7 +15,7 @@
 
 ### R1 - Dependency And Scope
 
-- 只消费已评审的 T04 protocol v1 和 fake worker；自动化测试不依赖 Python、模型、网络或 GPU。
+- 只消费已评审的 T04 protocol v1、canonical limits 和 fake worker；T05 不重定义 schema/limits/scenarios，自动化测试不依赖 Python、模型、网络或 GPU。
 - T05 实现通用 host、event reducer、recovery、取消和退出清理，不实现 CTranslate2/CrispASR backend、模型 manifest/downloader、runtime packaging、GPU probe、settings 或 UI 迁移。
 - Python inference/model commands 保持可用，production/default route 不在 T05 切换。
 
