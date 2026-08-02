@@ -3,7 +3,7 @@ use crate::dependencies::{
     is_source_checkout_asr_service_dir, managed_asr_venv_python_path, python311_candidates,
     python311_lookup_fallbacks, python_version, PythonCommand,
 };
-use crate::process::hidden_command;
+use crate::process::{hidden_command, terminate_process_tree};
 use crate::settings::{load_settings, save_settings};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -119,7 +119,7 @@ impl AsrSetupState {
             for job in jobs.values() {
                 if let Ok(mut guard) = job.lock() {
                     if let Some(pid) = guard.current_pid {
-                        kill_process_tree(pid);
+                        terminate_process_tree(pid);
                         guard.current_pid = None;
                     }
                 }
@@ -590,30 +590,6 @@ fn setup_job_id() -> String {
     format!("asr-setup-{millis}")
 }
 
-fn kill_process_tree(pid: u32) {
-    if cfg!(windows) {
-        let _ = hidden_command("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-    } else {
-        let group = format!("-{pid}");
-        let group_status = hidden_command("kill")
-            .args(["-TERM", &group])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        if !group_status.map(|status| status.success()).unwrap_or(false) {
-            let _ = hidden_command("kill")
-                .args(["-TERM", &pid.to_string()])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-        }
-    }
-}
-
 fn run_logged_command(
     job: &Arc<StdMutex<AsrSetupJob>>,
     stage: &str,
@@ -978,7 +954,7 @@ pub async fn cancel_asr_setup(
     guard.stage = "已取消".into();
     guard.error = Some("用户已取消 ASR 引擎配置".into());
     if let Some(pid) = guard.current_pid.take() {
-        kill_process_tree(pid);
+        terminate_process_tree(pid);
     }
     Ok(())
 }

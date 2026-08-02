@@ -1,4 +1,4 @@
-# Media, FFmpeg, and ASR Sidecar
+# Media, FFmpeg, and ASR
 
 ## FFmpeg Resolve Order
 
@@ -71,13 +71,89 @@ Correct: … -vn -af aresample=async=1:first_pts=0 …     → return covered_ms
 | Clip | `clip.rs` | Soft/hard cut; progress polling; optional replace working video is a **frontend** session decision |
 | Burn | `burn.rs` | Hard-sub export via FFmpeg/libass; burn page has no subtitle preview |
 
+## Native ASR Job Host (Development-only)
+
+### Scope / Trigger
+
+Use the Rust host in `asr_worker.rs` when a reviewed native worker must be exercised through the existing product job contract. Until production cutover is explicitly approved, Release/default routing and model list/status/download remain on the Python sidecar; native routing is available only through test construction or debug-only `HIKARU_ASR_FAKE_WORKER` injection.
+
+### Signatures
+
+```rust
+#[tauri::command]
+async fn start_asr(state: State<'_, AsrState>, app: AppHandle, args: StartAsrArgs)
+    -> Result<serde_json::Value, String>;
+
+#[tauri::command]
+async fn get_asr_progress(
+    state: State<'_, AsrState>,
+    app: AppHandle,
+    job_id: String,
+    include_segments: Option<bool>,
+) -> Result<serde_json::Value, String>;
+
+#[tauri::command]
+async fn cancel_asr(state: State<'_, AsrState>, job_id: String) -> Result<(), String>;
+
+struct ResolvedNativeLaunch {
+    // resolved engine/backend, role/path models, device, audio/output/recovery paths
+}
+```
+
+### Contracts
+
+- Preserve command names, camelCase `StartAsrArgs`, missing-job text containing `转录任务不存在`, and `AsrJobSnapshot` fields. `includeSegments=false` omits `segments`.
+- Legacy and native routes share one active-job gate. Start failure releases an unactivated reservation; terminal poll/recovery, successful cancel, and shutdown release an active legacy slot; ordinary connection failure does not.
+- Worker `completed` is only a candidate until stdout reaches EOF and the process exits 0. The terminal snapshot must not become queryable until terminal recovery JSON and any minimal fallback ASS are persisted, or React's authoritative ASS write can race with the fallback.
+- Every terminal source uses first-terminal-wins. A later cancel/shutdown may still terminate and reap an outstanding PID, but must not overwrite the committed status/error.
+- Release the active slot before publishing `reaped`/returning cancel, so a caller cannot observe cleanup completion while a replacement start is still rejected.
+- Bound both `segment` append accumulation and `segmentsReplace` with canonical `maxReplacementSegments`. Embed `native-asr/protocol-v1-limits.json`; do not maintain a handwritten Rust limits copy.
+- Recovery/stderr artifact job IDs must use the host-safe generated character set, not merely the protocol's byte/control-character rules; otherwise separators can escape managed directories.
+- `HIKARU_ASR_FAKE_WORKER` and `HIKARU_ASR_FAKE_SCENARIO` are debug/test-only. `#[cfg(not(debug_assertions))]` must leave Release on legacy routing.
+
+### Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| Second legacy/native start while one is active | Reject before spawning a second process |
+| Malformed/unknown/version-mismatched/oversized event | Controlled failed snapshot; preserve last valid segments |
+| Nonzero exit without structured worker error | `[worker_abnormal_exit] ...` |
+| Exit 0 without terminal event | Stable protocol-incomplete failure |
+| `completed` followed by nonzero exit | Failure, not completed |
+| Cancel after a terminal snapshot but before reap | Keep first terminal status; terminate/reap remaining process tree |
+| Unsafe artifact job ID or path outside approved workspace/cache root | Reject before launch/write |
+
+### Good/Base/Bad Cases
+
+- Good: valid fake-worker success → pending/running, bounded progress/segments, exit 0, recovery writes, then completed becomes visible and the active slot is free.
+- Base: no debug override or Release build → unchanged Python legacy route and model APIs.
+- Bad: publish completed before fallback ASS persistence, release the slot after notifying reap, or return early from terminal cancel while a PID remains.
+
+### Tests Required
+
+- Reducer: ready ordering, duration/progress monotonicity, bounded append/replace, replacement atomicity, and first-terminal-wins.
+- Fake worker: success/replace/structured error/malformed/version/unknown/oversize/incomplete/crash/completed-nonzero/stderr scenarios.
+- Lifecycle: shared active slot, legacy release/retain branches, cancel/shutdown process-tree cleanup within two seconds, terminal-but-unreaped cleanup, and no orphan parent/child process.
+- Persistence/security: partial recovery after failure/cancel/crash, minimal ASS only after non-empty completion, safe artifact job IDs, canonical path containment, and stderr byte/retention bounds.
+- Compatibility: Release cargo check with malicious debug env values, full Rust tests, and `pnpm build` without frontend contract changes.
+
+### Wrong vs Correct
+
+```text
+Wrong:   completed visible → React writes formal ASS → Rust fallback overwrites it
+Correct: persist recovery/fallback under the terminal lock → publish completed
+
+Wrong:   terminal already committed → cancel returns while PID still runs
+Correct: preserve first terminal snapshot → terminate/reap PID → release slot → return
+```
+
 ## ASR Sidecar Process
 
-- Tauri starts/manages the Python FastAPI sidecar (`asr.rs`), proxies job start/progress/cancel and model download.
+- Tauri starts/manages the Python FastAPI sidecar (`asr.rs`) and continues to proxy production/default inference plus model download until an explicit native cutover task changes that boundary.
 - ASR setup (venv/deps) is separate (`asr_setup.rs`).
-- On app exit, kill the sidecar process.
+- App exit calls idempotent `AsrState.shutdown()` so native workers and the legacy sidecar share cleanup policy; `lib.rs` must not reach into process fields.
 - Diagnostics: host may set `HIKARU_ASR_DEBUG_LOG` → sidecar writes JSONL (often under managed `deps/asr-service/asr-debug.log`). Prefer `model_download_*` events when model download fails.
-- Inference stays in Python; Rust must not reimplement engines.
+- Rust owns orchestration only. Python or the independent native worker owns inference; do not run model inference inside the Tauri process.
 
 ## ASS Files on Disk
 
