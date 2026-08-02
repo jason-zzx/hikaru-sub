@@ -22,15 +22,32 @@
 - Recovery writes use host-approved paths only and preserve partial segments on every failure class.
 - No new frontend test/file is mandatory when wrappers/types remain unchanged; `pnpm build` plus Rust serialization/command tests are the minimal compatibility check.
 
-## T04 Handoff Required Before Start
+## Final T04 Handoff Locked
 
-- Exact request/event DTO shape and JSON key casing.
-- Numeric line/text/path/segment limits.
-- Fake scenario names, arguments and expected exit codes.
-- Reproducible fake executable path/build command.
-- Lifecycle/exit matrix.
+T04 implementation commit: `96077103e0c3070894b70ffa9fcd888bcc93075d`; archive commit: `a9ce6e6ac798d29870238af40c7ffb27c6bb4dbb`.
 
-The manifests must be refreshed to T04's archived final paths before `task.py start`.
+Tracked contract identities:
+
+| File | SHA-256 |
+|---|---|
+| `native-asr/docs/protocol-v1.md` | `f7faed6012288879e6ee85ee5c2007fa3ee56ff0a199e72162136cea33f601f7` |
+| `native-asr/protocol-v1-limits.json` | `435c4eb649dc7e8939c38fc0eb778d2428bf2646a028abfe636c62f43302b464` |
+| `native-asr/CMakePresets.json` | `2d3da9c3f16a5e3a099ea632d4292773a95b3df1d1a2808877bbe6e307db0d54` |
+| `native-asr/third_party/nlohmann/provenance.json` | `f04ce243791555affe46a8637f60264805964e0121a651468138a220bf5ba623` |
+
+Build/discovery contract:
+
+```text
+preset: windows-x64-release
+fake executable: native-asr/build/windows-x64-protocol/bin/hikaru-asr-fake-worker.exe
+test-only Rust env: HIKARU_ASR_FAKE_WORKER=<resolved executable path>
+```
+
+Canonical limits are read from JSON: request `262144`, event `8388608`, job ID `128`, path `32767`, text `16384`, model entries `8`, replacement segments `32768`, stderr diagnostic `65536` bytes/count as named by the schema.
+
+Final terminating scenarios: `success`, `segments-replace`, `structured-error`, `malformed-json`, `unknown-event`, `version-mismatch`, `invalid-transition`, `invalid-segment`, `duration-drift`, `oversized-line`, `crash-before-ready`, `crash-after-progress`, `zero-exit-without-terminal`, `completed-then-nonzero`, `stderr-diagnostics`. Host-terminated scenarios: `hang-after-ready`, `child-process-hang`.
+
+The finalized protocol includes pre-ready structured errors, ready-owned positive duration, legal segment-before-progress, exact duration equality, terminal/EOF classification and stable fake-worker discovery. T05 manifests already reference the final tracked protocol and limits directly; no active T04 task path remains.
 
 ## Downstream Handoff
 

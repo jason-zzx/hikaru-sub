@@ -1,14 +1,15 @@
 # Tauri Native ASR Job Host 实施计划
 
-> 状态：`planning`。Hard-blocked on completed/reviewed T04 protocol and fake-worker handoff; do not start from draft schema.
+> 状态：`planning`。T04 已完成、提交并归档；final protocol/limits/fake-worker handoff 已锁定。完成本次规划刷新并由用户确认后可启动 T05。
 
 ## Dependencies
 
-- T04 final protocol doc, numeric limits, fake scenario/exit matrix and reproducible executable discovery.
+- T04 code commit `96077103e0c3070894b70ffa9fcd888bcc93075d` and archive commit `a9ce6e6ac798d29870238af40c7ffb27c6bb4dbb`.
+- Final `native-asr/docs/protocol-v1.md`, `native-asr/protocol-v1-limits.json`, `windows-x64-release` preset and fake executable discovery at `native-asr/build/windows-x64-protocol/bin/hikaru-asr-fake-worker.exe`.
 - Parent stable command/snapshot/cancel/recovery/path contracts.
 - Current `asr.rs`, `asr_setup.rs`, `process.rs`, `lib.rs`, TypeScript wrappers/types and workspace path helpers.
 
-Before start, refresh this task's context manifests to T04's final archived paths.
+Context manifests already consume the final tracked protocol document and canonical limits directly; no stale active-task T04 path remains.
 
 ## Execution Checklist
 
@@ -27,6 +28,7 @@ Before start, refresh this task's context manifests to T04's final archived path
 ### 3. Implement Native Host Core
 
 - [ ] Add `asr_worker.rs` with active slot, job store, injected executable/config, internal `ResolvedNativeLaunch` and background monitor.
+- [ ] Test harness resolves `HIKARU_ASR_FAKE_WORKER` only for tests/debug injection; release product routing cannot honor this arbitrary path.
 - [ ] Build protocol requests only from resolved role/path/device/audio/output inputs; tests inject temp absolute paths/fixed CPU, while production resolver stays out of scope.
 - [ ] Spawn with structured args and piped stdio, send one request line, close stdin and return job id promptly.
 - [ ] Drain bounded stderr concurrently and wait/reap exact once.
@@ -85,13 +87,17 @@ Avoid changing `src/types/index.ts`, `src/services/tauri.ts`, `TranscribeView.ts
 ## Validation
 
 ```powershell
-# Build/locate T04 fake worker using its final documented preset.
-cmake --preset <t04-protocol-preset>
-cmake --build --preset <t04-protocol-build-preset>
-ctest --preset <t04-protocol-test-preset> --output-on-failure
+Push-Location native-asr
+cmake --preset windows-x64-release
+cmake --build --preset windows-x64-release
+ctest --preset windows-x64-release
+Pop-Location
 
+$env:HIKARU_ASR_FAKE_WORKER = (Resolve-Path "native-asr/build/windows-x64-protocol/bin/hikaru-asr-fake-worker.exe").Path
 cargo test --manifest-path src-tauri/Cargo.toml asr_worker
 cargo test --manifest-path src-tauri/Cargo.toml
+Remove-Item Env:HIKARU_ASR_FAKE_WORKER
+
 pnpm build
 python ./.trellis/scripts/task.py validate .trellis/tasks/08-02-native-asr-rust-job-host
 git diff --check
@@ -103,9 +109,9 @@ Process cleanup validation must explicitly confirm no fake parent/child PID rema
 
 Before start:
 
-- [ ] T04 completed/archived and manifests refreshed to final handoff.
-- [ ] PRD/design/implement reviewed; native route remains development-only.
-- [ ] Current command/snapshot/path contracts reconfirmed against code.
+- [x] T04 completed/archived and manifests consume the final protocol document/limits.
+- [ ] User reviews this final handoff refresh; native route remains development-only.
+- [x] Current command/snapshot/path contracts reconfirmed against code and planning evidence.
 
 Before completion:
 
