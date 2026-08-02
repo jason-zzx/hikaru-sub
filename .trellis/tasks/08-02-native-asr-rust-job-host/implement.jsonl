@@ -5,3 +5,5 @@
 {"file":".trellis/spec/asr/api-and-jobs.md","reason":"Preserve current camelCase snapshot, job state, segment refresh and polling semantics while moving host ownership to Rust."}
 {"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Keep the parent worker/Tauri boundary, recovery lifecycle, legacy rollout and security design."}
 {"file":".trellis/tasks/08-02-native-asr-rust-job-host/research/planning-evidence.md","reason":"Use the repository-backed module boundary, active-slot, terminal and T04 handoff decisions."}
+{"file":"native-asr/docs/protocol-v1.md","reason":"Implement the finalized request/event schema, lifecycle, exit matrix, fake scenario names and executable discovery contract from T04."}
+{"file":"native-asr/protocol-v1-limits.json","reason":"Consume the canonical protocol limits directly and add a Rust equality/behavior test instead of maintaining handwritten constants."}

@@ -1,0 +1,15 @@
+{
+  "name": "nlohmann/json",
+  "version": "3.11.3",
+  "source": "https://github.com/nlohmann/json/releases/tag/v3.11.3",
+  "files": {
+    "json.hpp": {
+      "sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6",
+      "sizeBytes": 919975
+    },
+    "LICENSE.MIT": {
+      "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14",
+      "sizeBytes": 1076
+    }
+  }
+}

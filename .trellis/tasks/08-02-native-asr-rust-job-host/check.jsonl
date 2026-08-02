@@ -4,3 +4,5 @@
 {"file":".trellis/spec/asr/api-and-jobs.md","reason":"Check snapshot casing, status, includeSegments and refresh compatibility."}
 {"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Check T05 stays development-only and does not absorb model/backend/settings/UI work."}
 {"file":".trellis/tasks/08-02-native-asr-rust-job-host/research/planning-evidence.md","reason":"Check shared active slot, first-terminal-wins, recovery and T04 final-handoff requirements."}
+{"file":"native-asr/docs/protocol-v1.md","reason":"Check the Rust host enforces every finalized lifecycle, exit classification, fake scenario and executable discovery contract from T04."}
+{"file":"native-asr/protocol-v1-limits.json","reason":"Check Rust embeds or generates from the canonical limits and proves cross-language equality without a handwritten mirror."}
