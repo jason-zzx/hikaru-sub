@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "maxRequestLineBytes": 262144,
+  "maxEventLineBytes": 8388608,
+  "maxJobIdBytes": 128,
+  "maxPathBytes": 32767,
+  "maxTextBytes": 16384,
+  "maxModelEntries": 8,
+  "maxReplacementSegments": 32768,
+  "maxStderrDiagnosticBytes": 65536
+}
