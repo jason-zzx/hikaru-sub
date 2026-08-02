@@ -6,6 +6,8 @@
 
 ## Background
 
+- T04 已由 `9607710 feat(asr): Add native worker protocol v1` 实现并归档；final contract 是 `native-asr/docs/protocol-v1.md`、`native-asr/protocol-v1-limits.json` 和 `windows-x64-release` preset。
+- T05 已由 `74d1a4e feat(asr): Host native ASR jobs in Tauri` 实现并由 `a18509a chore(task): archive 08-02-native-asr-rust-job-host` 归档；它提供 generic `NativeAsrHost::new(executable, workerArgs, activeGate)`、`ResolvedNativeLaunch::resolve(...)`、canonical reducer/recovery/cancel，并保持 Release/default Python legacy。
 - T02 已证明 CTranslate2 4.8.0 + oneDNN 3.1.1 Windows x64 CPU backend、tokenizer、official mel、timestamp parsing、WAV-end provenance、RTF 和 RSS 可行。
 - T02 当前算法是 `stop-revise`：large-v3 short CER `0.3583 > 0.35`；large-v3/Kotoba medium/long 存在 confirmed gaps。根因候选是 fixed non-overlap windows、no previous text 和最小 decode policy，不是 CT2 runtime 不可执行。
 - T01 `.asr-benchmark` WAV+ASS 是唯一质量真值。Python large-v2 V4/seed/session/private fork 仅是 regression material，不是 native template。
@@ -16,7 +18,7 @@
 
 ### R1 - Dependencies And Authority
 
-- Hard dependency：archived T01 benchmark contract、archived T02 lock/source/evidence、completed T04 protocol 和 T05 host。
+- Hard dependency：archived T01 benchmark contract、archived T02 lock/source/evidence、final T04 protocol/limits 和 archived T05 host/spec handoff；T06 不重定义其 JSONL/reducer/recovery contracts。
 - 实现来源顺序：official OpenAI Whisper/CTranslate2 APIs 与模型 metadata；当前维护良好的社区 long-form 实现；T01 ground-truth 实测选择；Python 仅诊断。
 - 固定每个算法候选的 source revision/config，禁止边看同一 corpus 结果边不断加入未记录的 case-specific heuristic。
 - 复用 T01 comparator；不得复制 CER/gap/timeline/report 逻辑或用 Python parity gate。
@@ -50,7 +52,8 @@
 
 - 在 T04 单一 `native-asr/` 工程中创建 production `hikaru-asr-worker` executable/CMake target 和 entry point；T04 `hikaru-asr-fake-worker` 保持独立 test-only target。
 - Production entry 读取一行 protocol v1 request、按 engine/backend dispatch，并在本任务只启用 ordinary faster-whisper；未实现 route 返回稳定 pre-ready error，不创建第二个 worker/protocol。
-- Model-backed development runs通过 T05 internal `ResolvedNativeLaunch` 注入 task-local locked absolute model path 和 resolved CPU；T11/T15 后续提供 production resolver。T06 不下载、不决定镜像、不写 readiness marker。
+- Model-backed development runs通过 T05 internal `ResolvedNativeLaunch::resolve(...)` 注入 task-local locked absolute model path 和 resolved CPU，并用 `NativeAsrHost::new(productionWorker, [], activeGate)` 启动无 scenario 参数的真实 worker；T11/T15 后续提供 production resolver。T06 不下载、不决定镜像、不写 readiness marker。
+- 在 `src-tauri/src/asr_worker.rs` 的 test module 增加真实 worker/CT2 focused integration；test-only env 固定为 `HIKARU_ASR_PRODUCTION_WORKER`、`HIKARU_ASR_CT2_MODEL_PATH`、`HIKARU_ASR_CT2_AUDIO_PATH`。测试将音频复制到临时受管 workspace 后构造 launch；Release/product route 不读取这些变量。
 - 只实现 CPU path；CUDA/Vulkan 代码和 qualification 属于 T13/T14。
 - 输出稳定 structured errors；stdout 仅 JSONL，stderr 有界诊断。
 - Progress 以已确认处理的 source audio 单调推进；不以 30s padded model duration 冒充 source progress。
@@ -89,7 +92,7 @@
 - [ ] `large-v2` short/medium/long 分别通过，且 authoritative long-v1 明确覆盖 Japanese >10min regression。
 - [ ] 其余五个模型均有完整 measured disposition；失败不阻塞 default route，也不从 T16 模型列表隐藏。
 - [ ] Qualified models 输出 subtitle-usable segments，无单巨段规避、synthetic timing、reference repair 或 Python parity gate。
-- [ ] Production `hikaru-asr-worker` target/main 存在且与 fake worker 分离；protocol progress 单调，cancel 不产生 completed，structured failure/recovery 通过 T05 tests。
+- [ ] Production `hikaru-asr-worker` target/main 存在且与 fake worker 分离；通过 T05 `NativeAsrHost`/`ResolvedNativeLaunch` 的真实 worker focused test，protocol progress 单调，cancel 不产生 completed，structured failure/recovery 保持兼容。
 - [ ] Full matrix 复用 T01 comparator，并绑定单一 final binary/DLL/lock/config identity。
 - [ ] Evidence publisher 确定性，tracked artifacts 无私有文本/路径/大型 binary/model。
 - [ ] 不实现 Kotoba、downloader/readiness、release packaging、GPU、settings 或 frontend。

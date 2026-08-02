@@ -7,7 +7,8 @@ T06 将 T02 中已证明正确的底层 primitives 移入 T04 的单一 worker �
 ## Architecture
 
 ```text
-T05 ResolvedNativeLaunch (task-local locked model path, resolved cpu)
+T05 NativeAsrHost::new(production worker, no scenario args, active gate)
+  + ResolvedNativeLaunch::resolve(task-local locked model path, resolved cpu)
         |
         v
 T04 WorkerRequestV1
@@ -40,9 +41,12 @@ native-asr/
   tests/ctranslate2_whisper_tests.cpp
   CMake target: hikaru-asr-worker
   Existing T04 target: hikaru-asr-fake-worker (test-only)
+
+src-tauri/src/asr_worker.rs
+  test module only: production worker + locked CT2 model/audio host compatibility
 ```
 
-`main.cpp` reads one request, uses the shared T04 protocol validator, dispatches only implemented production routes, and emits stable pre-ready errors for others. Do not split audio/tokenizer/prompt/window/decoder into speculative interfaces. Extract a helper only when unit vectors or T07 reuse proves a real seam.
+`main.cpp` reads one request, uses the shared T04 protocol validator, dispatches only implemented production routes, and emits stable pre-ready errors for others. The Rust addition is test-only: it instantiates the existing T05 host with empty worker args, copies the selected WAV into a temporary managed workspace, resolves the locked model path, and verifies the real worker without changing product/default routing. Do not split audio/tokenizer/prompt/window/decoder into speculative interfaces. Extract a helper only when unit vectors or T07 reuse proves a real seam.
 
 Task evidence:
 
@@ -148,7 +152,7 @@ Failed rows retain complete trace/identity and are never scored. No second CER/g
 
 ## Compatibility And Handoff
 
-- Protocol v1 and `AsrJobSnapshot` stay unchanged.
+- Protocol v1 and `AsrJobSnapshot` stay unchanged; T06 consumes T05's existing host constructor/resolver and adds no second reducer or recovery path.
 - T07 can reuse proven ordinary CT2 primitives but owns Kotoba model-card behavior/cache.
 - T11 consumes dispositions and locked file identities for model manifest/readiness.
 - T12 consumes frozen dependencies to build the reproducible packaging pipeline/provisional artifact; T17 rebuilds and attests the final CPU artifact from accepted T06～T10 identities.
