@@ -1,20 +1,26 @@
-//! ASR sidecar 进程管理与 HTTP 代理。
+//! Stable ASR commands with a Python legacy route and debug-only native worker host.
 //!
-//! Rust 负责按需拉起 Python sidecar（读取其 stdout 的就绪端口），并以 reqwest
-//! 代理转录任务的创建/查询/取消，使前端无需直接处理本地 HTTP 与端口。
+//! Product/default routing remains the Python HTTP sidecar. Setting the debug-only
+//! fake-worker environment enables the Rust-owned JSONL host without changing IPC.
 
+use crate::asr_worker::{native_job_id, ActiveJobGate, NativeAsrHost, ResolvedNativeLaunch};
 use crate::dependencies::{
     effective_asr_service_dir, effective_source_profile, ensure_runtime_deps_writable_or_elevate,
-    managed_asr_service_dir, managed_model_cache_dir, RuntimeDependencySourceProfile,
+    managed_asr_service_dir, managed_model_cache_dir, work_cache_dir,
+    RuntimeDependencySourceProfile,
 };
-use crate::process::hidden_command;
+use crate::process::{hidden_command, terminate_process_tree};
 use crate::settings::{load_settings, AppSettings};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+#[cfg(debug_assertions)]
+use std::ffi::OsString;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
@@ -27,26 +33,97 @@ pub struct Sidecar {
 }
 
 impl Sidecar {
-    pub fn kill(&mut self) {
+    fn kill(&mut self) {
+        terminate_process_tree(self.pid);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                _ => break,
+            }
+        }
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+impl Drop for Sidecar {
+    fn drop(&mut self) {
         let _ = self.child.kill();
     }
 }
 
-/// 受 Tauri 托管的全局 sidecar 状态（至多一个进程）。
+/// 受 Tauri 托管的全局 ASR 状态；legacy/native 共用一个活跃任务槽。
 pub struct AsrState {
-    pub sidecar: Mutex<Option<Sidecar>>,
+    sidecar: Mutex<Option<Sidecar>>,
     job_base_urls: Mutex<HashMap<String, String>>,
     job_recovery_paths: Mutex<HashMap<String, PathBuf>>,
+    active_job: Arc<ActiveJobGate>,
+    native_host: Option<NativeAsrHost>,
 }
 
 impl Default for AsrState {
     fn default() -> Self {
+        let active_job = Arc::new(ActiveJobGate::default());
+        let native_host = debug_native_host(Arc::clone(&active_job));
         Self {
             sidecar: Mutex::new(None),
             job_base_urls: Mutex::new(HashMap::new()),
             job_recovery_paths: Mutex::new(HashMap::new()),
+            active_job,
+            native_host,
         }
     }
+}
+
+impl AsrState {
+    pub fn shutdown(&self) {
+        if let Some(host) = &self.native_host {
+            host.shutdown();
+        }
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match self.sidecar.try_lock() {
+                Ok(mut guard) => {
+                    if let Some(mut sidecar) = guard.take() {
+                        sidecar.kill();
+                    }
+                    break;
+                }
+                Err(_) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                Err(_) => break,
+            }
+        }
+        self.active_job.clear();
+    }
+}
+
+#[cfg(debug_assertions)]
+fn debug_native_host(active_job: Arc<ActiveJobGate>) -> Option<NativeAsrHost> {
+    let executable = std::env::var_os("HIKARU_ASR_FAKE_WORKER")?;
+    let scenario =
+        std::env::var_os("HIKARU_ASR_FAKE_SCENARIO").unwrap_or_else(|| OsString::from("success"));
+    match NativeAsrHost::new(
+        PathBuf::from(executable),
+        vec![OsString::from("--scenario"), scenario],
+        active_job,
+    ) {
+        Ok(host) => Some(host),
+        Err(error) => {
+            eprintln!("[asr] ignoring invalid debug native worker override: {error}");
+            None
+        }
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn debug_native_host(_active_job: Arc<ActiveJobGate>) -> Option<NativeAsrHost> {
+    None
 }
 
 #[derive(Deserialize)]
@@ -55,19 +132,19 @@ struct ReadyLine {
     port: u16,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VadConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
-    threshold: Option<f32>,
+    pub(crate) threshold: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    min_speech_duration_ms: Option<u32>,
+    pub(crate) min_speech_duration_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    min_silence_duration_ms: Option<u32>,
+    pub(crate) min_silence_duration_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    speech_pad_ms: Option<u32>,
+    pub(crate) speech_pad_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    max_segment_duration_ms: Option<u32>,
+    pub(crate) max_segment_duration_ms: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -96,6 +173,50 @@ fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
         return Err("缺少转录字幕输出路径".into());
     }
     Ok(())
+}
+
+#[cfg(debug_assertions)]
+fn resolve_debug_native_launch(
+    args: StartAsrArgs,
+    job_id: String,
+    cache_root: PathBuf,
+) -> Result<ResolvedNativeLaunch, String> {
+    let model_path = std::env::var_os("HIKARU_ASR_FAKE_MODEL_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(&args.model));
+    let mut models = vec![("model".into(), model_path)];
+    if args.engine == "qwen3-asr" {
+        let aligner = std::env::var_os("HIKARU_ASR_FAKE_ALIGNER_PATH")
+            .map(PathBuf::from)
+            .ok_or_else(|| {
+                "qwen3-asr debug native route 缺少 HIKARU_ASR_FAKE_ALIGNER_PATH".to_string()
+            })?;
+        models.push(("aligner".into(), aligner));
+    }
+    ResolvedNativeLaunch::resolve(
+        job_id,
+        args.engine,
+        models,
+        "cpu".into(),
+        args.language.unwrap_or_else(|| "ja".into()),
+        PathBuf::from(args.audio_path),
+        PathBuf::from(
+            args.output_ass_path
+                .expect("outputAssPath was validated before native resolution"),
+        ),
+        &cache_root,
+        args.use_vad,
+        args.vad_config,
+    )
+}
+
+#[cfg(not(debug_assertions))]
+fn resolve_debug_native_launch(
+    _args: StartAsrArgs,
+    _job_id: String,
+    _cache_root: PathBuf,
+) -> Result<ResolvedNativeLaunch, String> {
+    Err("release build 禁止 native ASR debug override".into())
 }
 
 /// 解析 asr-service 目录（含 main.py）：设置 → 有效目录（debug 仓库 / release deps）→ 资源 → cwd。
@@ -290,7 +411,8 @@ fn spawn_sidecar(python: &str, dir: &Path, env: &[(String, String)]) -> Result<S
     let base_url = match base_url {
         Some(url) => url,
         None => {
-            let _ = child.kill();
+            terminate_process_tree(pid);
+            let _ = child.wait();
             return Err("sidecar 未输出就绪端口（请检查 Python 依赖是否已安装）".into());
         }
     };
@@ -323,34 +445,40 @@ async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, St
     let env = sidecar_runtime_env(app, &settings)?;
     let mut guard = state.sidecar.lock().await;
 
-    if let Some(sc) = guard.as_mut() {
+    let stale_sidecar = if let Some(sc) = guard.as_mut() {
         match sc.child.try_wait() {
+            Ok(None) if sidecar_env_matches(&sc.env, &env) => {
+                return Ok(sc.base_url.clone());
+            }
             Ok(None) => {
-                if sidecar_env_matches(&sc.env, &env) {
-                    return Ok(sc.base_url.clone()); // 仍在运行且环境仍匹配
-                }
                 eprintln!(
                     "[asr] restarting sidecar because runtime env changed pid={} base_url={}",
                     sc.pid, sc.base_url
                 );
-                sc.kill();
-                *guard = None;
+                guard.take()
             }
             Ok(Some(status)) => {
                 eprintln!(
                     "[asr] sidecar exited pid={} base_url={} status={status}",
                     sc.pid, sc.base_url
                 );
-                *guard = None; // 已退出，丢弃后重启
+                guard.take()
             }
             Err(err) => {
                 eprintln!(
                     "[asr] failed to inspect sidecar pid={} base_url={} error={err}",
                     sc.pid, sc.base_url
                 );
-                *guard = None; // 已退出，丢弃后重启
+                guard.take()
             }
         }
+    } else {
+        None
+    };
+    if let Some(mut sidecar) = stale_sidecar {
+        tauri::async_runtime::spawn_blocking(move || sidecar.kill())
+            .await
+            .map_err(|error| format!("终止旧 sidecar 失败：{error}"))?;
     }
 
     let sidecar = tauri::async_runtime::spawn_blocking(move || {
@@ -372,9 +500,9 @@ async fn ensure_base_url(app: &AppHandle, state: &AsrState) -> Result<String, St
 }
 
 pub async fn stop_sidecar(state: &AsrState) {
-    let mut guard = state.sidecar.lock().await;
-    if let Some(mut sidecar) = guard.take() {
-        sidecar.kill();
+    let sidecar = state.sidecar.lock().await.take();
+    if let Some(mut sidecar) = sidecar {
+        let _ = tauri::async_runtime::spawn_blocking(move || sidecar.kill()).await;
     }
 }
 
@@ -476,7 +604,23 @@ pub async fn start_asr(
     args: StartAsrArgs,
 ) -> Result<String, String> {
     validate_start_asr_args(&args)?;
+    let reservation = state.active_job.reserve()?;
+
+    if let Some(host) = state.native_host.clone() {
+        let cache_root = work_cache_dir(&app)?;
+        let job_id = native_job_id();
+        let launch = tauri::async_runtime::spawn_blocking(move || {
+            resolve_debug_native_launch(args, job_id, cache_root)
+        })
+        .await
+        .map_err(|error| format!("解析 native ASR 启动参数失败：{error}"))??;
+        return tauri::async_runtime::spawn_blocking(move || host.start(launch, reservation))
+            .await
+            .map_err(|error| format!("启动 native ASR 任务失败：{error}"))?;
+    }
+
     let base = ensure_base_url(&app, &state).await?;
+    let audio_path = args.audio_path.clone();
     let client = reqwest::Client::new();
     let body = serde_json::json!({
         "audioPath": args.audio_path,
@@ -504,9 +648,27 @@ pub async fn start_asr(
         .map(|s| s.to_string())
         .ok_or_else(|| "sidecar 响应缺少 jobId".to_string())?;
     remember_job_base_url(&state, &job_id, &base).await;
-    remember_job_recovery_path(&state, &job_id, &args.audio_path).await;
+    remember_job_recovery_path(&state, &job_id, &audio_path).await;
+    reservation.activate(&job_id)?;
     eprintln!("[asr] start_asr job_id={job_id} base_url={base}");
     Ok(job_id)
+}
+
+fn snapshot_is_terminal(snapshot: &serde_json::Value) -> bool {
+    matches!(
+        snapshot.get("status").and_then(|value| value.as_str()),
+        Some("completed" | "failed" | "cancelled")
+    )
+}
+
+fn release_legacy_slot_if_terminal(
+    active_job: &ActiveJobGate,
+    job_id: &str,
+    snapshot: &serde_json::Value,
+) {
+    if snapshot_is_terminal(snapshot) {
+        active_job.release(job_id);
+    }
 }
 
 #[tauri::command]
@@ -516,12 +678,22 @@ pub async fn get_asr_progress(
     job_id: String,
     include_segments: Option<bool>,
 ) -> Result<serde_json::Value, String> {
-    let base = match known_job_base_url(&state, &job_id).await {
+    let seg = include_segments.unwrap_or(true);
+    if let Some(host) = &state.native_host {
+        if let Some(snapshot) = host.snapshot(&job_id, seg)? {
+            return Ok(snapshot);
+        }
+    }
+
+    let known_base = known_job_base_url(&state, &job_id).await;
+    if state.native_host.is_some() && known_base.is_none() {
+        return Err(format!("转录任务不存在（jobId={job_id}）"));
+    }
+    let base = match known_base {
         Some(url) => url,
         None => ensure_base_url(&app, &state).await?,
     };
     let client = reqwest::Client::new();
-    let seg = include_segments.unwrap_or(true);
     let recovery_path = known_job_recovery_path(&state, &job_id).await;
     let resp = match client
         .get(format!("{base}/jobs/{job_id}"))
@@ -534,6 +706,7 @@ pub async fn get_asr_progress(
             if let Some(snapshot) =
                 try_recover_job_snapshot(recovery_path.as_deref(), &job_id, seg)?
             {
+                release_legacy_slot_if_terminal(&state.active_job, &job_id, &snapshot);
                 return Ok(snapshot);
             }
             return Err(format!(
@@ -543,13 +716,17 @@ pub async fn get_asr_progress(
     };
     if resp.status().as_u16() == 404 {
         if let Some(snapshot) = try_recover_job_snapshot(recovery_path.as_deref(), &job_id, seg)? {
+            release_legacy_slot_if_terminal(&state.active_job, &job_id, &snapshot);
             return Ok(snapshot);
         }
         return Err(format!("转录任务不存在（jobId={job_id}, sidecar={base}）"));
     }
-    resp.json::<serde_json::Value>()
+    let snapshot = resp
+        .json::<serde_json::Value>()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    release_legacy_slot_if_terminal(&state.active_job, &job_id, &snapshot);
+    Ok(snapshot)
 }
 
 #[tauri::command]
@@ -631,7 +808,22 @@ pub async fn cancel_asr(
     state: State<'_, AsrState>,
     job_id: String,
 ) -> Result<(), String> {
-    let base = match known_job_base_url(&state, &job_id).await {
+    if let Some(host) = state
+        .native_host
+        .as_ref()
+        .filter(|host| host.contains_job(&job_id))
+        .cloned()
+    {
+        return tauri::async_runtime::spawn_blocking(move || host.cancel(&job_id))
+            .await
+            .map_err(|error| format!("取消 native ASR 任务失败：{error}"))?;
+    }
+
+    let known_base = known_job_base_url(&state, &job_id).await;
+    if state.native_host.is_some() && known_base.is_none() {
+        return Err(format!("转录任务不存在（jobId={job_id}）"));
+    }
+    let base = match known_base {
         Some(url) => url,
         None => ensure_base_url(&app, &state).await?,
     };
@@ -644,6 +836,7 @@ pub async fn cancel_asr(
     if !resp.status().is_success() {
         return Err(format!("取消失败：HTTP {}", resp.status().as_u16()));
     }
+    state.active_job.release(&job_id);
     Ok(())
 }
 
@@ -651,6 +844,7 @@ pub async fn cancel_asr(
 mod tests {
     use super::*;
     use std::fs;
+    use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_dir(name: &str) -> PathBuf {
@@ -659,6 +853,25 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("hikaru_sub_{name}_{unique}"))
+    }
+
+    #[cfg(windows)]
+    fn fake_worker_process_count(worker: &Path) -> usize {
+        let name = worker.file_name().unwrap().to_string_lossy();
+        hidden_command("tasklist")
+            .args(["/FI", &format!("IMAGENAME eq {name}"), "/FO", "CSV", "/NH"])
+            .output()
+            .ok()
+            .map(|output| {
+                String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .filter(|line| {
+                        line.to_ascii_lowercase()
+                            .contains(&name.to_ascii_lowercase())
+                    })
+                    .count()
+            })
+            .unwrap_or(0)
     }
 
     #[test]
@@ -754,8 +967,7 @@ mod tests {
         let env = sidecar_hf_env(&cache, &profile);
 
         assert!(env.iter().any(|(key, value)| key == "HF_HOME"
-            && value.ends_with("models\\huggingface")
-            || key == "HF_HOME" && value.ends_with("models/huggingface")));
+            && (value.ends_with("models\\huggingface") || value.ends_with("models/huggingface"))));
         assert!(env
             .iter()
             .any(|(key, value)| key == "HF_ENDPOINT" && value == "https://hf-mirror.com"));
@@ -797,5 +1009,118 @@ mod tests {
             select_sidecar_spawn_error(&errors),
             "未找到可用的 Python 3.11。请安装系统 Python 3.11，或先配置 ASR 引擎依赖。"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn asr_state_shutdown_terminates_legacy_sidecar_process_tree() {
+        let _guard = crate::asr_worker::FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(worker) = std::env::var_os("HIKARU_ASR_FAKE_WORKER").map(PathBuf::from) else {
+            eprintln!("HIKARU_ASR_FAKE_WORKER not set; skipping legacy sidecar shutdown test");
+            return;
+        };
+        if !worker.is_file() {
+            return;
+        }
+        let baseline = fake_worker_process_count(&worker);
+        let mut child = hidden_command(&worker)
+            .args(["--scenario", "child-process-hang"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(
+                br#"{"protocolVersion":1,"jobId":"legacy-shutdown","engine":"faster-whisper","backend":"ctranslate2","modelPaths":[{"role":"model","path":"C:\\managed\\model"}],"audioPath":"C:\\workspace\\audio.wav","device":"cpu","language":"ja","useVad":false}
+"#,
+            )
+            .unwrap();
+        let stdout = child.stdout.take().unwrap();
+        let mut reader = BufReader::new(stdout);
+        let mut ready = String::new();
+        reader.read_line(&mut ready).unwrap();
+        assert!(ready.contains("\"event\":\"ready\""));
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while fake_worker_process_count(&worker) < baseline + 2 {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        let active_job = Arc::new(ActiveJobGate::default());
+        active_job
+            .reserve()
+            .unwrap()
+            .activate("legacy-shutdown")
+            .unwrap();
+        let state = AsrState {
+            sidecar: Mutex::new(Some(Sidecar {
+                base_url: "http://127.0.0.1:1".into(),
+                pid: child.id(),
+                child,
+                env: Vec::new(),
+            })),
+            job_base_urls: Mutex::new(HashMap::new()),
+            job_recovery_paths: Mutex::new(HashMap::new()),
+            active_job: Arc::clone(&active_job),
+            native_host: None,
+        };
+        state.shutdown();
+        assert!(active_job.current().is_none());
+        let deadline = Instant::now() + Duration::from_secs(1);
+        while fake_worker_process_count(&worker) > baseline && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(fake_worker_process_count(&worker), baseline);
+    }
+
+    #[test]
+    fn legacy_active_slot_release_rules_match_start_poll_cancel_recovery_and_shutdown() {
+        let gate = Arc::new(ActiveJobGate::default());
+
+        // HTTP start failure drops the unactivated reservation.
+        drop(gate.reserve().unwrap());
+        assert!(gate.current().is_none());
+
+        gate.reserve().unwrap().activate("legacy-running").unwrap();
+        release_legacy_slot_if_terminal(
+            &gate,
+            "legacy-running",
+            &serde_json::json!({"status": "running"}),
+        );
+        assert_eq!(gate.current().as_deref(), Some("legacy-running"));
+
+        // Ordinary connection errors do not call the release helper.
+        assert_eq!(gate.current().as_deref(), Some("legacy-running"));
+
+        // First terminal poll releases the slot.
+        release_legacy_slot_if_terminal(
+            &gate,
+            "legacy-running",
+            &serde_json::json!({"status": "completed"}),
+        );
+        assert!(gate.current().is_none());
+
+        // A terminal recovery snapshot follows the same branch.
+        gate.reserve().unwrap().activate("legacy-recovery").unwrap();
+        release_legacy_slot_if_terminal(
+            &gate,
+            "legacy-recovery",
+            &serde_json::json!({"status": "failed"}),
+        );
+        assert!(gate.current().is_none());
+
+        // Successful legacy cancel and shutdown release explicitly.
+        gate.reserve().unwrap().activate("legacy-cancel").unwrap();
+        gate.release("legacy-cancel");
+        assert!(gate.current().is_none());
+        gate.reserve().unwrap().activate("legacy-shutdown").unwrap();
+        gate.clear();
+        assert!(gate.current().is_none());
     }
 }

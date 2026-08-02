@@ -1,6 +1,7 @@
 mod app_paths;
 mod asr;
 mod asr_setup;
+mod asr_worker;
 mod ass;
 mod asset_scope;
 mod burn;
@@ -115,14 +116,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            // 应用退出时尽力终止 sidecar 进程，避免残留
+            // 应用退出时尽力终止 ASR worker/sidecar，避免残留。
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 if let Some(state) = app_handle.try_state::<asr::AsrState>() {
-                    if let Ok(mut guard) = state.sidecar.try_lock() {
-                        if let Some(mut sidecar) = guard.take() {
-                            sidecar.kill();
-                        }
-                    }
+                    state.shutdown();
                 }
                 if let Some(state) = app_handle.try_state::<burn::BurnState>() {
                     state.shutdown();

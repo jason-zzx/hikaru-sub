@@ -3,7 +3,7 @@
   "name": "native-asr-rust-job-host",
   "title": "Host native ASR jobs in Tauri",
   "description": "Replace the development HTTP proxy path with a Rust-owned native worker job host while preserving Tauri commands, snapshots, cancellation, crash recovery, and a legacy fallback.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

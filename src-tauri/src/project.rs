@@ -162,7 +162,7 @@ pub fn path_exists(path: String) -> bool {
     PathBuf::from(path).exists()
 }
 
-fn is_cached_audio_path(cache_root: &Path, audio_path: &Path) -> Result<bool, String> {
+pub(crate) fn is_cached_audio_path(cache_root: &Path, audio_path: &Path) -> Result<bool, String> {
     if audio_path.file_name().and_then(|name| name.to_str()) != Some("audio.wav") {
         return Ok(false);
     }
