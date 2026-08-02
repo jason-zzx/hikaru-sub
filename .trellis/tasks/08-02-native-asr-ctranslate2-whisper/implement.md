@@ -8,18 +8,20 @@
 - Archived T02 `inputs.lock.json`, source, raw-evidence contract and final report.
 - T04 implementation `96077103e0c3070894b70ffa9fcd888bcc93075d`: final protocol library, canonical limits, `windows-x64-release` preset and fake-worker contract; T06 creates the production worker entry point.
 - T05 implementation `74d1a4e`: generic `NativeAsrHost::new(executable, worker_args, active_gate)`, `ResolvedNativeLaunch::resolve(...)`, active gate, reducer, cancellation and recovery lifecycle; archive `a18509a`.
-- Official/maintained long-form candidate revisions and all seven current model identities must be lockable.
+- `research/start-gate-lock.md` locks official/community Candidate A, one conditional Silero V6 Candidate B asset, all seven current model revisions/model-weight hashes/licenses and the ignored local boundary.
 
 Context manifests are refreshed to final tracked T04 protocol/limits, T05 durable Tauri spec and archived T05 planning evidence. No active T04/T05 task path remains.
 
 ## Execution Checklist
 
-### 1. Lock Inputs And Candidate Sources
+### 1. Finalize Runtime Input Lock
 
-- [ ] Record T01 corpus/manifest identity and frozen gates.
-- [ ] Record T02 CT2/oneDNN/toolchain primitives to promote and PoC algorithm pieces explicitly rejected.
-- [ ] Pin official OpenAI Whisper/CT2 long-form behavior and at most one maintained VAD candidate before measurements.
-- [ ] Lock all seven model revisions/files/licenses and qualification semantics.
+- [x] Record T01 corpus/manifest identity and frozen gates in `start-gate-lock.md`.
+- [x] Record T02 CT2/oneDNN/toolchain primitives to promote and PoC algorithm pieces explicitly rejected.
+- [x] Pin official OpenAI/faster-whisper Candidate A sources and exactly one conditional Silero V6 Candidate B source/model asset.
+- [x] Lock all seven repository revisions, model-weight SHA-256 values, metadata identities, MIT licenses and qualification semantics; Tiny is remote-only but pinned/public/ungated.
+- [x] Add active/archive task-local `research/local/` ignore boundary.
+- [ ] Before first model load, acquire the required pinned snapshot(s), compute every local required-file SHA-256, freeze selected algorithm config/reproduction commands, and write `algorithm-lock.md`.
 
 ### 2. Create Production Worker And Promote Proven Primitives
 
@@ -43,7 +45,7 @@ Context manifests are refreshed to final tracked T04 protocol/limits, T05 durabl
 - [ ] Reproduce T02 result as a named failing baseline under the shared comparator.
 - [ ] Run Candidate A on short (1 cold + 3 warm), medium and long.
 - [ ] If all gates pass, freeze A and skip VAD work.
-- [ ] If confirmed gaps remain, run only the pre-pinned Candidate B VAD/chunk strategy; retain it only if it measurably fixes gaps without regressing other gates.
+- [ ] If confirmed gaps remain, return to planning to lock Candidate B's native ONNX executor/license/size, then run only the pre-pinned Silero V6 strategy; retain it only if it measurably fixes gaps without regressing other gates.
 - [ ] Freeze one algorithm/config identity before the full model matrix.
 
 ### 5. Full Product-Model Matrix
@@ -93,6 +95,7 @@ src-tauri/src/asr_worker.rs                  # focused test-module additions onl
 Task evidence:
 
 ```text
+.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/start-gate-lock.md
 .trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/algorithm-lock.md
 .trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/product-model-disposition.md
 .trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/ctranslate2-whisper-report.md
@@ -134,7 +137,7 @@ Before start:
 
 - [x] T04/T05 completed/archived; manifests point to final protocol/limits/spec/research handoffs.
 - [x] User-reviewed model policy is reflected: large-v3/large-v2 hard, all models visible later.
-- [ ] Candidate revisions, model identities, local ignored root and license provenance lockable.
+- [x] Candidate revisions, model identities/weight hashes, local ignored root and license provenance are lockable in `research/start-gate-lock.md`; Candidate B native executor remains an explicit on-demand planning gate.
 
 Before completion:
 

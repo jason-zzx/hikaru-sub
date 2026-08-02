@@ -13,6 +13,7 @@
 - T01 `.asr-benchmark` WAV+ASS 是唯一质量真值。Python large-v2 V4/seed/session/private fork 仅是 regression material，不是 native template。
 - 当前 ordinary faster-whisper 模型：`tiny`、`base`、`small`、`medium`、`large-v2`、`large-v3`、`large-v3-turbo`；`large-v3` 是默认。
 - 用户决定：`large-v3` 与 `large-v2` 长音频是硬门槛；其余模型失败不阻塞已通过的 native route，但必须实测并保留资格状态。T16 仍显示所有模型，不通过的模型不静默回退 Python。
+- `research/start-gate-lock.md` 已锁定 Candidate A official/community source、一个 conditional Silero V6 Candidate B asset、七模型 immutable revision/model-weight hash/license 和 task-local privacy boundary。Tiny 当前未缓存但 public/ungated/pinned，不阻塞启动。
 
 ## Requirements
 
@@ -20,7 +21,7 @@
 
 - Hard dependency：archived T01 benchmark contract、archived T02 lock/source/evidence、final T04 protocol/limits 和 archived T05 host/spec handoff；T06 不重定义其 JSONL/reducer/recovery contracts。
 - 实现来源顺序：official OpenAI Whisper/CTranslate2 APIs 与模型 metadata；当前维护良好的社区 long-form 实现；T01 ground-truth 实测选择；Python 仅诊断。
-- 固定每个算法候选的 source revision/config，禁止边看同一 corpus 结果边不断加入未记录的 case-specific heuristic。
+- Candidate A 与 conditional Candidate B source/model revision 已在 start-gate lock 固定；最终运行 config 和每个本地文件 SHA-256 在首个 model-backed measurement 前写入 `algorithm-lock.md`。禁止边看同一 corpus 结果边不断加入未记录的 case-specific heuristic。
 - 复用 T01 comparator；不得复制 CER/gap/timeline/report 逻辑或用 Python parity gate。
 
 ### R2 - Engine And Product-Model Scope
@@ -44,7 +45,7 @@
 3. 实现 pinned official prompt/history reset、consecutive timestamp、no-speech 和 invalid-generation 行为；
 4. 只做可证明的 overlap duplicate removal，不生成文本/时间；
 5. 先对 large-v3 short/medium/long 评估；如果所有门槛通过即停止，不增加 VAD；
-6. 若仍有 confirmed gaps，只评估一个 pinned maintained VAD/chunk candidate；只保留有 ground-truth 改善且全部合同通过的最小方案。
+6. 若仍有 confirmed gaps，只评估 start-gate lock 中的 Silero V6 candidate；在实现 Candidate B 前必须回到规划，锁定最小 native ONNX executor、archive hash/license/size 与 T12 packaging impact。只保留有 ground-truth 改善且全部合同通过的最小方案。
 
 不得默认复制 Silero V4 compression、Python hard-hole/backfill、private generation fork 或 corpus-specific transcript repair。
 
@@ -79,13 +80,14 @@
 
 ### R7 - Evidence, Privacy And Supply Chain Boundary
 
-- Task-local `research/local/` 保存 build/models/raw/token traces 并被精确 ignore；tracked evidence 只含 identity、aggregate metrics、distribution、failure trace hash、source citations 和 route dispositions。
+- Task-local `research/local/` 保存 build/models/raw/token traces 并由 active/archive 通用规则精确 ignore；tracked evidence 只含 identity、aggregate metrics、distribution、failure trace hash、source citations 和 route dispositions。
 - 一个发布结论只能使用单一 final binary/DLL/lock/config identity；failed evidence 必须完整且不评分。
 - deterministic publisher 重跑字节一致；无 transcript text、absolute path、model/runtime binary 或 private media 进入 Git。
 - T12 负责可复现 CPU packaging pipeline、provisional artifact 和 dependency/license inventory；T17 使用 T06～T10 final identities 重建并认证最终 CPU release artifact。T06 development binary 只是算法/qualification evidence。
 
 ## Acceptance Criteria
 
+- [ ] `start-gate-lock.md` 中 Candidate A/B source、七模型 revision/weight hash/license 与 ignored local boundary 在 implementation lock 中保持一致；Tiny 在运行前按 pinned revision 获取并本地完整校验。
 - [ ] T02 WAV/mel/tokenizer/timestamp/source-vs-model-window/WAV-end provenance contracts保留并有 CTest。
 - [ ] Selected algorithm 由 decoded timestamps 推进 seek，不再使用 unconditional fixed non-overlap windows。
 - [ ] `large-v3` short/medium/long 分别通过全部冻结 CPU 质量、性能、资源、timeline 和 gap 门槛。

@@ -41,6 +41,14 @@
 - T06 test-only host variables are `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH`; no Release/product route reads them.
 - The durable Tauri host contract is recorded in `.trellis/spec/tauri/media-ffmpeg-asr.md`; T06 does not create a second reducer, recovery format or process lifecycle.
 
+## Start-Gate Lockability Result
+
+- Candidate A pins OpenAI Whisper `transcribe.py` at `25639fc...` and faster-whisper v1.2.1 at `65882eee...`, both MIT.
+- The only conditional Candidate B is faster-whisper v1.2.1 Silero V6 (`vad.py` + `silero_vad_v6.onnx`, asset SHA-256 `4cbf549b...`). If needed, its native executor must be separately planned/pinned before implementation.
+- All seven ordinary model repositories are public/ungated/MIT with immutable revisions and LFS model-weight SHA-256 values recorded in `start-gate-lock.md`.
+- Base/small/medium/large-v2/large-v3/large-v3-turbo are cached at the pinned revisions. Tiny is not cached but is pinned and remotely lockable; this affects immediate run readiness, not task start.
+- A generic active/archive `.gitignore` rule protects T06 `research/local/` before any raw/model/build output is created.
+
 ## Task Boundaries
 
 - T04 owns protocol and test-only fake worker; T05 owns host/cancel/recovery; T06 creates the production `hikaru-asr-worker` entry/CMake target and first real route.

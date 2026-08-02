@@ -7,3 +7,4 @@
 {"file":"native-asr/docs/protocol-v1.md","reason":"Check production worker output exactly follows finalized protocol v1 and does not change event or failure semantics."}
 {"file":"native-asr/protocol-v1-limits.json","reason":"Check C++ and Rust tests continue using the canonical bounds without drift."}
 {"file":".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/planning-evidence.md","reason":"Check final host handoff, model visibility/disposition policy, candidate minimality and later-task boundaries."}
+{"file":".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/start-gate-lock.md","reason":"Check source/model/license locks, the single conditional VAD candidate, Tiny limitation and ignored local boundary are enforced without overclaiming final run readiness."}
