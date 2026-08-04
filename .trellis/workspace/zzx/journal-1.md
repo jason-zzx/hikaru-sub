@@ -603,3 +603,36 @@ Implemented and independently reviewed the development-only Rust native ASR work
 ### Next Steps
 
 - None - task complete
+
+
+## Session 19: Complete native CTranslate2 Whisper handoff
+
+**Date**: 2026-08-04
+**Task**: Complete native CTranslate2 Whisper handoff
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented and independently reviewed the native CTranslate2 faster-whisper worker, CPU diagnosis and selected baseline, Candidate B Silero V6 experiment, deterministic evidence publishers, T05 host compatibility, and the migration-handoff-stop-revise closure. Archived T06 with native routing disabled and Python legacy/default preserved.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b29412e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
