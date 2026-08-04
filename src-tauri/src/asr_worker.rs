@@ -1560,22 +1560,74 @@ mod tests {
         path.is_file().then_some(path)
     }
 
-    fn production_worker_inputs() -> Option<(PathBuf, PathBuf, PathBuf)> {
+    struct ProductionWorkerInputs {
+        worker: PathBuf,
+        cpu_worker: Option<PathBuf>,
+        model: PathBuf,
+        audio: PathBuf,
+        cancel_audio: PathBuf,
+        device: String,
+    }
+
+    fn production_worker_inputs() -> Option<ProductionWorkerInputs> {
         let values = [
             std::env::var_os("HIKARU_ASR_PRODUCTION_WORKER"),
             std::env::var_os("HIKARU_ASR_CT2_MODEL_PATH"),
             std::env::var_os("HIKARU_ASR_CT2_AUDIO_PATH"),
         ];
+        let optional_values = [
+            std::env::var_os("HIKARU_ASR_CT2_CPU_WORKER"),
+            std::env::var_os("HIKARU_ASR_CT2_CANCEL_AUDIO_PATH"),
+            std::env::var_os("HIKARU_ASR_CT2_DEVICE"),
+        ];
         if values.iter().all(Option::is_none) {
+            assert!(
+                optional_values.iter().all(Option::is_none),
+                "optional CT2 test env was set without the three production-worker inputs"
+            );
             return None;
         }
         let worker = PathBuf::from(values[0].clone().expect("production worker env missing"));
         let model = PathBuf::from(values[1].clone().expect("CT2 model env missing"));
         let audio = PathBuf::from(values[2].clone().expect("CT2 audio env missing"));
+        let cpu_worker = optional_values[0].clone().map(PathBuf::from);
+        let cancel_audio = optional_values[1]
+            .clone()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| audio.clone());
+        let device = optional_values[2]
+            .clone()
+            .map(|value| value.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "cpu".into());
+        assert!(
+            matches!(device.as_str(), "cpu" | "cuda"),
+            "CT2 test device must be cpu or cuda"
+        );
         assert!(worker.is_file(), "production worker env is not a file");
         assert!(model.is_dir(), "CT2 model env is not a directory");
         assert!(audio.is_file(), "CT2 audio env is not a file");
-        Some((worker, model, audio))
+        assert!(cancel_audio.is_file(), "CT2 cancel audio env is not a file");
+        if let Some(path) = &cpu_worker {
+            assert!(path.is_file(), "CT2 CPU worker env is not a file");
+        }
+        if device == "cuda" {
+            assert!(
+                cpu_worker.is_some(),
+                "CUDA host tests require HIKARU_ASR_CT2_CPU_WORKER"
+            );
+            assert!(
+                optional_values[1].is_some(),
+                "CUDA host tests require HIKARU_ASR_CT2_CANCEL_AUDIO_PATH"
+            );
+        }
+        Some(ProductionWorkerInputs {
+            worker,
+            cpu_worker,
+            model,
+            audio,
+            cancel_audio,
+            device,
+        })
     }
 
     fn production_launch(
@@ -1583,6 +1635,7 @@ mod tests {
         job_id: &str,
         model: PathBuf,
         source_audio: &Path,
+        device: &str,
         use_vad: bool,
         vad_config: Option<VadConfig>,
     ) -> ResolvedNativeLaunch {
@@ -1597,7 +1650,7 @@ mod tests {
             job_id.into(),
             "faster-whisper".into(),
             vec![("model".into(), model)],
-            "cpu".into(),
+            device.into(),
             "ja".into(),
             audio,
             output.join("result.ass"),
@@ -1606,6 +1659,41 @@ mod tests {
             vad_config,
         )
         .unwrap()
+    }
+
+    struct EnvVarGuard {
+        key: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(value) => std::env::set_var(self.key, value),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
+    fn restricted_cuda_path(worker: &Path) -> EnvVarGuard {
+        let cuda_root = PathBuf::from(std::env::var_os("CUDA_PATH").expect("CUDA_PATH missing"));
+        let system_root =
+            PathBuf::from(std::env::var_os("SystemRoot").expect("SystemRoot missing"));
+        let entries = [
+            worker
+                .parent()
+                .expect("worker directory missing")
+                .to_path_buf(),
+            cuda_root.join("bin"),
+            system_root.join("System32"),
+        ];
+        let value = std::env::join_paths(entries).expect("restricted CUDA PATH is invalid");
+        let guard = EnvVarGuard {
+            key: "PATH",
+            previous: std::env::var_os("PATH"),
+        };
+        std::env::set_var("PATH", value);
+        guard
     }
 
     #[cfg(windows)]
@@ -2034,26 +2122,34 @@ mod tests {
     }
 
     #[test]
-    fn production_worker_runs_no_vad_and_candidate_b_through_the_native_host() {
+    fn production_worker_runs_the_selected_device_through_the_native_host() {
         let _guard = FAKE_WORKER_TEST_LOCK
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        let Some((worker, model, audio)) = production_worker_inputs() else {
-            eprintln!("T06 production worker/model/audio env not set; skipping real CT2 host test");
+        let Some(inputs) = production_worker_inputs() else {
+            eprintln!("production worker/model/audio env not set; skipping real CT2 host test");
             return;
         };
-        for (job_id, use_vad) in [
-            ("production-ct2-no-vad", false),
-            ("production-ct2-candidate-b", true),
-        ] {
+        let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
+        let cases = if inputs.device == "cuda" {
+            vec![("production-ct2-cuda", false)]
+        } else {
+            vec![
+                ("production-ct2-no-vad", false),
+                ("production-ct2-candidate-b", true),
+            ]
+        };
+        for (job_id, use_vad) in cases {
             let temp = tempfile::tempdir().unwrap();
             let gate = Arc::new(ActiveJobGate::default());
-            let host = NativeAsrHost::new(worker.clone(), vec![], Arc::clone(&gate)).unwrap();
+            let host =
+                NativeAsrHost::new(inputs.worker.clone(), vec![], Arc::clone(&gate)).unwrap();
             let launch = production_launch(
                 &temp,
                 job_id,
-                model.clone(),
-                &audio,
+                inputs.model.clone(),
+                &inputs.audio,
+                &inputs.device,
                 use_vad,
                 None,
             );
@@ -2096,24 +2192,68 @@ mod tests {
     }
 
     #[test]
+    fn cpu_only_worker_rejects_cuda_before_ready_through_the_native_host() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = production_worker_inputs() else {
+            eprintln!(
+                "production worker/model/audio env not set; skipping real CT2 CUDA error test"
+            );
+            return;
+        };
+        if inputs.device != "cuda" {
+            eprintln!("CT2 test device is not cuda; skipping cuda_not_built host test");
+            return;
+        }
+        let cpu_worker = inputs.cpu_worker.clone().unwrap();
+        let _path = restricted_cuda_path(&cpu_worker);
+        let temp = tempfile::tempdir().unwrap();
+        let gate = Arc::new(ActiveJobGate::default());
+        let host = NativeAsrHost::new(cpu_worker, vec![], Arc::clone(&gate)).unwrap();
+        let launch = production_launch(
+            &temp,
+            "production-ct2-cuda-not-built",
+            inputs.model,
+            &inputs.audio,
+            "cuda",
+            false,
+            None,
+        );
+        let recovery = launch.recovery_path.clone();
+        let output = launch.output_ass_path.clone();
+        host.start(launch, gate.reserve().unwrap()).unwrap();
+        let snapshot = wait_terminal(&host, "production-ct2-cuda-not-built");
+        assert_eq!(snapshot["status"], "failed");
+        assert!(snapshot["error"]
+            .as_str()
+            .unwrap()
+            .starts_with("[cuda_not_built]"));
+        assert_eq!(snapshot["durationMs"], 0);
+        assert!(!output.exists());
+        assert!(recovery.is_file());
+        assert!(gate.current().is_none());
+    }
+
+    #[test]
     fn production_worker_rejects_candidate_b_config_identity_drift() {
         let _guard = FAKE_WORKER_TEST_LOCK
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        let Some((worker, model, audio)) = production_worker_inputs() else {
-            eprintln!(
-                "T06 production worker/model/audio env not set; skipping real CT2 error test"
-            );
+        let Some(inputs) = production_worker_inputs() else {
+            eprintln!("production worker/model/audio env not set; skipping real CT2 error test");
             return;
         };
+        let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
         let temp = tempfile::tempdir().unwrap();
         let gate = Arc::new(ActiveJobGate::default());
-        let host = NativeAsrHost::new(worker, vec![], Arc::clone(&gate)).unwrap();
+        let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
         let launch = production_launch(
             &temp,
             "production-ct2-vad-error",
-            model,
-            &audio,
+            inputs.model,
+            &inputs.audio,
+            &inputs.device,
             true,
             Some(VadConfig {
                 threshold: Some(0.6),
@@ -2136,34 +2276,37 @@ mod tests {
     }
 
     #[test]
-    fn cancelling_the_real_worker_never_publishes_completed() {
+    fn cancelling_the_real_worker_after_ready_never_publishes_completed() {
         let _guard = FAKE_WORKER_TEST_LOCK
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        let Some((worker, model, audio)) = production_worker_inputs() else {
-            eprintln!(
-                "T06 production worker/model/audio env not set; skipping real CT2 cancel test"
-            );
+        let Some(inputs) = production_worker_inputs() else {
+            eprintln!("production worker/model/audio env not set; skipping real CT2 cancel test");
             return;
         };
+        let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
         let temp = tempfile::tempdir().unwrap();
         let gate = Arc::new(ActiveJobGate::default());
-        let host = NativeAsrHost::new(worker, vec![], Arc::clone(&gate)).unwrap();
+        let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
         let launch = production_launch(
             &temp,
             "production-ct2-cancel",
-            model,
-            &audio,
-            true,
+            inputs.model,
+            &inputs.cancel_audio,
+            &inputs.device,
+            inputs.device == "cpu",
             None,
         );
+        let output = launch.output_ass_path.clone();
         host.start(launch, gate.reserve().unwrap()).unwrap();
         let deadline = Instant::now() + Duration::from_secs(60);
         while host
             .snapshot("production-ct2-cancel", false)
             .unwrap()
-            .unwrap()["status"]
-            != "running"
+            .unwrap()["durationMs"]
+            .as_i64()
+            .unwrap_or(0)
+            <= 0
         {
             assert!(
                 Instant::now() < deadline,
@@ -2171,10 +2314,14 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(20));
         }
+        let started = Instant::now();
         host.cancel("production-ct2-cancel").unwrap();
+        assert!(started.elapsed() <= Duration::from_secs(2));
         let snapshot = wait_terminal(&host, "production-ct2-cancel");
         assert_eq!(snapshot["status"], "cancelled");
         assert!(snapshot["detectedLanguage"].is_null());
+        assert!(!output.exists());
+        assert!(host.is_reaped("production-ct2-cancel"));
         assert!(gate.current().is_none());
     }
 
