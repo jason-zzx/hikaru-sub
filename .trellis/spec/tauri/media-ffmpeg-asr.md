@@ -110,7 +110,7 @@ struct ResolvedNativeLaunch {
 - Bound both `segment` append accumulation and `segmentsReplace` with canonical `maxReplacementSegments`. Embed `native-asr/protocol-v1-limits.json`; do not maintain a handwritten Rust limits copy.
 - Recovery/stderr artifact job IDs must use the host-safe generated character set, not merely the protocol's byte/control-character rules; otherwise separators can escape managed directories.
 - `HIKARU_ASR_FAKE_WORKER` and `HIKARU_ASR_FAKE_SCENARIO` are debug/test-only routing overrides. `#[cfg(not(debug_assertions))]` must leave Release on legacy routing.
-- Model-backed worker compatibility tests use `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH` only inside `asr_worker.rs`'s test module. All three must be set together; the test copies audio into a temporary managed workspace before `ResolvedNativeLaunch::resolve(...)`. Product/Release code never reads these keys.
+- Model-backed worker compatibility tests use required `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH` only inside `asr_worker.rs`'s test module. All three must be set together; optional `HIKARU_ASR_CT2_DEVICE` is exactly `cpu|cuda`, and optional `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH` selects a longer cancellation input. CUDA mode additionally requires `HIKARU_ASR_CT2_CPU_WORKER` so the same suite can deterministically prove pre-ready `cuda_not_built` without damaging the machine CUDA environment. The test copies every exercised audio into a temporary managed workspace before `ResolvedNativeLaunch::resolve(...)`. Product/Release code never reads these keys.
 
 ### Validation & Error Matrix
 
@@ -123,14 +123,17 @@ struct ResolvedNativeLaunch {
 | `completed` followed by nonzero exit | Failure, not completed |
 | Cancel after a terminal snapshot but before reap | Keep first terminal status; terminate/reap remaining process tree |
 | Unsafe artifact job ID or path outside approved workspace/cache root | Reject before launch/write |
-| Only some real-worker test env keys are set | Fail the test setup clearly; never guess model/audio/worker paths |
+| Only some required real-worker test env keys are set, or optional keys exist without the required triple | Fail the test setup clearly; never guess model/audio/worker paths |
+| `HIKARU_ASR_CT2_DEVICE` is not `cpu|cuda` | Fail test setup before launch |
+| CUDA mode lacks the CPU-only worker or dedicated cancel audio | Fail test setup; do not weaken the negative/cancel coverage |
+| CPU-only worker receives the CUDA request | Preserve structured `cuda_not_built` in recovery; accept no `ready`/completed snapshot |
 | Rust supplies a canonical extended Windows model path to CT2 4.8.0 | Worker normalizes only the `\\?\` spelling at the inference boundary; host validation remains canonical |
 
 ### Good/Base/Bad Cases
 
-- Good: valid fake-worker success → pending/running, bounded progress/segments, exit 0, recovery writes, then completed becomes visible and the active slot is free. A model-backed compatibility test uses the same host with empty worker args and a temporary managed audio copy.
-- Base: no debug/test override or Release build → unchanged Python legacy route and model APIs.
-- Bad: let product code read model-backed test env keys, pass authoritative corpus audio directly from an unmanaged root, publish completed before fallback ASS persistence, release the slot after notifying reap, or return early from terminal cancel while a PID remains.
+- Good: valid fake-worker success → pending/running, bounded progress/segments, exit 0, recovery writes, then completed becomes visible and the active slot is free. A model-backed CUDA suite selects `cuda`, uses a CUDA-enabled worker for success/cancel, a CPU-only worker for deterministic `cuda_not_built`, and temporary managed audio copies throughout.
+- Base: no debug/test override or Release build → unchanged Python legacy route and model APIs; the required model-backed triple absent with no optional keys means the tests skip.
+- Bad: let product code read model-backed test env keys, partially configure the optional CUDA keys, sabotage the system CUDA environment to force failure, pass authoritative corpus audio directly from an unmanaged root, publish completed before fallback ASS persistence, release the slot after notifying reap, or return early from terminal cancel while a PID remains.
 
 ### Tests Required
 
@@ -139,7 +142,7 @@ struct ResolvedNativeLaunch {
 - Lifecycle: shared active slot, legacy release/retain branches, cancel/shutdown process-tree cleanup within two seconds, terminal-but-unreaped cleanup, and no orphan parent/child process.
 - Persistence/security: partial recovery after failure/cancel/crash, minimal ASS only after non-empty completion, safe artifact job IDs, canonical path containment, and stderr byte/retention bounds.
 - Compatibility: Release cargo check with malicious debug/test env values, full Rust tests, and `pnpm build` without frontend contract changes.
-- Real worker: with all three production-worker test env keys set, assert success/recovery/fallback ASS, structured pre-ready failure/recovery, cancellation with no completed snapshot, managed audio copy, and active-gate release. Without them, ordinary test runs skip model-backed cases without changing product routing.
+- Real worker: with the required three production-worker test env keys set, assert selected-device success/recovery/fallback ASS, structured pre-ready failure/recovery, cancellation with no completed snapshot, managed audio copy, and active-gate release. CUDA mode also sets `HIKARU_ASR_CT2_CPU_WORKER`, `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH`, and `HIKARU_ASR_CT2_DEVICE=cuda`, then asserts `durationMs > 0` before cancellation and `cuda_not_built` from the CPU-only negative. Without the required triple, ordinary test runs skip only when no optional model-backed keys are present.
 
 ### Wrong vs Correct
 
@@ -150,8 +153,8 @@ Correct: persist recovery/fallback under the terminal lock → publish completed
 Wrong:   terminal already committed → cancel returns while PID still runs
 Correct: preserve first terminal snapshot → terminate/reap PID → release slot → return
 
-Wrong:   Release/product code reads HIKARU_ASR_PRODUCTION_WORKER or launches corpus audio directly
-Correct: test module reads all three env keys → copies audio to temporary workspace → exercises the unchanged host
+Wrong:   Release/product code reads model-backed env keys, or a CUDA test breaks CUDA_PATH to manufacture an error
+Correct: test module validates the required/optional env set → uses a CPU-only worker for deterministic cuda_not_built → copies audio to temporary workspace → exercises the unchanged host
 ```
 
 ## ASR Sidecar Process

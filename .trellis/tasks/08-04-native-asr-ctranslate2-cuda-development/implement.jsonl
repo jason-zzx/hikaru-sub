@@ -1,0 +1,10 @@
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Native model evidence, identity validation, privacy, frozen GPU/CPU RTF gates, and CTranslate2 regression requirements."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Existing development-only NativeAsrHost contracts, model-backed test seam, recovery, cancellation, and Release isolation."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Rust process/path/logging safety and required cargo validation."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Preserve the native worker to Rust host boundary without changing frontend or product routing."}
+{"file":".trellis/tasks/07-25-native-asr-migration/prd.md","reason":"Parent requirements and accepted development-GPU versus release-qualification boundary."}
+{"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Parent architecture, T06 handoff, T07 sequencing, and T14/T15 ownership."}
+{"file":".trellis/tasks/07-25-native-asr-migration/implement.md","reason":"Authoritative parent T07 deliverables, 20% paired speedup rule, downstream T08 dependency, and rollback boundary."}
+{"file":".trellis/tasks/08-04-native-asr-ctranslate2-cuda-development/research/cuda-development-design-inputs.md","reason":"Codebase-backed CUDA 12.8 build, device plumbing, attestation, benchmark, host, and CI recommendations for T07."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/selected-cpu-candidate-lock.md","reason":"Frozen T06 model, algorithm, CPU compute, runtime identities, evidence commands, and privacy boundary reused by paired measurements."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/cpu-rtf-diagnosis.md","reason":"Authoritative private 120-second slice identity and prior same-binary timing methodology."}

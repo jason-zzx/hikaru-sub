@@ -24,7 +24,8 @@
     "07-25-native-asr-crispasr-poc",
     "08-02-native-asr-worker-protocol",
     "08-02-native-asr-rust-job-host",
-    "08-02-native-asr-ctranslate2-whisper"
+    "08-02-native-asr-ctranslate2-whisper",
+    "08-04-native-asr-ctranslate2-cuda-development"
   ],
   "parent": null,
   "relatedFiles": [],

@@ -1,6 +1,6 @@
 # 原生 ASR 迁移实施总计划
 
-> 状态：父任务保持 `planning`；T01～T05 已完成并归档，Gate 0/1 已关闭；T06 已选择并经独立复核第三闭合分支 `migration-handoff-stop-revise`，其 Candidate B reviewed checkpoint 已停止但未资格化。Candidate A selected CPU candidate 因 large-v3 long-v1 7 个 confirmed gap 为 `stop-revise`；后续唯一 Candidate B direct ORT 1.28.0 CPU + faster-whisper 1.2.1 Silero V6 已实现并经最后 path-binding review 重冻结：short 全通过，但 medium 仍有 1 个 confirmed gap，因此在 long 前停止为 `stop-revise`。large-v2 与其余模型保持 `blocked-not-run`，ORT/VAD 不进入 T13 package input，native faster-whisper route 保持 disabled。当前下一步为 T07 development CUDA，用于在 T08 及后续质量工作前缩短迭代时间；这不构成 GPU-required 或发布资格结论，父任务不直接启动实现。
+> 状态：父任务保持 `planning`；T01～T05 已完成并归档，Gate 0/1 已关闭；T06 已选择并经独立复核第三闭合分支 `migration-handoff-stop-revise`，其 Candidate B reviewed checkpoint 已停止但未资格化。Candidate A selected CPU candidate 因 large-v3 long-v1 7 个 confirmed gap 为 `stop-revise`；后续唯一 Candidate B direct ORT 1.28.0 CPU + faster-whisper 1.2.1 Silero V6 已实现并经最后 path-binding review 重冻结：short 全通过，但 medium 仍有 1 个 confirmed gap，因此在 long 前停止为 `stop-revise`。large-v2 与其余模型保持 `blocked-not-run`，ORT/VAD 不进入 T13 package input，native faster-whisper route 保持 disabled。T07 development CUDA 已完成并记录 `development-gpu-ready`；当前下一步为 T08 Kotoba，重复字幕质量迭代使用该 GPU lane。这不构成 GPU-required 或发布资格结论，父任务不直接启动实现。
 
 ## Execution Policy
 
@@ -40,7 +40,7 @@ Allowed parallel groups:
 
 - T02 and T03 after T01.
 - T06 after T05. T07 starts after T06 exposes the production-worker seam and completes the CPU root-cause checkpoint; it does not depend on proving a CPU ceiling and does not wait for a GPU-required decision.
-- T08 Kotoba follows T07. `development-gpu-ready` means repeated quality iteration stays on GPU even when CER/gap/timeline gates fail. CPU development fallback is allowed only for `development-gpu-unavailable` or `development-gpu-no-speedup`, without implying that ordinary native faster-whisper is qualified or enabled.
+- T08 Kotoba follows T07. T07 is now `development-gpu-ready` with short-v1/locked-120s GPU-to-CPU warmed-median ratios `0.1090/0.1313`, so repeated T08 quality iteration stays on GPU even when CER/gap/timeline gates fail. This does not imply that ordinary native faster-whisper is qualified or enabled.
 - T10 and T11 may overlap after T09 stabilizes both the CrispASR core and its ignored-local development GPU seam. An attested, repeatably faster GPU seam remains the development device through CER/gap/segmentation/alignment failures; required CPU regression and final publishable-device gates remain separate.
 - T12 may start from proven model formats and overlap engine productization; T13 waits for the T06 production worker, then may overlap T08～T11.
 - T14 starts after final backend/device inputs and the CPU package contract stabilize; T15 starts after engine pipelines and formal GPU packs are measurable.
@@ -233,10 +233,10 @@ This is an early development lane, not a managed runtime pack or release qualifi
 
 Deliverables:
 
-- Build the pinned CTranslate2 source with CUDA 12 and cuDNN 9 below an ignored task-local root; do not alter the main installer, portable ZIP or trusted runtime manifests.
+- Build the pinned CTranslate2 source with the declared Windows CUDA 12.8 toolkit below an ignored task-local root. The primary development identity follows the upstream 4.8.0 Windows CMake shape with `WITH_CUDA=ON` and `WITH_CUDNN=OFF`; cuDNN 9.10.2 is reviewed but not downloaded/installed unless a separately reviewed root-cause revision requires a new build identity. Do not alter the main installer, portable ZIP or trusted runtime manifests.
 - Reuse the same `hikaru-asr-worker`, protocol v1, CTranslate2 backend and selected algorithm; add only resolved `device=cuda` execution required by the existing route matrix.
-- Record actual GPU model/driver, loaded CUDA/cuDNN/CT2 modules and requested/resolved device rather than trusting a device string.
-- Run paired warmed CPU/GPU diagnostics on the same worker, model, config and audio; use repeated median inference RTF to distinguish real speedup from measurement noise, report the release target `RTF <=0.5` separately, and leave a repeatable command/path for T08 quality iteration.
+- Record actual GPU model/driver, loaded CUDA/CT2 modules and requested/resolved device rather than trusting a device string; the primary no-cuDNN identity rejects unexpected `cudnn*.dll` modules.
+- Run paired CPU/GPU diagnostics on short-v1 and the locked medium-v1 first-120s slice. Each sample/device uses `1 cold + 3 warm`; both GPU warmed median RTF values must be at most `80%` of the paired CPU median to retain GPU for T08. Report the release target `RTF <=0.5` separately.
 - Preserve T05 process isolation, cancellation and stdout/stderr contracts.
 
 Depends on: T04/T05 plus the T06 production-worker seam and completed CPU root-cause checkpoint; it does not require T06 task completion.
@@ -246,10 +246,17 @@ Exit criteria:
 - The ignored-local CUDA build loads on the declared machine and produces legal protocol output through the existing host.
 - Actual GPU execution and loaded modules are attested; CPU execution mislabeled as CUDA fails closed.
 - Diagnostic evidence is explicitly non-publishable and does not claim downloader, fallback, pack reproducibility or release qualification.
-- Publish exactly one development result: `development-gpu-ready` when actual CUDA execution is attested and warmed median RTF is repeatably better than the paired CPU baseline; `development-gpu-unavailable` when the declared machine cannot build/load/run the CUDA path; or `development-gpu-no-speedup` when valid CUDA execution has no repeatable performance advantage. CER, confirmed gaps, segmentation and timeline quality do not affect this result.
+- Publish exactly one development result: `development-gpu-ready` when actual CUDA execution is attested and both sample GPU warmed medians are at most `80%` of CPU; `development-gpu-unavailable` only from a validated configure/build/load/device failure envelope; or `development-gpu-no-speedup` when valid CUDA execution completes but either sample misses the `20%` speedup. Invalid/incomplete evidence publishes no result. CER, confirmed gaps, segmentation and timeline quality do not affect this result.
 - Proving a CPU ceiling is not an activation condition. `RTF <=0.5` remains a T15 publishable-pack gate rather than a hard requirement for retaining a development GPU path that is already faster than CPU; all formal seven-model qualification/publication remains T15 work.
 
 Rollback point: delete only ignored development CUDA outputs and keep the CPU worker/protocol unchanged.
+
+Verified T07 result:
+
+- `development-gpu-ready` on RTX 3070 device 0/FLOAT16, CUDA 12.8.93, CTranslate2 4.8.0, `WITH_CUDNN=OFF`.
+- short-v1 CPU/GPU warmed median RTF `0.577901/0.062971` (`0.1090` ratio).
+- locked medium-v1 first-120s CPU/GPU warmed median RTF `0.591635/0.077707` (`0.1313` ratio).
+- CUDA-only module set: `nvcuda.dll`, `cublas64_12.dll`, `cublasLt64_12.dll`; no cuDNN. Development evidence is non-publishable and quality-independent.
 
 #### T08 - Productize Kotoba And Legacy CT2 Cache Compatibility
 
@@ -570,6 +577,7 @@ Stage 0 child-task creation:
 - [x] T03 proved the CrispASR ABI/runtime viable, with Reazon `proceed-with-named-risks` and Parakeet/Qwen `stop-revise`; Gate 0 backend/runtime feasibility is closed.
 - [x] User approved moving development GPU integration earlier: normal-numbered T07 provides CTranslate2 CUDA development immediately after the T06 CPU checkpoint and before T08 regardless of CPU-ceiling outcome; T09 provides the CrispASR development GPU seam before T10/T11. Formal packs/qualification remain T14/T15, and development GPU evidence never substitutes for release evidence.
 - [x] User approved T06 hard gates for `large-v3` and `large-v2` long audio; ordinary faster-whisper remains mandatory and all models remain visible in T17 even when native qualification fails.
+- [x] T07 completed the ignored-local CTranslate2 CUDA lane and independently froze `development-gpu-ready`; T08 now uses GPU for repeated subtitle-quality iteration, while T14/T15 remain the only pack/release qualification owners.
 - [x] T04-T06 were created as the next planning batch and linked to this parent.
 - [x] T04 completed protocol/limits/fake-worker implementation, independent check, commit and archive.
 - [x] T05 completed generic Rust host/active gate/reducer/recovery/process-tree lifecycle, independent check, commit and archive; Gate 1 is closed.

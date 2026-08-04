@@ -149,6 +149,87 @@ Wrong: use every Qwen aligner character range as a cue, expand zero-duration ran
 Correct: retain raw ranges, reproduce the exact pinned upstream source grouping, accept only legal ForcedAligner-derived final segments, and fail closed otherwise.
 ```
 
+## Scenario: Native CTranslate2 Development CUDA Evidence
+
+### 1. Scope / Trigger
+
+Use this contract when the existing native CTranslate2 Whisper worker is given an ignored-local development CUDA build for faster model-backed iteration. This lane proves truthful execution and relative speed on one declared machine; it does not qualify a runtime pack, release route, subtitle quality, installer input, downloader, or device matrix.
+
+### 2. Signatures
+
+```cpp
+// CMake option: HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT=ON
+// CMake preset: windows-x64-ct2-cuda-development
+
+enum class ExecutionDevice { Cpu, Cuda };
+enum class ExecutionComputeType { Int8, Float16 };
+
+struct BackendExecutionConfig {
+  ExecutionDevice device;
+  ExecutionComputeType compute_type;
+  int device_index;
+};
+
+BackendExecutionConfig cpu_execution_config();   // CPU / INT8 / index 0
+BackendExecutionConfig cuda_execution_config();  // CUDA / FLOAT16 / index 0
+```
+
+The protocol request remains v1 with `device="cpu" | "cuda"`. The existing CTranslate2 evidence runner accepts the development device out of band, and the stdlib publisher freezes modules then publishes paired measurements from ignored raw JSON.
+
+### 3. Contracts
+
+- The primary Windows development identity uses the pinned CTranslate2 source, CUDA 12.8, exact architecture `8.6`, `WITH_CUDA=ON`, `CUDA_DYNAMIC_LOADING=ON`, and `WITH_CUDNN=OFF`. It must not download, install, link, or load cuDNN.
+- The CUDA-enabled worker is the same worker used for paired CPU measurements. CPU remains INT8; CUDA is device 0/FLOAT16. Algorithm, model, tokenizer, protocol, and source identity stay fixed, and there is no automatic CPU fallback.
+- CUDA setup is fail-closed before `ready`: CPU-only builds return `cuda_not_built`; missing device 0 returns `cuda_device_unavailable`; unsupported FP16 returns `cuda_compute_type_unsupported`; driver/runtime failure returns `cuda_runtime_failed`; CUDA model construction failure returns `cuda_model_load_failed`. `ready.device="cuda"` is legal only after explicit CUDA model construction succeeds.
+- Device identity comes from CUDA Driver API queries bound to the loaded `nvcuda.dll`, not caller-provided labels. Raw evidence records GPU name, compute capability, driver/API versions, executable/DLL/model/config/audio hashes, and actual loaded modules.
+- CUDA child processes use an ordered restricted PATH: task-local runner/bin, locked CUDA Toolkit `bin`, then Windows System32. CUDA DLLs are not copied into tracked or publishable output.
+- Run separate completed CPU and CUDA discovery processes under the same CUDA-enabled binary. Derive shared, CPU-only, and CUDA-only required module sets, freeze them, then rerun every formal measurement from clean processes. Discovery rows never enter performance medians.
+- Formal short-v1 and locked first-120s measurements each use separate CPU/GPU processes with one backend and exactly `1 cold + 3 warm`. The publisher uses the median of the three warm inference RTF values. Both GPU medians must be `<= 0.80 * CPU median` for `development-gpu-ready`.
+- `development-gpu-unavailable` accepts only a validated configure/build failure envelope or structured pre-ready CUDA runtime/device/compute/model-construction failure. Completed CUDA with either sample missing the 20% threshold is `development-gpu-no-speedup`. Missing/incomplete/drifted evidence publishes no result.
+- CER, confirmed gaps, segmentation, and timeline quality are not read and never choose the development device. GPU RTF `<=0.5` is reported only as a future release diagnostic.
+- Tracked output contains only sanitized locks, hashes, aggregate timings, root roles, limitations, and one development result. Models, audio, transcripts, raw module paths, binaries, build trees, and raw JSON stay under the exact ignored task-local root.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| CPU-only worker receives CUDA | Structured `cuda_not_built` before `ready`; no fallback |
+| Driver/runtime/device 0 unavailable | Safe pre-ready CUDA error; eligible for a validated unavailable envelope |
+| Device 0 lacks FP16 | `cuda_compute_type_unsupported` before `ready` |
+| Requested CUDA resolves or attests as CPU | Reject evidence and worker/host route equality |
+| Caller-supplied GPU label differs from queried device | Ignore the label; bind queried CUDA Driver API identity |
+| cuDNN module loads in the primary identity | Reject evidence |
+| Shared or device-specific required module/hash/root/PATH differs | Reject publication; do not publish unavailable |
+| Formal row differs in worker/runner/model/config/audio identity | Reject the evidence set |
+| Formal process lacks exactly one cold plus three warm completed generations | Publish no result |
+| Either GPU warm median is above `0.80 * CPU` after valid completion | `development-gpu-no-speedup` |
+| Subtitle quality fails while GPU speed evidence passes | Keep `development-gpu-ready`; continue quality work on GPU |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** one no-cuDNN CUDA-enabled worker completes separate CPU/CUDA discovery, freezes actual module sets, reruns both samples as `1 cold + 3 warm`, attests device 0 from the driver API, and deterministically publishes the paired speed decision.
+- **Base:** CUDA cannot configure or fails before `ready` with a validated runtime/device/model-construction envelope; publish `development-gpu-unavailable` and keep CPU/protocol builds unchanged.
+- **Bad:** trust `device="cuda"`, a CLI GPU name, sibling DLL filenames, one cold run, or subtitle CER as proof; copy CUDA DLLs into tracked output; treat missing raw files or a validator error as GPU unavailable; or represent development evidence as a release pack.
+
+### 6. Tests Required
+
+- Configure/build/test protocol-only, CPU CT2, and opt-in CUDA CT2 presets; the first two must not require CUDA environment input.
+- Unit-test CPU default mapping, CUDA device 0/FLOAT16 mapping, CPU-only `cuda_not_built`, unsupported device/compute failure, no fallback, and truthful `ready.device`.
+- Evidence tests assert queried GPU/driver identity, restricted PATH roots, separate discovery rows, shared/CPU-only/CUDA-only module sets, no cuDNN, actual loaded-module hashes, cold process wall, completed generation traces, and four formal raw hashes.
+- Publisher mutation tests reject device/compute/GPU/module/PATH/worker/model/config/audio/repeat/timing/raw-path/failure-envelope drift and correlated root rewrites; run twice and require byte-identical output.
+- Rust model-backed tests cover CUDA success, deterministic CPU-only `cuda_not_built`, ready-derived cancellation within two seconds, recovery, reap, and active-gate release.
+- Run the full Rust suite, `pnpm build`, benchmark self-check/tests, `git diff --check`, privacy scans, and active/archive `git check-ignore` assertions.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: request device=cuda, observe a fast run, and declare the GPU lane ready.
+Correct: construct CUDA device 0/FLOAT16 explicitly, query the real device through nvcuda, freeze loaded module sets, then compare both locked samples with independent 1-cold/3-warm processes.
+
+Wrong: a CUDA validation error or subtitle-quality failure means fall back to CPU.
+Correct: invalid evidence publishes no result; subtitle quality remains GPU-side algorithm work. CPU fallback is authorized only by validated unavailable or completed no-speedup evidence.
+```
+
 ## Scenario: Native Candidate B Silero V6 Evidence
 
 ### 1. Scope / Trigger
