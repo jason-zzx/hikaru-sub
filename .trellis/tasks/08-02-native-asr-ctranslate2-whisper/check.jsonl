@@ -1,4 +1,4 @@
-{"file":".trellis/spec/asr/engine-plugins.md","reason":"Check ordinary faster-whisper scope, model list, large-v2 regression and T07 Kotoba separation."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Check ordinary faster-whisper scope, model list, large-v2 regression and T08 Kotoba separation."}
 {"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check shared comparator reuse, per-case gates, source/model windows, identity and privacy remain fail-closed."}
 {"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Check the real worker reuses T05 host, managed-workspace, terminal/recovery and Release-legacy contracts rather than adding a parallel lifecycle."}
 {"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Check every qualification claim uses the authoritative corpus and frozen absolute budgets."}
@@ -8,3 +8,7 @@
 {"file":"native-asr/protocol-v1-limits.json","reason":"Check C++ and Rust tests continue using the canonical bounds without drift."}
 {"file":".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/planning-evidence.md","reason":"Check final host handoff, model visibility/disposition policy, candidate minimality and later-task boundaries."}
 {"file":".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/start-gate-lock.md","reason":"Check source/model/license locks, the single conditional VAD candidate, Tiny limitation and ignored local boundary are enforced without overclaiming final run readiness."}
+{"file":".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/candidate-b-lock.md","reason":"Check the sole ORT 1.28.0 CPU executor, exact faster-whisper V6 behavior/asset/schema, attribution, fail-closed no-fallback boundary, conditional packaging and new-identity large-v3-only gate."}
+{"file":".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/python-large-v3-reference-report.md","reason":"Check the same-corpus Python large-v3 diagnostic comparison is deterministic, sanitized, explicitly non-gating and does not replace native absolute qualification gates."}
+{"file":"native-asr/CMakeLists.txt","reason":"Check protocol/fake-worker configuration keeps the CT2/model backend disabled by default while explicit T06 model builds opt in."}
+{"file":"native-asr/CMakePresets.json","reason":"Check windows-x64-release is protocol/fake-worker only and windows-x64-ct2-release explicitly enables the model-backed worker."}

@@ -1,0 +1,166 @@
+{
+  "candidate": "selected-cpu-beam1-no-history",
+  "decision": "stop-revise",
+  "identity": {
+    "acceptedShortMediumEvidenceSha256": "05beeec3410e7cef720bf73b1afebe0e371bfe81ec359f265575a3090809c3b4",
+    "candidateLockSha256": "0be239a83640c65f740f169da6c37a1141d3e92140d829243787671f9f410083",
+    "configSha256": "77120c8543e780231d8c65b3868c07f44d685a22a136da56c64e6a6922d4f9e6",
+    "frozenSelectedAdapterSha256": "4c650fc4f6e07ab5c2fa0315c722966499001622868a861d223be368246835da",
+    "frozenShortMediumPublisherSha256": "0b041931680b1de1aaf8a540ef5f4c07f6e3b9fc401f7d692e36d6854cffc300",
+    "longAdaptedResultSha256": "d9f3233281b4b585a2e57befdae6790541e1e1b400563ca1b3b54939283a396e",
+    "longAdapter": {
+      "sha256": "1088df4f30d9a1cb78327788bbe39f0e9cbb396ca1d762648456356acb5dc14e",
+      "sizeBytes": 599
+    },
+    "longRawSha256": "4ebb28126703b5ebb88184e78b6b4c7b181784e9f0b039bbd6d1fd9f4b84b32c",
+    "modelBinSha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+    "modelFiles": [
+      {
+        "name": "config.json",
+        "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+        "sizeBytes": 2394
+      },
+      {
+        "name": "model.bin",
+        "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+        "sizeBytes": 3087284237
+      },
+      {
+        "name": "preprocessor_config.json",
+        "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+        "sizeBytes": 340
+      },
+      {
+        "name": "tokenizer.json",
+        "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+        "sizeBytes": 2480617
+      },
+      {
+        "name": "vocabulary.json",
+        "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+        "sizeBytes": 1068114
+      }
+    ],
+    "modelId": "Systran/faster-whisper-large-v3",
+    "modelRevision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "publisher": {
+      "sha256": "cc369d7f2ab2e24eed420f1b89d678404699d95327c8c6aa07ba950caa160d2c",
+      "sizeBytes": 16698
+    },
+    "runtime": {
+      "computeType": "int8",
+      "ctranslate2Version": "4.8.0",
+      "device": "cpu",
+      "measurementExecutable": {
+        "sha256": "9acbf01a68bb95bac54bd2aab67a83c48ab240900d1317f55acb5861028e8254",
+        "sizeBytes": 562688
+      },
+      "productionWorker": {
+        "sha256": "cb77a661a9cca23895cd8c9a56fe18e1a99bdeb324f30390f7f38b77aa0764ad",
+        "sizeBytes": 459776
+      },
+      "requiredDlls": [
+        {
+          "name": "ctranslate2.dll",
+          "sha256": "e1204cfe83cd82916807d64060d896f6e244e139be5c9850838c5fe2da6e6e59",
+          "sizeBytes": 22417408
+        },
+        {
+          "name": "hikaru_asr_tokenizer.dll",
+          "sha256": "892142f8f3e64b77a835c1fa234fcea3bccc854faa9238f9d4be4a03ff24fc9d",
+          "sizeBytes": 2137088
+        }
+      ]
+    }
+  },
+  "largeV3LongV1": {
+    "allApplicableGatesPass": false,
+    "caseId": "long-v1",
+    "gates": {
+      "cerAtMost0_35": true,
+      "confirmedSpeechGapsZero": false,
+      "cpuInferenceRtfAtMost1_0": true,
+      "peakRssAtMost6GiB": true,
+      "shortColdWallAtMost120s": null,
+      "subtitleScaleUsable": true,
+      "timelineErrorsZero": true
+    },
+    "ignoredEvidence": {
+      "adaptedResultSha256": "d9f3233281b4b585a2e57befdae6790541e1e1b400563ca1b3b54939283a396e",
+      "rawSha256": "4ebb28126703b5ebb88184e78b6b4c7b181784e9f0b039bbd6d1fd9f4b84b32c"
+    },
+    "measurements": {
+      "cer": 0.26533295227207776,
+      "coldProcessWallMs": 2293239.2434,
+      "confirmedSpeechGapsAtLeast1500Ms": 7,
+      "inferenceRtf": 0.5502425504345193,
+      "peakProcessRssBytes": 3433250816,
+      "segmentCount": 1156,
+      "timelineErrors": 0,
+      "warmInferenceRtfMedian": null
+    },
+    "provenance": {
+      "decodedTimestampSeekWindows": 123,
+      "expectedSourceFrames": 414424,
+      "fallbackCallCount": 0,
+      "finalSeekFrames": 414424,
+      "generationCallCount": 148,
+      "historyDisabledEveryWindow": true,
+      "modelWindowDurationMs": 30000,
+      "noSpeechWindows": 0,
+      "segmentTraceProvenanceComplete": true,
+      "sourceAndModelWindowProvenanceComplete": true,
+      "sourceWindowEndSeekWindows": 25,
+      "traceCount": 148,
+      "wavEndBoundedSegmentCount": 1
+    },
+    "samples": {
+      "cold": 1,
+      "warm": 0
+    },
+    "seekEvidence": {
+      "decodedTimestampSeekWindows": 123,
+      "noSpeechWindows": 0,
+      "sourceWindowEndSeekWindows": 25,
+      "windowCount": 148
+    },
+    "subtitleDistribution": {
+      "characters": {
+        "count": 1156,
+        "maximum": 81,
+        "median": 14.0,
+        "minimum": 1,
+        "p95": 34.0
+      },
+      "durationMs": {
+        "count": 1156,
+        "maximum": 29980,
+        "median": 2680.0,
+        "minimum": 100,
+        "p95": 7210.0
+      }
+    }
+  },
+  "largeV3ShortMedium": {
+    "caseIds": [
+      "short-v1",
+      "medium-v1"
+    ],
+    "evidenceSha256": "05beeec3410e7cef720bf73b1afebe0e371bfe81ec359f265575a3090809c3b4",
+    "status": "pass"
+  },
+  "largeV3Status": "stop-revise",
+  "manifest": {
+    "assSha256": "7954ce24af05dca37b2930136c83ee722e80fd637ef298cc7eeb47f29cf8c6f3",
+    "audioSha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+    "caseId": "long-v1",
+    "corpusId": "hikaru-user-ja-ground-truth-v1",
+    "coverageLimitation": "low-volume is absent",
+    "durationMs": 4144235,
+    "sha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+  },
+  "nextGate": "stop-no-other-model",
+  "privacy": "sanitized identities, aggregates, distributions, and hashes only; no transcript, token IDs, segments, paths, model bytes, or private media",
+  "qualificationEligible": false,
+  "schemaVersion": 1
+}

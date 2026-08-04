@@ -13,22 +13,46 @@
       "binaryDir": "${sourceDir}/build/windows-x64-protocol",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_TESTING": "ON"
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "BUILD_TESTING": "ON",
+        "HIKARU_ASR_BUILD_CT2_WORKER": "OFF"
       },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
+    },
+    {
+      "name": "windows-x64-ct2-release",
+      "displayName": "Windows x64 CTranslate2 Release",
+      "inherits": "windows-x64-release",
+      "cacheVariables": {
+        "HIKARU_ASR_BUILD_CT2_WORKER": "ON"
+      }
     }
   ],
   "buildPresets": [
+    {
+      "name": "windows-x64-ct2-release",
+      "configurePreset": "windows-x64-ct2-release"
+    },
     {
       "name": "windows-x64-release",
       "configurePreset": "windows-x64-release"
     }
   ],
   "testPresets": [
+    {
+      "name": "windows-x64-ct2-release",
+      "configurePreset": "windows-x64-ct2-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
     {
       "name": "windows-x64-release",
       "configurePreset": "windows-x64-release",

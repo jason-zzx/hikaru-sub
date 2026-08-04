@@ -1560,6 +1560,54 @@ mod tests {
         path.is_file().then_some(path)
     }
 
+    fn production_worker_inputs() -> Option<(PathBuf, PathBuf, PathBuf)> {
+        let values = [
+            std::env::var_os("HIKARU_ASR_PRODUCTION_WORKER"),
+            std::env::var_os("HIKARU_ASR_CT2_MODEL_PATH"),
+            std::env::var_os("HIKARU_ASR_CT2_AUDIO_PATH"),
+        ];
+        if values.iter().all(Option::is_none) {
+            return None;
+        }
+        let worker = PathBuf::from(values[0].clone().expect("production worker env missing"));
+        let model = PathBuf::from(values[1].clone().expect("CT2 model env missing"));
+        let audio = PathBuf::from(values[2].clone().expect("CT2 audio env missing"));
+        assert!(worker.is_file(), "production worker env is not a file");
+        assert!(model.is_dir(), "CT2 model env is not a directory");
+        assert!(audio.is_file(), "CT2 audio env is not a file");
+        Some((worker, model, audio))
+    }
+
+    fn production_launch(
+        temp: &TempDir,
+        job_id: &str,
+        model: PathBuf,
+        source_audio: &Path,
+        use_vad: bool,
+        vad_config: Option<VadConfig>,
+    ) -> ResolvedNativeLaunch {
+        let cache = temp.path().join("cache");
+        let workspace = cache.join("workspace").join("job");
+        let output = temp.path().join("output");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        let audio = workspace.join("audio.wav");
+        fs::copy(source_audio, &audio).unwrap();
+        ResolvedNativeLaunch::resolve(
+            job_id.into(),
+            "faster-whisper".into(),
+            vec![("model".into(), model)],
+            "cpu".into(),
+            "ja".into(),
+            audio,
+            output.join("result.ass"),
+            &cache,
+            use_vad,
+            vad_config,
+        )
+        .unwrap()
+    }
+
     #[cfg(windows)]
     fn process_count(executable: &Path) -> usize {
         let Some(name) = executable.file_name().and_then(|value| value.to_str()) else {
@@ -1983,6 +2031,151 @@ mod tests {
                 "scenario {scenario} leaked active slot"
             );
         }
+    }
+
+    #[test]
+    fn production_worker_runs_no_vad_and_candidate_b_through_the_native_host() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some((worker, model, audio)) = production_worker_inputs() else {
+            eprintln!("T06 production worker/model/audio env not set; skipping real CT2 host test");
+            return;
+        };
+        for (job_id, use_vad) in [
+            ("production-ct2-no-vad", false),
+            ("production-ct2-candidate-b", true),
+        ] {
+            let temp = tempfile::tempdir().unwrap();
+            let gate = Arc::new(ActiveJobGate::default());
+            let host = NativeAsrHost::new(worker.clone(), vec![], Arc::clone(&gate)).unwrap();
+            let launch = production_launch(
+                &temp,
+                job_id,
+                model.clone(),
+                &audio,
+                use_vad,
+                None,
+            );
+            let recovery = launch.recovery_path.clone();
+            let output = launch.output_ass_path.clone();
+            let stderr_log = launch.stderr_log_path.clone();
+            host.start(launch, gate.reserve().unwrap()).unwrap();
+
+            let deadline = Instant::now() + Duration::from_secs(180);
+            let snapshot = loop {
+                let snapshot = host.snapshot(job_id, true).unwrap().unwrap();
+                if snapshot["status"] == "completed" && host.is_reaped(job_id) {
+                    break snapshot;
+                }
+                if Instant::now() >= deadline {
+                    panic!(
+                        "real CT2 worker did not complete: snapshot={snapshot}; stderr={}",
+                        fs::read_to_string(&stderr_log).unwrap_or_default()
+                    );
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            };
+            assert_eq!(snapshot["durationMs"], 24_102);
+            assert_eq!(snapshot["processedMs"], 24_102);
+            assert_eq!(snapshot["progress"], 1.0);
+            assert!(snapshot["segmentCount"].as_u64().unwrap() > 0);
+            assert!(snapshot["error"].is_null());
+            let mut previous_start = -1;
+            for segment in snapshot["segments"].as_array().unwrap() {
+                let start = segment["startMs"].as_i64().unwrap();
+                let end = segment["endMs"].as_i64().unwrap();
+                assert!(start >= previous_start && start >= 0 && start < end && end <= 24_102);
+                assert!(!segment["text"].as_str().unwrap().is_empty());
+                previous_start = start;
+            }
+            assert!(recovery.is_file());
+            assert!(output.is_file());
+            assert!(gate.current().is_none());
+        }
+    }
+
+    #[test]
+    fn production_worker_rejects_candidate_b_config_identity_drift() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some((worker, model, audio)) = production_worker_inputs() else {
+            eprintln!(
+                "T06 production worker/model/audio env not set; skipping real CT2 error test"
+            );
+            return;
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let gate = Arc::new(ActiveJobGate::default());
+        let host = NativeAsrHost::new(worker, vec![], Arc::clone(&gate)).unwrap();
+        let launch = production_launch(
+            &temp,
+            "production-ct2-vad-error",
+            model,
+            &audio,
+            true,
+            Some(VadConfig {
+                threshold: Some(0.6),
+                min_speech_duration_ms: None,
+                min_silence_duration_ms: None,
+                speech_pad_ms: None,
+                max_segment_duration_ms: None,
+            }),
+        );
+        let recovery = launch.recovery_path.clone();
+        host.start(launch, gate.reserve().unwrap()).unwrap();
+        let snapshot = wait_terminal(&host, "production-ct2-vad-error");
+        assert_eq!(snapshot["status"], "failed");
+        assert!(snapshot["error"]
+            .as_str()
+            .unwrap()
+            .starts_with("[vad_config_identity_mismatch]"));
+        assert!(recovery.is_file());
+        assert!(gate.current().is_none());
+    }
+
+    #[test]
+    fn cancelling_the_real_worker_never_publishes_completed() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some((worker, model, audio)) = production_worker_inputs() else {
+            eprintln!(
+                "T06 production worker/model/audio env not set; skipping real CT2 cancel test"
+            );
+            return;
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let gate = Arc::new(ActiveJobGate::default());
+        let host = NativeAsrHost::new(worker, vec![], Arc::clone(&gate)).unwrap();
+        let launch = production_launch(
+            &temp,
+            "production-ct2-cancel",
+            model,
+            &audio,
+            true,
+            None,
+        );
+        host.start(launch, gate.reserve().unwrap()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(60);
+        while host
+            .snapshot("production-ct2-cancel", false)
+            .unwrap()
+            .unwrap()["status"]
+            != "running"
+        {
+            assert!(
+                Instant::now() < deadline,
+                "real CT2 worker did not reach ready"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        host.cancel("production-ct2-cancel").unwrap();
+        let snapshot = wait_terminal(&host, "production-ct2-cancel");
+        assert_eq!(snapshot["status"], "cancelled");
+        assert!(snapshot["detectedLanguage"].is_null());
+        assert!(gate.current().is_none());
     }
 
     #[test]

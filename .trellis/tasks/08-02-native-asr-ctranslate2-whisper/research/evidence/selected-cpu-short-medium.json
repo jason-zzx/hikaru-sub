@@ -1,0 +1,158 @@
+{
+  "candidate": "selected-cpu-beam1-no-history",
+  "decision": "short-medium-pass-long-pending",
+  "historicalEvidence": {
+    "candidateA": "preserved separately in candidate-a-decision.json and ctranslate2-whisper-report.md",
+    "cpuRtfDiagnostic": "preserved separately in cpu-rtf-diagnosis.md",
+    "decodeSelection": "preserved separately in decode-selection.json and decode-selection.md"
+  },
+  "identity": {
+    "candidateLockSha256": "0be239a83640c65f740f169da6c37a1141d3e92140d829243787671f9f410083",
+    "configSha256": "77120c8543e780231d8c65b3868c07f44d685a22a136da56c64e6a6922d4f9e6",
+    "modelBinSha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+    "modelRevision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "runtime": {
+      "computeType": "int8",
+      "ctranslate2Version": "4.8.0",
+      "device": "cpu",
+      "measurementExecutable": {
+        "sha256": "9acbf01a68bb95bac54bd2aab67a83c48ab240900d1317f55acb5861028e8254",
+        "sizeBytes": 562688
+      },
+      "productionWorker": {
+        "sha256": "cb77a661a9cca23895cd8c9a56fe18e1a99bdeb324f30390f7f38b77aa0764ad",
+        "sizeBytes": 459776
+      },
+      "requiredDlls": [
+        {
+          "name": "ctranslate2.dll",
+          "sha256": "e1204cfe83cd82916807d64060d896f6e244e139be5c9850838c5fe2da6e6e59",
+          "sizeBytes": 22417408
+        },
+        {
+          "name": "hikaru_asr_tokenizer.dll",
+          "sha256": "892142f8f3e64b77a835c1fa234fcea3bccc854faa9238f9d4be4a03ff24fc9d",
+          "sizeBytes": 2137088
+        }
+      ]
+    }
+  },
+  "largeV3": {
+    "longV1": "not-run",
+    "measuredCases": [
+      {
+        "allApplicableGatesPass": true,
+        "caseId": "short-v1",
+        "gates": {
+          "cerAtMost0_35": true,
+          "confirmedSpeechGapsZero": true,
+          "cpuInferenceRtfAtMost1_0": true,
+          "peakRssAtMost6GiB": true,
+          "shortColdWallAtMost120s": true,
+          "timelineErrorsZero": true
+        },
+        "ignoredEvidence": {
+          "adaptedResultSha256": "f4fe1515275b6b8f638569334406b3a10577755d21218e8ba3cb585f2d49d3e1",
+          "rawSha256": "1d559f9a68c4fc1bcd5acc820a0b650d58a30b10654ed31ef245a088bfee8166"
+        },
+        "measurements": {
+          "cer": 0.26666666666666666,
+          "coldProcessWallMs": 28341.8491,
+          "confirmedSpeechGapsAtLeast1500Ms": 0,
+          "inferenceRtf": 0.6366991494481786,
+          "peakProcessRssBytes": 3433029632,
+          "segmentCount": 5,
+          "timelineErrors": 0,
+          "warmInferenceRtfMedian": 0.622985121566675
+        },
+        "samples": {
+          "cold": 1,
+          "warm": 3
+        },
+        "seekEvidence": {
+          "decodedTimestampSeekWindows": 0,
+          "noSpeechWindows": 0,
+          "sourceWindowEndSeekWindows": 1,
+          "windowCount": 1
+        },
+        "subtitleDistribution": {
+          "characters": {
+            "count": 5,
+            "maximum": 32,
+            "median": 23,
+            "minimum": 11,
+            "p95": 30.599999999999998
+          },
+          "durationMs": {
+            "count": 5,
+            "maximum": 5440,
+            "median": 4600,
+            "minimum": 4380,
+            "p95": 5388.0
+          }
+        }
+      },
+      {
+        "allApplicableGatesPass": true,
+        "caseId": "medium-v1",
+        "gates": {
+          "cerAtMost0_35": true,
+          "confirmedSpeechGapsZero": true,
+          "cpuInferenceRtfAtMost1_0": true,
+          "peakRssAtMost6GiB": true,
+          "shortColdWallAtMost120s": null,
+          "timelineErrorsZero": true
+        },
+        "ignoredEvidence": {
+          "adaptedResultSha256": "522baead4de92542f566de4b1d372836ac2d2bb95d8ab7544b8762d43c9a504a",
+          "rawSha256": "5cd366a7737b503138e629ca6f6d2ca602e32697ebf69e900f3d649e5ad2c3b0"
+        },
+        "measurements": {
+          "cer": 0.11340659340659341,
+          "coldProcessWallMs": 291070.8359,
+          "confirmedSpeechGapsAtLeast1500Ms": 0,
+          "inferenceRtf": 0.5592512011097035,
+          "peakProcessRssBytes": 3433033728,
+          "segmentCount": 181,
+          "timelineErrors": 0,
+          "warmInferenceRtfMedian": null
+        },
+        "samples": {
+          "cold": 1,
+          "warm": 0
+        },
+        "seekEvidence": {
+          "decodedTimestampSeekWindows": 16,
+          "noSpeechWindows": 0,
+          "sourceWindowEndSeekWindows": 2,
+          "windowCount": 18
+        },
+        "subtitleDistribution": {
+          "characters": {
+            "count": 181,
+            "maximum": 36,
+            "median": 10,
+            "minimum": 2,
+            "p95": 30.0
+          },
+          "durationMs": {
+            "count": 181,
+            "maximum": 8580,
+            "median": 2260,
+            "minimum": 120,
+            "p95": 5840.0
+          }
+        }
+      }
+    ],
+    "status": "qualification-pending"
+  },
+  "manifest": {
+    "corpusId": "hikaru-user-ja-ground-truth-v1",
+    "coverageLimitation": "low-volume is absent",
+    "sha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+  },
+  "privacy": "sanitized identities, aggregates, distributions, and hashes only; no transcript, token IDs, paths, model bytes, or private media",
+  "qualificationEligible": false,
+  "schemaVersion": 1
+}
