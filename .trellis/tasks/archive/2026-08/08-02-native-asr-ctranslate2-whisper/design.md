@@ -53,7 +53,7 @@ src-tauri/src/asr_worker.rs
 Task evidence:
 
 ```text
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/
   start-gate-lock.md
   algorithm-lock.md
   candidate-b-lock.md

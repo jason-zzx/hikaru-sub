@@ -90,7 +90,7 @@ if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
 endif()
 
 file(REAL_PATH
-  "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/local"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local"
   T06_LOCAL_ROOT_REAL)
 set(CT2_SOURCE_DIR "${T06_LOCAL_ROOT_REAL}/src/CTranslate2" CACHE PATH "Pinned CTranslate2 4.8.0 source")
 set(POCKETFFT_SOURCE_DIR "${T06_LOCAL_ROOT_REAL}/src/pocketfft" CACHE PATH "Pinned pocketfft source")

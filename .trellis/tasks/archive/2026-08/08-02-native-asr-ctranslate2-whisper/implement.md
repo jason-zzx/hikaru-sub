@@ -139,23 +139,23 @@ src-tauri/src/asr_worker.rs                  # focused test-module additions onl
 Task evidence:
 
 ```text
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/python-large-v3-reference-report.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/local/python-comparison/*  # ignored
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/start-gate-lock.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/algorithm-lock.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/candidate-b-lock.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/candidate-b-final-lock.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/candidate-b-short-medium-report.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/candidate-b-product-model-disposition.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/candidate_b_adapter.py
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/publish_candidate_b.py
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/product-model-disposition.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/ctranslate2-whisper-report.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/selected-cpu-long-report.md
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/publish_selected_cpu_long.py
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/selected_cpu_long_adapter.py
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/evidence/*
-.trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/local/*   # ignored
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/python-large-v3-reference-report.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/python-comparison/*  # ignored
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/start-gate-lock.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/algorithm-lock.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/candidate-b-lock.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/candidate-b-final-lock.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/candidate-b-short-medium-report.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/candidate-b-product-model-disposition.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/candidate_b_adapter.py
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/publish_candidate_b.py
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/product-model-disposition.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/ctranslate2-whisper-report.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/selected-cpu-long-report.md
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/publish_selected_cpu_long.py
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/selected_cpu_long_adapter.py
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/evidence/*
+.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/*   # ignored
 ```
 
 No T07/T08 or T12～T18 child files are modified; this task only records their handoff contracts. Candidate B planning acquisition/preflight remains under ignored `research/local/candidate-b/`.
@@ -165,13 +165,13 @@ No T07/T08 or T12～T18 child files are modified; this task only records their h
 Candidate B locked input/preflight identity:
 
 ```powershell
-$cb = ".trellis/tasks/08-02-native-asr-ctranslate2-whisper/research/local/candidate-b"
+$cb = ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/candidate-b"
 (Get-Item "$cb/downloads/onnxruntime-win-x64-1.28.0.zip").Length
 (Get-FileHash "$cb/downloads/onnxruntime-win-x64-1.28.0.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
 (Get-FileHash "$cb/model/silero_vad_v6.onnx" -Algorithm SHA256).Hash.ToLowerInvariant()
 & "$cb/preflight/run-preflight.cmd"
 Get-Content "$cb/preflight/result.txt"
-python ./.trellis/scripts/task.py validate .trellis/tasks/08-02-native-asr-ctranslate2-whisper
+python ./.trellis/scripts/task.py validate .trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper
 git check-ignore -v "$cb/preflight/result.txt"
 git diff --check
 git diff --cached --name-only
@@ -198,7 +198,7 @@ python scripts/asr-benchmark.py self-check
 python scripts/asr-benchmark.py validate --manifest .asr-benchmark/manifest.json --corpus-root .asr-benchmark
 python -m unittest discover -s asr-service/tests -p "test_asr_benchmark.py"
 cargo test --manifest-path src-tauri/Cargo.toml
-python ./.trellis/scripts/task.py validate .trellis/tasks/08-02-native-asr-ctranslate2-whisper
+python ./.trellis/scripts/task.py validate .trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper
 git diff --check
 ```
 
