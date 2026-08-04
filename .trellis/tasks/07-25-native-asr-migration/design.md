@@ -131,17 +131,28 @@ The worker does not create `SubtitleCue`, bilingual structure or ASS styles.
 | `reazonspeech-nemo` | CrispASR | Q8_0 default; evaluate official RNNT timestamps/chunking against ground truth |
 | `qwen3-asr` | CrispASR | Q4_K text model plus required Q4_K ForcedAligner; no synthetic timestamps |
 
-CTranslate2 productization supplies the native Whisper layers that CTranslate2 itself does not provide. Their tokenizer, feature, prompt, decoding, windowing, VAD and merge algorithms begin from official APIs/model cards and maintained community practice, then are selected by T01 ground-truth measurements. Current Python behavior is a diagnostic regression input, not a template.
+CTranslate2 productization supplies the native Whisper layers that CTranslate2 itself does not provide. Their tokenizer, feature, prompt, decoding, windowing, VAD and merge algorithms begin from official APIs/model cards and maintained community practice, then are selected by T01 ground-truth measurements. Current Python behavior is a diagnostic regression input, not a template. T06 first diagnoses CPU with a same-binary minimized matrix; T07 may then reuse the exact worker/backend/algorithm seam for ignored-local CUDA development without creating another protocol or route identity.
 
-The current `faster-whisper==1.2.1` / `ctranslate2==4.8.0` `large-v2` + `ja` + `>=600000ms` V4/seed/session/semantic path must be included in T06 product-model validation, but T06 may replace it with an authoritative, better-performing algorithm.
+The current T06 CPU checkpoint selects timestamp-driven/no-history/beam 1 through a bounded same-binary short-v1 beam 1/5 comparison. A separately locked and rebuilt identity passes authoritative large-v3 short/medium quality, CPU RTF, cold/RSS, timeline and gap gates, but its authoritative long-v1 retains 7 confirmed speech gaps `>=1500ms`. The sole Candidate B then implemented direct official ONNX Runtime 1.28.0 CPU with ordinary faster-whisper 1.2.1 Silero V6. Its last-review replacement identity `e687ead6...` binds actual CPU/module paths, the two restricted Windows PATH roots through `77f4714a...`, and fixed relative module layout `a650e185...`; the 21-case mutation matrix rejects a correlated all-module/all-root rewrite. Short passes every gate, while medium retains 1 confirmed gap despite passing CER/RTF/RSS/timeline. Candidate B is therefore `stop-revise`; long-v1, large-v2 and the seven-model matrix remain unstarted, the route is not qualified, and production routing remains unchanged.
+
+The current `faster-whisper==1.2.1` / `ctranslate2==4.8.0` `large-v2` + `ja` + `>=600000ms` V4/seed/session/semantic path remains a mandatory regression case. T06 owns it when the CPU branch remains viable; if T06 proves a CPU ceiling and closes with `gpu-required-pending`, T15 owns the corresponding full CUDA validation, including authoritative large-v2 long-v1.
+
+### T06 Closure Branch And Independent T08 Handoff
+
+T06 has three mutually exclusive reviewed closure branches. `cpu-qualified` requires the complete CPU matrix and hard gates. `gpu-required-pending` requires same-binary proof of a CPU ceiling and hands the worker seam to T07/T14/T15 without claiming GPU qualification. `migration-handoff-stop-revise` is allowed when the production worker, Candidate A selected CPU baseline, Candidate B reviewed stop-revise evidence, Python non-gating comparison, deterministic publishers, T05 host/protocol tests and downstream handoff are complete while no qualification branch is proven.
+
+The third branch is a truthful migration handoff, not a product qualification or GPU-required decision. It preserves unresolved large-v3/large-v2 hard gates, Candidate A's 7 long-v1 confirmed gaps, Candidate B's 1 medium confirmed gap, all remaining models as `blocked-not-run`, the `low-volume` corpus limitation, disabled native faster-whisper, and Release/default Python legacy. T07 remains optional ignored-local development CUDA only because CPU ceiling was not proven; T08 remains the next independent Kotoba/native CT2 task and may proceed while native faster-whisper stays disabled. ORT/VAD remains excluded from T13 packaging.
+
+
+For migration risk only, T06 also reran the existing Python `large-v3` CPU reference on the same T01 corpus. Python short/medium/long produced CER `0.358/0.099/0.295`, timeline errors `1/1/0`, and confirmed gaps `0/1/1`; the sanitized report is diagnostic evidence, not a relative gate. Candidate A remains the native CPU baseline, while its long seven-gap failure remains an absolute quality blocker.
 
 CrispASR productization likewise starts with documented upstream behavior. Python gap detection, chunking, Japanese segmentation, backfill and refresh patterns are copied only when ground-truth evidence and authoritative implementation guidance justify them, never to achieve Python parity.
 
 ## VAD Design
 
-The CPU runtime may reuse CrispASR's public VAD capability for CTranslate2 jobs when supported by official/stable APIs and ground-truth evaluation. `useVad=true` remains a product input contract, but the native algorithm need not copy Python VAD internals or fallback policy. Any fallback must remain observable, legal on the timeline, and pass the same authoritative corpus gates.
+For ordinary faster-whisper, T06's only authorized VAD candidate is the direct official ONNX Runtime 1.28.0 CPU session plus the exact faster-whisper 1.2.1 `silero_vad_v6.onnx` asset locked in T06's `research/candidate-b-lock.md`. It is fail-closed with no CrispASR/Python/Candidate-A fallback, executor abstraction, or protocol change. The existing `useVad` input remains part of protocol v1; qualification uses the frozen Candidate B configuration rather than request-specific VAD tuning.
 
-A small shared VAD companion model may be downloaded under `deps/models/shared/vad`. It remains separate from engine weights and follows the same manifest/hash rules.
+ORT/VAD was a conditional T13 CPU-runtime input only if Candidate B passed the new-identity large-v3 short/medium/long gate. Candidate B failed the medium gap gate, so it is not an accepted T13 package input; it remains outside T12 model download/readiness.
 
 ## Model And Runtime Layout
 
@@ -163,7 +174,7 @@ application resources/native-asr/windows-x64/cpu/
 └─ licenses/
 ```
 
-The CPU runtime is an application resource replaced with application upgrades. It is probed but cannot be independently cleaned. T13 produces optional CUDA/Vulkan packs and T14 qualifies device routing. A GPU pack overrides CPU only after identity, load and capability checks; any failure falls back to the built-in CPU runtime with one nonfatal UI notice. A failed pack is omitted from the release manifest and does not block CPU cutover.
+The CPU runtime is an application resource replaced with application upgrades. It is probed but cannot be independently cleaned. T07 provides an ignored-local development CTranslate2 CUDA lane before repeated engine work; it is not a managed or publishable pack. T14 produces optional CUDA/Vulkan packs and T15 qualifies device routing. A GPU pack overrides CPU only after identity, load and capability checks. Engines with a qualified CPU route fall back with one nonfatal notice; ordinary faster-whisper proven GPU-required instead becomes unavailable with an explanation when no qualified GPU exists. A failed pack is omitted from the release manifest and does not block unrelated CPU routes.
 
 The model manifest is application-owned trusted metadata. Download responses and bytes remain untrusted. Each file is written to a managed `.part`, validated by exact size and SHA-256, and atomically moved. A multi-file model receives its readiness marker only after every required role is valid.
 
@@ -230,13 +241,13 @@ The migration is capability-gated rather than a single irreversible switch:
 
 1. Establish authoritative ground-truth measurements and optional Python diagnostics, then run native PoCs without changing defaults.
 2. Introduce protocol and Rust host behind development-only native selection.
-3. Promote CTranslate2 engines after their independent CPU quality gate.
-4. Promote each CrispASR engine independently after its CPU gate.
-5. Build and qualify optional CUDA/Vulkan packs against the already-qualified engine pipelines; omit failed packs without delaying CPU release.
-6. Switch model/runtime UI and production packaging after required CPU paths are ready and GPU qualification outcomes are explicit.
+3. Productize ordinary CTranslate2 through the T06 CPU root-cause checkpoint; run T07 development CUDA before repeated CT2/engine work when CPU evidence requires or development speed benefits.
+4. Promote Kotoba and each CrispASR engine independently after their applicable quality gate.
+5. Build and qualify formal CUDA/Vulkan packs from accepted final engine identities; T07 diagnostics never substitute for T14/T15 evidence.
+6. Switch model/runtime UI and production packaging after required routes are ready and GPU qualification outcomes are explicit.
 7. Retain `python-legacy` for one stable source release cycle; do not bundle its runtime.
 
-Rollback is per engine and per runtime pack. A failed native route can return to Python legacy in development while unaffected native routes remain testable. The release package removes Python only after the full integration gate passes. A failed GPU pack is removed from the release manifest and falls back to CPU; it cannot delay an otherwise qualified CPU cutover.
+Rollback is per engine and per runtime pack. A failed native route can return to Python legacy in development while unaffected native routes remain testable. The release package removes Python only after the full integration gate passes. A failed GPU pack is removed from the release manifest; qualified CPU engines fall back to CPU, while a proven GPU-required ordinary faster-whisper route is unavailable/explained rather than silently running an unqualified CPU or Python path.
 
 ## Test Strategy
 
@@ -253,8 +264,8 @@ Rollback is per engine and per runtime pack. A failed native route can return to
 - **D1:** Independent worker over in-process FFI, prioritizing crash isolation and reliable cancellation.
 - **D2:** CTranslate2 remains the Whisper backend; CrispASR Whisper is not an automatic fallback.
 - **D3:** Rust owns orchestration and downloads; the worker is inference-only.
-- **D4:** CPU runtime is bundled, models are not.
-- **D5:** GPU packs are normal-numbered child deliverables in this parent, but qualification and publication are independent per pack; CPU remains the release baseline.
+- **D4:** CPU runtime is bundled as the general baseline, models are not; a specific ordinary faster-whisper route may become GPU-required only after T06 proves a CPU ceiling and T15 qualifies CUDA.
+- **D5:** T07 is an early development CUDA lane; T14/T15 remain separate normal-numbered supply-chain and qualification deliverables, and no T07 diagnostic artifact is publishable.
 - **D6:** Preserve product IPC before optimizing internal APIs.
 - **D7:** Prefer official/model-card/stable API and maintained community algorithms; add compensation only when ground-truth evidence requires it.
 - **D8:** No Qwen3 result without ForcedAligner timestamps.

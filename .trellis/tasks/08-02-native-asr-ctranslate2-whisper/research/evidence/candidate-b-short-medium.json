@@ -1,0 +1,275 @@
+{
+  "candidate": "candidate-b-silero-v6-beam1-no-history",
+  "decision": "stop-revise",
+  "historicalEvidence": "all Candidate A/diagnosis/selection/selected identities remain unchanged and separate",
+  "identity": {
+    "adapter": {
+      "sha256": "b5a47e4e8a97583ea270be6deb9e7f69fb58a3a2bbd510415072abcf8a665d88",
+      "sizeBytes": 34084
+    },
+    "candidateBLockSha256": "e687ead686df0499c70b649b63d7a85cd2882bc32deae20d1ccdbffc480a376f",
+    "configSha256": "75dedb4923d571a3bac77e0f1c3760d940ff7538c09d240cdf0ea921f5556d30",
+    "environment": {
+      "architecture": "x86_64",
+      "cpu": {
+        "architecture": "x86_64",
+        "availableIsa": {
+          "avx": true,
+          "avx2": true,
+          "avx512f": false,
+          "fma": true,
+          "sse2": true
+        },
+        "logicalCores": 16,
+        "model": "AMD Ryzen 7 5800X 8-Core Processor"
+      },
+      "os": "Windows",
+      "pathPolicy": {
+        "entryCount": 2,
+        "identitySha256": "439a4172b0cb5d50232784da10208261f69eea476773a2e737b3fe2293a53043",
+        "name": "windows-restricted-path-v1",
+        "orderedEntryRoles": [
+          "measurement-executable-directory",
+          "windows-system32"
+        ],
+        "restricted": true
+      }
+    },
+    "modelBinSha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+    "modelRevision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "planningLockSha256": "c06f9deac18106dc9caa215a8102378966cbe238ac5e048f6fd296968e944380",
+    "publisher": {
+      "sha256": "be00dc22544ed4c61f39f7b93196fe346dcfe39ef6320349d89499e08a974cc7",
+      "sizeBytes": 18973
+    },
+    "runtime": {
+      "algorithmConfigSha256": "75dedb4923d571a3bac77e0f1c3760d940ff7538c09d240cdf0ea921f5556d30",
+      "candidateBLockSha256": "e687ead686df0499c70b649b63d7a85cd2882bc32deae20d1ccdbffc480a376f",
+      "ctranslate2Version": "4.8.0",
+      "cudaDependency": false,
+      "implementation": "T06 Candidate B direct ORT Silero V6 + selected CT2 decode",
+      "loadedModules": [
+        {
+          "location": "measurement-executable-directory",
+          "name": "ctranslate2.dll",
+          "sha256": "e1204cfe83cd82916807d64060d896f6e244e139be5c9850838c5fe2da6e6e59",
+          "sizeBytes": 22417408
+        },
+        {
+          "location": "measurement-executable-directory",
+          "name": "hikaru-asr-ctranslate2-tests.exe",
+          "sha256": "4218523d53d09eba8a09023630fe612b1590310d101e7d5d37d9f4d127f5ea22",
+          "sizeBytes": 671232
+        },
+        {
+          "location": "measurement-executable-directory",
+          "name": "hikaru_asr_tokenizer.dll",
+          "sha256": "892142f8f3e64b77a835c1fa234fcea3bccc854faa9238f9d4be4a03ff24fc9d",
+          "sizeBytes": 2137088
+        },
+        {
+          "location": "measurement-executable-directory",
+          "name": "onnxruntime.dll",
+          "sha256": "18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257",
+          "sizeBytes": 15809848
+        },
+        {
+          "location": "windows-system32",
+          "name": "vcomp140.dll",
+          "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7",
+          "sizeBytes": 213064
+        }
+      ],
+      "measurementExecutable": {
+        "sha256": "4218523d53d09eba8a09023630fe612b1590310d101e7d5d37d9f4d127f5ea22",
+        "sizeBytes": 671232
+      },
+      "moduleLayout": {
+        "identitySha256": "a650e185dc2983b7e5af7e56f17211cf1c7bf2ab9fadb1ccebf07d04e8323994",
+        "localModuleNames": [
+          "ctranslate2.dll",
+          "hikaru_asr_tokenizer.dll",
+          "onnxruntime.dll",
+          "onnxruntime_providers_shared.dll"
+        ],
+        "name": "candidate-b-module-layout-v2",
+        "openmpRootRole": "windows-system32",
+        "runnerRootRole": "measurement-executable-directory"
+      },
+      "onnxRuntimeVersion": "1.28.0",
+      "productionWorker": {
+        "sha256": "fb55512246b2a28b4b0c62d23618f6da84e8e3cd792be1e1bcf55c865bc52bdb",
+        "sizeBytes": 496128
+      },
+      "pythonDependency": false,
+      "requiredDlls": [
+        {
+          "name": "ctranslate2.dll",
+          "sha256": "e1204cfe83cd82916807d64060d896f6e244e139be5c9850838c5fe2da6e6e59",
+          "sizeBytes": 22417408
+        },
+        {
+          "name": "hikaru_asr_tokenizer.dll",
+          "sha256": "892142f8f3e64b77a835c1fa234fcea3bccc854faa9238f9d4be4a03ff24fc9d",
+          "sizeBytes": 2137088
+        },
+        {
+          "name": "onnxruntime.dll",
+          "sha256": "18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257",
+          "sizeBytes": 15809848
+        },
+        {
+          "name": "onnxruntime_providers_shared.dll",
+          "sha256": "599629fa643707defe9156140ae5edd73531f221aa97b7585b1c9bb0a93586f8",
+          "sizeBytes": 21856
+        }
+      ],
+      "vadModel": {
+        "sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+        "sizeBytes": 1245151
+      }
+    }
+  },
+  "largeV3": {
+    "longV1": "not-run-stop-condition",
+    "measuredCases": [
+      {
+        "allApplicableGatesPass": true,
+        "caseId": "short-v1",
+        "gates": {
+          "cerAtMost0_35": true,
+          "confirmedSpeechGapsZero": true,
+          "cpuInferenceRtfAtMost1_0": true,
+          "peakRssAtMost6GiB": true,
+          "restoredProgressMonotonic": true,
+          "restoredProvenanceComplete": true,
+          "shortColdWallAtMost120s": true,
+          "subtitleScaleUsable": true,
+          "timelineErrorsZero": true
+        },
+        "ignoredEvidence": {
+          "adaptedResultSha256": "d32414f0fece5e2f2a31b6b5f9a0b006bf0563389a526e83a43a7600d5c189b2",
+          "rawSha256": "9fc31c5d3f97ae6de192edd26ac6a3a12836be7bf29f998a779e7594d9305afe"
+        },
+        "measurements": {
+          "cer": 0.26666666666666666,
+          "coldProcessWallMs": 29543.6523,
+          "confirmedSpeechGapsAtLeast1500Ms": 0,
+          "inferenceRtf": 0.6915147498132935,
+          "peakProcessRssBytes": 3436838912,
+          "segmentCount": 5,
+          "timelineErrors": 0,
+          "vadInferenceMs": 49.7708,
+          "warmInferenceRtfMedian": 0.6544541407352087
+        },
+        "samples": {
+          "cold": 1,
+          "warm": 3
+        },
+        "seekEvidence": {
+          "decodedTimestampSeekWindows": 0,
+          "noSpeechWindows": 0,
+          "sourceWindowEndSeekWindows": 1,
+          "windowCount": 1
+        },
+        "subtitleDistribution": {
+          "characters": {
+            "count": 5,
+            "maximum": 32,
+            "median": 23,
+            "minimum": 11,
+            "p95": 30.599999999999998
+          },
+          "durationMs": {
+            "count": 5,
+            "maximum": 5440,
+            "median": 4600,
+            "minimum": 4380,
+            "p95": 5388.0
+          }
+        },
+        "vad": {
+          "batchCount": 1,
+          "compressedSampleCount": 385637,
+          "intervalCount": 1,
+          "originalSampleCount": 385637,
+          "retainedRatio": 1.0,
+          "rowCount": 754
+        }
+      },
+      {
+        "allApplicableGatesPass": false,
+        "caseId": "medium-v1",
+        "gates": {
+          "cerAtMost0_35": true,
+          "confirmedSpeechGapsZero": false,
+          "cpuInferenceRtfAtMost1_0": true,
+          "peakRssAtMost6GiB": true,
+          "restoredProgressMonotonic": true,
+          "restoredProvenanceComplete": true,
+          "shortColdWallAtMost120s": null,
+          "subtitleScaleUsable": true,
+          "timelineErrorsZero": true
+        },
+        "ignoredEvidence": {
+          "adaptedResultSha256": "c7e85cb5122a9cb9793d82e4dbe11b8382f01bddc5553d7d2f3e87391cc6a716",
+          "rawSha256": "94c2a0c5a222f7f1bfe51f6710cc80fe8ebf54e5e3bd00f48648cfe222afca0b"
+        },
+        "measurements": {
+          "cer": 0.1054945054945055,
+          "coldProcessWallMs": 311714.2729,
+          "confirmedSpeechGapsAtLeast1500Ms": 1,
+          "inferenceRtf": 0.599304518593948,
+          "peakProcessRssBytes": 3437010944,
+          "segmentCount": 185,
+          "timelineErrors": 0,
+          "vadInferenceMs": 937.3343,
+          "warmInferenceRtfMedian": null
+        },
+        "samples": {
+          "cold": 1,
+          "warm": 0
+        },
+        "seekEvidence": {
+          "decodedTimestampSeekWindows": 16,
+          "noSpeechWindows": 0,
+          "sourceWindowEndSeekWindows": 1,
+          "windowCount": 17
+        },
+        "subtitleDistribution": {
+          "characters": {
+            "count": 185,
+            "maximum": 35,
+            "median": 10,
+            "minimum": 2,
+            "p95": 24.799999999999983
+          },
+          "durationMs": {
+            "count": 185,
+            "maximum": 8980,
+            "median": 2140,
+            "minimum": 300,
+            "p95": 5603.999999999994
+          }
+        },
+        "vad": {
+          "batchCount": 2,
+          "compressedSampleCount": 7593600,
+          "intervalCount": 10,
+          "originalSampleCount": 7981952,
+          "retainedRatio": 0.9513462371109223,
+          "rowCount": 15590
+        }
+      }
+    ],
+    "status": "stop-revise"
+  },
+  "manifest": {
+    "corpusId": "hikaru-user-ja-ground-truth-v1",
+    "coverageLimitation": "low-volume is absent",
+    "sha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+  },
+  "privacy": "sanitized identities, aggregates, distributions, and hashes only; no transcript, tokens, segments, paths, model bytes, or private media",
+  "qualificationEligible": false,
+  "schemaVersion": 1
+}

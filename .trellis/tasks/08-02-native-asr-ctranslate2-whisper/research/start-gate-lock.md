@@ -4,7 +4,7 @@
 
 **Ready to enter T06 implementation after review.** The authoritative corpus, CT2/toolchain dependencies, Candidate A sources, one conditional Candidate B VAD asset, all seven product-model immutable revisions, licenses, and private-output boundary are lockable.
 
-This is a start-gate provenance record, not the final model-run lock. Before the first model-backed measurement, T06 must create `algorithm-lock.md` with the selected algorithm config, exact local file SHA-256 values, final executable/DLL identities and reproduction commands.
+This is a start-gate provenance record, not the final model-run lock. Historical Candidate A/selected identities remain in their dedicated locks. After selected long-v1 produced 7 confirmed gaps, the required Candidate B planning addendum was completed in `candidate-b-lock.md`; implementation must create a new final executable/DLL/VAD/config/tool identity before any Candidate B model-backed measurement.
 
 ## Upstream Task Identities
 
@@ -40,7 +40,13 @@ Candidate B is activated only if Candidate A still has T01-confirmed gaps.
 | VAD behavior reference | faster-whisper `faster_whisper/vad.py` v1.2.1 commit `65882eee9f5cdbeeb2d877f1131d48cf241b327d` | 12,543 | `37a9c774aefdd3162d936b896c8dcf5571b2ed938d65bffecfd631770049a18d` | MIT |
 | Silero V6 ONNX asset | faster-whisper `assets/silero_vad_v6.onnx` at the same commit | 1,245,151 | `4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2` | Distributed in pinned MIT faster-whisper source; upstream Silero attribution review required before activation |
 
-The installed development asset matches the pinned ONNX SHA-256. No native ONNX execution runtime is selected at T06 start. If Candidate A fails and Candidate B is needed, T06 must return to planning before implementation to pin the smallest maintained native executor, its archive hash/license/size, and the T12 packaging impact. No second VAD candidate is permitted in T06.
+The installed development asset matches the pinned ONNX SHA-256. Selected Candidate A later failed only the long-v1 confirmed-gap gate, so the mandatory planning gate was activated and converged in `candidate-b-lock.md`:
+
+- sole executor: Microsoft ONNX Runtime `1.28.0` official Windows x64 CPU ZIP, tag/commit `da9b5e364c465de65c49d91e696cd6485270757f`, archive SHA-256 `abef733dacbe2f571547a7150b479b5cb9cc0df22f96c24983a42cadb1b4f8bc`, C API `28`, MIT;
+- upstream attribution: Silero VAD `v6.0` commit `fba061dc5559f696e62171e9a0741782b0fdc23c`, MIT LICENSE SHA-256 `2e63e9a...`; its immutable tag ONNX assets are not byte-identical to the selected faster-whisper asset and do not replace it;
+- planning preflight: the exact model loads under direct ORT CPU/no-custom-op session with the locked `input/h/c -> speech_probs/hn/cn` schema and one zero-input stateful inference;
+- algorithm: ordinary faster-whisper 1.2.1 V6 defaults, explicitly not batched `160ms/30s` or current Hikaru Python VAD settings; no silent Candidate A fallback;
+- packaging: ORT/VAD is conditional on Candidate B passing all large-v3 gates. No second VAD candidate is permitted in T06.
 
 ## Product Model Revision Lockability
 
@@ -64,6 +70,8 @@ Tiny being absent locally does not block T06 start. Before its measured run, acq
 
 - OpenAI authority: `https://github.com/openai/whisper/tree/25639fc17ddc013d56c594bfbf7644f2185fad84`
 - Maintained reference/VAD asset: `https://github.com/SYSTRAN/faster-whisper/tree/65882eee9f5cdbeeb2d877f1131d48cf241b327d`
+- ONNX Runtime executor: `https://github.com/microsoft/onnxruntime/releases/tag/v1.28.0`
+- Silero attribution: `https://github.com/snakers4/silero-vad/tree/fba061dc5559f696e62171e9a0741782b0fdc23c`
 - Model metadata: `https://huggingface.co/api/models/{repository}/revision/{revision}?blobs=true`
 - Model revision pages: `https://huggingface.co/{repository}/tree/{revision}`
 
@@ -76,9 +84,9 @@ Tiny being absent locally does not block T06 start. Before its measured run, acq
 
 ## Start-Gate Conclusion
 
-- Candidate A source and license: lockable.
-- One conditional Candidate B source/model and license: lockable; native executor deliberately deferred until and unless Candidate A fails.
-- All seven product model revisions and model-weight hashes: lockable.
+- Candidate A source/license and all historical evidence identities remain locked.
+- Candidate B source/model/executor/algorithm/attribution/preflight/package boundary is fully locked in `candidate-b-lock.md`; this planning completion does not authorize or claim implementation.
+- All seven product model revisions and model-weight hashes remain lockable.
 - Six models are already cached; tiny is remote-only but public/ungated and pinned.
-- T04/T05 protocol/host dependencies: complete and archived.
-- Remaining work belongs to T06 implementation: create final local file lock, production worker, Candidate A measurement, optional Candidate B planning gate, and model qualification.
+- T04/T05 protocol/host dependencies are complete and archived.
+- Remaining T06 work is independently reviewed minimal Candidate B implementation, a new final identity, and large-v3 short/medium/long only. large-v2/full matrix remains blocked until that gate passes.

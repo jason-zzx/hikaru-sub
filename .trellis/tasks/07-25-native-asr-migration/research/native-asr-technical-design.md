@@ -5,7 +5,7 @@
 > 首期平台：Windows x64
 > 目标运行时：CTranslate2 + CrispASR，安装包内置 CPU runtime，ASR 模型按需下载
 >
-> **规划与协议更新（2026-08-02）：** 本文保留技术架构、调研依据和历史提案；任务编号、Gate、GPU 开发顺序和发布阻塞规则以同目录最新 `prd.md`、`design.md`、`implement.md` 为准。CUDA/Vulkan 已纳入本父任务的 T13/T14，按 pack 独立资格和发布；失败 pack 不阻塞 CPU cutover。本文第 6 节的旧 `modelPaths`/`computeType`/`ready` JSON 示例仅为历史草案，最终 wire contract 以 T04 `prd.md`、`design.md` 和其产出的 `native-asr/docs/protocol-v1.md` 为准；后文原“阶段 6/后续 GPU”顺序也不再作为执行任务地图。
+> **规划与协议更新（2026-08-02）：** 本文保留技术架构、调研依据和历史提案；任务编号、Gate、GPU 开发顺序和发布阻塞规则以同目录最新 `prd.md`、`design.md`、`implement.md` 为准。开发 CTranslate2 CUDA 已提前为 T07；正式 CUDA/Vulkan packs 与资格分别为 T14/T15，失败 pack 不阻塞无关 CPU 路线。本文第 6 节的旧 `modelPaths`/`computeType`/`ready` JSON 示例仅为历史草案，最终 wire contract 以 T04 `prd.md`、`design.md` 和其产出的 `native-asr/docs/protocol-v1.md` 为准；后文原“阶段 6/后续 GPU”顺序也不再作为执行任务地图。
 
 ## 1. 结论摘要
 

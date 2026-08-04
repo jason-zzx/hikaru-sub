@@ -1,0 +1,194 @@
+{
+  "decision": {
+    "nextReviewedPlanningQuestion": null,
+    "selectedBeamSize": 1,
+    "selectionRule": "lowest inference RTF among rows with CER<=0.35, zero timeline errors, and zero confirmed gaps>=1500ms",
+    "status": "selected"
+  },
+  "ignoredRawFileSha256": "a1b02c4f5494e7723d2fed6a754116ffccd61f962d537e3d75782113a17e07d5",
+  "kind": "hikaru-ct2-whisper-short-decode-selection-sanitized",
+  "privacy": "identities, aggregates, distributions, hashes, and decision only; no transcript, token IDs, paths, model bytes, or private media",
+  "publisherSha256": "221ad160eab1a32ac4ff8284cfcba89b901db6a7c507a702e21649eb673bd8e6",
+  "qualificationEligible": false,
+  "rows": [
+    {
+      "aggregates": {
+        "cer": 0.26666666666666666,
+        "confirmedSpeechGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.632462646253423,
+        "peakProcessRssBytes": 3448725504,
+        "sampleWallMs": 15245.7497,
+        "subtitleDistribution": {
+          "characters": {
+            "count": 5,
+            "maximum": 32,
+            "median": 23,
+            "minimum": 11,
+            "p95": 30.599999999999998
+          },
+          "durationMs": {
+            "count": 5,
+            "maximum": 5440,
+            "median": 4600,
+            "minimum": 4380,
+            "p95": 5388.0
+          }
+        },
+        "timelineErrors": 0
+      },
+      "beamSize": 1,
+      "identity": {
+        "config": {
+          "beamSize": 1,
+          "conditionOnPreviousText": false,
+          "lengthPenalty": 1.0,
+          "logProbThreshold": -1.0,
+          "maxInitialTimestampIndex": 50,
+          "maxLength": 448,
+          "modelWindowDurationMs": 30000,
+          "noRepeatNgramSize": 0,
+          "noSpeechThreshold": 0.6,
+          "patience": 1.0,
+          "promptResetOnTemperature": 0.5,
+          "repetitionPenalty": 1.0,
+          "temperature": 0.0,
+          "timestampDrivenSeek": true,
+          "timestampResolutionMs": 20,
+          "vad": false
+        },
+        "configSha256": "f72bf131abf53cf35c86e91ee04be0987b045e30f3a910d67c7f007150748c81",
+        "model": {
+          "id": "Systran/faster-whisper-large-v3",
+          "modelBinSha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+          "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+          "tokenizerJsonSha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca"
+        },
+        "runtime": {
+          "computeType": "int8",
+          "ctranslate2Version": "4.8.0",
+          "device": "cpu",
+          "measurementExecutable": {
+            "sha256": "6339a201579fea04d128b82f5de2314444e54419cc6d7d16fe6b21612233d45f",
+            "sizeBytes": 559616
+          },
+          "requiredDlls": [
+            {
+              "name": "ctranslate2.dll",
+              "sha256": "e1204cfe83cd82916807d64060d896f6e244e139be5c9850838c5fe2da6e6e59",
+              "sizeBytes": 22417408
+            },
+            {
+              "name": "hikaru_asr_tokenizer.dll",
+              "sha256": "892142f8f3e64b77a835c1fa234fcea3bccc854faa9238f9d4be4a03ff24fc9d",
+              "sizeBytes": 2137088
+            }
+          ],
+          "tokenizerDllSha256": "892142f8f3e64b77a835c1fa234fcea3bccc854faa9238f9d4be4a03ff24fc9d"
+        },
+        "source": {
+          "assSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+          "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "caseId": "short-v1",
+          "corpusId": "hikaru-user-ja-ground-truth-v1",
+          "durationMs": 24102,
+          "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+        }
+      },
+      "ignoredRaw": {
+        "fileSha256": "a1b02c4f5494e7723d2fed6a754116ffccd61f962d537e3d75782113a17e07d5",
+        "rowSha256": "03539c2760eb8b9327eba9a221d9ac754c970a88c77d763fbd1db5e5ec4148d2"
+      },
+      "qualityPass": true
+    },
+    {
+      "aggregates": {
+        "cer": 0.35833333333333334,
+        "confirmedSpeechGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.8108409551074599,
+        "peakProcessRssBytes": 3448725504,
+        "sampleWallMs": 19545.1331,
+        "subtitleDistribution": {
+          "characters": {
+            "count": 4,
+            "maximum": 40,
+            "median": 28.5,
+            "minimum": 11,
+            "p95": 38.65
+          },
+          "durationMs": {
+            "count": 4,
+            "maximum": 9760,
+            "median": 4881.0,
+            "minimum": 3640,
+            "p95": 9069.999999999998
+          }
+        },
+        "timelineErrors": 0
+      },
+      "beamSize": 5,
+      "identity": {
+        "config": {
+          "beamSize": 5,
+          "conditionOnPreviousText": false,
+          "lengthPenalty": 1.0,
+          "logProbThreshold": -1.0,
+          "maxInitialTimestampIndex": 50,
+          "maxLength": 448,
+          "modelWindowDurationMs": 30000,
+          "noRepeatNgramSize": 0,
+          "noSpeechThreshold": 0.6,
+          "patience": 1.0,
+          "promptResetOnTemperature": 0.5,
+          "repetitionPenalty": 1.0,
+          "temperature": 0.0,
+          "timestampDrivenSeek": true,
+          "timestampResolutionMs": 20,
+          "vad": false
+        },
+        "configSha256": "fa01bb927e23fde168057b9849ca38ed9df1505d91289444a444c9213467a64b",
+        "model": {
+          "id": "Systran/faster-whisper-large-v3",
+          "modelBinSha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+          "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+          "tokenizerJsonSha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca"
+        },
+        "runtime": {
+          "computeType": "int8",
+          "ctranslate2Version": "4.8.0",
+          "device": "cpu",
+          "measurementExecutable": {
+            "sha256": "6339a201579fea04d128b82f5de2314444e54419cc6d7d16fe6b21612233d45f",
+            "sizeBytes": 559616
+          },
+          "requiredDlls": [
+            {
+              "name": "ctranslate2.dll",
+              "sha256": "e1204cfe83cd82916807d64060d896f6e244e139be5c9850838c5fe2da6e6e59",
+              "sizeBytes": 22417408
+            },
+            {
+              "name": "hikaru_asr_tokenizer.dll",
+              "sha256": "892142f8f3e64b77a835c1fa234fcea3bccc854faa9238f9d4be4a03ff24fc9d",
+              "sizeBytes": 2137088
+            }
+          ],
+          "tokenizerDllSha256": "892142f8f3e64b77a835c1fa234fcea3bccc854faa9238f9d4be4a03ff24fc9d"
+        },
+        "source": {
+          "assSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+          "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+          "caseId": "short-v1",
+          "corpusId": "hikaru-user-ja-ground-truth-v1",
+          "durationMs": 24102,
+          "manifestSha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+        }
+      },
+      "ignoredRaw": {
+        "fileSha256": "a1b02c4f5494e7723d2fed6a754116ffccd61f962d537e3d75782113a17e07d5",
+        "rowSha256": "60b414a918c1882e4c807144b64db23aabec6c08bdde71274518412970ce8684"
+      },
+      "qualityPass": false
+    }
+  ],
+  "schemaVersion": 1
+}
