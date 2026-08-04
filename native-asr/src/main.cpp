@@ -145,10 +145,10 @@ int run_worker(const WorkerRequestV1& request) {
         "requested native ASR route is not implemented by this worker");
     return 2;
   }
-  if (request.device != Device::Cpu) {
+  if (request.device == Device::Vulkan) {
     emit_pre_ready_error(
         "device_not_implemented",
-        "this worker currently implements the CPU route only");
+        "this CTranslate2 worker does not implement Vulkan");
     return 2;
   }
   try {
@@ -161,13 +161,16 @@ int run_worker(const WorkerRequestV1& request) {
         ? std::optional<fs::path>(
               current_executable_directory() / "silero_vad_v6.onnx")
         : std::nullopt;
-    whisper::CTranslate2WhisperBackend backend(model, {}, vad_model);
+    const whisper::BackendExecutionConfig execution = request.device == Device::Cuda
+        ? whisper::cuda_execution_config()
+        : whisper::cpu_execution_config();
+    whisper::CTranslate2WhisperBackend backend(model, {}, vad_model, execution);
     Emitter emitter(request);
 
     EventV1 ready;
     ready.type = EventType::Ready;
     ready.backend = Backend::CTranslate2;
-    ready.device = Device::Cpu;
+    ready.device = request.device;
     ready.duration_ms = duration_ms;
     if (!emitter.emit(ready)) {
       return 74;

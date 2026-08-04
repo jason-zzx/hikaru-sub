@@ -30,6 +30,15 @@
       "cacheVariables": {
         "HIKARU_ASR_BUILD_CT2_WORKER": "ON"
       }
+    },
+    {
+      "name": "windows-x64-ct2-cuda-development",
+      "displayName": "Windows x64 CTranslate2 CUDA Development",
+      "inherits": "windows-x64-ct2-release",
+      "binaryDir": "${sourceDir}/../.trellis/tasks/08-04-native-asr-ctranslate2-cuda-development/research/local/build/windows-x64-ct2-cuda",
+      "cacheVariables": {
+        "HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -40,6 +49,10 @@
     {
       "name": "windows-x64-release",
       "configurePreset": "windows-x64-release"
+    },
+    {
+      "name": "windows-x64-ct2-cuda-development",
+      "configurePreset": "windows-x64-ct2-cuda-development"
     }
   ],
   "testPresets": [
@@ -56,6 +69,16 @@
     {
       "name": "windows-x64-release",
       "configurePreset": "windows-x64-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-x64-ct2-cuda-development",
+      "configurePreset": "windows-x64-ct2-cuda-development",
       "output": {
         "outputOnFailure": true
       },

@@ -83,6 +83,14 @@ option(
   HIKARU_ASR_BUILD_CT2_WORKER
   "Build the T06 Windows x64 CTranslate2 production worker"
   ${HIKARU_ASR_BUILD_CT2_WORKER_DEFAULT})
+option(
+  HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT
+  "Enable the ignored-local T07 CTranslate2 CUDA development backend"
+  OFF)
+
+if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
+  message(FATAL_ERROR "T07 CUDA development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
+endif()
 
 if(HIKARU_ASR_BUILD_CT2_WORKER)
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -190,7 +198,20 @@ set(DNNL_INCLUDE_DIR "${DNNL_ROOT}/include" CACHE PATH "" FORCE)
 set(DNNL_LIBRARY "${DNNL_ROOT}/lib/dnnl.lib" CACHE FILEPATH "" FORCE)
 set(WITH_OPENBLAS OFF CACHE BOOL "" FORCE)
 set(WITH_RUY OFF CACHE BOOL "" FORCE)
-set(WITH_CUDA OFF CACHE BOOL "" FORCE)
+if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT)
+  if(NOT DEFINED ENV{CUDA_PATH} OR "$ENV{CUDA_PATH}" STREQUAL "")
+    message(FATAL_ERROR "T07 CUDA development requires the locked CUDA_PATH")
+  endif()
+  file(TO_CMAKE_PATH "$ENV{CUDA_PATH}" CUDA_TOOLKIT_ROOT_NORMALIZED)
+  set(CUDA_TOOLKIT_ROOT_DIR "${CUDA_TOOLKIT_ROOT_NORMALIZED}" CACHE PATH "" FORCE)
+  set(WITH_CUDA ON CACHE BOOL "" FORCE)
+  set(CUDA_DYNAMIC_LOADING ON CACHE BOOL "" FORCE)
+  set(CUDA_ARCH_LIST "8.6" CACHE STRING "" FORCE)
+  set(CUDA_NVCC_FLAGS "" CACHE STRING "" FORCE)
+else()
+  set(WITH_CUDA OFF CACHE BOOL "" FORCE)
+  set(CUDA_DYNAMIC_LOADING OFF CACHE BOOL "" FORCE)
+endif()
 set(WITH_CUDNN OFF CACHE BOOL "" FORCE)
 set(WITH_HIP OFF CACHE BOOL "" FORCE)
 set(WITH_TENSOR_PARALLEL OFF CACHE BOOL "" FORCE)
@@ -219,6 +240,10 @@ add_custom_target(hikaru-asr-tokenizer-build DEPENDS "${TOKENIZER_DLL}" "${TOKEN
 
 add_library(hikaru-asr-ctranslate2 STATIC src/ctranslate2_whisper.cpp)
 add_dependencies(hikaru-asr-ctranslate2 hikaru-asr-tokenizer-build)
+if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT)
+  target_compile_definitions(hikaru-asr-ctranslate2 PUBLIC HIKARU_ASR_CT2_WITH_CUDA=1)
+  target_include_directories(hikaru-asr-ctranslate2 PRIVATE "${CUDA_TOOLKIT_ROOT_NORMALIZED}/include")
+endif()
 target_include_directories(hikaru-asr-ctranslate2
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
   PRIVATE "${POCKETFFT_SOURCE_DIR}" "${ORT_ROOT}/include")
@@ -236,11 +261,15 @@ add_executable(hikaru-asr-worker src/main.cpp)
 target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-ctranslate2)
 
 add_executable(hikaru-asr-ctranslate2-tests tests/ctranslate2_whisper_tests.cpp)
-target_link_libraries(hikaru-asr-ctranslate2-tests PRIVATE hikaru-asr-ctranslate2 bcrypt psapi)
+target_link_libraries(hikaru-asr-ctranslate2-tests PRIVATE hikaru-asr-ctranslate2 bcrypt psapi version)
 target_include_directories(hikaru-asr-ctranslate2-tests SYSTEM PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+file(TO_CMAKE_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-04-native-asr-ctranslate2-cuda-development/research/local"
+  T07_LOCAL_ROOT)
 target_compile_definitions(hikaru-asr-ctranslate2-tests PRIVATE
-  "T06_LOCAL_ROOT=\"${T06_LOCAL_ROOT_REAL}\"")
+  "T06_LOCAL_ROOT=\"${T06_LOCAL_ROOT_REAL}\""
+  "T07_LOCAL_ROOT=\"${T07_LOCAL_ROOT}\"")
 
 foreach(target IN ITEMS hikaru-asr-worker hikaru-asr-ctranslate2-tests)
   add_custom_command(TARGET ${target} POST_BUILD
