@@ -1,0 +1,10 @@
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check evidence authority, identity mutation resistance, privacy, GPU attestation, and quality/performance gate separation."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Check NativeAsrHost lifecycle, recovery, cancellation, test-only routing, and Release isolation."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Check Rust test coverage, structured errors, path/logging safety, and full cargo regression."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check worker/host contract consistency and absence of unintended frontend/product changes."}
+{"file":".trellis/tasks/07-25-native-asr-migration/prd.md","reason":"Check child work against parent development-GPU requirements and release boundaries."}
+{"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Check T06/T07/T08 sequencing and T14/T15 ownership remain consistent."}
+{"file":".trellis/tasks/07-25-native-asr-migration/implement.md","reason":"Check exact parent T07 deliverables, no-cuDNN primary identity, 20% rule, result states, and rollback."}
+{"file":".trellis/tasks/08-04-native-asr-ctranslate2-cuda-development/research/cuda-development-design-inputs.md","reason":"Independent review baseline for minimal file surface, CUDA/cuDNN choice, attestation, benchmark, and CI isolation."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/selected-cpu-candidate-lock.md","reason":"Check paired runs preserve T06 model/algorithm/runtime identity and do not rewrite historical evidence."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/cpu-rtf-diagnosis.md","reason":"Check reuse of the exact 120-second slice and timing methodology."}

@@ -1,0 +1,230 @@
+{
+  "decisionInputsExcludeSubtitleQuality": true,
+  "developmentResult": "development-gpu-ready",
+  "gpu": {
+    "computeCapability": "8.6",
+    "cudaDriverApiVersion": 13020,
+    "deviceIndex": 0,
+    "driverModuleVersion": "32.0.15.9649",
+    "driverVersion": "596.49",
+    "float16Supported": true,
+    "name": "NVIDIA GeForce RTX 3070",
+    "visibleDeviceCount": 1
+  },
+  "identity": {
+    "algorithm": "selected-timestamp-no-history-beam1",
+    "config": {
+      "beamSize": 1,
+      "conditionOnPreviousText": false,
+      "lengthPenalty": 1.0,
+      "logProbThreshold": -1.0,
+      "maxInitialTimestampIndex": 50,
+      "maxLength": 448,
+      "modelWindowDurationMs": 30000,
+      "noRepeatNgramSize": 0,
+      "noSpeechThreshold": 0.6,
+      "patience": 1.0,
+      "promptResetOnTemperature": 0.5,
+      "repetitionPenalty": 1.0,
+      "temperature": 0.0,
+      "timestampDrivenSeek": true,
+      "timestampResolutionMs": 20,
+      "vad": false
+    },
+    "cpu": {
+      "architecture": "x86_64",
+      "availableIsa": {
+        "avx": true,
+        "avx2": true,
+        "avx512f": false,
+        "fma": true,
+        "sse2": true
+      },
+      "logicalCores": 16,
+      "model": "AMD Ryzen 7 5800X 8-Core Processor"
+    },
+    "ctranslate2Version": "4.8.0",
+    "inputLockSha256": "42d2de13627de0d83d6ecaa118897e370899734dfb3d26b5840802612c353bc9",
+    "measurementExecutable": {
+      "sha256": "143926ca86d9d149516489f10e2fdd63de4a776e249ff28731eea9328385e245",
+      "sizeBytes": 732672
+    },
+    "model": {
+      "files": [
+        {
+          "name": "config.json",
+          "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+          "sizeBytes": 2394
+        },
+        {
+          "name": "model.bin",
+          "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+          "sizeBytes": 3087284237
+        },
+        {
+          "name": "preprocessor_config.json",
+          "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+          "sizeBytes": 340
+        },
+        {
+          "name": "tokenizer.json",
+          "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+          "sizeBytes": 2480617
+        },
+        {
+          "name": "vocabulary.json",
+          "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+          "sizeBytes": 1068114
+        }
+      ],
+      "id": "Systran/faster-whisper-large-v3",
+      "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478"
+    },
+    "pathPolicy": {
+      "name": "t07-windows-cuda-restricted-path-v1",
+      "orderedEntryRoles": [
+        "task-local-runtime-bin",
+        "cuda-toolkit-12.8-bin",
+        "windows-system32"
+      ],
+      "rootIdentitySha256": "7a4ed8f631101a0d939c76c3795af907c74b79ae5dda3a116ba3a032d666bc6d"
+    },
+    "productionWorker": {
+      "sha256": "73aa6f0d993f5d2ee74f3451ae3657bca219ec2ef07e400d966802df8851312a",
+      "sizeBytes": 497664
+    },
+    "requiredDlls": [
+      {
+        "name": "ctranslate2.dll",
+        "sha256": "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2",
+        "sizeBytes": 36974592
+      },
+      {
+        "name": "hikaru_asr_tokenizer.dll",
+        "sha256": "391d9c3baf15ac2a2cc8a4e6dfbd2f8d38c93a1eef52d42f51bdd881b1d74b2b",
+        "sizeBytes": 2139136
+      },
+      {
+        "name": "onnxruntime.dll",
+        "sha256": "18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257",
+        "sizeBytes": 15809848
+      },
+      {
+        "name": "onnxruntime_providers_shared.dll",
+        "sha256": "599629fa643707defe9156140ae5edd73531f221aa97b7585b1c9bb0a93586f8",
+        "sizeBytes": 21856
+      }
+    ]
+  },
+  "kind": "hikaru-ct2-whisper-cuda-development-result",
+  "limitations": [
+    "Ignored-local RTX 3070 development evidence only; not a runtime pack or release qualification.",
+    "CER, confirmed gaps, segmentation, and timeline quality were not read or scored.",
+    "RTF <= 0.5 is diagnostic for future T15 work and does not override the paired 20% rule."
+  ],
+  "moduleLockSha256": "8c8dba3bec12d6b87c08c4df3ee886f0d87aff36a5dff5eb33aa96ae19004a45",
+  "moduleSets": {
+    "cpuOnly": [],
+    "cudaOnly": [
+      {
+        "name": "cublas64_12.dll",
+        "rootRole": "cuda-toolkit-12.8-bin",
+        "sha256": "9513540e4ec4c51ee9e7304138c2cc255c29a8c181f9e80c38efa25738becd99",
+        "sizeBytes": 113716224,
+        "version": "6.14.11.1284"
+      },
+      {
+        "name": "cublasLt64_12.dll",
+        "rootRole": "cuda-toolkit-12.8-bin",
+        "sha256": "b199d1ff892a81b7fd3d57ba1781549609b41500b36008fef326038393ad46c7",
+        "sizeBytes": 674667520,
+        "version": "6.14.11.1284"
+      },
+      {
+        "name": "nvcuda.dll",
+        "rootRole": "windows-system32",
+        "sha256": "ec9942ff94bcf2a6714531932720d0d36bd1f362df768af9ae21f2388c08ef7c",
+        "sizeBytes": 4466920,
+        "version": "32.0.15.9649"
+      }
+    ],
+    "shared": [
+      {
+        "name": "ctranslate2.dll",
+        "rootRole": "task-local-runtime-bin",
+        "sha256": "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2",
+        "sizeBytes": 36974592,
+        "version": ""
+      },
+      {
+        "name": "hikaru-asr-ctranslate2-tests.exe",
+        "rootRole": "task-local-runtime-bin",
+        "sha256": "143926ca86d9d149516489f10e2fdd63de4a776e249ff28731eea9328385e245",
+        "sizeBytes": 732672,
+        "version": ""
+      },
+      {
+        "name": "hikaru_asr_tokenizer.dll",
+        "rootRole": "task-local-runtime-bin",
+        "sha256": "391d9c3baf15ac2a2cc8a4e6dfbd2f8d38c93a1eef52d42f51bdd881b1d74b2b",
+        "sizeBytes": 2139136,
+        "version": ""
+      },
+      {
+        "name": "onnxruntime.dll",
+        "rootRole": "task-local-runtime-bin",
+        "sha256": "18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257",
+        "sizeBytes": 15809848,
+        "version": "1.28.0.724"
+      },
+      {
+        "name": "vcomp140.dll",
+        "rootRole": "windows-system32",
+        "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7",
+        "sizeBytes": 213064,
+        "version": "14.50.35719.0"
+      }
+    ]
+  },
+  "publisherSha256": "74bcf3eb8f8deac9e2ec3003e3daed703696efce489444560a0f5c15fd1b5f3d",
+  "qualificationEligible": false,
+  "samples": {
+    "medium-v1-first-120s": {
+      "atLeast20PercentSpeedup": true,
+      "audioSha256": "d7b8c62d1358eee4f7ca40596ec424e91cde6992654add5c0219cdeed3907b42",
+      "cpuColdLoadMs": 6941.4789,
+      "cpuColdProcessWallMs": 83521.4021,
+      "cpuWarmInferenceRtfMedian": 0.591635355,
+      "durationMs": 120000,
+      "gpuColdLoadMs": 4285.9775,
+      "gpuColdProcessWallMs": 18614.5921,
+      "gpuMedianRtfAtMost0_5": true,
+      "gpuToCpuRatio": 0.13134335224664412,
+      "gpuWarmInferenceRtfMedian": 0.07770737083333333,
+      "rawEvidenceSha256": {
+        "cpu": "e61262a5c0f58eabbe17c6488f6c835011c49bfc81336db3020f9e1a2ef41080",
+        "cuda": "9757a9a9e53abdf780a6e28583337bed260ffa76b0e62030d798f670cb5b8fd2"
+      },
+      "requiredMaximumRatio": 0.8
+    },
+    "short-v1": {
+      "atLeast20PercentSpeedup": true,
+      "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+      "cpuColdLoadMs": 6974.772,
+      "cpuColdProcessWallMs": 25324.8601,
+      "cpuWarmInferenceRtfMedian": 0.5779012737532154,
+      "durationMs": 24102,
+      "gpuColdLoadMs": 4222.3081,
+      "gpuColdProcessWallMs": 10541.0355,
+      "gpuMedianRtfAtMost0_5": true,
+      "gpuToCpuRatio": 0.10896528442802467,
+      "gpuWarmInferenceRtfMedian": 0.06297117666583686,
+      "rawEvidenceSha256": {
+        "cpu": "515be579fba02229e74fa4782ae9cd7d2371bafb359acba181ab64df468a5e68",
+        "cuda": "6d1c09f57e5f8027c5737130befd382cf38932812b76581405ea79b7c00cf494"
+      },
+      "requiredMaximumRatio": 0.8
+    }
+  },
+  "schemaVersion": 1
+}
