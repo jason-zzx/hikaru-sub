@@ -1,7 +1,7 @@
 #include "ctranslate2_whisper.hpp"
 
 #ifndef _WIN32
-#error The T06 CTranslate2 worker is Windows x64 CPU-only.
+#error The CTranslate2 worker currently supports Windows x64 only.
 #endif
 
 #define NOMINMAX
@@ -9,7 +9,12 @@
 #include <windows.h>
 #include <bcrypt.h>
 
+#include <ctranslate2/devices.h>
 #include <ctranslate2/models/whisper.h>
+#include <ctranslate2/types.h>
+#ifdef HIKARU_ASR_CT2_WITH_CUDA
+#include <cuda.h>
+#endif
 #include <cpu_provider_factory.h>
 #include <nlohmann/json.hpp>
 #include <onnxruntime_cxx_api.h>
@@ -929,7 +934,124 @@ float average_log_probability(
   return static_cast<float>(cumulative / (length + 1.0));
 }
 
+#ifdef HIKARU_ASR_CT2_WITH_CUDA
+class CudaDriverModule {
+ public:
+  CudaDriverModule()
+      : handle_(LoadLibraryW(L"nvcuda.dll")) {
+    if (handle_ == nullptr) {
+      throw BackendError("cuda_runtime_failed", "CUDA driver module is unavailable");
+    }
+  }
+
+  ~CudaDriverModule() {
+    FreeLibrary(handle_);
+  }
+
+  template <typename Function>
+  Function symbol(const char* name) const {
+    const FARPROC value = GetProcAddress(handle_, name);
+    if (value == nullptr) {
+      throw BackendError("cuda_runtime_failed", "CUDA driver API is incomplete");
+    }
+    return reinterpret_cast<Function>(value);
+  }
+
+ private:
+  HMODULE handle_ = nullptr;
+};
+#endif
+
+BackendExecutionAttestation validate_execution_config(
+    const BackendExecutionConfig& config) {
+  BackendExecutionAttestation attestation;
+  attestation.config = config;
+  if (config.device_index != 0) {
+    throw BackendError("execution_config_invalid", "CTranslate2 device index must be 0");
+  }
+  if (config.device == ExecutionDevice::Cpu) {
+    if (config.compute_type != ExecutionComputeType::Int8) {
+      throw BackendError("execution_config_invalid", "CPU execution requires INT8");
+    }
+    return attestation;
+  }
+  if (config.compute_type != ExecutionComputeType::Float16) {
+    throw BackendError("execution_config_invalid", "CUDA execution requires FLOAT16");
+  }
+#ifndef HIKARU_ASR_CT2_WITH_CUDA
+  throw BackendError("cuda_not_built", "This worker was built without CUDA support");
+#else
+  const CudaDriverModule driver;
+  const auto initialize = driver.symbol<decltype(&cuInit)>("cuInit");
+  const auto get_driver_version = driver.symbol<decltype(&cuDriverGetVersion)>("cuDriverGetVersion");
+  const auto get_device_count = driver.symbol<decltype(&cuDeviceGetCount)>("cuDeviceGetCount");
+  const auto get_device = driver.symbol<decltype(&cuDeviceGet)>("cuDeviceGet");
+  const auto get_device_name = driver.symbol<decltype(&cuDeviceGetName)>("cuDeviceGetName");
+  const auto get_device_attribute = driver.symbol<decltype(&cuDeviceGetAttribute)>("cuDeviceGetAttribute");
+  int driver_device_count = 0;
+  CUdevice device = 0;
+  std::array<char, 256> device_name{};
+  if (initialize(0) != CUDA_SUCCESS
+      || get_driver_version(&attestation.cuda_driver_api_version) != CUDA_SUCCESS
+      || get_device_count(&driver_device_count) != CUDA_SUCCESS) {
+    throw BackendError("cuda_runtime_failed", "CUDA driver initialization failed");
+  }
+  if (driver_device_count <= config.device_index) {
+    throw BackendError("cuda_device_unavailable", "CUDA device 0 is unavailable");
+  }
+  if (get_device(&device, config.device_index) != CUDA_SUCCESS
+      || get_device_name(device_name.data(), static_cast<int>(device_name.size()), device) != CUDA_SUCCESS
+      || get_device_attribute(
+             &attestation.compute_capability_major,
+             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
+             device) != CUDA_SUCCESS
+      || get_device_attribute(
+             &attestation.compute_capability_minor,
+             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+             device) != CUDA_SUCCESS) {
+    throw BackendError("cuda_runtime_failed", "CUDA device attestation failed");
+  }
+  attestation.device_name = device_name.data();
+  try {
+    attestation.visible_device_count = ctranslate2::get_device_count(ctranslate2::Device::CUDA);
+    attestation.compute_type_supported = attestation.compute_capability_major >= 7
+        && ctranslate2::mayiuse_float16(ctranslate2::Device::CUDA, config.device_index);
+  } catch (const std::exception&) {
+    throw BackendError("cuda_runtime_failed", "CTranslate2 CUDA capability detection failed");
+  }
+  if (attestation.visible_device_count <= config.device_index) {
+    throw BackendError("cuda_device_unavailable", "CTranslate2 cannot access CUDA device 0");
+  }
+  if (!attestation.compute_type_supported) {
+    throw BackendError(
+        "cuda_compute_type_unsupported",
+        "CUDA device 0 does not support FLOAT16");
+  }
+  return attestation;
+#endif
+}
+
+ctranslate2::Device ctranslate2_device(ExecutionDevice device) {
+  return device == ExecutionDevice::Cuda
+      ? ctranslate2::Device::CUDA
+      : ctranslate2::Device::CPU;
+}
+
+ctranslate2::ComputeType ctranslate2_compute_type(ExecutionComputeType compute_type) {
+  return compute_type == ExecutionComputeType::Float16
+      ? ctranslate2::ComputeType::FLOAT16
+      : ctranslate2::ComputeType::INT8;
+}
+
 }  // namespace
+
+BackendExecutionConfig cpu_execution_config() {
+  return {};
+}
+
+BackendExecutionConfig cuda_execution_config() {
+  return {ExecutionDevice::Cuda, ExecutionComputeType::Float16, 0};
+}
 
 BackendError::BackendError(std::string code, std::string message)
     : std::runtime_error(std::move(message)), code_(std::move(code)) {}
@@ -1182,8 +1304,10 @@ class CTranslate2WhisperBackend::Impl {
   Impl(
       const fs::path& model_path,
       CandidateAConfig config,
-      std::optional<fs::path> vad_model_path)
-      : tokenizer(model_path / "tokenizer.json"),
+      std::optional<fs::path> vad_model_path,
+      BackendExecutionConfig execution)
+      : attestation(validate_execution_config(execution)),
+        tokenizer(model_path / "tokenizer.json"),
         config(std::move(config)),
         vad_model_path(std::move(vad_model_path)) {
     validate_model_directory(model_path);
@@ -1200,12 +1324,15 @@ class CTranslate2WhisperBackend::Impl {
     try {
       model = std::make_unique<ctranslate2::models::Whisper>(
           model_path.u8string(),
-          ctranslate2::Device::CPU,
-          ctranslate2::ComputeType::INT8,
-          std::vector<int>{0},
+          ctranslate2_device(attestation.config.device),
+          ctranslate2_compute_type(attestation.config.compute_type),
+          std::vector<int>{attestation.config.device_index},
           false,
           pool);
     } catch (const std::exception&) {
+      if (attestation.config.device == ExecutionDevice::Cuda) {
+        throw BackendError("cuda_model_load_failed", "CUDA model initialization failed");
+      }
       throw BackendError("model_load_failed", "CTranslate2 model could not be loaded");
     }
     if (!model->is_multilingual()) {
@@ -1230,6 +1357,7 @@ class CTranslate2WhisperBackend::Impl {
     check_cancelled(is_cancelled);
   }
 
+  BackendExecutionAttestation attestation;
   Tokenizer tokenizer;
   CandidateAConfig config;
   TokenIds tokens;
@@ -1245,11 +1373,13 @@ class CTranslate2WhisperBackend::Impl {
 CTranslate2WhisperBackend::CTranslate2WhisperBackend(
     const fs::path& model_path,
     CandidateAConfig config,
-    std::optional<fs::path> vad_model_path)
+    std::optional<fs::path> vad_model_path,
+    BackendExecutionConfig execution)
     : impl_(std::make_unique<Impl>(
           model_path,
           std::move(config),
-          std::move(vad_model_path))) {}
+          std::move(vad_model_path),
+          execution)) {}
 
 CTranslate2WhisperBackend::~CTranslate2WhisperBackend() = default;
 
@@ -1267,6 +1397,10 @@ std::size_t CTranslate2WhisperBackend::resolved_inter_threads() const {
 
 const TokenIds& CTranslate2WhisperBackend::token_ids() const {
   return impl_->tokens;
+}
+
+const BackendExecutionAttestation& CTranslate2WhisperBackend::execution_attestation() const {
+  return impl_->attestation;
 }
 
 TranscriptionResult CTranslate2WhisperBackend::transcribe(

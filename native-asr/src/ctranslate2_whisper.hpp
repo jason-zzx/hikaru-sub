@@ -27,6 +27,35 @@ inline constexpr double vad_negative_threshold = 0.35;
 inline constexpr std::int64_t vad_min_silence_ms = 2000;
 inline constexpr std::int64_t vad_speech_pad_ms = 400;
 
+enum class ExecutionDevice {
+  Cpu,
+  Cuda,
+};
+
+enum class ExecutionComputeType {
+  Int8,
+  Float16,
+};
+
+struct BackendExecutionConfig {
+  ExecutionDevice device = ExecutionDevice::Cpu;
+  ExecutionComputeType compute_type = ExecutionComputeType::Int8;
+  int device_index = 0;
+};
+
+struct BackendExecutionAttestation {
+  BackendExecutionConfig config;
+  int visible_device_count = 0;
+  bool compute_type_supported = true;
+  std::string device_name;
+  int compute_capability_major = 0;
+  int compute_capability_minor = 0;
+  int cuda_driver_api_version = 0;
+};
+
+BackendExecutionConfig cpu_execution_config();
+BackendExecutionConfig cuda_execution_config();
+
 struct CandidateAConfig {
   std::size_t beam_size = 1;
   std::size_t max_length = 448;
@@ -197,7 +226,8 @@ class CTranslate2WhisperBackend {
   explicit CTranslate2WhisperBackend(
       const std::filesystem::path& model_path,
       CandidateAConfig config = {},
-      std::optional<std::filesystem::path> vad_model_path = std::nullopt);
+      std::optional<std::filesystem::path> vad_model_path = std::nullopt,
+      BackendExecutionConfig execution = {});
   ~CTranslate2WhisperBackend();
 
   CTranslate2WhisperBackend(const CTranslate2WhisperBackend&) = delete;
@@ -213,6 +243,7 @@ class CTranslate2WhisperBackend {
   std::size_t resolved_intra_threads() const;
   std::size_t resolved_inter_threads() const;
   const TokenIds& token_ids() const;
+  const BackendExecutionAttestation& execution_attestation() const;
 
  private:
   class Impl;
