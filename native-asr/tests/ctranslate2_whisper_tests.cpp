@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -460,8 +461,8 @@ void validate_candidate_b_loaded_modules(const Json& modules) {
   }
 }
 
-bool is_task_local_output(const fs::path& path) {
-  const fs::path root = fs::weakly_canonical(fs::path(T06_LOCAL_ROOT));
+bool is_path_within(const fs::path& root_path, const fs::path& path) {
+  const fs::path root = fs::weakly_canonical(root_path);
   const fs::path candidate = fs::weakly_canonical(
       path.is_absolute() ? path : fs::absolute(path));
   const fs::path relative = candidate.lexically_relative(root);
@@ -470,6 +471,197 @@ bool is_task_local_output(const fs::path& path) {
   }
   const auto first = relative.begin();
   return first != relative.end() && *first != "..";
+}
+
+bool is_task_local_output(const fs::path& path) {
+  return is_path_within(fs::path(T06_LOCAL_ROOT), path);
+}
+
+bool is_t07_task_local_output(const fs::path& path) {
+  return is_path_within(fs::path(T07_LOCAL_ROOT), path);
+}
+
+std::string file_version(const fs::path& path) {
+  DWORD ignored = 0;
+  const DWORD size = GetFileVersionInfoSizeW(path.c_str(), &ignored);
+  if (size == 0) {
+    return {};
+  }
+  std::vector<unsigned char> buffer(size);
+  check(
+      GetFileVersionInfoW(path.c_str(), 0, size, buffer.data()) != 0,
+      "file version read failed");
+  VS_FIXEDFILEINFO* info = nullptr;
+  UINT info_size = 0;
+  check(
+      VerQueryValueW(buffer.data(), L"\\", reinterpret_cast<void**>(&info), &info_size) != 0
+          && info != nullptr
+          && info_size >= sizeof(VS_FIXEDFILEINFO),
+      "file version metadata failed");
+  return std::to_string(HIWORD(info->dwFileVersionMS)) + "."
+      + std::to_string(LOWORD(info->dwFileVersionMS)) + "."
+      + std::to_string(HIWORD(info->dwFileVersionLS)) + "."
+      + std::to_string(LOWORD(info->dwFileVersionLS));
+}
+
+Json cuda_development_path_policy() {
+  const DWORD path_size = GetEnvironmentVariableW(L"PATH", nullptr, 0);
+  check(path_size > 0, "T07 restricted PATH is missing");
+  std::vector<wchar_t> path_buffer(path_size);
+  const DWORD path_length = GetEnvironmentVariableW(
+      L"PATH", path_buffer.data(), static_cast<DWORD>(path_buffer.size()));
+  check(path_length > 0 && path_length < path_buffer.size(), "T07 restricted PATH read failed");
+  std::vector<fs::path> entries;
+  std::wstringstream input(std::wstring(path_buffer.data(), path_length));
+  std::wstring item;
+  while (std::getline(input, item, L';')) {
+    check(!item.empty(), "T07 restricted PATH contains an empty entry");
+    entries.push_back(fs::weakly_canonical(fs::path(item)));
+  }
+  check(entries.size() == 3, "T07 restricted PATH must contain exactly three entries");
+
+  std::array<wchar_t, 32768> cuda_root_buffer{};
+  const DWORD cuda_root_length = GetEnvironmentVariableW(
+      L"CUDA_PATH", cuda_root_buffer.data(), static_cast<DWORD>(cuda_root_buffer.size()));
+  check(cuda_root_length > 0 && cuda_root_length < cuda_root_buffer.size(), "CUDA_PATH is missing");
+  std::array<wchar_t, 32768> system_buffer{};
+  const UINT system_length = GetSystemDirectoryW(
+      system_buffer.data(), static_cast<UINT>(system_buffer.size()));
+  check(system_length > 0 && system_length < system_buffer.size(), "System32 path resolution failed");
+
+  const fs::path runtime = fs::weakly_canonical(current_executable()).parent_path();
+  const fs::path cuda_bin = fs::weakly_canonical(
+      fs::path(std::wstring(cuda_root_buffer.data(), cuda_root_length)) / "bin");
+  const fs::path system = fs::weakly_canonical(
+      fs::path(std::wstring(system_buffer.data(), system_length)));
+  check(fs::equivalent(entries[0], runtime)
+            && fs::equivalent(entries[1], cuda_bin)
+            && fs::equivalent(entries[2], system),
+        "T07 restricted PATH order or root identity mismatch");
+
+  const std::string identity_input =
+      "task-local-runtime-bin=" + runtime.u8string()
+      + "\ncuda-toolkit-12.8-bin=" + cuda_bin.u8string()
+      + "\nwindows-system32=" + system.u8string();
+  return Json{
+      {"name", "t07-windows-cuda-restricted-path-v1"},
+      {"restricted", true},
+      {"entryCount", 3},
+      {"orderedEntryRoles", Json::array({
+           "task-local-runtime-bin",
+           "cuda-toolkit-12.8-bin",
+           "windows-system32"})},
+      {"rootIdentitySha256", sha256_text(identity_input)},
+      {"resolvedRoots", Json::array({
+           Json{{"role", "task-local-runtime-bin"}, {"canonicalPath", runtime.u8string()}},
+           Json{{"role", "cuda-toolkit-12.8-bin"}, {"canonicalPath", cuda_bin.u8string()}},
+           Json{{"role", "windows-system32"}, {"canonicalPath", system.u8string()}}})}};
+}
+
+Json cuda_development_loaded_modules(const Json& path_policy) {
+  std::array<HMODULE, 1024> modules{};
+  DWORD required_bytes = 0;
+  check(
+      EnumProcessModules(
+          GetCurrentProcess(),
+          modules.data(),
+          static_cast<DWORD>(modules.size() * sizeof(HMODULE)),
+          &required_bytes) != 0,
+      "T07 loaded module inventory failed");
+  check(required_bytes <= modules.size() * sizeof(HMODULE), "T07 module inventory was truncated");
+  const std::size_t count = required_bytes / sizeof(HMODULE);
+  const std::string executable_name = lowercase(current_executable().filename().u8string());
+  Json result = Json::array();
+  for (std::size_t index = 0; index < count; ++index) {
+    std::array<wchar_t, 32768> buffer{};
+    const DWORD length = GetModuleFileNameExW(
+        GetCurrentProcess(), modules[index], buffer.data(), static_cast<DWORD>(buffer.size()));
+    check(length > 0 && length < buffer.size(), "T07 loaded module path resolution failed");
+    const fs::path path = fs::weakly_canonical(fs::path(std::wstring(buffer.data(), length)));
+    const std::string name = path.filename().u8string();
+    const std::string normalized = lowercase(name);
+    const bool relevant = normalized == executable_name
+        || normalized == "ctranslate2.dll"
+        || normalized == "hikaru_asr_tokenizer.dll"
+        || normalized == "onnxruntime.dll"
+        || normalized == "onnxruntime_providers_shared.dll"
+        || normalized == "nvcuda.dll"
+        || normalized.rfind("cublas", 0) == 0
+        || normalized.rfind("cudart", 0) == 0
+        || normalized.rfind("curand", 0) == 0
+        || normalized.rfind("cufft", 0) == 0
+        || normalized.rfind("cusparse", 0) == 0
+        || normalized.rfind("nvrtc", 0) == 0
+        || normalized.rfind("cudnn", 0) == 0
+        || normalized.find("vcomp") != std::string::npos
+        || normalized.find("dnnl") != std::string::npos
+        || normalized.find("iomp") != std::string::npos
+        || normalized.find("openmp") != std::string::npos;
+    if (!relevant) {
+      continue;
+    }
+    std::string root_role;
+    for (const Json& root : path_policy.at("resolvedRoots")) {
+      const fs::path root_path = fs::weakly_canonical(
+          fs::u8path(root.at("canonicalPath").get<std::string>()));
+      if (fs::equivalent(path.parent_path(), root_path)) {
+        root_role = root.at("role").get<std::string>();
+        break;
+      }
+    }
+    check(!root_role.empty(), "T07 relevant module escaped the restricted PATH roots: " + name);
+    Json identity = file_identity(path);
+    identity["name"] = name;
+    identity["version"] = file_version(path);
+    identity["rootRole"] = root_role;
+    identity["canonicalPath"] = path.u8string();
+    result.push_back(std::move(identity));
+  }
+  std::sort(result.begin(), result.end(), [](const Json& left, const Json& right) {
+    return lowercase(left.at("name").get<std::string>())
+        < lowercase(right.at("name").get<std::string>());
+  });
+  return result;
+}
+
+std::vector<unsigned char> wav_pcm_data(const fs::path& path) {
+  std::ifstream input(path, std::ios::binary);
+  check(static_cast<bool>(input), "WAV prefix authority is missing");
+  std::vector<unsigned char> bytes(
+      (std::istreambuf_iterator<char>(input)),
+      std::istreambuf_iterator<char>());
+  check(bytes.size() >= 12
+            && std::memcmp(bytes.data(), "RIFF", 4) == 0
+            && std::memcmp(bytes.data() + 8, "WAVE", 4) == 0,
+        "WAV prefix authority is invalid");
+  const auto u32 = [&](std::size_t offset) {
+    check(offset + 4 <= bytes.size(), "WAV chunk length is truncated");
+    return static_cast<std::uint32_t>(bytes[offset])
+        | (static_cast<std::uint32_t>(bytes[offset + 1]) << 8)
+        | (static_cast<std::uint32_t>(bytes[offset + 2]) << 16)
+        | (static_cast<std::uint32_t>(bytes[offset + 3]) << 24);
+  };
+  std::size_t offset = 12;
+  while (offset + 8 <= bytes.size()) {
+    const std::uint32_t size = u32(offset + 4);
+    const std::size_t data_offset = offset + 8;
+    check(data_offset + size <= bytes.size(), "WAV chunk data is truncated");
+    if (std::memcmp(bytes.data() + offset, "data", 4) == 0) {
+      return std::vector<unsigned char>(
+          bytes.begin() + static_cast<std::ptrdiff_t>(data_offset),
+          bytes.begin() + static_cast<std::ptrdiff_t>(data_offset + size));
+    }
+    offset = data_offset + size + (size % 2);
+  }
+  throw std::runtime_error("WAV data chunk is missing");
+}
+
+void verify_wav_prefix(const fs::path& source, const fs::path& slice) {
+  const std::vector<unsigned char> source_pcm = wav_pcm_data(source);
+  const std::vector<unsigned char> slice_pcm = wav_pcm_data(slice);
+  check(source_pcm.size() >= slice_pcm.size(), "diagnostic source is shorter than the slice");
+  check(std::equal(slice_pcm.begin(), slice_pcm.end(), source_pcm.begin()),
+        "diagnostic slice is not the exact source PCM prefix");
 }
 
 void write_pcm_wav(const fs::path& path, const std::vector<std::int16_t>& pcm) {
@@ -519,6 +711,17 @@ void expect_timestamp_error(
 }
 
 void run_core_tests() {
+  const BackendExecutionConfig cpu_execution = cpu_execution_config();
+  check(cpu_execution.device == ExecutionDevice::Cpu
+            && cpu_execution.compute_type == ExecutionComputeType::Int8
+            && cpu_execution.device_index == 0,
+        "CPU execution mapping drift");
+  const BackendExecutionConfig cuda_execution = cuda_execution_config();
+  check(cuda_execution.device == ExecutionDevice::Cuda
+            && cuda_execution.compute_type == ExecutionComputeType::Float16
+            && cuda_execution.device_index == 0,
+        "CUDA execution mapping drift");
+
   const CandidateAConfig production_defaults;
   check(production_defaults.timestamp_driven_seek, "production seek default drift");
   check(!production_defaults.condition_on_previous_text, "production history default drift");
@@ -817,6 +1020,18 @@ void run_core_tests() {
   write_model_fixture(root / "ordinary-json-vocabulary", "vocabulary.json");
   write_model_fixture(root / "ordinary-text-vocabulary", "vocabulary.txt");
   validate_model_directory(root / "ordinary-json-vocabulary");
+#ifndef HIKARU_ASR_CT2_WITH_CUDA
+  try {
+    CTranslate2WhisperBackend backend(
+        root / "ordinary-json-vocabulary",
+        {},
+        std::nullopt,
+        cuda_execution_config());
+    throw std::runtime_error("CPU-only backend accepted CUDA execution");
+  } catch (const BackendError& error) {
+    check(error.code() == "cuda_not_built", "CPU-only CUDA rejection drift");
+  }
+#endif
   validate_model_directory(root / "ordinary-text-vocabulary");
   check(
       !fs::exists(root / "ordinary-json-vocabulary" / "preprocessor_config.json"),
@@ -1461,6 +1676,197 @@ void run_evidence(
       {"sampleCount", raw["samples"].size()}}.dump() << '\n';
 }
 
+void run_cuda_development_evidence(const std::vector<std::string>& args) {
+  const fs::path model_path = fs::u8path(required_arg(args, "--model"));
+  const fs::path audio_path = fs::u8path(required_arg(args, "--audio"));
+  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
+  const fs::path input_lock = fs::u8path(required_arg(args, "--input-lock"));
+  const fs::path production_worker = fs::u8path(required_arg(args, "--production-worker"));
+  const std::string model_id = required_arg(args, "--model-id");
+  const std::string model_revision = required_arg(args, "--model-revision");
+  const std::string expected_model_hash = required_arg(args, "--model-bin-sha256");
+  const std::string case_id = required_arg(args, "--case-id");
+  const std::string requested_device = lowercase(required_arg(args, "--device"));
+  const bool discovery = std::find(args.begin(), args.end(), "--module-discovery") != args.end();
+  const int repeats = integer_arg(args, "--repeats", discovery ? 1 : 4);
+
+  check(is_t07_task_local_output(output_path), "T07 raw output must stay under research/local");
+  check(fs::is_regular_file(input_lock), "T07 CUDA input lock is missing");
+  check(fs::is_regular_file(production_worker), "T07 production worker is missing");
+  check(requested_device == "cpu" || requested_device == "cuda", "T07 device must be cpu or cuda");
+  check(repeats == (discovery ? 1 : 4), "T07 evidence requires discovery=1 or measurement=4 repeats");
+  check(
+      sha256_file(model_path / "model.bin") == expected_model_hash
+          && expected_model_hash == "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+      "T07 model.bin does not match locked large-v3");
+
+  const std::int64_t expected_duration = case_id == "short-v1"
+      ? 24102
+      : (case_id == "medium-v1-first-120s" ? 120000 : -1);
+  check(expected_duration > 0, "T07 case identity is not allowed");
+  check(verified_wav_duration_ms(audio_path) == expected_duration, "T07 audio duration drift");
+  const std::string expected_audio_hash = case_id == "short-v1"
+      ? "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"
+      : "d7b8c62d1358eee4f7ca40596ec424e91cde6992654add5c0219cdeed3907b42";
+  check(sha256_file(audio_path) == expected_audio_hash, "T07 audio identity drift");
+  Json source_identity = nullptr;
+  if (case_id == "medium-v1-first-120s") {
+    const fs::path source_audio = fs::u8path(required_arg(args, "--source-audio"));
+    check(
+        sha256_file(source_audio)
+            == "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+        "T07 diagnostic source identity drift");
+    verify_wav_prefix(source_audio, audio_path);
+    source_identity = Json{{"sha256", sha256_file(source_audio)}, {"pcmPrefixVerified", true}};
+  }
+
+  const Json path_policy = cuda_development_path_policy();
+  const BackendExecutionConfig execution = requested_device == "cuda"
+      ? cuda_execution_config()
+      : cpu_execution_config();
+  const Clock::time_point load_started = Clock::now();
+  CTranslate2WhisperBackend backend(model_path, {}, std::nullopt, execution);
+  const double load_ms = elapsed_ms(load_started);
+  const BackendExecutionAttestation attestation = backend.execution_attestation();
+  const std::string resolved_device = attestation.config.device == ExecutionDevice::Cuda
+      ? "cuda"
+      : "cpu";
+  const std::string compute_type = attestation.config.compute_type == ExecutionComputeType::Float16
+      ? "float16"
+      : "int8";
+  check(resolved_device == requested_device, "T07 resolved device differs from request");
+
+  Json samples = Json::array();
+  for (int repeat = 0; repeat < repeats; ++repeat) {
+    const Clock::time_point sample_started = Clock::now();
+    const TranscriptionResult result = backend.transcribe(audio_path);
+    const double sample_wall_ms = elapsed_ms(sample_started);
+    check(result.failure_code.empty(), "T07 completed measurement failed: " + result.failure_code);
+    check(result.duration_ms == expected_duration, "T07 measured duration drift");
+    check(!result.traces.empty(), "T07 completed measurement has no generation trace");
+    const std::size_t generation_calls = std::accumulate(
+        result.traces.begin(),
+        result.traces.end(),
+        std::size_t{0},
+        [](std::size_t total, const WindowTrace& trace) {
+          return total + trace.generation_call_count;
+        });
+    check(generation_calls > 0, "T07 completed measurement has no generation call");
+
+    Json segments = Json::array();
+    for (const SegmentEvidence& segment : result.segments) {
+      segments.push_back(segment_json(segment));
+    }
+    Json traces = Json::array();
+    for (const WindowTrace& trace : result.traces) {
+      traces.push_back(trace_json(trace));
+    }
+    Json sample{
+        {"status", "completed"},
+        {"runKind", discovery ? "module-discovery" : (repeat == 0 ? "cold" : "warm")},
+        {"repeatIndex", repeat + 1},
+        {"segments", std::move(segments)},
+        {"tokenTraces", std::move(traces)},
+        {"generationCompleted", true},
+        {"generationCallCount", generation_calls},
+        {"timings", Json{
+             {"loadMs", repeat == 0 ? Json(load_ms) : Json(nullptr)},
+             {"sampleWallMs", sample_wall_ms},
+             {"featureMs", result.feature_ms},
+             {"modelGenerateMs", result.generate_ms},
+             {"inferenceMs", result.inference_ms},
+             {"inferenceRtf", result.inference_ms / result.duration_ms}}}};
+    if (repeat == 0) {
+      const double process_wall_ms = elapsed_ms(process_started);
+      sample["timings"]["processWallMs"] = process_wall_ms;
+      sample["timings"]["processWallRtf"] = process_wall_ms / result.duration_ms;
+    }
+    samples.push_back(std::move(sample));
+  }
+
+  const fs::path executable = current_executable();
+  Json modules = cuda_development_loaded_modules(path_policy);
+  check(std::none_of(modules.begin(), modules.end(), [](const Json& module) {
+          return lowercase(module.at("name").get<std::string>()).rfind("cudnn", 0) == 0;
+        }),
+        "T07 no-cuDNN identity loaded an unexpected cuDNN module");
+  Json gpu = nullptr;
+  if (requested_device == "cuda") {
+    const auto driver_module = std::find_if(modules.begin(), modules.end(), [](const Json& module) {
+      return lowercase(module.at("name").get<std::string>()) == "nvcuda.dll";
+    });
+    check(driver_module != modules.end(), "T07 CUDA driver module attestation is missing");
+    check(attestation.device_name == "NVIDIA GeForce RTX 3070", "T07 GPU name drift");
+    check(attestation.compute_capability_major == 8
+              && attestation.compute_capability_minor == 6,
+          "T07 compute capability drift");
+    check(attestation.cuda_driver_api_version == 13020, "T07 CUDA driver API version drift");
+    check(driver_module->at("version") == "32.0.15.9649", "T07 NVIDIA driver module drift");
+    gpu = Json{
+        {"deviceIndex", 0},
+        {"name", attestation.device_name},
+        {"driverVersion", "596.49"},
+        {"driverModuleVersion", driver_module->at("version")},
+        {"cudaDriverApiVersion", attestation.cuda_driver_api_version},
+        {"computeCapability", std::to_string(attestation.compute_capability_major) + "."
+             + std::to_string(attestation.compute_capability_minor)},
+        {"visibleDeviceCount", attestation.visible_device_count},
+        {"float16Supported", attestation.compute_type_supported}};
+  }
+
+  const Json raw{
+      {"schemaVersion", 1},
+      {"kind", "hikaru-ct2-whisper-cuda-development-raw"},
+      {"status", "completed"},
+      {"qualificationEligible", false},
+      {"moduleDiscovery", discovery},
+      {"caseId", case_id},
+      {"engine", "faster-whisper"},
+      {"model", Json{
+           {"id", model_id},
+           {"revision", model_revision},
+           {"files", model_file_identities(model_path)}}},
+      {"audio", Json{
+           {"sha256", expected_audio_hash},
+           {"durationMs", expected_duration},
+           {"source", source_identity}}},
+      {"algorithm", "selected-timestamp-no-history-beam1"},
+      {"config", config_json({})},
+      {"inputLockSha256", sha256_file(input_lock)},
+      {"runtime", Json{
+           {"measurementExecutable", file_identity(executable)},
+           {"productionWorker", file_identity(production_worker)},
+           {"requiredDlls", runtime_file_identities(executable, true)},
+           {"requestedDevice", requested_device},
+           {"resolvedDevice", resolved_device},
+           {"computeType", compute_type},
+           {"deviceIndex", attestation.config.device_index},
+           {"ctranslate2Version", "4.8.0"},
+           {"cudaBuildEnabled", true},
+           {"cudaDynamicLoading", true},
+           {"withCudnn", false},
+           {"gpu", gpu},
+           {"cpu", cpu_identity()},
+           {"pathPolicy", path_policy},
+           {"loadedModules", std::move(modules)}}},
+      {"samples", std::move(samples)},
+      {"resources", Json{
+           {"peakProcessRssBytes", peak_working_set()},
+           {"method", "GetProcessMemoryInfo.PeakWorkingSetSize"}}}};
+
+  fs::create_directories(output_path.parent_path());
+  const fs::path temporary = output_path.string() + ".tmp";
+  std::ofstream(temporary, std::ios::binary) << std::setw(2) << raw << '\n';
+  fs::remove(output_path);
+  fs::rename(temporary, output_path);
+  std::cout << Json{
+      {"status", "completed"},
+      {"caseId", case_id},
+      {"device", requested_device},
+      {"moduleDiscovery", discovery},
+      {"sampleCount", repeats}}.dump() << '\n';
+}
+
 void run_candidate_b_identity_check() {
   static_cast<void>(restricted_path_policy());
   run_core_tests();
@@ -1489,6 +1895,8 @@ int main(int argc, char** argv) {
       run_evidence(args, true);
     } else if (std::find(args.begin(), args.end(), "--run-candidate-b-evidence") != args.end()) {
       run_evidence(args, true, true);
+    } else if (std::find(args.begin(), args.end(), "--run-cuda-development-evidence") != args.end()) {
+      run_cuda_development_evidence(args);
     } else if (std::find(args.begin(), args.end(), "--run-cpu-rtf-diagnostic") != args.end()) {
       run_diagnostic_matrix(args);
     } else if (std::find(args.begin(), args.end(), "--run-short-decode-selection") != args.end()) {
