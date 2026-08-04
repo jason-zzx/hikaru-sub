@@ -27,7 +27,8 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - 首期交付平台为 Windows x64。
 - 主安装包和 portable 包内置可直接使用的原生 CPU runtime；CPU 是通用硬发布基线，但不再预设每个引擎都必须在 CPU 上达标。
 - 安装包不得包含任何 ASR 模型权重或 CUDA/Vulkan runtime；正式 GPU runtime 以可选受管 pack 交付。
-- T07 在重复引擎工作前提供 ignored-local development CTranslate2 CUDA execution，仅用于证明设备可行性和加速开发；T14/T15 后续分别负责正式可复现 GPU pack 与资格认证。
+- T07 在 T06 production-worker seam 和 CPU 根因 checkpoint 完成后立即提供 ignored-local development CTranslate2 CUDA execution；是否证明 CPU ceiling 只影响发布路线是否可标记为 GPU-required，不影响开发 CUDA 通道用于加速后续字幕质量迭代。只要 CUDA 路径真实可用且相对同配置 CPU 有可复现加速，后续字幕质量失败不得触发回退 CPU。
+- T09 在共享 CrispASR backend 稳定时同步建立 ignored-local development GPU execution，供 T10/T11 优先进行模型质量迭代；同样只有 GPU 不可用或相对 CPU 没有可复现性能收益时才允许开发回退 CPU，CER、漏段、分段和时间戳问题继续在 GPU 上迭代。T14/T15 后续分别负责正式可复现 GPU pack 与资格认证，开发期 GPU 证据不得替代发布证据。
 - 普通 faster-whisper 只有在 T06 同二进制诊断证明 CPU ceiling、且正式 CUDA 路线达到质量与 accelerated RTF `<=0.5` 后，才可标记为 GPU-required。无 qualified GPU 的机器必须显示 route unavailable/原因，不得启用失败 CPU route或静默回退 Python。
 - 其他未达到质量、性能、稳定回退或许可证门槛的 GPU pack 标记为 `stop-revise` 并从发布清单移除，不阻塞已通过的 CPU 原生路线。
 - 首期同一时间只允许一个活跃 ASR 推理任务。
@@ -107,7 +108,7 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - Windows setup 不超过 80 MB，portable ZIP 不超过 90 MB，解压后的 CPU ASR runtime 不超过 250 MB。
 - 迁移期间保留 `python-legacy` 源码开发/诊断路径；发布包不携带 Python runtime 或 venv。
 - 每个引擎分别通过用户真值和产品合同门槛后才能切换；单个 CrispASR 引擎失败不阻塞已达标的 CTranslate2 路径。
-- ordinary faster-whisper 的 `large-v3` 默认模型和 `large-v2` 日语长音频是路线硬门槛且路线本身必须交付。T06 在归档前完成 CPU RTF 根因矩阵：CPU branch 由 T06 完成这些硬门槛；确认 CPU ceiling 时，T06 以 `gpu-required-pending` 完成 CPU handoff，T07 开发 CUDA，T14/T15 正式打包并完成同一硬门槛；若 production worker、selected CPU baseline、Candidate B reviewed stop-revise evidence、Python non-gating comparison、deterministic publishers、host/protocol tests 与 downstream handoff 完成但没有资格分支被证明，T06 可按 `migration-handoff-stop-revise` truthful handoff。该第三分支不代表 product qualification 或 GPU-required decision，native route 保持 disabled，Release/default 保持 Python legacy。
+- ordinary faster-whisper 的 `large-v3` 默认模型和 `large-v2` 日语长音频是路线硬门槛且路线本身必须交付。T06 在归档前完成 CPU RTF 根因矩阵：CPU branch 由 T06 完成这些硬门槛；确认 CPU ceiling 时，T06 以 `gpu-required-pending` 完成 CPU handoff，并由 T14/T15 正式打包和完成同一硬门槛；若 production worker、selected CPU baseline、Candidate B reviewed stop-revise evidence、Python non-gating comparison、deterministic publishers、host/protocol tests 与 downstream handoff 完成但没有资格分支被证明，T06 可按 `migration-handoff-stop-revise` truthful handoff。无论 T06 采用哪个闭合分支，只要 production worker seam 与 CPU checkpoint 已完成，T07 都应先建立开发 CUDA 通道再进入重复 CT2 质量迭代；该开发顺序不代表 product qualification 或 GPU-required decision，未资格化的 native route 保持 disabled，Release/default 保持 Python legacy。
 - CPU branch 由 T06 实测其余模型；GPU-required branch 由 T15 实测全部七模型并标记 `qualified`、`stop-revise` 或 `unsupported-for-native-release`。非默认模型失败不阻塞已通过的原生 faster-whisper。
 - T17 仍展示全部现有模型；资格状态控制原生可用性、禁用状态和说明，而不是从列表隐藏。发布版不得为未通过模型静默回退到 Python。
 
@@ -121,14 +122,14 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 
 ## Acceptance Criteria
 
-- [x] T06 已在独立审查后选择 `migration-handoff-stop-revise`：worker、Candidate A selected CPU baseline、Candidate B reviewed stop-revise evidence、Python non-gating comparison、deterministic publishers、host/protocol tests 与 downstream handoff 已完成，但 qualification 未被证明。该选择保留原始 `cpu-qualified`/`gpu-required-pending` 要求、large-v3/large-v2 hard gates、Candidate A long 的 7 个 confirmed gaps、Candidate B medium 的 1 个 confirmed gap、其余模型 `blocked-not-run`、`low-volume` 限制、native disabled 和 Python legacy/default；T08 可独立推进，T07 仍仅为可选 development CUDA seam。
+- [x] T06 已在独立审查后选择 `migration-handoff-stop-revise`：worker、Candidate A selected CPU baseline、Candidate B reviewed stop-revise evidence、Python non-gating comparison、deterministic publishers、host/protocol tests 与 downstream handoff 已完成，但 qualification 未被证明。该选择保留原始 `cpu-qualified`/`gpu-required-pending` 要求、large-v3/large-v2 hard gates、Candidate A long 的 7 个 confirmed gaps、Candidate B medium 的 1 个 confirmed gap、其余模型 `blocked-not-run`、`low-volume` 限制、native disabled 和 Python legacy/default；下一步先执行 T07 development CUDA seam，再进入 T08 的重复 CT2 质量迭代。
 - [ ] 发布版全新安装无需 Python、pip、PyTorch、NeMo 或 FastAPI 即可使用已缓存模型转录。
 - [ ] React 使用的 Tauri command、任务状态和 `AsrJobSnapshot` 合同保持兼容。
 - [ ] Worker protocol v1、单任务管理、进程树取消、异常退出和恢复快照均有自动化覆盖。
 - [ ] Qwen3 的模型就绪状态同时要求 ASR 模型与 ForcedAligner，且对齐失败不会输出伪时间轴。
 - [ ] 模型 manifest、固定来源、大小、SHA-256、断点续传和多文件原子安装通过测试。
 - [ ] installed 与 portable 的 runtime/model/download 路径、probe/measure/cleanup 行为通过测试。
-- [ ] T07 development CUDA seam 在重复模型工作前证明同一 worker/protocol/device 路径；T14/T15 GPU packs 具备固定构建身份、哈希、许可证、能力探测和适用的 CPU 回退/不可用说明，只有通过自身 `RTF <=0.5` 与质量门槛的 pack 才进入发布清单。
+- [ ] T07 在 T08 前完成 CTranslate2 development CUDA seam，T09 在 T10/T11 前完成 CrispASR development GPU seam。每条开发通道必须记录 `development-gpu-ready`、`development-gpu-unavailable` 或 `development-gpu-no-speedup`：只在无法证明真实 GPU 执行，或同模型/配置/音频的 GPU warmed median RTF 没有超出测量噪声地优于 CPU 时，才允许下游开发回退 CPU；CER、漏段、分段和时间戳失败不参与该设备回退决策。T14/T15 GPU packs 仍须具备固定构建身份、哈希、许可证、能力探测和适用的 CPU 回退/不可用说明，只有通过自身 `RTF <=0.5` 与质量门槛的 pack 才进入发布清单。
 - [ ] 运行依赖和转录 UI 不再暴露 Python/venv，旧设置可安全加载并迁移；全部现有模型仍可见，但未通过原生资格的模型有明确状态且不能静默走 Python。
 - [ ] 五引擎质量、长音频覆盖、性能与资源矩阵直接对 T01 用户真值达到用户评审后冻结的绝对门槛；Python 数值只作为可选参考。
 - [ ] setup、portable 和解压 runtime 体积达到 R8 预算，安装包内模型权重为 0。
@@ -154,8 +155,8 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - T01 ground-truth contract、per-case coverage 与绝对预算已获用户评审并冻结；T02/T03 模型实测直接复用该 manifest identity 和共享指标实现，不依赖 Python reference 成功。
 - T02 已证明 CTranslate2 + oneDNN native CPU backend/runtime 可行，但当前最小 fixed-window 算法为 `stop-revise`：large-v3 short CER 略超门槛，large-v3/Kotoba 中长音频均有 confirmed speech gaps。T06 必须修订算法并重测，不能把 runtime 可执行等同于产品质量通过。
 - T03 final immutable evidence 修正了两个 harness interpretation：Reazon GGUF 应通过 public `parakeet` session backend，三 case CER/RTF/RSS/timeline/gap 冻结门槛均通过，但单巨段与大量 zero-duration native words 仅支持 `proceed-with-named-risks`；Qwen 使用 pinned upstream grouping 后 short/leading/boundary timeline legal，但 short timing 严重失败且 medium/long grouped source segments 仍 fail closed。Parakeet 与 Qwen 为 `stop-revise`；没有 T03 route 可据此直接切换 production default。
-- GPU 加速不再另建后续父任务：新增正常编号 T07，在 T06 production-worker/CPU diagnosis checkpoint 后提供 development CTranslate2 CUDA execution；T14 负责可复现 CUDA/Vulkan runtime packs，T15 负责设备路由、不可用说明/CPU fallback 和 pack 独立资格矩阵。
+- GPU 加速不再另建后续父任务：正常编号 T07 在 T06 production-worker/CPU diagnosis checkpoint 后立即提供 development CTranslate2 CUDA execution，优先于 T08 的重复质量迭代且不以 CPU ceiling 为激活条件；T09 同步建立 CrispASR development GPU seam，供 T10/T11 GPU-first 迭代。T14 负责可复现 CUDA/Vulkan runtime packs，T15 负责设备路由、不可用说明/CPU fallback 和 pack 独立资格矩阵。
 - T04 `native-asr-worker-protocol` 与 T05 `native-asr-rust-job-host` 均已实现、检查、提交并归档；final protocol/limits、generic Rust host、active gate、recovery 和 process-tree cancellation 已成为 T06 handoff。
 - T06 已完成同二进制 warmed 120s CPU 根因矩阵：no-history A/B RTF `0.842/0.916` 通过，full-history beam5 C 为 `1.321`，beam1 D 为 `0.988`。因此当前证据排除固有 CT2 CPU ceiling，确认 full-history prefill 为主回归因子，并证明 beam 5 在 full-history 配置中显著增加总成本；四格矩阵不单独证明 beam/history 交互效应。
 - T06 后续 bounded short decode selection 只改变 beam size：timestamp/no-history beam 1 以 CER/RTF `0.2667/0.632` 通过，beam 5 以 `0.3583/0.811` 失败，均为 0 timeline/gap；因此未扩展 beam 3/10。独立审查修正 diagnostic-default drift 并强化 evidence identity 后，修订 lock 下的 beam-1/no-history CPU candidate 已通过 authoritative large-v3 short（CER `0.2667`、warm RTF `0.623`、cold `28.342s`、RSS `3.43 GB`、0 timeline/gap）和 medium（CER `0.1134`、RTF `0.559`、RSS `3.43 GB`、0 timeline/gap），但同一 identity 的 long-v1 虽通过 CER `0.2653`、RTF `0.550`、RSS `3.43 GB` 与 timeline 0，仍有 7 个 confirmed gap `>=1500ms`。随后唯一 Candidate B 已以 direct official ORT 1.28.0 CPU + ordinary faster-whisper 1.2.1 Silero V6 实现；最后独立审查 blocker 修复后的 final lock `e687ead6...` 绑定实际 CPU/module paths、restricted PATH roots `77f4714a...` 和 module layout `a650e185...`，并通过包含 correlated all-root rewrite 的 21 项 mutation matrix。它的 large-v3 short 全通过（CER `0.2667`、warm RTF `0.654`、cold `29.544s`、RSS `3.44 GB`、0 timeline/gap），但 medium 仍有 1 个 confirmed gap（CER `0.1055`、RTF `0.599`、RSS `3.44 GB`、timeline 0），因此在 long 前停止为 `stop-revise`。large-v2、其余模型、T07/GPU 均未启动，route 保持未 qualified/未启用，ORT/VAD 不进入 T13 package input。
-- T06 已完成 Candidate B reviewed `stop-revise` checkpoint 与迁移交接所需的 worker、publisher、host/protocol、Python non-gating 和 downstream handoff 材料，并已在独立复核后选择 `migration-handoff-stop-revise`；该选择不改变 ordinary faster-whisper mandatory、T08 独立下一步、`low-volume` limitation 或 T13 排除 ORT/VAD 的边界。
+- T06 已完成 Candidate B reviewed `stop-revise` checkpoint 与迁移交接所需的 worker、publisher、host/protocol、Python non-gating 和 downstream handoff 材料，并已在独立复核后选择 `migration-handoff-stop-revise`；该选择不改变 ordinary faster-whisper mandatory、`low-volume` limitation 或 T13 排除 ORT/VAD 的边界。当前下一步为 T07 development CUDA；T08 在 T07 记录 `development-gpu-ready`、`development-gpu-unavailable` 或 `development-gpu-no-speedup` 后继续。
