@@ -636,3 +636,38 @@ Implemented and independently reviewed the native CTranslate2 faster-whisper wor
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: Complete T07 CTranslate2 CUDA development lane
+
+**Date**: 2026-08-05
+**Task**: Complete T07 CTranslate2 CUDA development lane
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented and verified the ignored-local CTranslate2 CUDA development lane. Added opt-in CUDA 12.8/SM 8.6 build support with cuDNN disabled, explicit CPU INT8 and CUDA device-0 FP16 execution, fail-closed pre-ready errors, driver-based GPU/module attestation, paired 1-cold/3-warm evidence and deterministic publication. RTX 3070 evidence reached development-gpu-ready with GPU/CPU warmed RTF ratios 0.1090 and 0.1313. Updated ASR/Tauri specs and parent T07/T08 handoff; archived T07 without changing release routing or packaging.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9645704` | (see git log) |
+| `5b90d83` | (see git log) |
+| `ad3482e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
