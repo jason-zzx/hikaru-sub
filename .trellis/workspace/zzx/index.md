@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
-- **Last Active**: 2026-08-04
+- **Total Sessions**: 20
+- **Last Active**: 2026-08-05
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~638 | Active |
+| `journal-1.md` | ~673 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-08-05 | Complete T07 CTranslate2 CUDA development lane | `9645704`, `5b90d83`, `ad3482e` | `dev-crisp-asr` |
 | 19 | 2026-08-04 | Complete native CTranslate2 Whisper handoff | `b29412e` | `dev-crisp-asr` |
 | 18 | 2026-08-02 | Native ASR Rust job host | `74d1a4e` | `dev-crisp-asr` |
 | 17 | 2026-07-31 | Establish native ASR benchmark ground truth | `a9e31cb` | `dev-crisp-asr` |
