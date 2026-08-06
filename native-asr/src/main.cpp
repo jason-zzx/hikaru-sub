@@ -173,7 +173,7 @@ int run_worker(const WorkerRequestV1& request) {
         ? whisper::cuda_execution_config()
         : whisper::cpu_execution_config();
     const whisper::CandidateAConfig config = kotoba
-        ? whisper::kotoba_config()
+        ? whisper::kotoba_k2_config()
         : whisper::CandidateAConfig{};
     whisper::CTranslate2WhisperBackend backend(
         model,

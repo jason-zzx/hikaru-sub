@@ -71,7 +71,7 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 - Controlled failed evidence retains the failing trace and source/model bounds. Validators reject empty placeholder traces, and the benchmark adapter must refuse failed evidence. An externally terminated long run with no atomic token result is process evidence only: keep its binary/lock/timeout/termination identity separate, mark it unscored, and never merge it into completed rows.
 - A sanitized publisher must recompute CER/timeline/gaps from the authoritative manifest/ASS through the shared T01 implementation; it must not trust mutable pre-adapted metric fields. Any inference source/config/binary/DLL/model identity change invalidates affected measurements and requires rerunning them before publication.
 - Missing confirmed-speech regions are semantic and gating by default. A region is diagnostic-only when every overlapping reference cue, after NFKC normalization and removal of whitespace, Unicode punctuation/symbols, and `ー` / `〜` / `~`, is exactly 1..6 repeats of one unit from `あ`, `う`, `え`, `お`, `ん`, `うん`, or `うあ`. Excluded regions remain in CER and publish separately; `はい`, laughter, mixed/lexical cues, and unknown forms remain semantic.
-- Product qualification stops after a mandatory gate fails for candidates whose required matrix ends at that gate. T08 Kotoba K1 is the explicit full-matrix exception: short-v1, medium-v1, and long-v2 are all scored under one frozen inference identity even after an earlier failure; only the complete matrix publishes `accepted-kotoba-algorithm-input` or `stop-revise`. Partial prefixes remain diagnostic and identify the next case. A later Kotoba candidate requires a newly reviewed identity that addresses the complete observed failure profile.
+- Product qualification stops after a mandatory gate fails for candidates whose required matrix ends at that gate. T08 Kotoba K1/K2 are explicit full-matrix candidates: short-v1, medium-v1, and long-v2 are all scored under one frozen inference identity even after an earlier failure; only the complete matrix publishes `accepted-kotoba-algorithm-input` or `stop-revise`. Partial prefixes remain diagnostic and identify the next case. Every later Kotoba candidate requires a newly reviewed identity that addresses the complete observed failure profile.
 - Frozen native gates: CER `<=0.35` per engine/case; CPU inference RTF `<=1.0`; accelerated GPU inference RTF `<=0.5`; short cold wall `<=120s`; peak RSS `<=6 GiB` for CTranslate2 or `<=12 GiB` for CrispASR; zero invalid/out-of-bounds segments; zero semantic confirmed-speech gaps `>=1500ms`; Qwen3 ForcedAligner median `<=150ms` and P95 `<=500ms`. No VRAM gate is defined.
 - Python references never establish expected output, relative CER/RTF gates, or missing annotations.
 
@@ -148,6 +148,80 @@ Correct: stop the rejected algorithm, keep remaining models `blocked-not-run`, a
 
 Wrong: use every Qwen aligner character range as a cue, expand zero-duration ranges, or publish session getter sentinel timing.
 Correct: retain raw ranges, reproduce the exact pinned upstream source grouping, accept only legal ForcedAligner-derived final segments, and fail closed otherwise.
+```
+
+## Scenario: Native Kotoba Bounded-Stride Overlap
+
+### 1. Scope / Trigger
+
+Use this contract for the accepted native Kotoba algorithm identity `kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1`. It applies only to `kotoba-faster-whisper -> ctranslate2`; ordinary faster-whisper, protocol v1, the Tauri host, Python legacy/default routing, downloader, package, and UI remain unchanged.
+
+### 2. Signatures
+
+```cpp
+struct CandidateAConfig {
+  int max_source_frames = 3000;
+  int max_applied_seek_frames = 0;
+};
+
+CandidateAConfig kotoba_k2_config();  // 1500 source, 1000 max applied
+std::int64_t kotoba_k2_applied_seek_frames(
+    std::int64_t proposed,
+    std::int64_t remaining,
+    std::int64_t maximum);
+std::int64_t kotoba_k2_owner_window_index(
+    const std::vector<std::int64_t>& window_starts_ms,
+    std::int64_t segment_start_ms);
+```
+
+Ignored K2 raw traces include candidate/ownership identity, parsed/proposed/applied advances, source overlap, ownership interval, progress frontier, count conservation, per-parsed-segment exact tuple/trace hashes, resolved owner index, and `emitted|non-owner|exact-duplicate` disposition.
+
+### 3. Contracts
+
+- Keep Kotoba's 1500-frame source window, padded 3000-frame model/timestamp range, Japanese prompt, beam 5, temperature 0, no previous-text history, no VAD, and reviewed CUDA device-0/FLOAT16 identity.
+- Speech proposed advance is `min(parsedAdvance, sourceWindowFrames)`; no-speech proposed advance is the current source window. Applied advance is exactly `min(proposedAdvance, 1000, remainingFrames)`. A full source window therefore overlaps the next decode by at least 500 frames / 5000ms.
+- Decoded starts define ownership. Non-final window `i` owns `[S[i], S[i+1])`; the final window owns `[S[last], audioDuration)`. A start exactly at a boundary belongs to the later window. Resolve recorded owner indices against the complete decoded-start chain; never assume a future segment belongs only to `i+1`.
+- Buffer one current window until advance/ownership is known. Filter non-owner segments, remove only exact `(startMs, endMs, text)` duplicates, validate unchanged bounds/nondecreasing starts, then emit callbacks. Do not clip, stretch, synthesize, fuzzy-merge, reference-match, or fill gaps.
+- Progress equals each committed ownership frontier and ends once at exact duration.
+- The adapter derives disposition categories from ownership and prior emitted tuple hashes; it does not trust editable category labels/counts. `exact-duplicate` requires `tupleSha256 == duplicateTargetSha256` and an already emitted identical tuple.
+- Tracked publication recomputes metrics through T01, binds the K2 input/correction/tool/runtime/model identities plus every ignored raw SHA-256, publishes all seven prior K1 coordinate statuses, and contains no transcript/token/path data.
+- K2's accepted development result is an algorithm/cache input only. It does not enable a production route or qualify a runtime pack.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Applied advance differs from the exact frozen formula | Reject evidence as a different candidate identity |
+| Full non-final 1500-frame window overlaps by less than 500 frames | Reject evidence |
+| Ownership intervals are noncontiguous, boundary ownership changes, or owner index differs from complete start-chain resolution | Reject evidence |
+| Owned unique segment is labeled non-owner/duplicate, non-owner is emitted, category counts differ, or duplicate target differs | Reject evidence |
+| Top-level emitted segment sequence differs from emitted dispositions in text/timing/tokens/trace hash | Reject evidence |
+| Progress differs from ownership frontiers, regresses, duplicates final completion, or misses exact duration | Reject evidence |
+| Short/medium/long order, 1+3/1/1 samples, lock, executable/worker/DLL/model/device/corpus, or raw hash differs | Publish no result |
+| Any case fails CER/RTF/wall/RSS/timeline/semantic-gap gate | Complete the full matrix, publish `stop-revise`, keep native Kotoba disabled |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** one frozen K2 CUDA identity completes all three cases; adapter independently derives stride, ownership, disposition, progress, runtime, raw hashes, and shared T01 metrics; deterministic JSON/Markdown publishes an accepted algorithm input.
+- **Base:** complete evidence passes structural identity but one mandatory quality gate fails; publish `stop-revise` and return to planning without K3 or a waiver.
+- **Bad:** trust raw disposition labels/counts, accept `applied <= cap` instead of exact formula, assume every future owner is `i+1`, omit raw hashes, use midpoint ownership, or let a final cleanup hide callback/output divergence.
+
+### 6. Tests Required
+
+- C++ vectors cover ordinary/K1 isolation, `1500->1000`, shorter parsed advance, no-speech, final partial, zero advance, exact boundary, future owner beyond `i+1`, gap #3/#6 latest-start versus midpoint, exact-only dedup, same-time different text, unchanged timing, and progress.
+- Protocol-only, CPU CT2, and pinned CUDA CTest lanes remain independently green.
+- Real Rust-host Kotoba CUDA success, pre-ready malformed snapshot, CPU-only `cuda_not_built`, cancellation/reap, recovery, and active-gate tests remain green.
+- Publisher mutation tests coordinate stride/frontier changes, forge ownership/disposition/count/duplicate fields, mutate runtime/corpus/path/candidate identities, run actual publication twice, compare bytes, bind raw hashes, and scan sanitized output for private data.
+- Run the complete short 1-cold+3-warm, medium once, and long-v2 once matrix regardless of earlier outcome; reassess all seven K1 coordinates without pre-waiver.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: appliedAdvance <= min(proposed, 1000, remaining), so call it K2.
+Correct: appliedAdvance == min(proposed, 1000, remaining), and every downstream seek/overlap/ownership/progress field reproduces that exact chain.
+
+Wrong: trust disposition="non-owner" and adjusted counts, then score the reduced top-level output.
+Correct: derive ownership and exact-duplicate status independently, require category counts to match derived categories, and bind the accepted raw bytes by SHA-256.
 ```
 
 ## Scenario: Native CTranslate2 Development CUDA Evidence

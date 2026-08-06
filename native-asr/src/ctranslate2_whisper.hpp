@@ -71,9 +71,12 @@ struct CandidateAConfig {
   float temperature = 0.0f;
   std::size_t max_initial_timestamp_index = 50;
   int max_source_frames = max_model_frames;
+  // Zero keeps the K1/ordinary seek behavior; K2 sets the Kotoba-only cap.
+  int max_applied_seek_frames = 0;
 };
 
 CandidateAConfig kotoba_config();
+CandidateAConfig kotoba_k2_config();
 bool kotoba_mel_shape_supported(std::size_t mel_bins);
 
 struct TokenIds {
@@ -97,6 +100,22 @@ struct SegmentEvidence {
   std::size_t timestamp_end_token = 0;
   std::vector<std::size_t> tokens;
   std::string trace_sha256;
+};
+
+struct K2SegmentDisposition {
+  SegmentEvidence segment;
+  std::int64_t owner_window_index = -1;
+  std::string disposition;
+  std::string tuple_sha256;
+  std::string duplicate_target_sha256;
+};
+
+struct K2CommitResult {
+  std::vector<SegmentEvidence> emitted;
+  std::vector<K2SegmentDisposition> dispositions;
+  std::size_t owned_before_dedup_count = 0;
+  std::size_t non_owner_discarded_count = 0;
+  std::size_t exact_duplicate_discarded_count = 0;
 };
 
 struct VadSpeechInterval {
@@ -129,6 +148,26 @@ struct WindowTrace {
   std::int64_t source_progress_before_ms = 0;
   std::int64_t source_progress_after_ms = 0;
   bool vad_timestamp_restored = false;
+  bool k2_candidate = false;
+  std::size_t window_index = 0;
+  std::int64_t parsed_seek_advance_frames = 0;
+  std::int64_t proposed_advance_frames = 0;
+  std::int64_t applied_seek_advance_frames = 0;
+  std::int64_t next_window_start_ms = 0;
+  std::int64_t actual_source_overlap_frames = 0;
+  bool single_timestamp_ending = false;
+  bool used_decoded_seek = false;
+  std::int64_t ownership_start_ms = 0;
+  std::int64_t ownership_end_ms = 0;
+  bool final_window = false;
+  std::size_t parsed_segment_count = 0;
+  std::size_t owned_before_dedup_count = 0;
+  std::size_t non_owner_discarded_count = 0;
+  std::size_t exact_duplicate_discarded_count = 0;
+  std::size_t emitted_segment_count = 0;
+  std::int64_t last_emitted_start_before_ms = -1;
+  std::int64_t last_emitted_start_after_ms = -1;
+  std::vector<K2SegmentDisposition> segment_dispositions;
   std::size_t prompt_token_count = 0;
   std::size_t history_token_count_before = 0;
   std::size_t history_token_count_after = 0;
@@ -207,6 +246,22 @@ std::vector<float> official_log_mel_for_test(
     int frame_count);
 
 void remove_exact_duplicate_segments(std::vector<SegmentEvidence>& segments);
+
+std::int64_t kotoba_k2_applied_seek_frames(
+    std::int64_t proposed_advance_frames,
+    std::int64_t remaining_frames,
+    std::int64_t max_applied_seek_frames);
+std::int64_t kotoba_k2_owner_window_index(
+    const std::vector<std::int64_t>& window_starts_ms,
+    std::int64_t segment_start_ms);
+K2CommitResult commit_kotoba_k2_window(
+    const std::vector<SegmentEvidence>& parsed_segments,
+    std::int64_t ownership_start_ms,
+    std::int64_t ownership_end_ms,
+    bool final_window,
+    std::int64_t audio_duration_ms,
+    std::int64_t window_index,
+    const std::vector<SegmentEvidence>& already_emitted);
 
 std::vector<float> candidate_b_vad_rows_for_test(const std::vector<float>& samples);
 std::vector<VadSpeechInterval> candidate_b_intervals_for_test(

@@ -1069,6 +1069,12 @@ CandidateAConfig kotoba_config() {
   return config;
 }
 
+CandidateAConfig kotoba_k2_config() {
+  CandidateAConfig config = kotoba_config();
+  config.max_applied_seek_frames = 1000;
+  return config;
+}
+
 bool kotoba_mel_shape_supported(std::size_t mel_bins) {
   return mel_bins == 128;
 }
@@ -1246,6 +1252,114 @@ void remove_exact_duplicate_segments(std::vector<SegmentEvidence>& segments) {
   segments = std::move(unique);
 }
 
+std::int64_t kotoba_k2_applied_seek_frames(
+    std::int64_t proposed_advance_frames,
+    std::int64_t remaining_frames,
+    std::int64_t max_applied_seek_frames) {
+  if (proposed_advance_frames <= 0
+      || remaining_frames <= 0
+      || max_applied_seek_frames <= 0) {
+    throw BackendError("invalid_generation", "K2 seek advance must be positive");
+  }
+  return std::min({proposed_advance_frames, max_applied_seek_frames, remaining_frames});
+}
+
+std::int64_t kotoba_k2_owner_window_index(
+    const std::vector<std::int64_t>& window_starts_ms,
+    std::int64_t segment_start_ms) {
+  if (window_starts_ms.empty()
+      || segment_start_ms < 0
+      || window_starts_ms.front() != 0
+      || !std::is_sorted(window_starts_ms.begin(), window_starts_ms.end())
+      || std::adjacent_find(window_starts_ms.begin(), window_starts_ms.end())
+          != window_starts_ms.end()) {
+    throw BackendError("invalid_generation", "K2 window-start chain is invalid");
+  }
+  const auto owner = std::upper_bound(
+      window_starts_ms.begin(),
+      window_starts_ms.end(),
+      segment_start_ms);
+  return owner == window_starts_ms.begin()
+      ? 0
+      : static_cast<std::int64_t>(owner - window_starts_ms.begin() - 1);
+}
+
+K2CommitResult commit_kotoba_k2_window(
+    const std::vector<SegmentEvidence>& parsed_segments,
+    std::int64_t ownership_start_ms,
+    std::int64_t ownership_end_ms,
+    bool final_window,
+    std::int64_t audio_duration_ms,
+    std::int64_t window_index,
+    const std::vector<SegmentEvidence>& already_emitted) {
+  if (ownership_start_ms < 0
+      || ownership_end_ms <= ownership_start_ms
+      || ownership_end_ms > audio_duration_ms
+      || final_window != (ownership_end_ms == audio_duration_ms)) {
+    throw BackendError("invalid_generation", "K2 ownership interval is invalid");
+  }
+
+  K2CommitResult result;
+  result.dispositions.reserve(parsed_segments.size());
+  for (const SegmentEvidence& segment : parsed_segments) {
+    K2SegmentDisposition disposition;
+    disposition.segment = segment;
+    disposition.tuple_sha256 = sha256_text(
+        std::to_string(segment.segment.start_ms) + "\n"
+        + std::to_string(segment.segment.end_ms) + "\n"
+        + segment.segment.text);
+    const bool owned = segment.segment.start_ms >= ownership_start_ms
+        && segment.segment.start_ms < ownership_end_ms;
+    if (!owned) {
+      disposition.owner_window_index = segment.segment.start_ms >= ownership_end_ms
+          ? window_index + 1
+          : std::max<std::int64_t>(0, window_index - 1);
+      disposition.disposition = "non-owner";
+      ++result.non_owner_discarded_count;
+      result.dispositions.push_back(std::move(disposition));
+      continue;
+    }
+
+    disposition.owner_window_index = window_index;
+    ++result.owned_before_dedup_count;
+    const auto duplicate = std::find_if(
+        already_emitted.begin(),
+        already_emitted.end(),
+        [&](const SegmentEvidence& existing) { return same_segment(existing, segment); });
+    const auto current_duplicate = std::find_if(
+        result.emitted.begin(),
+        result.emitted.end(),
+        [&](const SegmentEvidence& existing) { return same_segment(existing, segment); });
+    if (duplicate != already_emitted.end() || current_duplicate != result.emitted.end()) {
+      const SegmentEvidence& target = duplicate != already_emitted.end()
+          ? *duplicate
+          : *current_duplicate;
+      disposition.disposition = "exact-duplicate";
+      disposition.duplicate_target_sha256 = sha256_text(
+          std::to_string(target.segment.start_ms) + "\n"
+          + std::to_string(target.segment.end_ms) + "\n"
+          + target.segment.text);
+      ++result.exact_duplicate_discarded_count;
+      result.dispositions.push_back(std::move(disposition));
+      continue;
+    }
+    if (!has_text(segment.segment.text)
+        || segment.segment.start_ms < 0
+        || segment.segment.end_ms <= segment.segment.start_ms
+        || segment.segment.end_ms > audio_duration_ms
+        || (!already_emitted.empty()
+            && segment.segment.start_ms < already_emitted.back().segment.start_ms)
+        || (!result.emitted.empty()
+            && segment.segment.start_ms < result.emitted.back().segment.start_ms)) {
+      throw BackendError("invalid_generation", "K2 owned segment timeline is invalid");
+    }
+    disposition.disposition = "emitted";
+    result.emitted.push_back(segment);
+    result.dispositions.push_back(std::move(disposition));
+  }
+  return result;
+}
+
 std::vector<float> candidate_b_vad_rows_for_test(const std::vector<float>& samples) {
   return make_vad_rows(samples);
 }
@@ -1342,7 +1456,11 @@ class CTranslate2WhisperBackend::Impl {
         config(std::move(config)),
         vad_model_path(std::move(vad_model_path)) {
     if (this->config.max_source_frames <= 0
-        || this->config.max_source_frames > max_model_frames) {
+        || this->config.max_source_frames > max_model_frames
+        || this->config.max_applied_seek_frames < 0
+        || this->config.max_applied_seek_frames > max_model_frames
+        || (this->config.max_applied_seek_frames > 0
+            && this->config.max_applied_seek_frames > this->config.max_source_frames)) {
       throw BackendError("config_identity_mismatch", "Source window frame limit is invalid");
     }
     tokens.eot = tokenizer.token_to_id("<|endoftext|>");
@@ -1453,6 +1571,8 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
   result.duration_ms = audio.duration_ms;
   result.original_sample_count = audio.samples.size();
   const Clock::time_point inference_started = Clock::now();
+  const bool k2 = impl_->config.max_applied_seek_frames > 0;
+  std::size_t window_index = 0;
 
   CandidateBVadResult vad;
   const std::vector<float>* decode_samples = &audio.samples;
@@ -1508,6 +1628,12 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     trace.history_token_count_before = history.size();
     trace.source_progress_before_ms = source_progress;
     trace.vad_timestamp_restored = result.vad_enabled;
+    trace.k2_candidate = k2;
+    trace.window_index = window_index;
+    trace.ownership_start_ms = window_offset_ms;
+    trace.last_emitted_start_before_ms = result.segments.empty()
+        ? -1
+        : result.segments.back().segment.start_ms;
 
     const Clock::time_point feature_started = Clock::now();
     std::vector<float> mel = log_mel_window(
@@ -1572,20 +1698,35 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     if (skip_no_speech) {
       trace.skipped_as_no_speech = true;
       trace.parse_status = "no-speech";
-      seek += segment_frames;
+      const std::int64_t proposed_advance = segment_frames;
+      const std::int64_t advance = k2
+          ? kotoba_k2_applied_seek_frames(
+              proposed_advance,
+              total_frames - seek,
+              impl_->config.max_applied_seek_frames)
+          : proposed_advance;
+      trace.parsed_seek_advance_frames = proposed_advance;
+      trace.proposed_advance_frames = proposed_advance;
+      trace.applied_seek_advance_frames = advance;
+      seek += advance;
       trace.seek_frames_after = seek;
+      trace.next_window_start_ms = std::min(audio.duration_ms, seek * 10);
+      trace.final_window = seek == total_frames;
+      trace.ownership_end_ms = trace.final_window
+          ? audio.duration_ms
+          : trace.next_window_start_ms;
       trace.history_token_count_after = history.size();
-      trace.source_overlap_ms = std::max<std::int64_t>(
-          0,
-          trace.source_window_duration_ms
-              - (trace.seek_frames_after - trace.seek_frames_before) * 10);
+      trace.actual_source_overlap_frames = std::max<std::int64_t>(0, segment_frames - advance);
+      trace.source_overlap_ms = trace.actual_source_overlap_frames * 10;
       source_progress = result.vad_enabled
           ? std::min(
                 audio.duration_ms,
                 restore_vad_time_ms(vad.intervals, seek * 10, true))
           : std::min(audio.duration_ms, seek * 10);
       trace.source_progress_after_ms = source_progress;
+      trace.last_emitted_start_after_ms = trace.last_emitted_start_before_ms;
       result.traces.push_back(std::move(trace));
+      ++window_index;
       if (on_progress) {
         on_progress(source_progress);
       }
@@ -1635,25 +1776,27 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
           segment.segment.end_ms = restored_end;
           segment.vad_timestamp_restored = true;
         }
-        const bool duplicate = std::any_of(
-            result.segments.begin(),
-            result.segments.end(),
-            [&](const SegmentEvidence& existing) {
-              return same_segment(existing, segment);
-            });
-        if (!duplicate) {
-          if (!has_text(segment.segment.text)
-              || segment.segment.start_ms < 0
-              || segment.segment.end_ms <= segment.segment.start_ms
-              || segment.segment.end_ms > audio.duration_ms
-              || (!result.segments.empty()
-                  && segment.segment.start_ms < result.segments.back().segment.start_ms)) {
-            throw BackendError("invalid_generation", "Generated segment timeline is invalid");
+        if (!k2) {
+          const bool duplicate = std::any_of(
+              result.segments.begin(),
+              result.segments.end(),
+              [&](const SegmentEvidence& existing) {
+                return same_segment(existing, segment);
+              });
+          if (!duplicate) {
+            if (!has_text(segment.segment.text)
+                || segment.segment.start_ms < 0
+                || segment.segment.end_ms <= segment.segment.start_ms
+                || segment.segment.end_ms > audio.duration_ms
+                || (!result.segments.empty()
+                    && segment.segment.start_ms < result.segments.back().segment.start_ms)) {
+              throw BackendError("invalid_generation", "Generated segment timeline is invalid");
+            }
+            if (!result.vad_enabled && on_segment) {
+              on_segment(segment.segment);
+            }
+            result.segments.push_back(segment);
           }
-          if (!result.vad_enabled && on_segment) {
-            on_segment(segment.segment);
-          }
-          result.segments.push_back(std::move(segment));
         }
       }
       history.insert(
@@ -1668,18 +1811,59 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
       const std::int64_t parsed_advance = std::min<std::int64_t>(
           parsed.seek_advance_frames,
           segment_frames);
-      const std::int64_t advance = impl_->config.timestamp_driven_seek
+      const std::int64_t proposed_advance = impl_->config.timestamp_driven_seek
           ? parsed_advance
           : segment_frames;
+      const std::int64_t advance = k2
+          ? kotoba_k2_applied_seek_frames(
+              proposed_advance,
+              total_frames - seek,
+              impl_->config.max_applied_seek_frames)
+          : proposed_advance;
       if (advance <= 0) {
         throw BackendError("invalid_generation", "Generated timestamps did not advance seek");
       }
+      trace.parsed_seek_advance_frames = parsed.seek_advance_frames;
+      trace.proposed_advance_frames = proposed_advance;
+      trace.applied_seek_advance_frames = advance;
+      trace.single_timestamp_ending = parsed.single_timestamp_ending;
+      trace.used_decoded_seek = parsed.used_decoded_seek;
       seek += advance;
       trace.seek_frames_after = seek;
-      trace.source_overlap_ms = std::max<std::int64_t>(
-          0,
-          trace.source_window_duration_ms - advance * 10);
+      trace.next_window_start_ms = std::min(audio.duration_ms, seek * 10);
+      trace.final_window = seek == total_frames;
+      trace.ownership_end_ms = trace.final_window
+          ? audio.duration_ms
+          : trace.next_window_start_ms;
+      trace.actual_source_overlap_frames = std::max<std::int64_t>(0, segment_frames - advance);
+      trace.source_overlap_ms = trace.actual_source_overlap_frames * 10;
       trace.parse_status = parsed.used_decoded_seek ? "decoded-seek" : "source-window-end";
+
+      if (k2) {
+        trace.parsed_segment_count = parsed.segments.size();
+        K2CommitResult committed = commit_kotoba_k2_window(
+            parsed.segments,
+            trace.ownership_start_ms,
+            trace.ownership_end_ms,
+            trace.final_window,
+            audio.duration_ms,
+            static_cast<std::int64_t>(window_index),
+            result.segments);
+        trace.owned_before_dedup_count = committed.owned_before_dedup_count;
+        trace.non_owner_discarded_count = committed.non_owner_discarded_count;
+        trace.exact_duplicate_discarded_count = committed.exact_duplicate_discarded_count;
+        trace.emitted_segment_count = committed.emitted.size();
+        trace.segment_dispositions = std::move(committed.dispositions);
+        for (SegmentEvidence& segment : committed.emitted) {
+          if (!result.vad_enabled && on_segment) {
+            on_segment(segment.segment);
+          }
+          result.segments.push_back(std::move(segment));
+        }
+      }
+      trace.last_emitted_start_after_ms = result.segments.empty()
+          ? -1
+          : result.segments.back().segment.start_ms;
       source_progress = result.vad_enabled
           ? std::min(
                 audio.duration_ms,
@@ -1704,11 +1888,26 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     }
 
     result.traces.push_back(std::move(trace));
+    ++window_index;
     if (on_progress) {
       on_progress(source_progress);
     }
   }
 
+  if (k2) {
+    std::vector<std::int64_t> window_starts_ms;
+    window_starts_ms.reserve(result.traces.size());
+    for (const WindowTrace& trace : result.traces) {
+      window_starts_ms.push_back(trace.ownership_start_ms);
+    }
+    for (WindowTrace& trace : result.traces) {
+      for (K2SegmentDisposition& disposition : trace.segment_dispositions) {
+        disposition.owner_window_index = kotoba_k2_owner_window_index(
+            window_starts_ms,
+            disposition.segment.segment.start_ms);
+      }
+    }
+  }
   remove_exact_duplicate_segments(result.segments);
   if (result.vad_enabled && on_segment) {
     for (const SegmentEvidence& segment : result.segments) {
@@ -1716,7 +1915,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     }
   }
   check_cancelled(is_cancelled);
-  if (on_progress) {
+  if (on_progress && (!k2 || source_progress != audio.duration_ms)) {
     on_progress(audio.duration_ms);
   }
   result.inference_ms = elapsed_ms(inference_started);

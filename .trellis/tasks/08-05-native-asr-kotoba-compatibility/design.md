@@ -8,6 +8,8 @@ The design deliberately does not introduce a model downloader, production route 
 
 A planning rollback adds a corrected benchmark layer: the user supplied the correct `long-v2.ass` for the existing long WAV and approved a conservative standalone-vocalization exclusion. Completed T02/T06/T08 raw CTranslate2 outputs are rescored without rerunning inference, while historical reports remain immutable.
 
+Corrected K1 retains seven long-v2 semantic gaps. K2 changes only Kotoba window orchestration: it caps applied stride at 10 seconds for at least 5 seconds of source overlap and gives the later-starting window deterministic ownership of the complete overlap. K1 model/decode settings, ordinary faster-whisper, protocol, host, benchmark policy, and production routing remain unchanged.
+
 ## Architecture
 
 ```text
@@ -237,6 +239,71 @@ K1 execution order:
 
 If K1 fails any gate, do not add VAD or merge heuristics in the same iteration. Complete the three-case K1 matrix, preserve traces, then revise `prd.md`/`design.md` with one evidence-backed candidate, review the new identity, and only then resume implementation.
 
+## K2 Bounded-Stride Overlap Candidate
+
+Frozen candidate ID:
+
+```text
+kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1
+```
+
+K1 evidence shows that every responsible long-v2 trace ended `source-window-end` with zero overlap. Six of seven gaps lie wholly within the final four seconds of their responsible 15-second window. K2 retains the 15-second source window but caps the applied advance:
+
+```text
+proposedAdvance = parsed timestamp advance, or full source window for no-speech
+appliedAdvance = min(proposedAdvance, 1000 frames, remaining frames)
+nextWindowStart = currentWindowStart + appliedAdvance
+```
+
+A full 1500-frame window therefore has at least 500 frames / 5 seconds of source overlap. Parsed advances below 1000 frames retain their larger overlap. Final partial windows cannot advance beyond source end. This cap applies only to the K2 Kotoba profile; ordinary faster-whisper and preserved K1 evidence remain unchanged.
+
+The full HF chunk postprocessor is intentionally not copied. K2 borrows only the 15s/10s/5s geometry and does not add longest-common-sequence token merging, fuzzy text matching, or a second subtitle representation.
+
+## K2 Temporal Ownership
+
+Let decoded window starts be `S[0], S[1], ...`, with `S[i+1]` produced by window `i`'s applied advance:
+
+- non-final window `i` owns segment start timestamps in `[S[i], S[i+1])`;
+- the final window owns `[S[last], audioDuration)`;
+- a start exactly at `S[i+1]` belongs to the later window;
+- equivalently, the latest decoded window whose start is not after a segment start owns it.
+
+The later window owns the complete overlap. This is deliberate: midpoint ownership was rejected because it can expose K1 gaps #3 and #6 to the next decode and then discard the recovered segments before publication.
+
+Ownership uses only token-derived start time and window coordinates. It never inspects reference text, candidate text similarity, token similarity, or gap coordinates. Segment start/end/text remain unchanged; no clipping, stretching, synthetic timing, or gap filling is allowed.
+
+Known risk: a segment emitted by an earlier window may start before the next window but extend into its ownership interval, while a later segment covers overlapping content with shifted timestamps. K2 does not add fuzzy conflict resolution; CER, gap, timeline, and duplicate diagnostics decide whether the deterministic rule is acceptable.
+
+## K2 Buffering, Emission, And Progress
+
+Current K1 emits parsed segments before the applied advance is known. K2 reorders only the current-window commit:
+
+1. Parse and validate timestamp-derived segments into a current-window buffer.
+2. Compute proposed/applied advance, next window start, overlap, and ownership end.
+3. Classify every buffered segment by start-time ownership.
+4. Remove only exact `(startMs, endMs, text)` duplicates from owned segments.
+5. Validate unchanged bounds and nondecreasing emitted starts against prior output.
+6. Append and invoke the protocol segment callback only for surviving owned segments.
+7. Publish progress at the committed ownership frontier / next window start; publish exact audio duration on completion.
+
+Only one decoded window is buffered; no lookahead decode or retractable protocol event is introduced. Exact dedup occurs before callback emission because the existing final cleanup cannot retract already emitted events.
+
+Ignored raw trace adds candidate/ownership identity, window index/start/end, parsed/proposed/applied advance, next start, actual overlap, parser flags, half-open ownership interval, segment disposition counts, progress frontier, and per-parsed-segment exact tuple/trace hashes plus `emitted|non-owner|exact-duplicate` disposition. The adapter proves count conservation, contiguous ownership, overlap floor, unchanged token-derived output, monotonic progress, and ordinary-route isolation. Tracked evidence publishes only hashes and aggregate counts.
+
+## K2 Evidence Gate
+
+Create a new K2 lock and preserve K1 unchanged. Run one frozen identity on the T07 CUDA device-0/FLOAT16 lane:
+
+1. Profile/stride/ownership/parser/streaming/trace tests.
+2. Protocol-only, CPU CT2, and CUDA development builds/tests.
+3. short-v1: 1 cold + 3 warm.
+4. medium-v1: one measured run.
+5. long-v2: one measured run.
+6. Reassess all seven K1 gap coordinates, including #1/#4/#6 with no pre-run waiver.
+7. Publish the complete matrix twice and require byte-identical sanitized JSON/Markdown.
+
+Existing gates remain unchanged. A failure publishes `stop-revise`, leaves native Kotoba disabled, and returns to planning before K3 or any non-defect classification. A pass is still only an algorithm/cache handoff, not a release pack or production route.
+
 ## Compatibility And Ownership
 
 - Protocol v1 and `AsrJobSnapshot` remain unchanged.
@@ -258,7 +325,7 @@ If K1 fails any gate, do not add VAD or merge heuristics in the same iteration. 
 
 ## Rollback
 
-Revert the Kotoba route switch, K1 source-window config, Kotoba validation, test-only host engine selection, and T08 evidence tooling. Delete only T08 ignored local output. No user cache, setting, project, Python route, ordinary worker route, or CUDA development artifact requires migration.
+K2 rollback removes its Kotoba-only applied-stride cap, ownership filter, buffered commit order, trace fields, and K2 evidence artifacts, restoring the committed K1 `stop-revise` profile. Broader rollback reverts the Kotoba route switch, K1 source-window config, Kotoba validation, test-only host engine selection, and T08 evidence tooling. Delete only T08 ignored local output. No user cache, setting, project, Python route, ordinary worker route, or CUDA development artifact requires migration.
 
 ## Design Decisions
 
@@ -272,3 +339,7 @@ Revert the Kotoba route switch, K1 source-window config, Kotoba validation, test
 - **D8:** Exclude only the approved frozen standalone vocalization forms from the zero-gap gate; retain them in CER and diagnostics.
 - **D9:** Re-score completed historical raw evidence after validating its original identity; do not rerun completed inference or rewrite archived reports.
 - **D10:** Do not run Candidate B long: corrected selected Candidate A already removes the only product reason for VAD/ORT.
+- **D11:** K2 uses a Kotoba-only 1000-frame maximum applied stride, preserving any shorter parsed seek and guaranteeing at least 500 frames of overlap on full windows.
+- **D12:** The later-starting window owns the complete overlap by half-open segment-start intervals; midpoint ownership is rejected because it can discard plausible #3/#6 recovery.
+- **D13:** Buffer only the current window until advance/ownership is known, deduplicate exact tuples before callback emission, and keep protocol events non-retractable.
+- **D14:** Keep all seven K1 gaps mandatory during K2; defer the user's reviewed #1/#4/#6 non-defect decision until complete K2 evidence exists.

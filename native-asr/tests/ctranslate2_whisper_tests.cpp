@@ -739,6 +739,94 @@ void run_core_tests() {
   check(!kotoba.condition_on_previous_text, "Kotoba history drift");
   check(kotoba.timestamp_driven_seek, "Kotoba seek drift");
   check(kotoba.max_source_frames == 1500, "Kotoba source-window drift");
+  check(kotoba.max_applied_seek_frames == 0, "Kotoba K1 seek-cap drift");
+  const CandidateAConfig kotoba_k2 = kotoba_k2_config();
+  check(kotoba_k2.beam_size == kotoba.beam_size
+            && kotoba_k2.max_source_frames == 1500
+            && kotoba_k2.max_applied_seek_frames == 1000,
+        "Kotoba K2 profile drift");
+  check(production_defaults.max_applied_seek_frames == 0,
+        "ordinary Whisper unexpectedly enabled K2 orchestration");
+  check(kotoba_k2_applied_seek_frames(1500, 1500, 1000) == 1000,
+        "K2 full-window stride cap drift");
+  check(kotoba_k2_applied_seek_frames(800, 1500, 1000) == 800,
+        "K2 shorter parsed advance drift");
+  check(kotoba_k2_applied_seek_frames(1500, 700, 1000) == 700,
+        "K2 final partial advance drift");
+  check(kotoba_k2_applied_seek_frames(1500, 1500, 800) == 800,
+        "K2 configured stride cap was not applied");
+  check(kotoba_k2_owner_window_index({0, 10000}, 10000) == 1,
+        "K2 exact boundary did not resolve to the later owner");
+  check(kotoba_k2_owner_window_index({0, 10000, 18000}, 19000) == 2,
+        "K2 owner resolution incorrectly assumed only the next window");
+  check(kotoba_k2_owner_window_index({0, 10000}, 11000) == 1
+            && 11000 < 12500,
+        "K2 gap #3 latest-start owner no longer rejects midpoint ownership");
+  check(kotoba_k2_owner_window_index({0, 10000}, 12160) == 1
+            && 12160 < 12500,
+        "K2 gap #6 latest-start owner no longer rejects midpoint ownership");
+  try {
+    static_cast<void>(kotoba_k2_applied_seek_frames(0, 1500, 1000));
+    throw std::runtime_error("K2 zero advance unexpectedly passed");
+  } catch (const BackendError& error) {
+    check(error.code() == "invalid_generation", "K2 zero-advance error drift");
+  }
+
+  const auto segment = [](std::int64_t start, std::int64_t end, std::string text) {
+    SegmentEvidence value;
+    value.segment = {start, end, std::move(text)};
+    value.raw_start_ms = start;
+    value.raw_end_ms = end;
+    return value;
+  };
+  const K2CommitResult gap3 = commit_kotoba_k2_window(
+      {segment(1289540, 1291540, "gap3")},
+      1288540,
+      1298540,
+      false,
+      1300000,
+      87,
+      {});
+  check(gap3.emitted.size() == 1
+            && gap3.dispositions[0].owner_window_index == 87
+            && gap3.dispositions[0].disposition == "emitted",
+        "K2 gap #3 latest-start ownership drift");
+  check(1289540 < 1291040,
+        "K2 gap #3 midpoint mutation no longer demonstrates the rejected discard");
+  const K2CommitResult gap6 = commit_kotoba_k2_window(
+      {segment(1845700, 1847230, "gap6")},
+      1843540,
+      1853540,
+      false,
+      1860000,
+      124,
+      {});
+  check(gap6.emitted.size() == 1 && 1845700 < 1846040,
+        "K2 gap #6 latest-start/midpoint golden drift");
+  const K2CommitResult boundary = commit_kotoba_k2_window(
+      {segment(10000, 11000, "later")},
+      0,
+      10000,
+      false,
+      20000,
+      0,
+      {});
+  check(boundary.emitted.empty()
+            && boundary.non_owner_discarded_count == 1
+            && boundary.dispositions[0].owner_window_index == 1,
+        "K2 exact boundary did not belong to the later window");
+  const K2CommitResult dedup = commit_kotoba_k2_window(
+      {segment(1000, 2000, "same"), segment(1000, 2000, "same"),
+       segment(1000, 2000, "different")},
+      0,
+      10000,
+      false,
+      20000,
+      0,
+      {});
+  check(dedup.emitted.size() == 2
+            && dedup.exact_duplicate_discarded_count == 1,
+        "K2 exact-only pre-emission dedup drift");
   check(kotoba_mel_shape_supported(128), "Kotoba 128-mel readiness drift");
   check(!kotoba_mel_shape_supported(80), "Kotoba wrong-mel rejection drift");
 
@@ -1100,8 +1188,24 @@ Json segment_json(const SegmentEvidence& segment) {
       {"traceSha256", segment.trace_sha256}};
 }
 
-Json trace_json(const WindowTrace& trace) {
+Json k2_disposition_json(const K2SegmentDisposition& disposition) {
   return Json{
+      {"startMs", disposition.segment.segment.start_ms},
+      {"endMs", disposition.segment.segment.end_ms},
+      {"text", disposition.segment.segment.text},
+      {"tokenIds", disposition.segment.tokens},
+      {"traceSha256", disposition.segment.trace_sha256},
+      {"tupleSha256", disposition.tuple_sha256},
+      {"ownerWindowIndex", disposition.owner_window_index},
+      {"ownershipAnchor", "startMs"},
+      {"disposition", disposition.disposition},
+      {"duplicateTargetSha256", disposition.duplicate_target_sha256.empty()
+           ? Json(nullptr)
+           : Json(disposition.duplicate_target_sha256)}};
+}
+
+Json trace_json(const WindowTrace& trace) {
+  Json value{
       {"windowOffsetMs", trace.window_offset_ms},
       {"sourceWindowDurationMs", trace.source_window_duration_ms},
       {"modelWindowDurationMs", trace.model_window_duration_ms},
@@ -1127,6 +1231,37 @@ Json trace_json(const WindowTrace& trace) {
       {"parseError", trace.parse_error.empty() ? Json(nullptr) : Json(trace.parse_error)},
       {"sha256", trace.sha256},
       {"tokenIds", trace.token_ids}};
+  if (trace.k2_candidate) {
+    Json dispositions = Json::array();
+    for (const K2SegmentDisposition& disposition : trace.segment_dispositions) {
+      dispositions.push_back(k2_disposition_json(disposition));
+    }
+    value.update(Json{
+        {"candidateId", "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1"},
+        {"ownershipRule", "latest-start-half-open-v1"},
+        {"windowIndex", trace.window_index},
+        {"parsedSeekAdvanceFrames", trace.parsed_seek_advance_frames},
+        {"proposedAdvanceFrames", trace.proposed_advance_frames},
+        {"appliedSeekAdvanceFrames", trace.applied_seek_advance_frames},
+        {"nextWindowStartMs", trace.next_window_start_ms},
+        {"actualSourceOverlapFrames", trace.actual_source_overlap_frames},
+        {"actualSourceOverlapMs", trace.source_overlap_ms},
+        {"singleTimestampEnding", trace.single_timestamp_ending},
+        {"usedDecodedSeek", trace.used_decoded_seek},
+        {"ownershipStartMs", trace.ownership_start_ms},
+        {"ownershipEndMs", trace.ownership_end_ms},
+        {"ownershipEndExclusive", !trace.final_window},
+        {"finalWindow", trace.final_window},
+        {"parsedSegmentCount", trace.parsed_segment_count},
+        {"ownedBeforeDedupCount", trace.owned_before_dedup_count},
+        {"nonOwnerDiscardedCount", trace.non_owner_discarded_count},
+        {"exactDuplicateDiscardedCount", trace.exact_duplicate_discarded_count},
+        {"emittedSegmentCount", trace.emitted_segment_count},
+        {"lastEmittedStartBeforeMs", trace.last_emitted_start_before_ms},
+        {"lastEmittedStartAfterMs", trace.last_emitted_start_after_ms},
+        {"segmentDispositions", std::move(dispositions)}});
+  }
+  return value;
 }
 
 Json config_json(const CandidateAConfig& config) {
@@ -1157,6 +1292,13 @@ Json kotoba_config_json(const CandidateAConfig& config) {
   value["maxSourceFrames"] = config.max_source_frames;
   value["maxSourceWindowDurationMs"] = config.max_source_frames * 10;
   value["language"] = "ja";
+  if (config.max_applied_seek_frames > 0) {
+    value["maxAppliedSeekFrames"] = config.max_applied_seek_frames;
+    value["maxAppliedSeekDurationMs"] = config.max_applied_seek_frames * 10;
+    value["candidateId"] = "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1";
+    value["ownershipRule"] = "latest-start-half-open-v1";
+    value["overlapFloorFrames"] = config.max_source_frames - config.max_applied_seek_frames;
+  }
   return value;
 }
 
@@ -1908,7 +2050,7 @@ void run_cuda_development_evidence(const std::vector<std::string>& args) {
       {"sampleCount", repeats}}.dump() << '\n';
 }
 
-void run_kotoba_evidence(const std::vector<std::string>& args) {
+void run_kotoba_evidence(const std::vector<std::string>& args, bool k2) {
   const fs::path output_path = fs::u8path(required_arg(args, "--output"));
   check(is_t08_task_local_output(output_path),
         "T08 raw output must stay under research/local");
@@ -1919,7 +2061,7 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
   const fs::path production_worker = fs::u8path(required_arg(args, "--production-worker"));
   const std::string case_id = required_arg(args, "--case-id");
   const int repeats = integer_arg(args, "--repeats", case_id == "short-v1" ? 4 : 1);
-  check(fs::is_regular_file(input_lock), "T08 K1 input lock is missing");
+  check(fs::is_regular_file(input_lock), "T08 Kotoba input lock is missing");
   check(fs::is_regular_file(production_worker), "T08 production worker is missing");
   check(repeats == (case_id == "short-v1" ? 4 : 1),
         "T08 requires short=4 repeats and medium/long=1 repeat");
@@ -1953,6 +2095,7 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
       {"short-v1", {24102, "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"}},
       {"medium-v1", {498872, "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458"}},
       {"long-v1", {4144235, "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e"}},
+      {"long-v2", {4144235, "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e"}},
   };
   const auto expected_case = expected_cases.find(case_id);
   check(expected_case != expected_cases.end(), "T08 case identity is not allowed");
@@ -1961,7 +2104,7 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
         "T08 authoritative audio identity drifted");
 
   const Json path_policy = cuda_development_path_policy();
-  const CandidateAConfig config = kotoba_config();
+  const CandidateAConfig config = k2 ? kotoba_k2_config() : kotoba_config();
   const Clock::time_point load_started = Clock::now();
   CTranslate2WhisperBackend backend(
       model_path,
@@ -1982,7 +2125,12 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
   bool failed = false;
   for (int repeat = 0; repeat < repeats; ++repeat) {
     const Clock::time_point sample_started = Clock::now();
-    const TranscriptionResult result = backend.transcribe(audio_path);
+    std::vector<std::int64_t> progress;
+    const TranscriptionResult result = backend.transcribe(
+        audio_path,
+        k2 ? ProgressCallback([&](std::int64_t processed_ms) {
+          progress.push_back(processed_ms);
+        }) : ProgressCallback{});
     const double sample_wall_ms = elapsed_ms(sample_started);
     const std::int64_t current_source_frames = source_frame_count(result.original_sample_count);
     if (source_frames == 0) {
@@ -1995,15 +2143,44 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
     }
     Json traces = Json::array();
     std::size_t generation_calls = 0;
+    std::size_t trace_index = 0;
     for (const WindowTrace& trace : result.traces) {
       check(trace.source_window_duration_ms > 0
                 && trace.source_window_duration_ms <= 15000
                 && trace.model_window_duration_ms == 30000
                 && trace.history_token_count_before == 0
                 && trace.history_token_count_after == 0,
-            "T08 K1 window/profile trace drifted");
+            "T08 Kotoba window/profile trace drifted");
+      if (k2) {
+        const std::int64_t remaining = current_source_frames - trace.seek_frames_before;
+        const std::int64_t expected_advance = std::min({
+            trace.proposed_advance_frames,
+            std::int64_t{1000},
+            remaining});
+        check(trace.k2_candidate
+                  && trace.window_index == trace_index
+                  && trace.applied_seek_advance_frames == expected_advance
+                  && trace.seek_frames_after - trace.seek_frames_before == expected_advance
+                  && trace.next_window_start_ms
+                      == std::min(result.duration_ms, trace.seek_frames_after * 10)
+                  && trace.ownership_start_ms == trace.seek_frames_before * 10
+                  && trace.ownership_end_ms
+                      == (trace.final_window ? result.duration_ms : trace.next_window_start_ms)
+                  && trace.parsed_segment_count
+                      == trace.non_owner_discarded_count + trace.owned_before_dedup_count
+                  && trace.owned_before_dedup_count
+                      == trace.exact_duplicate_discarded_count + trace.emitted_segment_count,
+              "T08 K2 seek/ownership trace drifted");
+        if (trace.source_window_duration_ms == 15000 && !trace.final_window) {
+          check(trace.actual_source_overlap_frames >= 500,
+                "T08 K2 full-window overlap floor drifted");
+        }
+      } else {
+        check(!trace.k2_candidate, "T08 K1 unexpectedly used K2 orchestration");
+      }
       generation_calls += trace.generation_call_count;
       traces.push_back(trace_json(trace));
+      ++trace_index;
     }
     if (result.failure_code.empty()) {
       check(!result.segments.empty() && !result.traces.empty() && generation_calls > 0,
@@ -2011,6 +2188,12 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
       check(result.traces.back().seek_frames_after
                 == source_frame_count(result.original_sample_count),
             "T08 K1 trace chain did not reach WAV end");
+    }
+    if (k2 && result.failure_code.empty()) {
+      check(!progress.empty()
+                && std::is_sorted(progress.begin(), progress.end())
+                && progress.back() == result.duration_ms,
+            "T08 K2 ownership-frontier progress drifted");
     }
     Json sample{
         {"status", result.failure_code.empty() ? "completed" : "failed"},
@@ -2023,6 +2206,7 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
         {"failure", result.failure_code.empty()
              ? Json(nullptr)
              : Json{{"code", result.failure_code}}},
+        {"progressMs", k2 ? Json(progress) : Json(nullptr)},
         {"timings", Json{
              {"loadMs", repeat == 0 ? Json(load_ms) : Json(nullptr)},
              {"sampleWallMs", sample_wall_ms},
@@ -2055,7 +2239,7 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
 
   const Json raw{
       {"schemaVersion", 1},
-      {"kind", "hikaru-ct2-kotoba-k1-raw"},
+      {"kind", k2 ? "hikaru-ct2-kotoba-k2-raw" : "hikaru-ct2-kotoba-k1-raw"},
       {"status", failed ? "failed" : "completed"},
       {"caseId", case_id},
       {"engine", "kotoba-faster-whisper"},
@@ -2071,7 +2255,9 @@ void run_kotoba_evidence(const std::vector<std::string>& args) {
            {"sha256", expected_case->second.second},
            {"durationMs", expected_case->second.first},
            {"sourceFrames", source_frames}}},
-      {"candidate", "kotoba-k1"},
+      {"candidate", k2
+           ? "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1"
+           : "kotoba-k1"},
       {"config", kotoba_config_json(config)},
       {"inputLockSha256", sha256_file(input_lock)},
       {"runtime", Json{
@@ -2144,8 +2330,10 @@ int main(int argc, char** argv) {
       run_evidence(args, true, true);
     } else if (std::find(args.begin(), args.end(), "--run-cuda-development-evidence") != args.end()) {
       run_cuda_development_evidence(args);
+    } else if (std::find(args.begin(), args.end(), "--run-kotoba-k2-evidence") != args.end()) {
+      run_kotoba_evidence(args, true);
     } else if (std::find(args.begin(), args.end(), "--run-kotoba-evidence") != args.end()) {
-      run_kotoba_evidence(args);
+      run_kotoba_evidence(args, false);
     } else if (std::find(args.begin(), args.end(), "--run-cpu-rtf-diagnostic") != args.end()) {
       run_diagnostic_matrix(args);
     } else if (std::find(args.begin(), args.end(), "--run-short-decode-selection") != args.end()) {

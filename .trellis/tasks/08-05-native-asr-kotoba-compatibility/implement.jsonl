@@ -9,3 +9,4 @@
 {"file":".trellis/tasks/08-05-native-asr-kotoba-compatibility/research/corrected-baseline-research.md","reason":"User-corrected long-v2 reference, approved vocalization policy, raw availability, preview re-score, and history boundary."}
 {"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Original T01 manifest, comparator, privacy, and immutable evidence contract to supersede safely rather than rewrite."}
 {"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/ctranslate2-whisper-report.md","reason":"T06 selected Candidate A/B identities and old dispositions that require corrected supersession."}
+{"file":".trellis/tasks/08-05-native-asr-kotoba-compatibility/research/k2-candidate-design-critique.md","reason":"Final K2 decision: rejection of midpoint ownership and exact latest-start ownership/buffering/test contract."}
