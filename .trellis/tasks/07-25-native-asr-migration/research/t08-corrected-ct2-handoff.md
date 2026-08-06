@@ -24,10 +24,10 @@ The current private benchmark uses distinct `long-v2` identity `3c05c0eb705c2906
 
 Authoritative artifacts:
 
-- correction lock: `.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/corrected-ct2-reassessment-lock.md`, SHA-256 `4a91bc04eb25c2c4fafc65667a05d233b8ef0f698ed6e7f7943d8197ffe0c6d1`
-- correction matrix: `.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/evidence/corrected-ct2-reassessment.json`, SHA-256 `a470ce38aeb2173b54b31f359771bc6d24836a5688ee605c0091db7681bdf99d`
-- correction report: `.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/corrected-ct2-reassessment-report.md`, SHA-256 `984b4c48c499f64b0e64eeabef2b8c8ad590e958ec270385c7718cfa77f82a62`
-- K2 input lock: `.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-lock.md`, SHA-256 `d55f363d69cf6ce29892c159e26556dcfecc00e207f7e7c9cd13425078d24c9a`
-- K2 evidence: `.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/evidence/kotoba-k2-candidate.json`, SHA-256 `5b7fa644eb1d9cbd10412bf0959ea46631332b7bb1266567d203b00cbbfc2415`
-- K2 report: `.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-candidate-report.md`, SHA-256 `5149c954b93ee6eeb6fd4fef3e25873d69ce7fcf99ef8102ba9a97607daf9419`
-- K2 handoff: `.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-handoff.md`
+- correction lock: `.trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/corrected-ct2-reassessment-lock.md`, SHA-256 `4a91bc04eb25c2c4fafc65667a05d233b8ef0f698ed6e7f7943d8197ffe0c6d1`
+- correction matrix: `.trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/evidence/corrected-ct2-reassessment.json`, SHA-256 `a470ce38aeb2173b54b31f359771bc6d24836a5688ee605c0091db7681bdf99d`
+- correction report: `.trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/corrected-ct2-reassessment-report.md`, SHA-256 `984b4c48c499f64b0e64eeabef2b8c8ad590e958ec270385c7718cfa77f82a62`
+- K2 input lock: `.trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-lock.md`, SHA-256 `d55f363d69cf6ce29892c159e26556dcfecc00e207f7e7c9cd13425078d24c9a`
+- K2 evidence: `.trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/evidence/kotoba-k2-candidate.json`, SHA-256 `5b7fa644eb1d9cbd10412bf0959ea46631332b7bb1266567d203b00cbbfc2415`
+- K2 report: `.trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-candidate-report.md`, SHA-256 `5149c954b93ee6eeb6fd4fef3e25873d69ce7fcf99ef8102ba9a97607daf9419`
+- K2 handoff: `.trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-handoff.md`

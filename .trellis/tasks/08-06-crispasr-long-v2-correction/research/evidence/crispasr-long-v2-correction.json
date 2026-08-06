@@ -1,0 +1,570 @@
+{
+  "budgets": {
+    "cerMax": 0.35,
+    "cpuInferenceRtfMax": 1.0,
+    "crispasrPeakRssBytesMax": 12884901888,
+    "qwenStartMedianMsMax": 150,
+    "qwenStartP95MsMax": 500,
+    "semanticGapsMax": 0,
+    "shortColdWallMsMax": 120000,
+    "timelineErrorsMax": 0
+  },
+  "identity": {
+    "comparatorSha256": "b2ae880e693d16daf6a3e29f7be3f0058c2ce74068b333b90850be5798cef822",
+    "compiledValidationRows": [
+      "parakeet-short:valid",
+      "parakeet-medium:valid",
+      "parakeet-long:valid",
+      "reazonspeech-short:valid",
+      "reazonspeech-medium:valid",
+      "reazonspeech-long:valid",
+      "qwen3-short:valid",
+      "qwen3-medium:valid",
+      "qwen3-long:valid"
+    ],
+    "cpuOpenParams": {
+      "abiVersion": 2,
+      "flashAttn": 0,
+      "nGpuLayers": 0,
+      "nThreads": 16,
+      "useGpu": 0
+    },
+    "currentManifest": {
+      "assSha256": "46b4891a4f86c70c1fe54ba4dcfbd776b361f73bb774f1d14e0f2bb53659d04b",
+      "dialogueCount": 681,
+      "longCaseId": "long-v2",
+      "sha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea"
+    },
+    "historicalManifest": {
+      "assSha256": "7954ce24af05dca37b2930136c83ee722e80fd637ef298cc7eeb47f29cf8c6f3",
+      "longCaseId": "long-v1",
+      "sha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+    },
+    "loadedLocalModules": [
+      {
+        "fileName": "crispasr.dll",
+        "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+        "sizeBytes": 11758080
+      },
+      {
+        "fileName": "ggml-base.dll",
+        "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+        "sizeBytes": 644096
+      },
+      {
+        "fileName": "ggml-cpu.dll",
+        "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+        "sizeBytes": 907264
+      },
+      {
+        "fileName": "ggml.dll",
+        "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+        "sizeBytes": 68608
+      },
+      {
+        "fileName": "hikaru-crispasr-poc.exe",
+        "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+        "sizeBytes": 472576
+      }
+    ],
+    "longAudio": {
+      "durationMs": 4144235,
+      "sha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e"
+    },
+    "models": [
+      {
+        "engine": "parakeet-ja",
+        "fileName": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+        "role": "primary",
+        "sha256": "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17",
+        "sizeBytes": 673554880
+      },
+      {
+        "engine": "reazonspeech",
+        "fileName": "reazonspeech-nemo-v2-q8_0.gguf",
+        "role": "primary",
+        "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+        "sizeBytes": 667147072
+      },
+      {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+        "role": "primary",
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      },
+      {
+        "engine": "qwen3-asr",
+        "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+        "role": "aligner",
+        "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+        "sizeBytes": 529001216
+      }
+    ],
+    "requiredDlls": [
+      {
+        "fileName": "crispasr.dll",
+        "sha256": "aa5d08f8cfe459727764bbe724b0780a75bd4167043c9cf63fd0fb43c2a559de",
+        "sizeBytes": 11758080
+      },
+      {
+        "fileName": "ggml-base.dll",
+        "sha256": "7c296bf21291c386766ea8f8055c9a7477756a3ed3c45026ade32e6a54f374c4",
+        "sizeBytes": 644096
+      },
+      {
+        "fileName": "ggml-cpu.dll",
+        "sha256": "5872f3cf3001f172f99672d1385ff45e5d9129a55c4e07dcbc8d9373ae9b4554",
+        "sizeBytes": 907264
+      },
+      {
+        "fileName": "ggml.dll",
+        "sha256": "e4c77bd4e86f66af6ed4b245bba14f5aa35fbea1220ea07cb3029bef1c4aa72d",
+        "sizeBytes": 68608
+      }
+    ],
+    "restrictedPath": {
+      "entryCategories": [
+        "harness-directory",
+        "windows-system32"
+      ],
+      "entryCount": 2,
+      "restricted": true
+    },
+    "t03Executable": {
+      "fileName": "hikaru-crispasr-poc.exe",
+      "sha256": "66e35b7a00f22338304a7005a9cfd633352a8a6afa93b11ff0d1c158e62040cf",
+      "sizeBytes": 472576
+    },
+    "t03InputLockSha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f"
+  },
+  "kind": "hikaru-crispasr-long-v2-correction",
+  "namedRisks": {
+    "parakeet": [
+      "all completed cases fail CER",
+      "one oversized top-level segment per case"
+    ],
+    "qwen3": [
+      "short ForcedAligner start timing fails",
+      "medium/long-v2 have no legal accepted timeline"
+    ],
+    "reazonspeech": [
+      "one oversized top-level segment per case",
+      "most native word ranges are zero-duration",
+      "not subtitle-ready"
+    ]
+  },
+  "routeDispositions": {
+    "parakeet": "stop-revise",
+    "qwen3": "stop-revise",
+    "reazonspeech": "proceed-with-named-risks"
+  },
+  "rows": [
+    {
+      "cer": {
+        "cer": 0.49166666666666664,
+        "deletions": 52,
+        "errors": 59,
+        "hypothesisNormalizedSha256": "3ccf4a29551b950abddd5ed9f628ae336bc5c693d3858c89f95644c2ebd5834e",
+        "hypothesisRawSha256": "3ccf4a29551b950abddd5ed9f628ae336bc5c693d3858c89f95644c2ebd5834e",
+        "insertions": 3,
+        "referenceCharacters": 120,
+        "referenceNormalizedSha256": "888fd7d73fbb78db70692fe424b01a1787433224e6e86381556445d15c853b51",
+        "referenceRawSha256": "888fd7d73fbb78db70692fe424b01a1787433224e6e86381556445d15c853b51",
+        "substitutions": 4
+      },
+      "coldProcessWallMs": 5243.7382,
+      "currentCaseId": "short-v1",
+      "engine": "parakeet-ja",
+      "excludedVocalizationGapCount": 0,
+      "gates": {
+        "cer": "fail",
+        "cpuRtf": "pass",
+        "rss": "pass",
+        "semanticGaps": "fail",
+        "shortColdWall": "pass",
+        "timeline": "pass"
+      },
+      "inferenceRtf": 0.13166823085221144,
+      "nativeWordNonPositiveDurationCount": 0,
+      "nativeWordRangeCount": 50,
+      "peakProcessRssBytes": 891621376,
+      "rawSha256": "5e68c20de04c60022550c50664758c43ec71cd48c1564bd8f9c6217b62c0e37c",
+      "result": "fail",
+      "route": "parakeet",
+      "rowId": "parakeet-short-v1",
+      "sampleCount": 4,
+      "semanticGapCount": 2,
+      "sourceHistoricalCaseId": "short-v1",
+      "status": "measured",
+      "timelineErrorCount": 0,
+      "timestampProvenance": "engine-native",
+      "topLevelSegmentCount": 1,
+      "topLevelTextLength": {
+        "max": 71,
+        "median": 71,
+        "min": 71
+      },
+      "warmInferenceRtfMedian": 0.1251921707742096
+    },
+    {
+      "cer": {
+        "cer": 0.6123076923076923,
+        "deletions": 1166,
+        "errors": 1393,
+        "hypothesisNormalizedSha256": "197d15a30ddfe16358b95af87e1ea4c354f593c44b53b99b9d0f4bb019fa80e5",
+        "hypothesisRawSha256": "197d15a30ddfe16358b95af87e1ea4c354f593c44b53b99b9d0f4bb019fa80e5",
+        "insertions": 37,
+        "referenceCharacters": 2275,
+        "referenceNormalizedSha256": "257c0d418584f54f8dcc2d8b7fdd810349a925c5885829099f40839a94c1aab0",
+        "referenceRawSha256": "b5879a81a1e9ed30303a964a2052f223714006e1e4e752195519802c66fdc173",
+        "substitutions": 190
+      },
+      "coldProcessWallMs": null,
+      "currentCaseId": "medium-v1",
+      "engine": "parakeet-ja",
+      "excludedVocalizationGapCount": 0,
+      "gates": {
+        "cer": "fail",
+        "cpuRtf": "pass",
+        "rss": "pass",
+        "semanticGaps": "fail",
+        "shortColdWall": "not-applicable",
+        "timeline": "pass"
+      },
+      "inferenceRtf": 0.1251923948427653,
+      "nativeWordNonPositiveDurationCount": 23,
+      "nativeWordRangeCount": 737,
+      "peakProcessRssBytes": 973533184,
+      "rawSha256": "684ee6dbb5ebdeea1ab6e47288d349dcd272fb3132238b66fceeebbf192dfec5",
+      "result": "fail",
+      "route": "parakeet",
+      "rowId": "parakeet-medium-v1",
+      "sampleCount": 1,
+      "semanticGapCount": 1,
+      "sourceHistoricalCaseId": "medium-v1",
+      "status": "measured",
+      "timelineErrorCount": 0,
+      "timestampProvenance": "engine-native",
+      "topLevelSegmentCount": 1,
+      "topLevelTextLength": {
+        "max": 1146,
+        "median": 1146,
+        "min": 1146
+      },
+      "warmInferenceRtfMedian": null
+    },
+    {
+      "cer": {
+        "cer": 0.5962250926204066,
+        "deletions": 10557,
+        "errors": 11909,
+        "hypothesisNormalizedSha256": "b71841a527a6ba55dc1e571b4535d1999dc85a51d91ced4c788362472e017a94",
+        "hypothesisRawSha256": "b71841a527a6ba55dc1e571b4535d1999dc85a51d91ced4c788362472e017a94",
+        "insertions": 314,
+        "referenceCharacters": 19974,
+        "referenceNormalizedSha256": "f7fc187ef043aa0b1ddf399a7a9ef3f83099c6f4535e4c1f42463cc091cf1173",
+        "referenceRawSha256": "463369ccfc83d1c02f8a953ceaf35242517714dfc1d35441aa3b77c128fe6e43",
+        "substitutions": 1038
+      },
+      "coldProcessWallMs": null,
+      "currentCaseId": "long-v2",
+      "engine": "parakeet-ja",
+      "excludedVocalizationGapCount": 0,
+      "gates": {
+        "cer": "fail",
+        "cpuRtf": "pass",
+        "rss": "pass",
+        "semanticGaps": "pass",
+        "shortColdWall": "not-applicable",
+        "timeline": "pass"
+      },
+      "inferenceRtf": 0.12547003881295343,
+      "nativeWordNonPositiveDurationCount": 43,
+      "nativeWordRangeCount": 6349,
+      "peakProcessRssBytes": 1635348480,
+      "rawSha256": "49520ba5851050701ae3936e58e5c3e6e3a2ae47c840e2e4bfbd372fa165255d",
+      "result": "fail",
+      "route": "parakeet",
+      "rowId": "parakeet-long-v2",
+      "sampleCount": 1,
+      "semanticGapCount": 0,
+      "sourceHistoricalCaseId": "long-v1",
+      "status": "measured",
+      "timelineErrorCount": 0,
+      "timestampProvenance": "engine-native",
+      "topLevelSegmentCount": 1,
+      "topLevelTextLength": {
+        "max": 9731,
+        "median": 9731,
+        "min": 9731
+      },
+      "warmInferenceRtfMedian": null
+    },
+    {
+      "cer": {
+        "cer": 0.13333333333333333,
+        "deletions": 13,
+        "errors": 16,
+        "hypothesisNormalizedSha256": "96caf4cc7ca95594c01f87c39a252b99808fe5301c13a7bd07ad62a1984ea783",
+        "hypothesisRawSha256": "96caf4cc7ca95594c01f87c39a252b99808fe5301c13a7bd07ad62a1984ea783",
+        "insertions": 0,
+        "referenceCharacters": 120,
+        "referenceNormalizedSha256": "888fd7d73fbb78db70692fe424b01a1787433224e6e86381556445d15c853b51",
+        "referenceRawSha256": "888fd7d73fbb78db70692fe424b01a1787433224e6e86381556445d15c853b51",
+        "substitutions": 3
+      },
+      "coldProcessWallMs": 5774.5839,
+      "currentCaseId": "short-v1",
+      "engine": "reazonspeech",
+      "excludedVocalizationGapCount": 0,
+      "gates": {
+        "cer": "pass",
+        "cpuRtf": "pass",
+        "rss": "pass",
+        "semanticGaps": "pass",
+        "shortColdWall": "pass",
+        "timeline": "pass"
+      },
+      "inferenceRtf": 0.15497992697701435,
+      "nativeWordNonPositiveDurationCount": 69,
+      "nativeWordRangeCount": 76,
+      "peakProcessRssBytes": 891244544,
+      "rawSha256": "f48b010c50d3d599f35c3ed5658f085469affafd3817039c762ca3d3c45165ef",
+      "result": "pass",
+      "route": "reazonspeech",
+      "rowId": "reazonspeech-short-v1",
+      "sampleCount": 4,
+      "semanticGapCount": 0,
+      "sourceHistoricalCaseId": "short-v1",
+      "status": "measured",
+      "timelineErrorCount": 0,
+      "timestampProvenance": "engine-native",
+      "topLevelSegmentCount": 1,
+      "topLevelTextLength": {
+        "max": 107,
+        "median": 107,
+        "min": 107
+      },
+      "warmInferenceRtfMedian": 0.1506202306862501
+    },
+    {
+      "cer": {
+        "cer": 0.2857142857142857,
+        "deletions": 356,
+        "errors": 650,
+        "hypothesisNormalizedSha256": "65dc8df2f720d9f944873beb9dd24d1aec8bbdb07e0e054367aafcd3bd9fb81c",
+        "hypothesisRawSha256": "65dc8df2f720d9f944873beb9dd24d1aec8bbdb07e0e054367aafcd3bd9fb81c",
+        "insertions": 89,
+        "referenceCharacters": 2275,
+        "referenceNormalizedSha256": "257c0d418584f54f8dcc2d8b7fdd810349a925c5885829099f40839a94c1aab0",
+        "referenceRawSha256": "b5879a81a1e9ed30303a964a2052f223714006e1e4e752195519802c66fdc173",
+        "substitutions": 205
+      },
+      "coldProcessWallMs": null,
+      "currentCaseId": "medium-v1",
+      "engine": "reazonspeech",
+      "excludedVocalizationGapCount": 0,
+      "gates": {
+        "cer": "pass",
+        "cpuRtf": "pass",
+        "rss": "pass",
+        "semanticGaps": "pass",
+        "shortColdWall": "not-applicable",
+        "timeline": "pass"
+      },
+      "inferenceRtf": 0.1492737048782052,
+      "nativeWordNonPositiveDurationCount": 1141,
+      "nativeWordRangeCount": 1248,
+      "peakProcessRssBytes": 958439424,
+      "rawSha256": "d531864d763ee7f4c010b2e683a4bda578c60a61509f171d7a1063d22681074c",
+      "result": "pass",
+      "route": "reazonspeech",
+      "rowId": "reazonspeech-medium-v1",
+      "sampleCount": 1,
+      "semanticGapCount": 0,
+      "sourceHistoricalCaseId": "medium-v1",
+      "status": "measured",
+      "timelineErrorCount": 0,
+      "timestampProvenance": "engine-native",
+      "topLevelSegmentCount": 1,
+      "topLevelTextLength": {
+        "max": 2008,
+        "median": 2008,
+        "min": 2008
+      },
+      "warmInferenceRtfMedian": null
+    },
+    {
+      "cer": {
+        "cer": 0.2944327625913688,
+        "deletions": 3795,
+        "errors": 5881,
+        "hypothesisNormalizedSha256": "8761d68c3db61ea5dacdbbce92ee415e339d1e61e8be7d2081dce6a2bcc546dd",
+        "hypothesisRawSha256": "8761d68c3db61ea5dacdbbce92ee415e339d1e61e8be7d2081dce6a2bcc546dd",
+        "insertions": 486,
+        "referenceCharacters": 19974,
+        "referenceNormalizedSha256": "f7fc187ef043aa0b1ddf399a7a9ef3f83099c6f4535e4c1f42463cc091cf1173",
+        "referenceRawSha256": "463369ccfc83d1c02f8a953ceaf35242517714dfc1d35441aa3b77c128fe6e43",
+        "substitutions": 1600
+      },
+      "coldProcessWallMs": null,
+      "currentCaseId": "long-v2",
+      "engine": "reazonspeech",
+      "excludedVocalizationGapCount": 0,
+      "gates": {
+        "cer": "pass",
+        "cpuRtf": "pass",
+        "rss": "pass",
+        "semanticGaps": "pass",
+        "shortColdWall": "not-applicable",
+        "timeline": "pass"
+      },
+      "inferenceRtf": 0.14997570593849047,
+      "nativeWordNonPositiveDurationCount": 10098,
+      "nativeWordRangeCount": 10749,
+      "peakProcessRssBytes": 1636114432,
+      "rawSha256": "967a881a1e9a3c49b017eb54e0bedc251be454f6ec15477fc4bdc189d9e81634",
+      "result": "pass",
+      "route": "reazonspeech",
+      "rowId": "reazonspeech-long-v2",
+      "sampleCount": 1,
+      "semanticGapCount": 0,
+      "sourceHistoricalCaseId": "long-v1",
+      "status": "measured",
+      "timelineErrorCount": 0,
+      "timestampProvenance": "engine-native",
+      "topLevelSegmentCount": 1,
+      "topLevelTextLength": {
+        "max": 16665,
+        "median": 16665,
+        "min": 16665
+      },
+      "warmInferenceRtfMedian": null
+    },
+    {
+      "cer": {
+        "cer": 0.20833333333333334,
+        "deletions": 11,
+        "errors": 25,
+        "hypothesisNormalizedSha256": "b22c979203880b1e6c190cee55c13d56dcfaf63415e512d2878961fd76f8afb6",
+        "hypothesisRawSha256": "b22c979203880b1e6c190cee55c13d56dcfaf63415e512d2878961fd76f8afb6",
+        "insertions": 3,
+        "referenceCharacters": 120,
+        "referenceNormalizedSha256": "888fd7d73fbb78db70692fe424b01a1787433224e6e86381556445d15c853b51",
+        "referenceRawSha256": "888fd7d73fbb78db70692fe424b01a1787433224e6e86381556445d15c853b51",
+        "substitutions": 11
+      },
+      "coldProcessWallMs": 20986.724,
+      "currentCaseId": "short-v1",
+      "engine": "qwen3-asr",
+      "excludedVocalizationGapCount": 0,
+      "gates": {
+        "cer": "pass",
+        "cpuRtf": "pass",
+        "rss": "pass",
+        "semanticGaps": "pass",
+        "shortColdWall": "pass",
+        "timeline": "pass"
+      },
+      "inferenceRtf": 0.6186816571238901,
+      "nativeWordNonPositiveDurationCount": 1,
+      "nativeWordRangeCount": 1,
+      "peakProcessRssBytes": 3646832640,
+      "qwenTiming": {
+        "eligible": true,
+        "gate": "fail",
+        "medianStartErrorMs": 7700.0,
+        "p95StartErrorMs": 17968.999999999996
+      },
+      "rawSha256": "2b7fe38eab319f85e232a6219cb6b48efaff730e5e573683d87ac759fa9022f4",
+      "result": "fail",
+      "route": "qwen3",
+      "rowId": "qwen3-short-v1",
+      "sampleCount": 4,
+      "semanticGapCount": 0,
+      "sourceHistoricalCaseId": "short-v1",
+      "status": "measured",
+      "timelineErrorCount": 0,
+      "timestampProvenance": "forced-aligner",
+      "topLevelSegmentCount": 1,
+      "topLevelTextLength": {
+        "max": 112,
+        "median": 112,
+        "min": 112
+      },
+      "warmInferenceRtfMedian": 0.5851799020828147
+    },
+    {
+      "acceptedTimedSegmentCount": 0,
+      "alignmentUnitCount": 2451,
+      "attempted": true,
+      "cer": null,
+      "currentCaseId": "medium-v1",
+      "engine": "qwen3-asr",
+      "excludedVocalizationGapCount": null,
+      "failureCode": "segment-legality-failed",
+      "gates": {
+        "cer": "blocked",
+        "cpuRtf": "blocked",
+        "qwenTiming": "blocked",
+        "rss": "pass",
+        "semanticGaps": "blocked",
+        "shortColdWall": "not-applicable",
+        "timeline": "blocked"
+      },
+      "inferenceRtf": 0.659300493312914,
+      "peakProcessRssBytes": 6933118976,
+      "qwenTiming": null,
+      "rawAlignerEntryCount": 2451,
+      "rawSha256": "02013002cd133bb3619e18637654a50ec970ba9d7ac5bc7340bed6c677ee0b87",
+      "result": "upstream-blocker",
+      "route": "qwen3",
+      "rowId": "qwen3-medium-v1",
+      "semanticGapCount": null,
+      "sourceHistoricalCaseId": "medium-v1",
+      "status": "upstream-blocker",
+      "timelineErrorCount": null,
+      "timestampProvenance": "forced-aligner"
+    },
+    {
+      "acceptedTimedSegmentCount": 0,
+      "alignmentUnitCount": 20915,
+      "attempted": true,
+      "cer": null,
+      "currentCaseId": "long-v2",
+      "engine": "qwen3-asr",
+      "excludedVocalizationGapCount": null,
+      "failureCode": "segment-legality-failed",
+      "gates": {
+        "cer": "blocked",
+        "cpuRtf": "blocked",
+        "qwenTiming": "blocked",
+        "rss": "pass",
+        "semanticGaps": "blocked",
+        "shortColdWall": "not-applicable",
+        "timeline": "blocked"
+      },
+      "inferenceRtf": 0.6340158163810691,
+      "peakProcessRssBytes": 7267368960,
+      "qwenTiming": null,
+      "rawAlignerEntryCount": 20915,
+      "rawSha256": "33d46de94e42d86c7cd9b315c1b143b306cf2cd12abdbf13ed062f5a53fe8943",
+      "result": "upstream-blocker",
+      "route": "qwen3",
+      "rowId": "qwen3-long-v2",
+      "semanticGapCount": null,
+      "sourceHistoricalCaseId": "long-v1",
+      "status": "upstream-blocker",
+      "timelineErrorCount": null,
+      "timestampProvenance": "forced-aligner"
+    }
+  ],
+  "schemaVersion": 1,
+  "supersession": {
+    "currentAuthority": "this matrix supersedes T03 quality conclusions for the current long-v2 benchmark",
+    "historicalBoundary": "archived T01/T03 long-v1 reports remain immutable provenance only",
+    "productBoundary": "no inference, rebuild, production route, package, settings, UI, downloader, or installer change",
+    "releaseDefault": "python-legacy"
+  }
+}

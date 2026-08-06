@@ -1,6 +1,6 @@
 # 原生 ASR 迁移实施总计划
 
-> 状态：父任务保持 `planning`；T01～T05 已完成并归档，Gate 0/1 已关闭；T06 已选择并经独立复核第三闭合分支 `migration-handoff-stop-revise`，其 Candidate B reviewed checkpoint 已停止但未资格化。Candidate A selected CPU candidate 因 large-v3 long-v1 7 个 confirmed gap 为 `stop-revise`；后续唯一 Candidate B direct ORT 1.28.0 CPU + faster-whisper 1.2.1 Silero V6 已实现并经最后 path-binding review 重冻结：short 全通过，但 medium 仍有 1 个 confirmed gap，因此在 long 前停止为 `stop-revise`。large-v2 与其余模型保持 `blocked-not-run`，ORT/VAD 不进入 T13 package input，native faster-whisper route 保持 disabled。T07 development CUDA 已完成并记录 `development-gpu-ready`；当前下一步为 T08 Kotoba，重复字幕质量迭代使用该 GPU lane。这不构成 GPU-required 或发布资格结论，父任务不直接启动实现。
+> 状态：父任务保持 `planning`；Gate 0/1 已关闭。当前 benchmark authority 使用 long-v2：T08 corrected CT2 handoff 使 selected Candidate A short/medium/long-v2 通过并将 Candidate B 保持 diagnostic-only，Kotoba K2 为 `accepted-kotoba-algorithm-input`；T03C corrected CrispASR handoff 保持 ReazonSpeech `proceed-with-named-risks`、Parakeet/Qwen `stop-revise`。所有 historical long-v1 数值仅为 superseded provenance。native routes 仍未切换，ORT/VAD 不进入 T13，Release/default 保持 Python legacy；父任务不直接启动实现。
 
 ## Execution Policy
 
@@ -136,9 +136,9 @@ Rollback point: discard PoC without affecting CT2 work or production ASR.
 Verified T03 Gate 0 result:
 
 - CrispASR v0.8.22 public CPU C ABI, callback/reset/cleanup lifecycle and all three model routes are executable under one immutable Windows x64 binary/runtime identity.
-- Reazon passes frozen text/performance/timeline/gap gates through the public `parakeet` backend but remains `proceed-with-named-risks` because its top-level output is one oversized segment and native words are mostly zero-duration.
-- Parakeet is `stop-revise` after all three cases fail CER and top-level output remains one giant segment, despite useful native word getters.
-- Qwen is `stop-revise`: short text/performance pass but ForcedAligner start timing fails severely; medium/long upstream-grouped zero-duration source segments fail closed. Synthetic timing remains prohibited.
+- Current T03C long-v2 correction retains Reazon `proceed-with-named-risks`: corrected CER `0.1333/0.2857/0.2944` and original text/performance/timeline/gap gates pass, but top-level output remains one oversized segment and native words are mostly zero-duration.
+- Parakeet remains `stop-revise` after corrected CER `0.4917/0.6123/0.5962`; top-level output remains one giant segment despite useful native word getters.
+- Qwen remains `stop-revise`: corrected short CER `0.2083` passes but ForcedAligner start timing fails severely; medium/long-v2 remain validated unscored `segment-legality-failed` blockers. Synthetic timing remains prohibited.
 
 **Gate 0:** Closed for backend/runtime feasibility. T04/T05 may proceed because CT2 and CrispASR can execute safely in isolated native processes. Route quality blockers are mandatory inputs to T06/T08/T10/T11 and still prevent production promotion; a future finding of fundamental ABI, license or package non-viability reopens Gate 0.
 
@@ -223,7 +223,7 @@ Exit criteria:
 
 Rollback point: retain Python faster-whisper as development default.
 
-T06 checkpoint: Candidate A remains a separate historical provisional `stop-revise` set (short CER `0.3583`, medium RTF `1.100`, unscored long timeout). The warmed same-binary matrix rejects an inherent CPU ceiling and identifies full-history prefill as the dominant regression. A bounded same-binary short beam 1/5 selection then chose timestamp/no-history/beam 1 (`0.2667` CER, `0.632` RTF, 0 timeline/gap) over beam 5 (`0.3583`, `0.811`); beam 3/10 were not activated. The selected identity passes authoritative large-v3 short/medium, while long-v1 passes CER/RTF/RSS/timeline but fails with 7 confirmed gaps. The sole Candidate B then implemented direct official ORT 1.28.0 CPU and ordinary faster-whisper 1.2.1 Silero V6. Last-review replacement lock `e687ead6...` binds actual CPU/module paths, restricted PATH roots `77f4714a...`, and fixed module layout `a650e185...`; the 21-case mutation matrix rejects the correlated all-module/all-root rewrite. Short passes (`0.2667` CER, `0.654` warm RTF, `29.544s` cold, `3.44 GB`, 0 timeline/gap), medium passes CER `0.1055`, RTF `0.599`, RSS `3.44 GB` and timeline 0 but fails with 1 confirmed gap. Candidate B is `stop-revise`; long-v1, large-v2, other models, T07 and GPU were not run, route remains disabled, and ORT/VAD is excluded from T13 package input.
+T06 checkpoint: Candidate A remains a separate historical provisional `stop-revise` set (short CER `0.3583`, medium RTF `1.100`, unscored long timeout). The warmed same-binary matrix rejects an inherent CPU ceiling and identifies full-history prefill as the dominant regression. A bounded same-binary short beam 1/5 selection then chose timestamp/no-history/beam 1 (`0.2667` CER, `0.632` RTF, 0 timeline/gap) over beam 5 (`0.3583`, `0.811`); beam 3/10 were not activated. The selected identity passes authoritative large-v3 short/medium; its historical long-v1 7-gap result is superseded by the current retained-output long-v2 correction (`0.1509` CER, zero semantic gaps/timeline errors). The sole Candidate B then implemented direct official ORT 1.28.0 CPU and ordinary faster-whisper 1.2.1 Silero V6. Last-review replacement lock `e687ead6...` binds actual CPU/module paths, restricted PATH roots `77f4714a...`, and fixed module layout `a650e185...`; the 21-case mutation matrix rejects the correlated all-module/all-root rewrite. Short passes (`0.2667` CER, `0.654` warm RTF, `29.544s` cold, `3.44 GB`, 0 timeline/gap), medium passes CER `0.1055`, RTF `0.599`, RSS `3.44 GB` and timeline 0 but fails with 1 confirmed gap. Candidate B is diagnostic-only under current corrected authority; its long run remains unnecessary, the seven-model qualification matrix remains follow-up work, the route remains disabled, and ORT/VAD is excluded from T13 package input.
 
 #### T07 - Integrate Development CTranslate2 CUDA Execution
 
@@ -430,7 +430,7 @@ Deliverables:
 - Record T14 `stop-revise`/unbuilt candidates as omitted without attempting to route them.
 - Validate actual loaded modules and device execution rather than trusting a requested device string.
 - Run the applicable T01 short/medium/long engine matrix on explicit hardware/driver identities; preserve the same CER/timeline/gap/Qwen gates and require accelerated inference RTF `<=0.5`.
-- When T06 records `gpu-required-pending`, T15 explicitly owns the complete seven-model ordinary faster-whisper CUDA dispositions: `large-v3` and `large-v2` short/medium/long remain hard gates, including authoritative large-v2 long-v1; the other five models receive measured `qualified`, `stop-revise` or `unsupported-for-native-release` results.
+- If a reviewed device branch activates T15, it owns the complete seven-model ordinary faster-whisper CUDA dispositions: `large-v3` and `large-v2` short/medium/long-v2 remain hard gates; archived long-v1 observations are historical only. The other five models receive measured `qualified`, `stop-revise` or `unsupported-for-native-release` results.
 - Verify pack-load/runtime failure produces one nonfatal notice: engines with a qualified CPU route retry that bundled CPU path without losing job/recovery semantics, while ordinary faster-whisper proven GPU-required becomes unavailable without launching its unqualified CPU route.
 - Publish an independent `qualified`, `stop-revise` or `omitted-no-candidate` decision for CUDA and Vulkan; no non-qualified pack blocks CPU cutover.
 
@@ -572,7 +572,7 @@ Rollback point: restore the previous production package inputs and per-engine/pa
 Stage 0 child-task creation:
 
 - [x] User reviewed and approved the parent `prd.md`, `design.md` and task map.
-- [x] T01-T03 were the first creation batch; all three have independently reviewable artifacts, are completed and archived, and their handoffs remain authoritative.
+- [x] T01-T03 were the first creation batch and remain immutable archived provenance; current long-v2 authority is carried by the T08 corrected CT2 and T03C corrected CrispASR handoffs.
 - [x] T02 proved the CTranslate2 backend/runtime viable while recording the current fixed-window algorithm as `stop-revise`.
 - [x] T03 proved the CrispASR ABI/runtime viable, with Reazon `proceed-with-named-risks` and Parakeet/Qwen `stop-revise`; Gate 0 backend/runtime feasibility is closed.
 - [x] User approved moving development GPU integration earlier: normal-numbered T07 provides CTranslate2 CUDA development immediately after the T06 CPU checkpoint and before T08 regardless of CPU-ceiling outcome; T09 provides the CrispASR development GPU seam before T10/T11. Formal packs/qualification remain T14/T15, and development GPU evidence never substitutes for release evidence.
@@ -586,7 +586,7 @@ Stage 0 child-task creation:
 - [x] T06 start-gate planning update is reviewed; the user authorized committing it and starting T06 immediately afterwards.
 - [x] T06 Candidate A implementation and independent check completed a truthful provisional baseline: short CER and medium/long CPU performance block promotion; Candidate B was not activated; six remaining models are `blocked-not-run`.
 - [x] T06 same-binary warmed CPU RTF diagnostic gate is implemented and measured; A/B pass while C fails, so no inherent CPU ceiling or GPU-required handoff is claimed.
-- [x] T06 bounded short beam selection chose beam 1/no-history and froze a separate selected identity. It passed authoritative large-v3 short/medium, then completed long-v1 with passing CER/RTF/RSS/timeline but 7 confirmed gaps; selected CPU status is `stop-revise` and all other models remain `blocked-not-run`.
+- [x] T06 bounded short beam selection chose beam 1/no-history and froze a separate selected identity. Its historical long-v1 7-gap result is superseded; T08 retained-output correction passes long-v2 at CER `0.1509` with zero semantic gaps/timeline errors. Full ordinary model qualification remains follow-up work.
 - [x] T06 Candidate B planning lock selects only official ORT 1.28.0 Windows x64 CPU and ordinary faster-whisper 1.2.1 Silero V6, records exact asset/attribution/package identities, and passes an ignored-local direct CPU/no-custom-op smoke.
-- [x] T06 Candidate B direct session/focused CTest/final path-bound identity and deterministic T01 short/medium publication are complete. Short passes, medium fails with 1 confirmed gap, so Candidate B is `stop-revise`; long/other models/T07 were not run and ORT/VAD is not a T13 package input.
+- [x] T06 Candidate B direct session/focused CTest/final path-bound identity and historical T01 short/medium publication are complete. Its old medium gap is an excluded vocalization under current policy; Candidate B is diagnostic-only, long remains unnecessary, and ORT/VAD is not a T13 package input.
 - [x] T06 reran the same-corpus Python `large-v3` CPU diagnostics with the development interpreter and application HF_HOME. The sanitized report records short CER `0.358`/warm inference RTF `0.886`/1 timeline error, medium CER `0.099`/1 timeline error/1 gap, and long CER `0.295`/0 timeline errors/1 gap; these remain non-gating diagnostics and do not replace absolute native gates.
