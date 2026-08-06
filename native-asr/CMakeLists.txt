@@ -267,9 +267,13 @@ target_include_directories(hikaru-asr-ctranslate2-tests SYSTEM PRIVATE
 file(TO_CMAKE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-04-native-asr-ctranslate2-cuda-development/research/local"
   T07_LOCAL_ROOT)
+file(TO_CMAKE_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/local"
+  T08_LOCAL_ROOT)
 target_compile_definitions(hikaru-asr-ctranslate2-tests PRIVATE
   "T06_LOCAL_ROOT=\"${T06_LOCAL_ROOT_REAL}\""
-  "T07_LOCAL_ROOT=\"${T07_LOCAL_ROOT}\"")
+  "T07_LOCAL_ROOT=\"${T07_LOCAL_ROOT}\""
+  "T08_LOCAL_ROOT=\"${T08_LOCAL_ROOT}\"")
 
 foreach(target IN ITEMS hikaru-asr-worker hikaru-asr-ctranslate2-tests)
   add_custom_command(TARGET ${target} POST_BUILD

@@ -1043,6 +1043,13 @@ ctranslate2::ComputeType ctranslate2_compute_type(ExecutionComputeType compute_t
       : ctranslate2::ComputeType::INT8;
 }
 
+fs::path validated_tokenizer_path(
+    const fs::path& model_path,
+    bool require_kotoba_preprocessor) {
+  validate_model_directory(model_path, require_kotoba_preprocessor);
+  return model_path / "tokenizer.json";
+}
+
 }  // namespace
 
 BackendExecutionConfig cpu_execution_config() {
@@ -1051,6 +1058,19 @@ BackendExecutionConfig cpu_execution_config() {
 
 BackendExecutionConfig cuda_execution_config() {
   return {ExecutionDevice::Cuda, ExecutionComputeType::Float16, 0};
+}
+
+CandidateAConfig kotoba_config() {
+  CandidateAConfig config;
+  config.beam_size = 5;
+  config.condition_on_previous_text = false;
+  config.timestamp_driven_seek = true;
+  config.max_source_frames = 1500;
+  return config;
+}
+
+bool kotoba_mel_shape_supported(std::size_t mel_bins) {
+  return mel_bins == 128;
 }
 
 BackendError::BackendError(std::string code, std::string message)
@@ -1070,7 +1090,9 @@ std::int64_t source_frame_count(std::size_t sample_count) {
       / static_cast<std::size_t>(hop_length));
 }
 
-void validate_model_directory(const fs::path& model_path) {
+void validate_model_directory(
+    const fs::path& model_path,
+    bool require_kotoba_preprocessor) {
   if (!fs::is_directory(model_path)) {
     throw BackendError("model_not_ready", "Model directory is missing");
   }
@@ -1085,6 +1107,14 @@ void validate_model_directory(const fs::path& model_path) {
       && (!fs::is_regular_file(model_path / "vocabulary.txt")
           || fs::file_size(model_path / "vocabulary.txt") == 0)) {
     throw BackendError("model_not_ready", "Required model vocabulary is missing");
+  }
+  if (require_kotoba_preprocessor) {
+    const fs::path preprocessor = model_path / "preprocessor_config.json";
+    if (!fs::is_regular_file(preprocessor) || fs::file_size(preprocessor) == 0) {
+      throw BackendError(
+          "kotoba_preprocessor_missing",
+          "Kotoba preprocessor metadata is missing");
+    }
   }
 
   std::ifstream config_input(model_path / "config.json");
@@ -1305,12 +1335,16 @@ class CTranslate2WhisperBackend::Impl {
       const fs::path& model_path,
       CandidateAConfig config,
       std::optional<fs::path> vad_model_path,
-      BackendExecutionConfig execution)
+      BackendExecutionConfig execution,
+      bool require_kotoba_model)
       : attestation(validate_execution_config(execution)),
-        tokenizer(model_path / "tokenizer.json"),
+        tokenizer(validated_tokenizer_path(model_path, require_kotoba_model)),
         config(std::move(config)),
         vad_model_path(std::move(vad_model_path)) {
-    validate_model_directory(model_path);
+    if (this->config.max_source_frames <= 0
+        || this->config.max_source_frames > max_model_frames) {
+      throw BackendError("config_identity_mismatch", "Source window frame limit is invalid");
+    }
     tokens.eot = tokenizer.token_to_id("<|endoftext|>");
     tokens.sot = tokenizer.token_to_id("<|startoftranscript|>");
     tokens.japanese = tokenizer.token_to_id("<|ja|>");
@@ -1341,6 +1375,9 @@ class CTranslate2WhisperBackend::Impl {
     const std::size_t model_mels = model->n_mels();
     if (model_mels != 80 && model_mels != 128) {
       throw BackendError("model_contract_mismatch", "Whisper model mel shape is unsupported");
+    }
+    if (require_kotoba_model && !kotoba_mel_shape_supported(model_mels)) {
+      throw BackendError("kotoba_mel_shape_mismatch", "Kotoba model must expose 128 mel bins");
     }
     mel_bins = static_cast<int>(model_mels);
   }
@@ -1374,12 +1411,14 @@ CTranslate2WhisperBackend::CTranslate2WhisperBackend(
     const fs::path& model_path,
     CandidateAConfig config,
     std::optional<fs::path> vad_model_path,
-    BackendExecutionConfig execution)
+    BackendExecutionConfig execution,
+    bool require_kotoba_model)
     : impl_(std::make_unique<Impl>(
           model_path,
           std::move(config),
           std::move(vad_model_path),
-          execution)) {}
+          execution,
+          require_kotoba_model)) {}
 
 CTranslate2WhisperBackend::~CTranslate2WhisperBackend() = default;
 
@@ -1455,7 +1494,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
   while (seek < total_frames) {
     check_cancelled(is_cancelled);
     const int segment_frames = static_cast<int>(std::min<std::int64_t>(
-        max_model_frames,
+        impl_->config.max_source_frames,
         total_frames - seek));
     const std::int64_t window_offset_ms = seek * 10;
     const std::int64_t source_duration_ms = std::min<std::int64_t>(

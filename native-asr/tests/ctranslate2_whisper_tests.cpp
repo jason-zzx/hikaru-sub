@@ -21,6 +21,7 @@
 #include <iomanip>
 #include <iostream>
 #include <iterator>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -481,6 +482,10 @@ bool is_t07_task_local_output(const fs::path& path) {
   return is_path_within(fs::path(T07_LOCAL_ROOT), path);
 }
 
+bool is_t08_task_local_output(const fs::path& path) {
+  return is_path_within(fs::path(T08_LOCAL_ROOT), path);
+}
+
 std::string file_version(const fs::path& path) {
   DWORD ignored = 0;
   const DWORD size = GetFileVersionInfoSizeW(path.c_str(), &ignored);
@@ -726,6 +731,16 @@ void run_core_tests() {
   check(production_defaults.timestamp_driven_seek, "production seek default drift");
   check(!production_defaults.condition_on_previous_text, "production history default drift");
   check(production_defaults.beam_size == 1, "production beam default drift");
+  check(production_defaults.max_source_frames == max_model_frames,
+        "production source-window default drift");
+
+  const CandidateAConfig kotoba = kotoba_config();
+  check(kotoba.beam_size == 5, "Kotoba beam drift");
+  check(!kotoba.condition_on_previous_text, "Kotoba history drift");
+  check(kotoba.timestamp_driven_seek, "Kotoba seek drift");
+  check(kotoba.max_source_frames == 1500, "Kotoba source-window drift");
+  check(kotoba_mel_shape_supported(128), "Kotoba 128-mel readiness drift");
+  check(!kotoba_mel_shape_supported(80), "Kotoba wrong-mel rejection drift");
 
   const auto diagnostic_configs = diagnostic_matrix_configs();
   check(diagnostic_configs.size() == 4, "diagnostic matrix size drift");
@@ -1019,6 +1034,8 @@ void run_core_tests() {
   };
   write_model_fixture(root / "ordinary-json-vocabulary", "vocabulary.json");
   write_model_fixture(root / "ordinary-text-vocabulary", "vocabulary.txt");
+  write_model_fixture(root / "kotoba", "vocabulary.json");
+  std::ofstream(root / "kotoba" / "preprocessor_config.json") << R"({"feature_size":128})";
   validate_model_directory(root / "ordinary-json-vocabulary");
 #ifndef HIKARU_ASR_CT2_WITH_CUDA
   try {
@@ -1033,9 +1050,25 @@ void run_core_tests() {
   }
 #endif
   validate_model_directory(root / "ordinary-text-vocabulary");
+  validate_model_directory(root / "kotoba", true);
   check(
       !fs::exists(root / "ordinary-json-vocabulary" / "preprocessor_config.json"),
       "ordinary Whisper fixture unexpectedly requires preprocessor metadata");
+  try {
+    validate_model_directory(root / "ordinary-json-vocabulary", true);
+    throw std::runtime_error("Kotoba fixture without preprocessor unexpectedly passed");
+  } catch (const BackendError& error) {
+    check(error.code() == "kotoba_preprocessor_missing",
+          "Kotoba missing-preprocessor error drift");
+  }
+  std::ofstream(root / "kotoba" / "preprocessor_config.json", std::ios::trunc);
+  try {
+    validate_model_directory(root / "kotoba", true);
+    throw std::runtime_error("Kotoba empty preprocessor unexpectedly passed");
+  } catch (const BackendError& error) {
+    check(error.code() == "kotoba_preprocessor_missing",
+          "Kotoba empty-preprocessor error drift");
+  }
   fs::remove(root / "ordinary-text-vocabulary" / "vocabulary.txt");
   try {
     validate_model_directory(root / "ordinary-text-vocabulary");
@@ -1117,6 +1150,14 @@ Json config_json(const CandidateAConfig& config) {
       {"modelWindowDurationMs", model_window_duration_ms},
       {"timestampResolutionMs", timestamp_resolution_ms},
       {"vad", false}};
+}
+
+Json kotoba_config_json(const CandidateAConfig& config) {
+  Json value = config_json(config);
+  value["maxSourceFrames"] = config.max_source_frames;
+  value["maxSourceWindowDurationMs"] = config.max_source_frames * 10;
+  value["language"] = "ja";
+  return value;
 }
 
 Json candidate_b_config_json(const CandidateAConfig& config) {
@@ -1867,6 +1908,212 @@ void run_cuda_development_evidence(const std::vector<std::string>& args) {
       {"sampleCount", repeats}}.dump() << '\n';
 }
 
+void run_kotoba_evidence(const std::vector<std::string>& args) {
+  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
+  check(is_t08_task_local_output(output_path),
+        "T08 raw output must stay under research/local");
+
+  const fs::path model_path = fs::u8path(required_arg(args, "--model"));
+  const fs::path audio_path = fs::u8path(required_arg(args, "--audio"));
+  const fs::path input_lock = fs::u8path(required_arg(args, "--input-lock"));
+  const fs::path production_worker = fs::u8path(required_arg(args, "--production-worker"));
+  const std::string case_id = required_arg(args, "--case-id");
+  const int repeats = integer_arg(args, "--repeats", case_id == "short-v1" ? 4 : 1);
+  check(fs::is_regular_file(input_lock), "T08 K1 input lock is missing");
+  check(fs::is_regular_file(production_worker), "T08 production worker is missing");
+  check(repeats == (case_id == "short-v1" ? 4 : 1),
+        "T08 requires short=4 repeats and medium/long=1 repeat");
+
+  const std::map<std::string, std::pair<std::uintmax_t, std::string>> expected_model_files{
+      {"config.json", {2394, "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9"}},
+      {"model.bin", {1512927867, "60d2bc2e33de9d43f2745be09caefe1161acab670f6796d4a750d8d848382b36"}},
+      {"preprocessor_config.json", {340, "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"}},
+      {"tokenizer.json", {2481381, "f70c9740a90657b489cf05b0fa0605c1d497db542f11a70a8cc80a025c94c7d8"}},
+      {"vocabulary.json", {1068114, "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"}},
+  };
+  const Json model_files = model_file_identities(model_path);
+  check(model_files.size() == expected_model_files.size(),
+        "T08 Kotoba model file set drifted");
+  for (const Json& file : model_files) {
+    const std::string name = file.at("name").get<std::string>();
+    const auto expected = expected_model_files.find(name);
+    check(expected != expected_model_files.end()
+              && file.at("sizeBytes").get<std::uintmax_t>() == expected->second.first
+              && file.at("sha256").get<std::string>() == expected->second.second,
+          "T08 Kotoba model identity drifted: " + name);
+  }
+  check(model_path.filename() == "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc"
+            && model_path.parent_path().filename() == "snapshots"
+            && model_path.parent_path().parent_path().filename()
+                == "models--kotoba-tech--kotoba-whisper-v2.0-faster"
+            && model_path.parent_path().parent_path().parent_path().filename() == "hub",
+        "T08 model is not the exact pinned Hugging Face snapshot path");
+
+  const std::map<std::string, std::pair<std::int64_t, std::string>> expected_cases{
+      {"short-v1", {24102, "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"}},
+      {"medium-v1", {498872, "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458"}},
+      {"long-v1", {4144235, "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e"}},
+  };
+  const auto expected_case = expected_cases.find(case_id);
+  check(expected_case != expected_cases.end(), "T08 case identity is not allowed");
+  check(verified_wav_duration_ms(audio_path) == expected_case->second.first
+            && sha256_file(audio_path) == expected_case->second.second,
+        "T08 authoritative audio identity drifted");
+
+  const Json path_policy = cuda_development_path_policy();
+  const CandidateAConfig config = kotoba_config();
+  const Clock::time_point load_started = Clock::now();
+  CTranslate2WhisperBackend backend(
+      model_path,
+      config,
+      std::nullopt,
+      cuda_execution_config(),
+      true);
+  const double load_ms = elapsed_ms(load_started);
+  check(backend.mel_bins() == 128, "T08 Kotoba model mel shape drifted");
+  const BackendExecutionAttestation attestation = backend.execution_attestation();
+  check(attestation.config.device == ExecutionDevice::Cuda
+            && attestation.config.compute_type == ExecutionComputeType::Float16
+            && attestation.config.device_index == 0,
+        "T08 CUDA execution mapping drifted");
+
+  Json samples = Json::array();
+  std::int64_t source_frames = 0;
+  bool failed = false;
+  for (int repeat = 0; repeat < repeats; ++repeat) {
+    const Clock::time_point sample_started = Clock::now();
+    const TranscriptionResult result = backend.transcribe(audio_path);
+    const double sample_wall_ms = elapsed_ms(sample_started);
+    const std::int64_t current_source_frames = source_frame_count(result.original_sample_count);
+    if (source_frames == 0) {
+      source_frames = current_source_frames;
+    }
+    check(source_frames == current_source_frames, "T08 source frame identity drifted");
+    Json segments = Json::array();
+    for (const SegmentEvidence& segment : result.segments) {
+      segments.push_back(segment_json(segment));
+    }
+    Json traces = Json::array();
+    std::size_t generation_calls = 0;
+    for (const WindowTrace& trace : result.traces) {
+      check(trace.source_window_duration_ms > 0
+                && trace.source_window_duration_ms <= 15000
+                && trace.model_window_duration_ms == 30000
+                && trace.history_token_count_before == 0
+                && trace.history_token_count_after == 0,
+            "T08 K1 window/profile trace drifted");
+      generation_calls += trace.generation_call_count;
+      traces.push_back(trace_json(trace));
+    }
+    if (result.failure_code.empty()) {
+      check(!result.segments.empty() && !result.traces.empty() && generation_calls > 0,
+            "T08 completed sample has incomplete segment/trace evidence");
+      check(result.traces.back().seek_frames_after
+                == source_frame_count(result.original_sample_count),
+            "T08 K1 trace chain did not reach WAV end");
+    }
+    Json sample{
+        {"status", result.failure_code.empty() ? "completed" : "failed"},
+        {"runKind", repeat == 0 ? "cold" : "warm"},
+        {"repeatIndex", repeat + 1},
+        {"segments", std::move(segments)},
+        {"tokenTraces", std::move(traces)},
+        {"generationCompleted", result.failure_code.empty()},
+        {"generationCallCount", generation_calls},
+        {"failure", result.failure_code.empty()
+             ? Json(nullptr)
+             : Json{{"code", result.failure_code}}},
+        {"timings", Json{
+             {"loadMs", repeat == 0 ? Json(load_ms) : Json(nullptr)},
+             {"sampleWallMs", sample_wall_ms},
+             {"featureMs", result.feature_ms},
+             {"modelGenerateMs", result.generate_ms},
+             {"inferenceMs", result.inference_ms},
+             {"inferenceRtf", result.inference_ms / result.duration_ms}}}};
+    if (repeat == 0) {
+      const double process_wall_ms = elapsed_ms(process_started);
+      sample["timings"]["processWallMs"] = process_wall_ms;
+      sample["timings"]["processWallRtf"] = process_wall_ms / result.duration_ms;
+    }
+    failed = failed || !result.failure_code.empty();
+    samples.push_back(std::move(sample));
+    if (failed) {
+      break;
+    }
+  }
+
+  const fs::path executable = current_executable();
+  Json modules = cuda_development_loaded_modules(path_policy);
+  check(std::none_of(modules.begin(), modules.end(), [](const Json& module) {
+          return lowercase(module.at("name").get<std::string>()).rfind("cudnn", 0) == 0;
+        }),
+        "T08 no-cuDNN identity loaded an unexpected cuDNN module");
+  const auto driver_module = std::find_if(modules.begin(), modules.end(), [](const Json& module) {
+    return lowercase(module.at("name").get<std::string>()) == "nvcuda.dll";
+  });
+  check(driver_module != modules.end(), "T08 CUDA driver module attestation is missing");
+
+  const Json raw{
+      {"schemaVersion", 1},
+      {"kind", "hikaru-ct2-kotoba-k1-raw"},
+      {"status", failed ? "failed" : "completed"},
+      {"caseId", case_id},
+      {"engine", "kotoba-faster-whisper"},
+      {"model", Json{
+           {"id", "kotoba-tech/kotoba-whisper-v2.0-faster"},
+           {"revision", "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc"},
+           {"files", model_files},
+           {"legacyCache", Json{
+                {"layout", "huggingface-immutable-snapshot"},
+                {"revisionDirectoryVerified", true},
+                {"usedInPlace", true}}}}},
+      {"audio", Json{
+           {"sha256", expected_case->second.second},
+           {"durationMs", expected_case->second.first},
+           {"sourceFrames", source_frames}}},
+      {"candidate", "kotoba-k1"},
+      {"config", kotoba_config_json(config)},
+      {"inputLockSha256", sha256_file(input_lock)},
+      {"runtime", Json{
+           {"measurementExecutable", file_identity(executable)},
+           {"productionWorker", file_identity(production_worker)},
+           {"requiredDlls", runtime_file_identities(executable, true)},
+           {"requestedDevice", "cuda"},
+           {"resolvedDevice", "cuda"},
+           {"computeType", "float16"},
+           {"deviceIndex", 0},
+           {"ctranslate2Version", "4.8.0"},
+           {"cudaBuildEnabled", true},
+           {"cudaDynamicLoading", true},
+           {"withCudnn", false},
+           {"gpu", Json{
+                {"deviceIndex", 0},
+                {"name", attestation.device_name},
+                {"driverModuleVersion", driver_module->at("version")},
+                {"cudaDriverApiVersion", attestation.cuda_driver_api_version},
+                {"computeCapability", std::to_string(attestation.compute_capability_major)
+                     + "." + std::to_string(attestation.compute_capability_minor)},
+                {"visibleDeviceCount", attestation.visible_device_count},
+                {"float16Supported", attestation.compute_type_supported}}},
+           {"cpu", cpu_identity()},
+           {"pathPolicy", path_policy},
+           {"loadedModules", std::move(modules)}}},
+      {"samples", std::move(samples)},
+      {"resources", Json{
+           {"peakProcessRssBytes", peak_working_set()},
+           {"method", "GetProcessMemoryInfo.PeakWorkingSetSize"}}}};
+
+  fs::create_directories(output_path.parent_path());
+  const fs::path temporary = output_path.string() + ".tmp";
+  std::ofstream(temporary, std::ios::binary) << std::setw(2) << raw << '\n';
+  fs::remove(output_path);
+  fs::rename(temporary, output_path);
+  std::cout << Json{
+      {"status", failed ? "failed" : "completed"},
+      {"caseId", case_id},
+      {"sampleCount", raw["samples"].size()}}.dump() << '\n';
+}
+
 void run_candidate_b_identity_check() {
   static_cast<void>(restricted_path_policy());
   run_core_tests();
@@ -1897,6 +2144,8 @@ int main(int argc, char** argv) {
       run_evidence(args, true, true);
     } else if (std::find(args.begin(), args.end(), "--run-cuda-development-evidence") != args.end()) {
       run_cuda_development_evidence(args);
+    } else if (std::find(args.begin(), args.end(), "--run-kotoba-evidence") != args.end()) {
+      run_kotoba_evidence(args);
     } else if (std::find(args.begin(), args.end(), "--run-cpu-rtf-diagnostic") != args.end()) {
       run_diagnostic_matrix(args);
     } else if (std::find(args.begin(), args.end(), "--run-short-decode-selection") != args.end()) {

@@ -1,0 +1,11 @@
+{"file":".trellis/spec/asr/index.md","reason":"ASR layer ownership and pre-development checklist."}
+{"file":".trellis/spec/asr/engine-plugins.md","reason":"Preserve the single Kotoba model and Kotoba-only preprocessor readiness rule."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Authoritative ground-truth gates, native CTranslate2 evidence identity, privacy, and CUDA development rules."}
+{"file":".trellis/spec/tauri/index.md","reason":"Tauri layer ownership and validation checklist."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Preserve development-only native host, model-backed test seam, recovery, cancellation, and Release legacy routing."}
+{"file":".trellis/tasks/08-05-native-asr-kotoba-compatibility/research/kotoba-productization-inputs.md","reason":"T08 source research, existing evidence, minimum K1 candidate, and cache compatibility boundary."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-ctranslate2-poc/research/ctranslate2-poc-report.md","reason":"T02 Kotoba short/medium/long baseline and exact failure class."}
+{"file":".trellis/tasks/archive/2026-08/08-04-native-asr-ctranslate2-cuda-development/research/cuda-development-report.md","reason":"Reviewed T07 development-gpu-ready identity and performance handoff."}
+{"file":".trellis/tasks/08-05-native-asr-kotoba-compatibility/research/corrected-baseline-research.md","reason":"User-corrected long-v2 reference, approved vocalization policy, raw availability, preview re-score, and history boundary."}
+{"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Original T01 manifest, comparator, privacy, and immutable evidence contract to supersede safely rather than rewrite."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/ctranslate2-whisper-report.md","reason":"T06 selected Candidate A/B identities and old dispositions that require corrected supersession."}

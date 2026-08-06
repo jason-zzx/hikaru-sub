@@ -1,0 +1,9 @@
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Verify T01 recomputation, per-case gates, identity binding, deterministic publication, and privacy."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Verify Rust safety, tests, path handling, and reporting of unavailable model/GPU checks."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Verify native host lifecycle, test-only env boundaries, recovery, cancellation, and unchanged Release routing."}
+{"file":".trellis/tasks/08-05-native-asr-kotoba-compatibility/research/kotoba-productization-inputs.md","reason":"Check implementation against the pinned model-card settings, K1 scope, and legacy cache boundary."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-ctranslate2-poc/research/ctranslate2-poc-report.md","reason":"Compare final Kotoba evidence to the immutable T02 fixed-window baseline without rewriting history."}
+{"file":".trellis/tasks/archive/2026-08/08-04-native-asr-ctranslate2-cuda-development/research/cuda-development-report.md","reason":"Ensure quality iteration used the reviewed development GPU lane without claiming formal pack qualification."}
+{"file":".trellis/tasks/08-05-native-asr-kotoba-compatibility/research/corrected-baseline-research.md","reason":"Verify long-v2 identity, conservative vocalization boundary, preview dispositions, and no unnecessary Candidate B long run."}
+{"file":".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md","reason":"Verify current manifest correction and supplemental evidence preserve the original T01 history/privacy contract."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/ctranslate2-whisper-report.md","reason":"Verify corrected T06 handoff binds the original selected Candidate A/B identities without rewriting archived evidence."}

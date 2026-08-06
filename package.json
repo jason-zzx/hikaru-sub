@@ -12,7 +12,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "vitest run",
+    "test": "vitest run --exclude \".trellis/**\"",
     "preview": "vite preview",
     "tauri": "tauri",
     "build:desktop": "tauri build",

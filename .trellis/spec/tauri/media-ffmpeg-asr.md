@@ -110,7 +110,7 @@ struct ResolvedNativeLaunch {
 - Bound both `segment` append accumulation and `segmentsReplace` with canonical `maxReplacementSegments`. Embed `native-asr/protocol-v1-limits.json`; do not maintain a handwritten Rust limits copy.
 - Recovery/stderr artifact job IDs must use the host-safe generated character set, not merely the protocol's byte/control-character rules; otherwise separators can escape managed directories.
 - `HIKARU_ASR_FAKE_WORKER` and `HIKARU_ASR_FAKE_SCENARIO` are debug/test-only routing overrides. `#[cfg(not(debug_assertions))]` must leave Release on legacy routing.
-- Model-backed worker compatibility tests use required `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH` only inside `asr_worker.rs`'s test module. All three must be set together; optional `HIKARU_ASR_CT2_DEVICE` is exactly `cpu|cuda`, and optional `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH` selects a longer cancellation input. CUDA mode additionally requires `HIKARU_ASR_CT2_CPU_WORKER` so the same suite can deterministically prove pre-ready `cuda_not_built` without damaging the machine CUDA environment. The test copies every exercised audio into a temporary managed workspace before `ResolvedNativeLaunch::resolve(...)`. Product/Release code never reads these keys.
+- Model-backed worker compatibility tests use required `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH` only inside `asr_worker.rs`'s test module. All three must be set together; optional `HIKARU_ASR_CT2_DEVICE` is exactly `cpu|cuda`, optional `HIKARU_ASR_CT2_ENGINE` is exactly `faster-whisper|kotoba-faster-whisper` (default ordinary), and optional `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH` selects a longer cancellation input. Kotoba tests require the exact immutable Hugging Face snapshot revision directory. CUDA mode additionally requires `HIKARU_ASR_CT2_CPU_WORKER` so the same suite can deterministically prove pre-ready `cuda_not_built` without damaging the machine CUDA environment. The test copies every exercised audio into a temporary managed workspace before `ResolvedNativeLaunch::resolve(...)`. Product/Release code never reads these keys.
 
 ### Validation & Error Matrix
 
@@ -124,7 +124,8 @@ struct ResolvedNativeLaunch {
 | Cancel after a terminal snapshot but before reap | Keep first terminal status; terminate/reap remaining process tree |
 | Unsafe artifact job ID or path outside approved workspace/cache root | Reject before launch/write |
 | Only some required real-worker test env keys are set, or optional keys exist without the required triple | Fail the test setup clearly; never guess model/audio/worker paths |
-| `HIKARU_ASR_CT2_DEVICE` is not `cpu|cuda` | Fail test setup before launch |
+| `HIKARU_ASR_CT2_DEVICE` is not `cpu|cuda`, or `HIKARU_ASR_CT2_ENGINE` is not an exact supported CT2 engine | Fail test setup before launch |
+| Kotoba model path is not the exact pinned immutable Hugging Face snapshot directory | Fail test setup before launch |
 | CUDA mode lacks the CPU-only worker or dedicated cancel audio | Fail test setup; do not weaken the negative/cancel coverage |
 | CPU-only worker receives the CUDA request | Preserve structured `cuda_not_built` in recovery; accept no `ready`/completed snapshot |
 | Rust supplies a canonical extended Windows model path to CT2 4.8.0 | Worker normalizes only the `\\?\` spelling at the inference boundary; host validation remains canonical |

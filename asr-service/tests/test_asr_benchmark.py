@@ -92,6 +92,20 @@ class BenchmarkMetricTests(unittest.TestCase):
         long_hypothesis = "あ" * 20_000 + "え" + "う" * 20_000
         self.assertEqual(benchmark.levenshtein_counts(long_reference, long_hypothesis)["substitutions"], 1)
 
+        tied_reference = "前" * 400 + "ab" + "後" * 400
+        tied_hypothesis = "前" * 400 + "ba" + "後" * 400
+        self.assertEqual(
+            benchmark.levenshtein_counts(tied_reference, tied_hypothesis),
+            {
+                "substitutions": 2,
+                "deletions": 0,
+                "insertions": 0,
+                "referenceCharacters": len(tied_reference),
+                "errors": 2,
+                "cer": 2 / len(tied_reference),
+            },
+        )
+
     def test_percentile_uses_linear_interpolation(self):
         self.assertEqual(benchmark.percentile([0, 100], 0.95), 95.0)
         self.assertEqual(benchmark.percentile([5], 0.95), 5.0)
@@ -127,6 +141,29 @@ class BenchmarkMetricTests(unittest.TestCase):
             1000,
         )
         self.assertEqual(nested["nonMonotonicCount"], 0)
+
+    def test_approved_non_semantic_vocalizations_are_exact_and_conservative(self):
+        for text in (
+            "あ",
+            "うううううう",
+            "うんうん",
+            "うあ、うあ、うあ",
+            "（え）〜",
+            "おーお",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(benchmark.is_approved_non_semantic_vocalization(text))
+        for text in (
+            "あああああああ",
+            "はい",
+            "（笑）",
+            "うん、はい",
+            "うあん",
+            "ああ言う",
+            "……",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(benchmark.is_approved_non_semantic_vocalization(text))
 
     def test_missing_speech_uses_merged_ass_confirmed_intervals_only(self):
         missing = benchmark.missing_speech_regions(
@@ -165,6 +202,49 @@ class BenchmarkMetricTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_gap_exclusion_requires_every_overlapping_reference_cue_to_be_approved(self):
+        gap = {"speechIntervalIndex": 0, "startMs": 1000, "endMs": 2500, "durationMs": 1500}
+        approved = [
+            {"startMs": 0, "endMs": 1800, "text": "うんうん", "speech": True},
+            {"startMs": 1700, "endMs": 3000, "text": "うあ、うあ", "speech": True},
+        ]
+        self.assertEqual(benchmark.classify_missing_speech_regions(approved, [gap]), ([], [gap]))
+
+        mixed = approved + [{"startMs": 1400, "endMs": 2000, "text": "はい", "speech": True}]
+        self.assertEqual(benchmark.classify_missing_speech_regions(mixed, [gap]), ([gap], []))
+        non_speech_mixed = approved + [
+            {"startMs": 1400, "endMs": 2000, "text": "はい", "speech": False}
+        ]
+        self.assertEqual(
+            benchmark.classify_missing_speech_regions(non_speech_mixed, [gap]),
+            ([gap], []),
+        )
+        self.assertEqual(benchmark.classify_missing_speech_regions([], [gap]), ([gap], []))
+
+    def test_excluded_vocalizations_stay_in_cer_and_publish_separate_diagnostics(self):
+        metrics = benchmark._sample_metrics(
+            "うんうん",
+            [{"startMs": 0, "endMs": 2000, "text": "うんうん", "speech": True}],
+            [{"startMs": 0, "endMs": 2000, "speech": True}],
+            [],
+            2000,
+            "engine-native",
+            "faster-whisper",
+        )
+        expected_gap = {"speechIntervalIndex": 0, "startMs": 0, "endMs": 2000, "durationMs": 2000}
+        self.assertEqual(metrics["cer"]["cer"], 1.0)
+        self.assertEqual(metrics["missingSpeechRegions"], [])
+        self.assertEqual(metrics["excludedNonSemanticVocalizationRegions"], [expected_gap])
+        self.assertEqual(metrics, benchmark._sample_metrics(
+            "うんうん",
+            [{"startMs": 0, "endMs": 2000, "text": "うんうん", "speech": True}],
+            [{"startMs": 0, "endMs": 2000, "speech": True}],
+            [],
+            2000,
+            "engine-native",
+            "faster-whisper",
+        ))
 
     def test_refresh_replaces_preview_for_all_refresh_capable_routes(self):
         for engine in ("parakeet", "qwen3-asr", "reazonspeech-nemo"):
@@ -602,7 +682,7 @@ class BenchmarkReportTests(unittest.TestCase):
         self.assertIn("current-implementation diagnostics only", first)
         self.assertIn("Python-reference duration classes not recorded: long, medium", first)
         self.assertIn("Missing coverage tags: low-volume, person-names", first)
-        self.assertIn("| failed | 0.000 | 1 | 0 | 0.100 |", first)
+        self.assertIn("| failed | 0.000 | 1 | 0 | 0 | 0.100 |", first)
         self.assertNotIn("proposed and unfrozen", first)
         self.assertIn("c" * 64, first)
 

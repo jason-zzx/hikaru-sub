@@ -14,6 +14,7 @@ import datetime as dt
 import difflib
 import hashlib
 import importlib.metadata
+from functools import lru_cache
 import json
 import math
 import os
@@ -127,6 +128,26 @@ def sha256_file(path: Path) -> str:
 def normalize_japanese_text(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", str(text).replace("\r\n", "\n").replace("\r", "\n"))
     return "".join(char for char in normalized if not char.isspace())
+
+
+NON_SEMANTIC_VOCALIZATION_UNITS = ("あ", "う", "え", "お", "ん", "うん", "うあ")
+NON_SEMANTIC_VOCALIZATION_STRIP = frozenset("ー〜~")
+
+
+def normalize_non_semantic_vocalization(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", str(text))
+    return "".join(
+        char
+        for char in normalized
+        if not char.isspace()
+        and char not in NON_SEMANTIC_VOCALIZATION_STRIP
+        and unicodedata.category(char)[0] not in {"P", "S"}
+    )
+
+
+def is_approved_non_semantic_vocalization(text: str) -> bool:
+    normalized = normalize_non_semantic_vocalization(text)
+    return any(normalized == unit * repeats for unit in NON_SEMANTIC_VOCALIZATION_UNITS for repeats in range(1, 7))
 
 
 ASS_OVERRIDE_RE = re.compile(r"\{[^}]*\}")
@@ -254,62 +275,259 @@ def _manifest_absolute_path_fields(value: Any, field: str = "manifest") -> list[
     return [field] if isinstance(value, str) and contains_machine_absolute_path(value) else []
 
 
-def levenshtein_counts(reference: str, hypothesis: str) -> dict[str, int | float]:
-    """Return exact deterministic S/D/I counts using an exact widening DP band."""
-    reference = str(reference)
-    hypothesis = str(hypothesis)
+LEVENSHTEIN_DIRECT_CELLS = 100_000
+LEVENSHTEIN_DIRECT_BAND_CELLS = 2_000_000
+
+
+def _levenshtein_direct(reference: str, hypothesis: str) -> tuple[int, int, int, int]:
+    """Return S/D/I/distance with the historical substitution/deletion/insertion tie order."""
     reference_count = len(reference)
     hypothesis_count = len(hypothesis)
     if reference == hypothesis:
-        substitutions = deletions = insertions = distance = 0
-    elif not reference:
-        substitutions = deletions = 0
-        insertions = distance = hypothesis_count
-    elif not hypothesis:
-        substitutions = insertions = 0
-        deletions = distance = reference_count
+        return 0, 0, 0, 0
+    if not reference:
+        return 0, 0, hypothesis_count, hypothesis_count
+    if not hypothesis:
+        return 0, reference_count, 0, reference_count
+
+    band = max(1, abs(reference_count - hypothesis_count))
+    maximum_band = max(reference_count, hypothesis_count)
+    while True:
+        previous: dict[int, tuple[int, int, int, int]] = {
+            index: (index, 0, 0, index) for index in range(min(hypothesis_count, band) + 1)
+        }
+        for reference_index in range(1, reference_count + 1):
+            start = max(0, reference_index - band)
+            end = min(hypothesis_count, reference_index + band)
+            current: dict[int, tuple[int, int, int, int]] = {}
+            if start == 0:
+                current[0] = (reference_index, 0, reference_index, 0)
+            for hypothesis_index in range(max(1, start), end + 1):
+                candidates: list[tuple[int, int, int, int, int]] = []
+                diagonal = previous.get(hypothesis_index - 1)
+                if diagonal is not None:
+                    edit, substitutions, deletions, insertions = diagonal
+                    if reference[reference_index - 1] == hypothesis[hypothesis_index - 1]:
+                        candidates.append((edit, 0, substitutions, deletions, insertions))
+                    else:
+                        candidates.append((edit + 1, 0, substitutions + 1, deletions, insertions))
+                deletion = previous.get(hypothesis_index)
+                if deletion is not None:
+                    edit, substitutions, deletions, insertions = deletion
+                    candidates.append((edit + 1, 1, substitutions, deletions + 1, insertions))
+                insertion = current.get(hypothesis_index - 1)
+                if insertion is not None:
+                    edit, substitutions, deletions, insertions = insertion
+                    candidates.append((edit + 1, 2, substitutions, deletions, insertions + 1))
+                edit, _rank, substitutions, deletions, insertions = min(
+                    candidates, key=lambda item: (item[0], item[1])
+                )
+                current[hypothesis_index] = (edit, substitutions, deletions, insertions)
+            previous = current
+        final = previous.get(hypothesis_count)
+        if final is not None and final[0] <= band:
+            distance, substitutions, deletions, insertions = final
+            return substitutions, deletions, insertions, distance
+        if band >= maximum_band:  # pragma: no cover - a full band always contains an optimal path
+            raise AssertionError("Levenshtein DP did not reach the target")
+        band = min(maximum_band, band * 2)
+
+
+def _levenshtein_prefix_distances(pattern: str, text: str) -> list[int]:
+    """Exact distance from pattern to every text prefix using Myers bit vectors."""
+    if not pattern:
+        return list(range(len(text) + 1))
+    masks: dict[str, int] = {}
+    for index, char in enumerate(pattern):
+        masks[char] = masks.get(char, 0) | (1 << index)
+    width_mask = (1 << len(pattern)) - 1
+    high_bit = 1 << (len(pattern) - 1)
+    positive = width_mask
+    negative = 0
+    score = len(pattern)
+    distances = [score]
+    for char in text:
+        equal = masks.get(char, 0)
+        vertical = equal | negative
+        horizontal = (((equal & positive) + positive) ^ positive) | equal
+        positive_horizontal = negative | ~(horizontal | positive)
+        negative_horizontal = positive & horizontal
+        if positive_horizontal & high_bit:
+            score += 1
+        elif negative_horizontal & high_bit:
+            score -= 1
+        positive_horizontal = ((positive_horizontal << 1) | 1) & width_mask
+        negative_horizontal = (negative_horizontal << 1) & width_mask
+        positive = (negative_horizontal | ~(vertical | positive_horizontal)) & width_mask
+        negative = positive_horizontal & vertical
+        distances.append(score)
+    return distances
+
+
+def _levenshtein_direct_operations(reference: str, hypothesis: str) -> bytes:
+    """Return the historical traceback in reverse order: diagonal, deletion, insertion."""
+    hypothesis_count = len(hypothesis)
+    rows = [list(range(hypothesis_count + 1))]
+    for reference_index, reference_char in enumerate(reference, start=1):
+        previous = rows[-1]
+        current = [reference_index]
+        for hypothesis_index, hypothesis_char in enumerate(hypothesis, start=1):
+            if reference_char == hypothesis_char:
+                current.append(previous[hypothesis_index - 1])
+            else:
+                current.append(min(
+                    previous[hypothesis_index - 1],
+                    previous[hypothesis_index],
+                    current[hypothesis_index - 1],
+                ) + 1)
+        rows.append(current)
+
+    reference_index = len(reference)
+    hypothesis_index = hypothesis_count
+    operations = bytearray()
+    while reference_index or hypothesis_index:
+        distance = rows[reference_index][hypothesis_index]
+        if (
+            reference_index
+            and hypothesis_index
+            and reference[reference_index - 1] == hypothesis[hypothesis_index - 1]
+            and rows[reference_index - 1][hypothesis_index - 1] == distance
+        ):
+            operations.append(0)
+            reference_index -= 1
+            hypothesis_index -= 1
+        elif (
+            reference_index
+            and hypothesis_index
+            and rows[reference_index - 1][hypothesis_index - 1] + 1 == distance
+        ):
+            operations.append(0)
+            reference_index -= 1
+            hypothesis_index -= 1
+        elif reference_index and rows[reference_index - 1][hypothesis_index] + 1 == distance:
+            operations.append(1)
+            reference_index -= 1
+        else:
+            if not hypothesis_index or rows[reference_index][hypothesis_index - 1] + 1 != distance:
+                raise AssertionError("Levenshtein traceback did not reach a predecessor")
+            operations.append(2)
+            hypothesis_index -= 1
+    return bytes(operations)
+
+
+def _levenshtein_subsequence_operations(reference: str, hypothesis: str) -> bytes:
+    """Trace an edit path whose distance is exactly the string-length difference."""
+    reference_index = len(reference)
+    hypothesis_index = len(hypothesis)
+    operations = bytearray()
+    if reference_index >= hypothesis_index:
+        while hypothesis_index:
+            if reference[reference_index - 1] == hypothesis[hypothesis_index - 1]:
+                operations.append(0)
+                hypothesis_index -= 1
+            else:
+                operations.append(1)
+            reference_index -= 1
+        operations.extend(bytes([1]) * reference_index)
     else:
-        band = max(1, abs(reference_count - hypothesis_count))
-        maximum_band = max(reference_count, hypothesis_count)
-        while True:
-            previous: dict[int, tuple[int, int, int, int]] = {
-                index: (index, 0, 0, index) for index in range(min(hypothesis_count, band) + 1)
-            }
-            for reference_index in range(1, reference_count + 1):
-                start = max(0, reference_index - band)
-                end = min(hypothesis_count, reference_index + band)
-                current: dict[int, tuple[int, int, int, int]] = {}
-                if start == 0:
-                    current[0] = (reference_index, 0, reference_index, 0)
-                for hypothesis_index in range(max(1, start), end + 1):
-                    candidates: list[tuple[int, int, int, int, int]] = []
-                    diagonal = previous.get(hypothesis_index - 1)
-                    if diagonal is not None:
-                        edit, substitutions, deletions, insertions = diagonal
-                        if reference[reference_index - 1] == hypothesis[hypothesis_index - 1]:
-                            candidates.append((edit, 0, substitutions, deletions, insertions))
-                        else:
-                            candidates.append((edit + 1, 0, substitutions + 1, deletions, insertions))
-                    deletion = previous.get(hypothesis_index)
-                    if deletion is not None:
-                        edit, substitutions, deletions, insertions = deletion
-                        candidates.append((edit + 1, 1, substitutions, deletions + 1, insertions))
-                    insertion = current.get(hypothesis_index - 1)
-                    if insertion is not None:
-                        edit, substitutions, deletions, insertions = insertion
-                        candidates.append((edit + 1, 2, substitutions, deletions, insertions + 1))
-                    edit, _rank, substitutions, deletions, insertions = min(
-                        candidates, key=lambda item: (item[0], item[1])
-                    )
-                    current[hypothesis_index] = (edit, substitutions, deletions, insertions)
-                previous = current
-            final = previous.get(hypothesis_count)
-            if final is not None and final[0] <= band:
-                distance, substitutions, deletions, insertions = final
-                break
-            if band >= maximum_band:  # pragma: no cover - a full band always contains an optimal path
-                raise AssertionError("Levenshtein DP did not reach the target")
-            band = min(maximum_band, band * 2)
+        while reference_index:
+            if reference[reference_index - 1] == hypothesis[hypothesis_index - 1]:
+                operations.append(0)
+                reference_index -= 1
+            else:
+                operations.append(2)
+            hypothesis_index -= 1
+        operations.extend(bytes([2]) * hypothesis_index)
+    return bytes(operations)
+
+
+def _levenshtein_divide(reference: str, hypothesis: str) -> tuple[int, int, int, int]:
+    reference_count = len(reference)
+    hypothesis_count = len(hypothesis)
+    if reference_count * hypothesis_count <= LEVENSHTEIN_DIRECT_CELLS:
+        return _levenshtein_direct(reference, hypothesis)
+    distance = _levenshtein_prefix_distances(reference, hypothesis)[-1]
+    if max(reference_count, hypothesis_count) * (2 * distance + 1) <= LEVENSHTEIN_DIRECT_BAND_CELLS:
+        return _levenshtein_direct(reference, hypothesis)
+
+    @lru_cache(maxsize=None)
+    def operations(
+        reference_start: int,
+        reference_end: int,
+        hypothesis_start: int,
+        hypothesis_end: int,
+    ) -> bytes:
+        reference_count = reference_end - reference_start
+        hypothesis_count = hypothesis_end - hypothesis_start
+        if not reference_count:
+            return bytes([2]) * hypothesis_count
+        if not hypothesis_count:
+            return bytes([1]) * reference_count
+        reference_slice = reference[reference_start:reference_end]
+        hypothesis_slice = hypothesis[hypothesis_start:hypothesis_end]
+        if (
+            reference_count == 1
+            or hypothesis_count == 1
+            or reference_count * hypothesis_count <= LEVENSHTEIN_DIRECT_CELLS
+        ):
+            return _levenshtein_direct_operations(reference_slice, hypothesis_slice)
+        distance = _levenshtein_prefix_distances(reference_slice, hypothesis_slice)[-1]
+        if distance == abs(reference_count - hypothesis_count):
+            return _levenshtein_subsequence_operations(reference_slice, hypothesis_slice)
+
+        reference_midpoint = reference_start + reference_count // 2
+        forward = _levenshtein_prefix_distances(
+            reference[reference_start:reference_midpoint],
+            hypothesis_slice,
+        )
+        reverse = _levenshtein_prefix_distances(
+            reference[reference_midpoint:reference_end][::-1],
+            hypothesis_slice[::-1],
+        )
+        minimum = min(
+            forward[index] + reverse[hypothesis_count - index]
+            for index in range(hypothesis_count + 1)
+        )
+        best: bytes | None = None
+        for index in range(hypothesis_count + 1):
+            if forward[index] + reverse[hypothesis_count - index] != minimum:
+                continue
+            hypothesis_midpoint = hypothesis_start + index
+            candidate = (
+                operations(reference_midpoint, reference_end, hypothesis_midpoint, hypothesis_end)
+                + operations(reference_start, reference_midpoint, hypothesis_start, hypothesis_midpoint)
+            )
+            if best is None or candidate < best:
+                best = candidate
+        if best is None:  # pragma: no cover - every edit graph has an optimal midpoint
+            raise AssertionError("Levenshtein divide did not find an optimal split")
+        return best
+
+    reference_index = len(reference)
+    hypothesis_index = len(hypothesis)
+    substitutions = deletions = insertions = 0
+    for operation in operations(0, reference_index, 0, hypothesis_index):
+        if operation == 0:
+            reference_index -= 1
+            hypothesis_index -= 1
+            substitutions += reference[reference_index] != hypothesis[hypothesis_index]
+        elif operation == 1:
+            reference_index -= 1
+            deletions += 1
+        else:
+            hypothesis_index -= 1
+            insertions += 1
+    if reference_index or hypothesis_index:  # pragma: no cover - guarded by traceback construction
+        raise AssertionError("Levenshtein operations did not consume both strings")
+    return substitutions, deletions, insertions, substitutions + deletions + insertions
+
+
+def levenshtein_counts(reference: str, hypothesis: str) -> dict[str, int | float]:
+    """Return exact deterministic S/D/I counts without quadratic long-case storage."""
+    reference = str(reference)
+    hypothesis = str(hypothesis)
+    substitutions, deletions, insertions, distance = _levenshtein_divide(reference, hypothesis)
+    reference_count = len(reference)
     return {
         "substitutions": substitutions,
         "deletions": deletions,
@@ -464,6 +682,26 @@ def missing_speech_regions(
                     }
                 )
     return missing
+
+
+def classify_missing_speech_regions(
+    reference_segments: Sequence[dict[str, Any]],
+    missing_regions: Sequence[dict[str, int]],
+) -> tuple[list[dict[str, int]], list[dict[str, int]]]:
+    semantic: list[dict[str, int]] = []
+    excluded: list[dict[str, int]] = []
+    for region in missing_regions:
+        overlapping = [
+            segment
+            for segment in reference_segments
+            if int(segment["startMs"]) < int(region["endMs"])
+            and int(segment["endMs"]) > int(region["startMs"])
+        ]
+        target = excluded if overlapping and all(
+            is_approved_non_semantic_vocalization(segment.get("text", "")) for segment in overlapping
+        ) else semantic
+        target.append(dict(region))
+    return semantic, excluded
 
 
 def timing_metrics(
@@ -1238,6 +1476,8 @@ def _sample_metrics(
 ) -> dict[str, Any]:
     hypothesis = "".join(segment["text"] for segment in segments)
     normalized_hypothesis = normalize_japanese_text(hypothesis)
+    missing = missing_speech_regions(speech_intervals, segments)
+    semantic_missing, excluded_vocalizations = classify_missing_speech_regions(reference_segments, missing)
     return {
         "segments": segments,
         "text": {
@@ -1248,7 +1488,8 @@ def _sample_metrics(
         },
         "cer": cer_metrics(reference_text, hypothesis),
         "timeline": timeline_metrics(segments, duration_ms),
-        "missingSpeechRegions": missing_speech_regions(speech_intervals, segments),
+        "missingSpeechRegions": semantic_missing,
+        "excludedNonSemanticVocalizationRegions": excluded_vocalizations,
         "timestampProvenance": timestamp_provenance,
         "timingAccuracy": timing_metrics(reference_segments, segments, timestamp_provenance, engine_name),
     }
@@ -1777,8 +2018,8 @@ def render_markdown(results: Sequence[dict[str, Any]]) -> str:
         "",
         "## Candidate Status",
         "",
-        "| Kind | Engine | Model | Device | Case | Class | Status | CER | Timeline errors | Confirmed gaps >=1.5s | Cold total RTF | Warm inference RTF median | Timestamp provenance | Qwen start median ms | Qwen start P95 ms |",
-        "|---|---|---|---|---|---|---|---:|---:|---:|---:|---:|---|---:|---:|",
+        "| Kind | Engine | Model | Device | Case | Class | Status | CER | Timeline errors | Semantic gaps >=1.5s | Excluded vocalization gaps | Cold total RTF | Warm inference RTF median | Timestamp provenance | Qwen start median ms | Qwen start P95 ms |",
+        "|---|---|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|---:|---:|",
     ]
     for row in rows:
         case = row["case"]
@@ -1796,7 +2037,7 @@ def render_markdown(results: Sequence[dict[str, Any]]) -> str:
         )
         timing = cold.get("timingAccuracy", {}) if cold and row["engine"] == "qwen3-asr" else {}
         lines.append(
-            "| {candidate_kind} | {engine} | `{model}` | {device} | `{case_id}` | {duration_class} | {status} | {cer} | {timeline_errors} | {gap_count} | {total_rtf} | {warm_rtf} | {provenance} | {timing_median} | {timing_p95} |".format(
+            "| {candidate_kind} | {engine} | `{model}` | {device} | `{case_id}` | {duration_class} | {status} | {cer} | {timeline_errors} | {gap_count} | {excluded_gap_count} | {total_rtf} | {warm_rtf} | {provenance} | {timing_median} | {timing_p95} |".format(
                 candidate_kind=_markdown_text(row["candidateKind"]),
                 engine=_markdown_text(_public_identifier(row["engine"])),
                 model=_markdown_text(_public_model(row["model"])).replace("`", "'"),
@@ -1807,6 +2048,7 @@ def render_markdown(results: Sequence[dict[str, Any]]) -> str:
                 cer=_format_number(cold.get("cer", {}).get("cer") if cold else None),
                 timeline_errors=timeline_errors if cold else "—",
                 gap_count=len(cold.get("missingSpeechRegions", [])) if cold else "—",
+                excluded_gap_count=len(cold.get("excludedNonSemanticVocalizationRegions", [])) if cold else "—",
                 total_rtf=_format_number(cold.get("timings", {}).get("totalRtf") if cold else None),
                 warm_rtf=_format_number(case.get("warmInferenceRtfMedian")),
                 provenance=_markdown_text(cold.get("timestampProvenance", "—") if cold else "—"),
@@ -1971,6 +2213,12 @@ def command_self_check(_args: argparse.Namespace) -> int:
         [{"startMs": 0, "endMs": 1000, "text": "a"}, {"startMs": 3000, "endMs": 4000, "text": "b"}],
     )
     assert gaps == [{"speechIntervalIndex": 0, "startMs": 1000, "endMs": 3000, "durationMs": 2000}]
+    assert is_approved_non_semantic_vocalization(" うあ、うあ、うあ〜 ")
+    semantic, excluded = classify_missing_speech_regions(
+        [{"startMs": 1000, "endMs": 3000, "text": "うんうん", "speech": True}],
+        gaps,
+    )
+    assert semantic == [] and excluded == gaps
     reference = parse_ass_reference(ASR_SERVICE_ROOT / "benchmarks" / "fixtures" / "synthetic-parser-fixture.ass")
     assert reference["text"] == "テスト\n一行" and reference["speechIntervals"] == [{"startMs": 100, "endMs": 900}]
 
@@ -2013,7 +2261,7 @@ def command_self_check(_args: argparse.Namespace) -> int:
         ],
     }
     assert render_markdown([sample]) == render_markdown([json.loads(json.dumps(sample))])
-    print("self-check passed: ASS derivation, normalization, CER, P95, timeline, speech gaps, refresh, deterministic report")
+    print("self-check passed: ASS derivation, normalization, CER, P95, semantic/excluded gaps, refresh, deterministic report")
     return 0
 
 

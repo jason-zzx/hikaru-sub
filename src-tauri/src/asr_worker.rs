@@ -1567,6 +1567,7 @@ mod tests {
         audio: PathBuf,
         cancel_audio: PathBuf,
         device: String,
+        engine: String,
     }
 
     fn production_worker_inputs() -> Option<ProductionWorkerInputs> {
@@ -1579,6 +1580,7 @@ mod tests {
             std::env::var_os("HIKARU_ASR_CT2_CPU_WORKER"),
             std::env::var_os("HIKARU_ASR_CT2_CANCEL_AUDIO_PATH"),
             std::env::var_os("HIKARU_ASR_CT2_DEVICE"),
+            std::env::var_os("HIKARU_ASR_CT2_ENGINE"),
         ];
         if values.iter().all(Option::is_none) {
             assert!(
@@ -1599,12 +1601,30 @@ mod tests {
             .clone()
             .map(|value| value.to_string_lossy().into_owned())
             .unwrap_or_else(|| "cpu".into());
+        let engine = optional_values[3]
+            .clone()
+            .map(|value| value.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "faster-whisper".into());
         assert!(
             matches!(device.as_str(), "cpu" | "cuda"),
             "CT2 test device must be cpu or cuda"
         );
+        assert!(
+            matches!(engine.as_str(), "faster-whisper" | "kotoba-faster-whisper"),
+            "CT2 test engine must be faster-whisper or kotoba-faster-whisper"
+        );
         assert!(worker.is_file(), "production worker env is not a file");
         assert!(model.is_dir(), "CT2 model env is not a directory");
+        let model = fs::canonicalize(model).expect("CT2 model env cannot be canonicalized");
+        if engine == "kotoba-faster-whisper" {
+            let normalized = model.to_string_lossy().replace('\\', "/");
+            assert!(
+                normalized.ends_with(
+                    "/hub/models--kotoba-tech--kotoba-whisper-v2.0-faster/snapshots/f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc"
+                ),
+                "Kotoba host test must use the exact pinned legacy Hugging Face snapshot"
+            );
+        }
         assert!(audio.is_file(), "CT2 audio env is not a file");
         assert!(cancel_audio.is_file(), "CT2 cancel audio env is not a file");
         if let Some(path) = &cpu_worker {
@@ -1627,12 +1647,14 @@ mod tests {
             audio,
             cancel_audio,
             device,
+            engine,
         })
     }
 
     fn production_launch(
         temp: &TempDir,
         job_id: &str,
+        engine: &str,
         model: PathBuf,
         source_audio: &Path,
         device: &str,
@@ -1648,7 +1670,7 @@ mod tests {
         fs::copy(source_audio, &audio).unwrap();
         ResolvedNativeLaunch::resolve(
             job_id.into(),
-            "faster-whisper".into(),
+            engine.into(),
             vec![("model".into(), model)],
             device.into(),
             "ja".into(),
@@ -2131,8 +2153,8 @@ mod tests {
             return;
         };
         let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
-        let cases = if inputs.device == "cuda" {
-            vec![("production-ct2-cuda", false)]
+        let cases = if inputs.device == "cuda" || inputs.engine == "kotoba-faster-whisper" {
+            vec![("production-ct2-selected", false)]
         } else {
             vec![
                 ("production-ct2-no-vad", false),
@@ -2147,6 +2169,7 @@ mod tests {
             let launch = production_launch(
                 &temp,
                 job_id,
+                &inputs.engine,
                 inputs.model.clone(),
                 &inputs.audio,
                 &inputs.device,
@@ -2214,6 +2237,7 @@ mod tests {
         let launch = production_launch(
             &temp,
             "production-ct2-cuda-not-built",
+            &inputs.engine,
             inputs.model,
             &inputs.audio,
             "cuda",
@@ -2248,9 +2272,15 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let gate = Arc::new(ActiveJobGate::default());
         let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
+        let expected_error = if inputs.engine == "kotoba-faster-whisper" {
+            "[kotoba_vad_not_qualified]"
+        } else {
+            "[vad_config_identity_mismatch]"
+        };
         let launch = production_launch(
             &temp,
             "production-ct2-vad-error",
+            &inputs.engine,
             inputs.model,
             &inputs.audio,
             &inputs.device,
@@ -2270,9 +2300,69 @@ mod tests {
         assert!(snapshot["error"]
             .as_str()
             .unwrap()
-            .starts_with("[vad_config_identity_mismatch]"));
+            .starts_with(expected_error));
         assert!(recovery.is_file());
         assert!(gate.current().is_none());
+    }
+
+    #[test]
+    fn kotoba_worker_rejects_incomplete_legacy_snapshots_before_ready() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = production_worker_inputs() else {
+            eprintln!("production worker/model/audio env not set; skipping Kotoba cache test");
+            return;
+        };
+        if inputs.engine != "kotoba-faster-whisper" {
+            eprintln!("CT2 test engine is not Kotoba; skipping Kotoba cache test");
+            return;
+        }
+        let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
+        for (name, preprocessor, expected_error) in [
+            (
+                "missing-preprocessor",
+                None,
+                "[kotoba_preprocessor_missing]",
+            ),
+            ("invalid-metadata", Some("{}"), "[model_metadata_invalid]"),
+        ] {
+            let temp = tempfile::tempdir().unwrap();
+            let model = temp.path().join("model");
+            fs::create_dir_all(&model).unwrap();
+            fs::write(model.join("config.json"), "{}").unwrap();
+            fs::write(model.join("model.bin"), "model").unwrap();
+            fs::write(model.join("tokenizer.json"), "tokenizer").unwrap();
+            fs::write(model.join("vocabulary.json"), "vocabulary").unwrap();
+            if let Some(value) = preprocessor {
+                fs::write(model.join("preprocessor_config.json"), value).unwrap();
+            }
+            let job_id = format!("production-kotoba-{name}");
+            let gate = Arc::new(ActiveJobGate::default());
+            let host =
+                NativeAsrHost::new(inputs.worker.clone(), vec![], Arc::clone(&gate)).unwrap();
+            let launch = production_launch(
+                &temp,
+                &job_id,
+                &inputs.engine,
+                model,
+                &inputs.audio,
+                &inputs.device,
+                false,
+                None,
+            );
+            let recovery = launch.recovery_path.clone();
+            host.start(launch, gate.reserve().unwrap()).unwrap();
+            let snapshot = wait_terminal(&host, &job_id);
+            assert_eq!(snapshot["status"], "failed");
+            assert!(snapshot["error"]
+                .as_str()
+                .unwrap()
+                .starts_with(expected_error));
+            assert_eq!(snapshot["durationMs"], 0);
+            assert!(recovery.is_file());
+            assert!(gate.current().is_none());
+        }
     }
 
     #[test]
@@ -2291,10 +2381,11 @@ mod tests {
         let launch = production_launch(
             &temp,
             "production-ct2-cancel",
+            &inputs.engine,
             inputs.model,
             &inputs.cancel_audio,
             &inputs.device,
-            inputs.device == "cpu",
+            inputs.engine == "faster-whisper" && inputs.device == "cpu",
             None,
         );
         let output = launch.output_ass_path.clone();
