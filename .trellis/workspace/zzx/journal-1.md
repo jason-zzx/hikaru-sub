@@ -671,3 +671,41 @@ Implemented and verified the ignored-local CTranslate2 CUDA development lane. Ad
 ### Next Steps
 
 - None - task complete
+
+## Session 21: Qualify and archive Kotoba K2
+
+**Date**: 2026-08-06
+**Task**: Productize Kotoba and legacy CTranslate2 cache compatibility
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Qualified the bounded-stride Kotoba K2 candidate on the reviewed CUDA lane, published deterministic evidence, committed the implementation, and archived T08 without changing production routing.
+
+### Main Changes
+
+- Added 15-second Kotoba windows with a maximum 10-second applied stride, latest-start half-open ownership, one-window buffering, and exact-only deduplication.
+- Bound strict raw/tool/runtime identities and published a complete short/medium/long-v2 matrix with all seven K1 gap coordinates covered.
+- Preserved ordinary faster-whisper, protocol v1, legacy cache reuse, and Python Release/default routing.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4688624` | `feat(asr): Add Kotoba K1 evaluation and corrected CT2 evidence` |
+| `ceefa99` | `feat(asr): Qualify Kotoba K2 overlap candidate` |
+
+### Testing
+
+- Protocol CTest 4/4; CPU and CUDA CTranslate2 CTest 5/5 each.
+- Rust model-backed Kotoba 20/20 and full Rust suite 205/205.
+- ASR sidecar 176 passed with 4 optional skips; benchmark 24/24; K2 publisher/mutation 6/6.
+- Frontend 830/830; `pnpm build`, task validation, privacy/ignore checks, deterministic double publication, and final independent review passed.
+
+### Status
+
+[OK] **Completed and archived**
+
+### Next Steps
+
+- Consume the accepted K2 algorithm/cache handoff in downstream T12-T18 work; production routing remains unchanged.
