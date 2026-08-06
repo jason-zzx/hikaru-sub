@@ -71,7 +71,7 @@ The committed example uses a task-authored, standard-library-generated 440 Hz PC
 - Levenshtein reports substitutions, deletions, insertions, reference character count, and `(S+D+I)/N`; ties prefer substitution, deletion, insertion.
 - P95 uses linear interpolation at `(n-1)*0.95`.
 - Timeline checks count empty text, `endMs <= startMs`, negative starts, ends after the verified WAV duration, and start times that move backward. Overlap and nested ASS intervals remain valid when starts are ordered.
-- Missing speech subtracts valid non-empty candidate coverage only from merged ASS-derived confirmed speech intervals; uncovered spans shorter than 1500 ms are ignored.
+- Missing speech subtracts valid non-empty candidate coverage only from merged ASS-derived confirmed speech intervals; uncovered spans shorter than 1500 ms are ignored. A gap is diagnostic-only when every overlapping reference cue matches the frozen standalone-vocalization policy; excluded gaps stay in CER and publish separately from semantic gaps.
 - Timing matching aligns the normalized reference and candidate character streams, then maps each reference Dialogue start to the candidate segment containing its first aligned character; segmentation differences therefore do not require exact whole-segment text equality.
 - Qwen3 timing is eligible only for `forced-aligner` provenance. `synthetic`, `mixed`, `unknown`, and a generic `engine-native` label are excluded.
 - Any `TranscriptSegmentRefresh` atomically replaces all preview segments before metrics are computed, including Parakeet, Qwen3, and ReazonSpeech routes.
@@ -82,7 +82,7 @@ The user-reviewed frozen gates are:
 - inference RTF is `<=1.0` on pure CPU and `<=0.5` on accelerated GPU paths such as CUDA/Vulkan;
 - short cold process wall is `<=120s`;
 - peak process RSS is `<=6 GiB` for CTranslate2 and `<=12 GiB` for CrispASR;
-- zero invalid/out-of-bounds timeline entries and zero confirmed speech gaps `>=1500ms`;
+- zero invalid/out-of-bounds timeline entries and zero semantic confirmed-speech gaps `>=1500ms`;
 - Qwen3 start median `<=150ms` and P95 `<=500ms`, using ForcedAligner provenance only.
 
 No VRAM gate is defined. Python-reference results remain current-implementation diagnostics and are not declared pass/fail against these native-candidate gates.

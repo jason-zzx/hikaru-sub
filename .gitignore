@@ -44,3 +44,4 @@ docs/superpowers/
 /.trellis/tasks/**/07-25-native-asr-crispasr-poc/research/local/
 /.trellis/tasks/**/08-02-native-asr-ctranslate2-whisper/research/local/
 /.trellis/tasks/**/08-04-native-asr-ctranslate2-cuda-development/research/local/
+/.trellis/tasks/**/08-05-native-asr-kotoba-compatibility/research/local/

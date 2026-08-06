@@ -25,7 +25,8 @@
     "08-02-native-asr-worker-protocol",
     "08-02-native-asr-rust-job-host",
     "08-02-native-asr-ctranslate2-whisper",
-    "08-04-native-asr-ctranslate2-cuda-development"
+    "08-04-native-asr-ctranslate2-cuda-development",
+    "08-05-native-asr-kotoba-compatibility"
   ],
   "parent": null,
   "relatedFiles": [],

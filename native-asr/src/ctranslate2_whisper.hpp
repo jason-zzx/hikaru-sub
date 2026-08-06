@@ -70,7 +70,11 @@ struct CandidateAConfig {
   float prompt_reset_on_temperature = 0.5f;
   float temperature = 0.0f;
   std::size_t max_initial_timestamp_index = 50;
+  int max_source_frames = max_model_frames;
 };
+
+CandidateAConfig kotoba_config();
+bool kotoba_mel_shape_supported(std::size_t mel_bins);
 
 struct TokenIds {
   std::size_t eot = 0;
@@ -184,7 +188,9 @@ using CancellationCallback = std::function<bool()>;
 
 std::int64_t verified_wav_duration_ms(const std::filesystem::path& audio_path);
 std::int64_t source_frame_count(std::size_t sample_count);
-void validate_model_directory(const std::filesystem::path& model_path);
+void validate_model_directory(
+    const std::filesystem::path& model_path,
+    bool require_kotoba_preprocessor = false);
 
 TimestampParseResult parse_timestamp_tokens(
     const std::vector<std::size_t>& token_ids,
@@ -227,7 +233,8 @@ class CTranslate2WhisperBackend {
       const std::filesystem::path& model_path,
       CandidateAConfig config = {},
       std::optional<std::filesystem::path> vad_model_path = std::nullopt,
-      BackendExecutionConfig execution = {});
+      BackendExecutionConfig execution = {},
+      bool require_kotoba_model = false);
   ~CTranslate2WhisperBackend();
 
   CTranslate2WhisperBackend(const CTranslate2WhisperBackend&) = delete;

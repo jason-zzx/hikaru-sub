@@ -138,8 +138,9 @@ fs::path model_path(const WorkerRequestV1& request) {
 }
 
 int run_worker(const WorkerRequestV1& request) {
-  if (request.engine != Engine::FasterWhisper
-      || request.backend != Backend::CTranslate2) {
+  const bool ordinary = request.engine == Engine::FasterWhisper;
+  const bool kotoba = request.engine == Engine::KotobaFasterWhisper;
+  if ((!ordinary && !kotoba) || request.backend != Backend::CTranslate2) {
     emit_pre_ready_error(
         "route_not_implemented",
         "requested native ASR route is not implemented by this worker");
@@ -152,19 +153,34 @@ int run_worker(const WorkerRequestV1& request) {
     return 2;
   }
   try {
-    validate_candidate_b_config(request);
+    if (kotoba && request.use_vad) {
+      throw whisper::BackendError(
+          "kotoba_vad_not_qualified",
+          "Native Kotoba VAD is not qualified");
+    }
+    if (ordinary) {
+      validate_candidate_b_config(request);
+    }
     const fs::path audio = fs::u8path(request.audio_path);
     const fs::path model = model_path(request);
-    whisper::validate_model_directory(model);
+    whisper::validate_model_directory(model, kotoba);
     const std::int64_t duration_ms = whisper::verified_wav_duration_ms(audio);
-    const std::optional<fs::path> vad_model = request.use_vad
+    const std::optional<fs::path> vad_model = ordinary && request.use_vad
         ? std::optional<fs::path>(
               current_executable_directory() / "silero_vad_v6.onnx")
         : std::nullopt;
     const whisper::BackendExecutionConfig execution = request.device == Device::Cuda
         ? whisper::cuda_execution_config()
         : whisper::cpu_execution_config();
-    whisper::CTranslate2WhisperBackend backend(model, {}, vad_model, execution);
+    const whisper::CandidateAConfig config = kotoba
+        ? whisper::kotoba_config()
+        : whisper::CandidateAConfig{};
+    whisper::CTranslate2WhisperBackend backend(
+        model,
+        config,
+        vad_model,
+        execution,
+        kotoba);
     Emitter emitter(request);
 
     EventV1 ready;

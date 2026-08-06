@@ -1,0 +1,538 @@
+{
+  "candidateDispositions": [
+    {
+      "candidateId": "t02-large-v3-fixed",
+      "disposition": "historical-stop-revise",
+      "reason": "short CER and medium/long semantic-gap gates still fail"
+    },
+    {
+      "candidateId": "t02-kotoba-fixed",
+      "disposition": "historical-stop-revise",
+      "reason": "medium/long semantic-gap gates still fail"
+    },
+    {
+      "candidateId": "t06-selected-a",
+      "disposition": "corrected-large-v3-pass",
+      "reason": "short/medium/long-v2 pass; full ordinary model qualification remains follow-up work"
+    },
+    {
+      "candidateId": "t06-candidate-b",
+      "disposition": "diagnostic-only-no-long-run",
+      "reason": "selected Candidate A passes, so Candidate B long is unnecessary and ORT/VAD is not a package input"
+    },
+    {
+      "candidateId": "t08-kotoba-k1",
+      "disposition": "stop-revise",
+      "reason": "short and medium pass, but long-v2 retains seven semantic gaps"
+    }
+  ],
+  "comparatorSha256": "b2ae880e693d16daf6a3e29f7be3f0058c2ce74068b333b90850be5798cef822",
+  "correctionLockSha256": "4a91bc04eb25c2c4fafc65667a05d233b8ef0f698ed6e7f7943d8197ffe0c6d1",
+  "downstream": {
+    "candidateB": "diagnostic-only-no-long-run-no-ort-package-input",
+    "kotobaK1": "stop-revise-native-disabled",
+    "ordinaryLargeV3": "corrected-pass-follow-up-seven-model-qualification-required",
+    "releaseRouteEnabled": false
+  },
+  "kind": "hikaru-ct2-corrected-reassessment",
+  "limitations": [
+    "Historical runtime/resource gates remain task-specific; T02/T06 CPU rows are not subjected to T08 GPU RTF limits.",
+    "The corpus still lacks low-volume coverage.",
+    "T08 K1 remains a reviewed CUDA development-lane result, not a publishable runtime pack or production route."
+  ],
+  "manifests": {
+    "current": {
+      "caseId": "long-v2",
+      "sha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea"
+    },
+    "historical": {
+      "caseId": "long-v1",
+      "sha256": "e4656b82e307a9a8e8cf92f9e10e6d5e968565fd28cf5a9da1dcf2fc8488d277"
+    }
+  },
+  "policy": {
+    "approvedUnits": [
+      "あ",
+      "う",
+      "え",
+      "お",
+      "ん",
+      "うん",
+      "うあ"
+    ],
+    "cerTreatment": "included",
+    "exclusionRule": "every reference cue overlapping the uncovered region must be an approved standalone vocalization",
+    "normalization": "NFKC; remove whitespace, Unicode punctuation/symbols, and ー/〜/~",
+    "repeatRange": [
+      1,
+      6
+    ]
+  },
+  "privacy": "sanitized identities, hashes, aggregate metrics, dispositions, and limitations only; no transcript, segments, token traces, absolute paths, models, binaries, or private media",
+  "publisherSha256": "ba2c6d4d07e5cdd23aaa4a12b49e832e4857c93b997e791e9657f42745c5c489",
+  "rows": [
+    {
+      "allApplicableGatesPass": false,
+      "candidateId": "t02-large-v3-fixed",
+      "caseId": "short-v1",
+      "gates": {
+        "cerAtMost0_35": false,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": true,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "2f7d38ecbcc1d5853b47f51c9468e7e949ac1b410d8aecc27e52a6e271af99e5",
+      "measurements": {
+        "cer": 0.35833333333333334,
+        "coldProcessWallMs": 32548.8993,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.7773676167952868,
+        "peakProcessRssBytes": 3435057152,
+        "segmentCount": 4,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "ordinary-large-v3-fixed-window",
+      "samples": {
+        "cold": 1,
+        "warm": 3
+      },
+      "sourceAdapterSha256": "157f739f8fc99496c24780de238d75885ee0d189a81cb6e76e8a39ddbe4ac16f",
+      "sourceCaseId": "short-v1",
+      "sourceLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+      "sourceTask": "T02"
+    },
+    {
+      "allApplicableGatesPass": false,
+      "candidateId": "t02-large-v3-fixed",
+      "caseId": "medium-v1",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": false,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "453e2fe380bd3e2e809a9c6cc26533fca91c3ae1b1d37c666b5315e7d1704d74",
+      "measurements": {
+        "cer": 0.17450549450549452,
+        "coldProcessWallMs": 369745.5247,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.7173253385638,
+        "peakProcessRssBytes": 3465654272,
+        "segmentCount": 135,
+        "semanticSpeechGapsAtLeast1500Ms": 10,
+        "timelineErrors": 0
+      },
+      "route": "ordinary-large-v3-fixed-window",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "157f739f8fc99496c24780de238d75885ee0d189a81cb6e76e8a39ddbe4ac16f",
+      "sourceCaseId": "medium-v1",
+      "sourceLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+      "sourceTask": "T02"
+    },
+    {
+      "allApplicableGatesPass": false,
+      "candidateId": "t02-large-v3-fixed",
+      "caseId": "long-v2",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": false,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "7f29ee9be534739e20d7f1d0f802a48a39844023c3c89c08d933cac6f7c2d3ca",
+      "measurements": {
+        "cer": 0.22449183939120856,
+        "coldProcessWallMs": 2940521.6139,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.7064852691992611,
+        "peakProcessRssBytes": 3698872320,
+        "segmentCount": 800,
+        "semanticSpeechGapsAtLeast1500Ms": 68,
+        "timelineErrors": 0
+      },
+      "route": "ordinary-large-v3-fixed-window",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "157f739f8fc99496c24780de238d75885ee0d189a81cb6e76e8a39ddbe4ac16f",
+      "sourceCaseId": "long-v1",
+      "sourceLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+      "sourceTask": "T02"
+    },
+    {
+      "allApplicableGatesPass": true,
+      "candidateId": "t02-kotoba-fixed",
+      "caseId": "short-v1",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": true,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "71db6d0572cc079588f65f87ed96b77acc3637ded8280bf6bad6961c527e4cc9",
+      "measurements": {
+        "cer": 0.3416666666666667,
+        "coldProcessWallMs": 20136.7858,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.5556914446933865,
+        "peakProcessRssBytes": 1857740800,
+        "segmentCount": 9,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "kotoba-fixed-window",
+      "samples": {
+        "cold": 1,
+        "warm": 3
+      },
+      "sourceAdapterSha256": "157f739f8fc99496c24780de238d75885ee0d189a81cb6e76e8a39ddbe4ac16f",
+      "sourceCaseId": "short-v1",
+      "sourceLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+      "sourceTask": "T02"
+    },
+    {
+      "allApplicableGatesPass": false,
+      "candidateId": "t02-kotoba-fixed",
+      "caseId": "medium-v1",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": false,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "bca05b36ab4898e552b75e2c90d28453792259e9738ce2e0af698ef195acf7cc",
+      "measurements": {
+        "cer": 0.22241758241758242,
+        "coldProcessWallMs": 262759.0996,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 2,
+        "inferenceRtf": 0.5150998223993329,
+        "peakProcessRssBytes": 1888260096,
+        "segmentCount": 178,
+        "semanticSpeechGapsAtLeast1500Ms": 3,
+        "timelineErrors": 0
+      },
+      "route": "kotoba-fixed-window",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "157f739f8fc99496c24780de238d75885ee0d189a81cb6e76e8a39ddbe4ac16f",
+      "sourceCaseId": "medium-v1",
+      "sourceLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+      "sourceTask": "T02"
+    },
+    {
+      "allApplicableGatesPass": false,
+      "candidateId": "t02-kotoba-fixed",
+      "caseId": "long-v2",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": false,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "4d661771477bbc7cf4e6d257885babae8c399371e0810583bcac58a5346f0086",
+      "measurements": {
+        "cer": 0.25117652948833485,
+        "coldProcessWallMs": 1907374.231,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.45872816459491317,
+        "peakProcessRssBytes": 2121338880,
+        "segmentCount": 1219,
+        "semanticSpeechGapsAtLeast1500Ms": 16,
+        "timelineErrors": 0
+      },
+      "route": "kotoba-fixed-window",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "157f739f8fc99496c24780de238d75885ee0d189a81cb6e76e8a39ddbe4ac16f",
+      "sourceCaseId": "long-v1",
+      "sourceLockSha256": "e0036e0f4f63180239f05524cac62b895017e49bd0eed3e72420432bf2a9b9f7",
+      "sourceTask": "T02"
+    },
+    {
+      "allApplicableGatesPass": true,
+      "candidateId": "t06-selected-a",
+      "caseId": "short-v1",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": true,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "1d559f9a68c4fc1bcd5acc820a0b650d58a30b10654ed31ef245a088bfee8166",
+      "measurements": {
+        "cer": 0.26666666666666666,
+        "coldProcessWallMs": 28341.8491,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.622985121566675,
+        "peakProcessRssBytes": 3433029632,
+        "segmentCount": 5,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "ordinary-large-v3-selected-beam1-no-history",
+      "samples": {
+        "cold": 1,
+        "warm": 3
+      },
+      "sourceAdapterSha256": "4c650fc4f6e07ab5c2fa0315c722966499001622868a861d223be368246835da",
+      "sourceCaseId": "short-v1",
+      "sourceLockSha256": "0be239a83640c65f740f169da6c37a1141d3e92140d829243787671f9f410083",
+      "sourceTask": "T06"
+    },
+    {
+      "allApplicableGatesPass": true,
+      "candidateId": "t06-selected-a",
+      "caseId": "medium-v1",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "5cd366a7737b503138e629ca6f6d2ca602e32697ebf69e900f3d649e5ad2c3b0",
+      "measurements": {
+        "cer": 0.11340659340659341,
+        "coldProcessWallMs": 291070.8359,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.5592512011097035,
+        "peakProcessRssBytes": 3433033728,
+        "segmentCount": 181,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "ordinary-large-v3-selected-beam1-no-history",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "4c650fc4f6e07ab5c2fa0315c722966499001622868a861d223be368246835da",
+      "sourceCaseId": "medium-v1",
+      "sourceLockSha256": "0be239a83640c65f740f169da6c37a1141d3e92140d829243787671f9f410083",
+      "sourceTask": "T06"
+    },
+    {
+      "allApplicableGatesPass": true,
+      "candidateId": "t06-selected-a",
+      "caseId": "long-v2",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "4ebb28126703b5ebb88184e78b6b4c7b181784e9f0b039bbd6d1fd9f4b84b32c",
+      "measurements": {
+        "cer": 0.15089616501451888,
+        "coldProcessWallMs": 2293239.2434,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.5502425504345193,
+        "peakProcessRssBytes": 3433250816,
+        "segmentCount": 1156,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "ordinary-large-v3-selected-beam1-no-history",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "4c650fc4f6e07ab5c2fa0315c722966499001622868a861d223be368246835da",
+      "sourceCaseId": "long-v1",
+      "sourceLockSha256": "0be239a83640c65f740f169da6c37a1141d3e92140d829243787671f9f410083",
+      "sourceTask": "T06"
+    },
+    {
+      "allApplicableGatesPass": true,
+      "candidateId": "t06-candidate-b",
+      "caseId": "short-v1",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": true,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "9fc31c5d3f97ae6de192edd26ac6a3a12836be7bf29f998a779e7594d9305afe",
+      "measurements": {
+        "cer": 0.26666666666666666,
+        "coldProcessWallMs": 29543.6523,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.6544541407352087,
+        "peakProcessRssBytes": 3436838912,
+        "segmentCount": 5,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "ordinary-large-v3-candidate-b-silero-v6",
+      "samples": {
+        "cold": 1,
+        "warm": 3
+      },
+      "sourceAdapterSha256": "b5a47e4e8a97583ea270be6deb9e7f69fb58a3a2bbd510415072abcf8a665d88",
+      "sourceCaseId": "short-v1",
+      "sourceLockSha256": "e687ead686df0499c70b649b63d7a85cd2882bc32deae20d1ccdbffc480a376f",
+      "sourceTask": "T06"
+    },
+    {
+      "allApplicableGatesPass": true,
+      "candidateId": "t06-candidate-b",
+      "caseId": "medium-v1",
+      "gates": {
+        "cerAtMost0_35": true,
+        "cpuInferenceRtfAtMost1_0": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "94c2a0c5a222f7f1bfe51f6710cc80fe8ebf54e5e3bd00f48648cfe222afca0b",
+      "measurements": {
+        "cer": 0.1054945054945055,
+        "coldProcessWallMs": 311714.2729,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 1,
+        "inferenceRtf": 0.599304518593948,
+        "peakProcessRssBytes": 3437010944,
+        "segmentCount": 185,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "ordinary-large-v3-candidate-b-silero-v6",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "b5a47e4e8a97583ea270be6deb9e7f69fb58a3a2bbd510415072abcf8a665d88",
+      "sourceCaseId": "medium-v1",
+      "sourceLockSha256": "e687ead686df0499c70b649b63d7a85cd2882bc32deae20d1ccdbffc480a376f",
+      "sourceTask": "T06"
+    },
+    {
+      "allApplicableGatesPass": true,
+      "candidateId": "t08-kotoba-k1",
+      "caseId": "short-v1",
+      "gates": {
+        "acceleratedInferenceRtfAtMost0_5": true,
+        "cerAtMost0_35": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": true,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "5f5695f961df5cf199aaba0b48af51f31de195fe847f170f122e40d3ee03e82d",
+      "measurements": {
+        "cer": 0.325,
+        "coldProcessWallMs": 5803.3943,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.03543051199070617,
+        "peakProcessRssBytes": 1655963648,
+        "segmentCount": 8,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "kotoba-k1-timestamp-driven",
+      "samples": {
+        "cold": 1,
+        "warm": 3
+      },
+      "sourceAdapterSha256": "e6d0c97791102ab8363e8011bd8321c93024b8722164b812f154a9e0e3d671ad",
+      "sourceCaseId": "short-v1",
+      "sourceLockSha256": "24d20963c1d5790d142694f579e2baf7baf21bf19355e126aaa66352a95a7c4e",
+      "sourceTask": "T08"
+    },
+    {
+      "allApplicableGatesPass": true,
+      "candidateId": "t08-kotoba-k1",
+      "caseId": "medium-v1",
+      "gates": {
+        "acceleratedInferenceRtfAtMost0_5": true,
+        "cerAtMost0_35": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "dda53c612a0e7a03ee32775fdfe168b21522272e88d201838a91cdbc86005fba",
+      "measurements": {
+        "cer": 0.21626373626373627,
+        "coldProcessWallMs": 20640.8211,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 2,
+        "inferenceRtf": 0.03188846938693693,
+        "peakProcessRssBytes": 1656016896,
+        "segmentCount": 179,
+        "semanticSpeechGapsAtLeast1500Ms": 0,
+        "timelineErrors": 0
+      },
+      "route": "kotoba-k1-timestamp-driven",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "e6d0c97791102ab8363e8011bd8321c93024b8722164b812f154a9e0e3d671ad",
+      "sourceCaseId": "medium-v1",
+      "sourceLockSha256": "24d20963c1d5790d142694f579e2baf7baf21bf19355e126aaa66352a95a7c4e",
+      "sourceTask": "T08"
+    },
+    {
+      "allApplicableGatesPass": false,
+      "candidateId": "t08-kotoba-k1",
+      "caseId": "long-v2",
+      "gates": {
+        "acceleratedInferenceRtfAtMost0_5": true,
+        "cerAtMost0_35": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": false,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "9a55accff3b028de3882fc9db580061bf2f88b337e30ffc913205037d7307ba0",
+      "measurements": {
+        "cer": 0.22679483328326824,
+        "coldProcessWallMs": 127287.2011,
+        "excludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "inferenceRtf": 0.029509349421545834,
+        "peakProcessRssBytes": 1655943168,
+        "segmentCount": 1221,
+        "semanticSpeechGapsAtLeast1500Ms": 7,
+        "timelineErrors": 0
+      },
+      "route": "kotoba-k1-timestamp-driven",
+      "samples": {
+        "cold": 1,
+        "warm": 0
+      },
+      "sourceAdapterSha256": "e6d0c97791102ab8363e8011bd8321c93024b8722164b812f154a9e0e3d671ad",
+      "sourceCaseId": "long-v1",
+      "sourceLockSha256": "24d20963c1d5790d142694f579e2baf7baf21bf19355e126aaa66352a95a7c4e",
+      "sourceTask": "T08"
+    }
+  ],
+  "schemaVersion": 1
+}
