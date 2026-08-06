@@ -2,7 +2,7 @@
 
 ## Goal
 
-Correct the authoritative long benchmark and non-semantic-vocalization policy, re-evaluate retained T02/T06/T08 CTranslate2 evidence without rewriting history, and continue productizing the native `kotoba-faster-whisper` route on the reviewed T07 CUDA development lane. Preserve Kotoba-only model readiness and prove that the exact existing Hugging Face CTranslate2 snapshot can be reused in place without copying.
+Correct the authoritative long benchmark and non-semantic-vocalization policy, re-evaluate retained T02/T06/T08 CTranslate2 evidence without rewriting history, and continue productizing the native `kotoba-faster-whisper` route on the reviewed T07 CUDA development lane. After K1 retained seven corrected long-v2 semantic gaps, qualify one K2 bounded-stride overlap candidate without pre-waiving any of those gaps. Preserve Kotoba-only model readiness and prove that the exact existing Hugging Face CTranslate2 snapshot can be reused in place without copying.
 
 T08 supplies corrected CTranslate2 dispositions plus an accepted Kotoba engine algorithm/cache handoff when its gates pass. It does not switch Hikaru Sub's production/default ASR route.
 
@@ -17,6 +17,8 @@ T08 supplies corrected CTranslate2 dispositions plus an accepted Kotoba engine a
 - The user corrected the long reference: existing `long.wav` must use `long-v2.ass` SHA-256 `46b4891a4f86c70c1fe54ba4dcfbd776b361f73bb774f1d14e0f2bb53659d04b` with 681 Dialogue rows. The old `long.ass` was incorrectly paired and remains historical only.
 - The user decided that a missed standalone non-semantic vocalization such as `うんうん` or `うあ、うあ、うあ` is diagnostic but not a subtitle-quality failure.
 - Retained T02/T06/T08 raw CTranslate2 segments permit corrected re-scoring without rerunning completed inference.
+- Corrected K1 passes short-v1 and medium-v1 but retains seven long-v2 semantic gaps. Six are wholly within the final four seconds of their responsible 15-second source window; all responsible traces ended `source-window-end` with zero source overlap.
+- The user reviewed gaps #1, #4, and #6 as likely non-product defects, but explicitly deferred recording any waiver until after K2. K2 must therefore score all seven under the unchanged comparator and gate.
 
 ## Requirements
 
@@ -100,26 +102,45 @@ T08 supplies corrected CTranslate2 dispositions plus an accepted Kotoba engine a
 - A passing T08 result is an accepted engine algorithm/cache input for T12-T15 and final T18 rebuild. It is not a publishable GPU pack, device matrix, or production route enablement.
 - A mandatory Kotoba failure records `stop-revise` after all three authoritative cases are measured, leaves native Kotoba disabled, and returns the complete observed failure profile to the parent without changing Python legacy.
 
+### R8 - Kotoba Candidate K2
+
+- Freeze exactly one K2 identity: `kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1`.
+- Keep K1's pinned model/revision, 15-second maximum source window, padded 30-second model/timestamp range, Japanese prompt, beam 5, temperature 0, no previous-text history, timestamp parser, no-VAD boundary, worker/protocol, and T07 CUDA device 0/FLOAT16 identity.
+- Cap Kotoba K2's applied seek to `1000` mel frames / `10000ms`; retain any parsed advance below that cap. Every full 15-second source window therefore overlaps the following decode by at least 5 seconds. Ordinary faster-whisper remains unchanged.
+- Deterministic ownership uses decoded window starts: non-final window `i` owns segment starts in `[S[i], S[i+1])`, the final window owns `[S[last], audioDuration)`, and a start exactly at the boundary belongs to the later window. The later-starting window owns the complete source overlap.
+- Buffer one window's parsed segments until its applied advance and ownership end are known. Filter non-owner segments, remove only exact `(startMs, endMs, text)` duplicates, validate unchanged timestamp bounds and monotonic starts, then emit protocol segments. Do not clip, stretch, synthesize, fuzzy-match, reference-match, or fill gaps.
+- Progress follows the committed ownership frontier / next window start and remains monotonic, ending at exact audio duration.
+- Preserve K1 evidence and create a distinct K2 lock, raw root, adapter identity, sanitized publisher identity, and gap-disposition diagnostic. Any K2 source/config/ownership/trace/runtime/model/corpus identity change invalidates affected rows.
+- Reassess all seven corrected K1 long-v2 gap coordinates. Do not pre-waive #1, #4, or #6; decide whether any is a reviewed non-defect only after the complete K2 result exists.
+- Run short-v1 as 1 cold + 3 warm and medium-v1/long-v2 once each under one K2 identity, regardless of earlier failures. Apply the existing CER, accelerated RTF, cold wall, RSS, timeline, and zero-semantic-gap gates unchanged.
+- If any mandatory K2 gate fails, publish `stop-revise`, leave native Kotoba disabled, preserve the complete diagnostic matrix, and return to planning before K3 or any waiver decision.
+
 ## Acceptance Criteria
 
-- [ ] Worker accepts protocol v1 `kotoba-faster-whisper -> ctranslate2` requests on CPU/CUDA and keeps ordinary faster-whisper behavior unchanged.
-- [ ] Kotoba requires non-empty `preprocessor_config.json` and 128 mel bins; ordinary Whisper still accepts valid snapshots without the preprocessor file.
-- [ ] K1 is frozen as 15-second source windows, 30-second model range, beam 5, no history, timestamp-driven seek, no VAD, and T07 CUDA device 0/FLOAT16.
-- [ ] The current benchmark manifest uses a new long-v2 identity bound to `long-v2.ass`; the old long-v1 reference remains historical and cannot enter current publication.
-- [ ] The shared comparator reports semantic gaps and excluded standalone vocalization gaps separately; excluded vocalizations remain in CER and cannot hide mixed/lexical content.
-- [ ] Short-v1 1-cold/3-warm and medium/long-v2 measured rows are evaluated against CER, accelerated RTF, cold wall, RSS, timeline, and semantic-gap gates under one identity.
-- [ ] T02/T06/T08 completed CTranslate2 raw outputs are deterministically rescored and correction artifacts preserve original evidence provenance without rewriting archived reports.
-- [ ] T06 selected Candidate A corrected long-v2 result passes with zero semantic gaps; Candidate B long is not run unless a separate reason survives Candidate A correction.
-- [ ] The exact pinned legacy Hugging Face snapshot runs in place without copying; incomplete/wrong/malformed cache fixtures fail before `ready`.
-- [ ] Real Rust-host Kotoba success/failure/cancel/recovery tests pass without changing Release/default routing or product command contracts.
-- [ ] Protocol-only, CPU CT2, and CUDA development CTests remain independently runnable; ordinary CI does not require CUDA or models.
-- [ ] Sanitized publication is deterministic and recomputes metrics through T01; tracked files contain no private subtitle/media/model/path data.
-- [ ] Parent/downstream handoff records either a passing Kotoba algorithm input or truthful `stop-revise`, with T12/T14/T15/T18 ownership unchanged.
-- [ ] Relevant worker CTest, Rust tests, `pnpm build`, benchmark self-check/tests, task validation, `git diff --check`, and privacy/ignore checks pass.
+- [x] Worker accepts protocol v1 `kotoba-faster-whisper -> ctranslate2` requests on CPU/CUDA and keeps ordinary faster-whisper behavior unchanged.
+- [x] Kotoba requires non-empty `preprocessor_config.json` and 128 mel bins; ordinary Whisper still accepts valid snapshots without the preprocessor file.
+- [x] K1 is frozen as 15-second source windows, 30-second model range, beam 5, no history, timestamp-driven seek, no VAD, and T07 CUDA device 0/FLOAT16.
+- [x] The current benchmark manifest uses a new long-v2 identity bound to `long-v2.ass`; the old long-v1 reference remains historical and cannot enter current publication.
+- [x] The shared comparator reports semantic gaps and excluded standalone vocalization gaps separately; excluded vocalizations remain in CER and cannot hide mixed/lexical content.
+- [x] Short-v1 1-cold/3-warm and medium/long-v2 measured rows are evaluated against CER, accelerated RTF, cold wall, RSS, timeline, and semantic-gap gates under one identity.
+- [x] T02/T06/T08 completed CTranslate2 raw outputs are deterministically rescored and correction artifacts preserve original evidence provenance without rewriting archived reports.
+- [x] T06 selected Candidate A corrected long-v2 result passes with zero semantic gaps; Candidate B long is not run unless a separate reason survives Candidate A correction.
+- [x] The exact pinned legacy Hugging Face snapshot runs in place without copying; incomplete/wrong/malformed cache fixtures fail before `ready`.
+- [x] Real Rust-host Kotoba success/failure/cancel/recovery tests pass without changing Release/default routing or product command contracts.
+- [x] Protocol-only, CPU CT2, and CUDA development CTests remain independently runnable; ordinary CI does not require CUDA or models.
+- [x] Sanitized publication is deterministic and recomputes metrics through T01; tracked files contain no private subtitle/media/model/path data.
+- [x] Parent/downstream handoff records either a passing Kotoba algorithm input or truthful `stop-revise`, with T12/T14/T15/T18 ownership unchanged.
+- [x] K2 uses a 15-second source window, maximum 10-second applied stride, at least 5-second full-window overlap, and later-start ownership without changing K1 model/decode/runtime identity or ordinary faster-whisper.
+- [x] K2 buffers before callback emission, filters by half-open ownership intervals, performs exact-only pre-emission deduplication, preserves token-derived text/timestamps, and reports a monotonic ownership-frontier progress chain.
+- [x] Focused goldens prove that plausible following-window recovery at K1 gap #3 and #6 coordinates is retained; a midpoint-ownership mutation fails those tests.
+- [x] K2 trace/evidence validates parsed/applied advances, overlap floor, ownership partition, per-segment disposition conservation, exact tuple hashes, ordinary-route isolation, and deterministic sanitized publication.
+- [x] All seven K1 long-v2 gaps are reassessed without pre-waiving #1/#4/#6, and the complete K2 short/medium/long-v2 GPU matrix records either an accepted algorithm input or truthful `stop-revise`.
+- [x] Relevant worker CTest, Rust tests, `pnpm build`, benchmark self-check/tests, task validation, `git diff --check`, and privacy/ignore checks pass.
 
 ## Out Of Scope
 
-- New ordinary faster-whisper algorithm work, rerunning already completed inference, or enabling its production route. The corrected T06 qualification handoff and any newly unlocked full seven-model matrix remain follow-up execution.
+- New ordinary faster-whisper algorithm work, rerunning already completed K1 inference, or enabling its production route. The corrected T06 qualification handoff and any newly unlocked full seven-model matrix remain follow-up execution.
+- Pre-classifying K1 gaps #1/#4/#6 as non-defects before K2 evidence exists.
 - Production native route cutover or Python removal.
 - Final native model manifest, download/resume/hash/atomic installation, cleanup, or settings migration.
 - Formal CUDA/Vulkan runtime packs, driver matrix, managed pack download, or GPU fallback qualification.
@@ -128,4 +149,4 @@ T08 supplies corrected CTranslate2 dispositions plus an accepted Kotoba engine a
 
 ## Rollback
 
-Restore the previous ignored benchmark manifest and remove only corrected supplemental publications if the new reference/policy validation fails; archived T01/T02/T06 reports remain untouched. Kotoba-specific rollback disables only the native Kotoba dispatch/profile and removes T08 task-local ignored build/raw outputs. Preserve T04-T07 worker/host/CUDA infrastructure, ordinary faster-whisper behavior, user caches, and Python legacy/default routing.
+Restore the previous ignored benchmark manifest and remove only corrected supplemental publications if the new reference/policy validation fails; archived T01/T02/T06 reports remain untouched. K2 rollback removes only its Kotoba stride cap, ownership filter, trace fields, distinct lock, and ignored K2 evidence, restoring the committed K1 `stop-revise` behavior. Broader Kotoba rollback disables only the native Kotoba dispatch/profile and removes T08 task-local ignored build/raw outputs. Preserve T04-T07 worker/host/CUDA infrastructure, ordinary faster-whisper behavior, user caches, and Python legacy/default routing.

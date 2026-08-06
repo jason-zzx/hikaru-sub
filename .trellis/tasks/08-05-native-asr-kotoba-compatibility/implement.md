@@ -9,6 +9,8 @@
 - Archived T07 `development-gpu-ready` CUDA lane and module identity.
 - Local private T01 corpus and pinned Kotoba snapshot are available only under ignored roots.
 
+Steps 1-8 were completed and committed in `4688624`; they remain below as immutable execution history. K2 implementation begins at Step 9 and must not rerun K1 inference or rewrite K1/correction evidence.
+
 ## Execution Checklist
 
 ### 1. Freeze K1 Inputs And Local Boundary
@@ -99,19 +101,62 @@ Rollback: remove only corrected supersession artifacts and restore the previous 
 - [ ] Update the parent T08 handoff with the corrected T02/T06/T08 dispositions and downstream inputs.
 - [ ] Stop before commit unless the user separately and explicitly authorizes committing.
 
+### 9. Freeze K2 Identity And Tests
+
+- [x] Write `research/kotoba-k2-lock.md` with the committed K1/corrected benchmark identities plus candidate `kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1`.
+- [x] Add a Kotoba-only maximum applied stride field/profile value of `1000` frames while preserving K1's `1500` source frames and ordinary faster-whisper defaults.
+- [x] Add pure focused vectors for parsed/no-speech/final-partial applied advances, minimum 500-frame overlap, variable shorter advances, and source-end termination.
+- [x] Add half-open latest-start ownership helpers/tests: `[S[i], S[i+1])`, exact boundary belongs later, final interval ends at audio duration.
+- [x] Add coordinate goldens proving following-window recovery at K1 gap #3 and #6 is retained; a midpoint-ownership mutation must fail.
+- [x] Keep all seven K1 long-v2 gaps mandatory; do not add a #1/#4/#6 waiver or comparator exception.
+
+Rollback: remove only K2 profile values/helpers/tests; committed K1 remains unchanged.
+
+### 10. Implement Bounded Stride And Buffered Ownership
+
+- [x] Parse one Kotoba K2 window into a temporary segment buffer before protocol emission.
+- [x] Compute proposed/applied advance as `min(proposed, 1000, remaining)` for K2 parsed and no-speech paths; ordinary/K1 behavior remains isolated.
+- [x] Derive next window start, actual overlap, and current half-open ownership interval.
+- [x] Filter non-owner segments by token-derived start timestamp; preserve start/end/text unchanged.
+- [x] Exact-deduplicate owned `(startMs, endMs, text)` tuples before callback emission; do not similarity-merge same-time different-text output.
+- [x] Run existing fail-closed bounds/nondecreasing-start validation after ownership and before callback.
+- [x] Publish progress at the ownership frontier / applied next start and exact duration on completion.
+- [x] Add streaming, duplicate, overlap-conflict, no-speech, final-partial, cancellation, and ordinary-route isolation tests.
+
+Rollback: restore K1's direct current-window commit and applied seek; remove K2-only trace fields.
+
+### 11. Add K2 Evidence And Mutation Validation
+
+- [x] Extend ignored raw evidence with K2 candidate/rule identity, window index/coordinates, parsed/proposed/applied advances, overlap, parser flags, ownership interval, progress frontier, and balanced disposition counts.
+- [x] Record every parsed segment under ignored local evidence with exact tuple hash, trace hash, owner index, and `emitted|non-owner|exact-duplicate` disposition; keep private text/token/path data untracked.
+- [x] Add a K2 adapter/publisher that imports the shared benchmark, validates the complete seek/ownership chain and ordinary-route isolation, and never trusts mutable metrics.
+- [x] Bind the original seven-gap coordinate-set hash and report each as covered/still missing without altering the quality gate.
+- [x] Add mutation tests for stride/overlap/owner/progress/count/candidate/config/runtime/corpus/private-path drift and byte-identical double publication.
+
+Rollback: delete only K2 lock/adapter/publisher/tracked sanitized output and ignored K2 raw data.
+
+### 12. Run Complete K2 Matrix And Handoff
+
+- [x] Build/test protocol-only, CPU CT2, and pinned MSVC 14.44 CUDA development lanes.
+- [x] Run focused and full Rust host tests, including Kotoba success/failure/cancel/recovery/active-gate behavior.
+- [x] Run short-v1 as 1 cold + 3 warm, medium-v1 once, and long-v2 once under one frozen K2 CUDA identity regardless of earlier failures.
+- [x] Reassess all seven K1 long-v2 gaps, including #1/#4/#6, before any non-defect decision.
+- [x] Require CER `<=0.35`, GPU RTF `<=0.5`, short cold wall `<=120s`, RSS `<=6 GiB`, zero timeline errors, and zero semantic gaps for every case.
+- [x] Publish sanitized JSON/Markdown twice and require byte identity.
+- [x] Run benchmark/sidecar tests, full Rust suite, `pnpm test`, `pnpm build`, task validation, `git diff --check`, ignore/privacy/size scans, and changed-file formatting.
+- [x] Update ASR/Tauri specs and parent handoff only for the K2 behavior/result that actually lands.
+- [x] On any mandatory failure, keep native Kotoba disabled, publish `stop-revise`, and return to planning before K3 or waiver classification. (Not triggered: K2 passed every gate.)
+- [x] Stop before commit unless the user separately and explicitly authorizes committing.
+
 ## Planned Product Files
 
 ```text
-.gitignore
-scripts/asr-benchmark.py
-asr-service/tests/test_asr_benchmark.py
 native-asr/src/ctranslate2_whisper.hpp
 native-asr/src/ctranslate2_whisper.cpp
-native-asr/src/main.cpp
 native-asr/tests/ctranslate2_whisper_tests.cpp
-src-tauri/src/asr_worker.rs                # test module only
-.asr-benchmark/manifest.json               # private ignored current benchmark
 ```
+
+K2 does not require CMake, worker route dispatch, protocol, Tauri host, frontend, model download, package, installer, or benchmark-comparator behavior changes unless implementation evidence exposes a real regression in an existing contract.
 
 ## Planned Task Evidence
 
@@ -128,7 +173,15 @@ src-tauri/src/asr_worker.rs                # test module only
 .trellis/tasks/08-05-native-asr-kotoba-compatibility/research/test_publish_corrected_ct2_reassessment.py
 .trellis/tasks/08-05-native-asr-kotoba-compatibility/research/evidence/corrected-ct2-reassessment.json
 .trellis/tasks/08-05-native-asr-kotoba-compatibility/research/corrected-ct2-reassessment-report.md
-.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/local/*  # ignored
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/k2-candidate-planning-brief.md
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/k2-candidate-design-critique.md
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-lock.md
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/kotoba_k2_benchmark_adapter.py
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/publish_kotoba_k2_candidate.py
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/test_publish_kotoba_k2_candidate.py
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/evidence/kotoba-k2-candidate.json
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-candidate-report.md
+.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/local/k2/*  # ignored
 ```
 
 ## Validation Commands
@@ -162,30 +215,36 @@ python scripts/asr-benchmark.py self-check
 python scripts/asr-benchmark.py validate --manifest .asr-benchmark/manifest.json --corpus-root .asr-benchmark
 python -m unittest discover -s asr-service/tests -p "test_asr_benchmark.py"
 python .trellis/tasks/08-05-native-asr-kotoba-compatibility/research/test_publish_corrected_ct2_reassessment.py
-# Run corrected publisher twice and compare JSON/Markdown bytes.
+# K2 focused checks additionally run the profile/stride/ownership/parser/streaming tests,
+# K2 publisher mutation suite, full short/medium/long-v2 CUDA evidence matrix,
+# seven-gap reassessment, and byte-identical double publication.
 
 # Cross-layer regression
+pnpm test
 pnpm build
 
 git diff --check
 git status --short
 ```
 
-Model-backed commands and local paths are finalized in `research/kotoba-k1-lock.md` before the first run.
+K2 model-backed commands, runtime paths, source/tool hashes, candidate parameters, and gap-coordinate-set hash are finalized in `research/kotoba-k2-lock.md` before the first K2 run.
 
 ## Start Gate
 
-Before `task.py start`:
+Before K2 `task.py start`:
 
-- [ ] User reviews/approves the corrected `prd.md`, `design.md`, and `implement.md`.
-- [ ] `research/kotoba-productization-inputs.md` and `research/corrected-baseline-research.md` are present.
-- [ ] `implement.jsonl` and `check.jsonl` contain real curated entries.
-- [ ] `task.py validate` passes.
-- [ ] Existing reviewed K1 implementation/evidence remains preserved; no correction-iteration product file is changed before reactivation.
+- [ ] User reviews/approves the K2 additions to `prd.md`, `design.md`, and `implement.md`.
+- [ ] `research/k2-candidate-planning-brief.md` and independent `research/k2-candidate-design-critique.md` are present.
+- [ ] Candidate ID, 1000-frame cap, latest-start ownership, no-waiver boundary, full matrix, rollback, and stop rule are frozen consistently.
+- [ ] `implement.jsonl` and `check.jsonl` include the K2 research and relevant ASR/Tauri specs.
+- [ ] `task.py validate` and `git diff --check` pass.
+- [ ] No K2 product file has changed before reactivation.
 
 ## Stop Conditions
 
-- K1 fails a mandatory semantic gate: complete and publish the remaining K1 authoritative cases under the same identity, then return to planning before another candidate.
+- K2 cannot guarantee at least 500 frames of overlap without changing the model/source-window identity.
+- Latest-start ownership requires fuzzy/text-derived resolution, segment clipping/stretching, synthetic timing, reference-guided selection, or retractable protocol events.
+- K2 evidence still fails a mandatory gate: complete/publish the full matrix, then return to planning before K3 or any #1/#4/#6 waiver decision.
 - Required model/corpus/runtime identity cannot be pinned or validated.
 - The fix requires reference-derived repair, synthetic timing, Python parity, a production downloader/UI change, or formal GPU pack work.
 - Legacy cache reuse would require copying/mutating user data rather than reading the exact snapshot in place.
@@ -193,4 +252,4 @@ Before `task.py start`:
 
 ## Completion Gate
 
-The correction iteration is complete when the long-v2 manifest and conservative vocalization policy are validated, completed T02/T06/T08 raw evidence has deterministic corrected dispositions, archived history remains unchanged, T06 selected Candidate A is handed off as corrected large-v3 pass, T08 K1 is truthfully retained as long-v2 `stop-revise`, all required validation passes, and no private/local artifact is tracked. T08 Kotoba productization itself remains incomplete until a reviewed Kotoba candidate passes short/medium/long-v2.
+The K2 iteration is complete when the frozen bounded-stride/latest-start implementation and trace invariants are verified, one complete short/medium/long-v2 CUDA matrix is deterministically published, all seven K1 gaps are reassessed without pre-waiver, archived K1/correction evidence remains immutable, and the parent receives either an accepted Kotoba algorithm input or truthful `stop-revise`. T08 Kotoba productization remains incomplete on any mandatory K2 failure.

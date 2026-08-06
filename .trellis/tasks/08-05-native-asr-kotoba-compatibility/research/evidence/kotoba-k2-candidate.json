@@ -1,0 +1,357 @@
+{
+  "adapterSha256": "fcd018c9bded7b4c4ce39abdd6f761e450cc1bfcdccc161a2f21cb107c0fea98",
+  "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+  "cases": [
+    {
+      "allApplicableGatesPass": true,
+      "caseId": "short-v1",
+      "gates": {
+        "acceleratedInferenceRtfAtMost0_5": true,
+        "cerAtMost0_35": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": true,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "f563cceacc31e9e2ca0cd8437c3b39ccd8fa99acd3abd27451c47655cdbe6439",
+      "measurements": {
+        "acceleratedInferenceRtf": 0.052050248941996516,
+        "coldProcessWallMs": 6067.4732,
+        "maximumExcludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "maximumSampleCer": 0.35,
+        "maximumSemanticSpeechGapsAtLeast1500Ms": 0,
+        "maximumTimelineErrors": 0,
+        "peakProcessRssBytes": 1656467456
+      },
+      "ownership": {
+        "emittedSegmentCount": 40,
+        "exactDuplicateDiscardedCount": 0,
+        "nonOwnerDiscardedCount": 8,
+        "parsedSegmentCount": 48,
+        "windowCount": 12
+      },
+      "sampleCounts": {
+        "cold": 1,
+        "warm": 3
+      }
+    },
+    {
+      "allApplicableGatesPass": true,
+      "caseId": "medium-v1",
+      "gates": {
+        "acceleratedInferenceRtfAtMost0_5": true,
+        "cerAtMost0_35": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "491623b83f22fcb1304da645940f62318830598abe90e89fbac62ca906f64d8f",
+      "measurements": {
+        "acceleratedInferenceRtf": 0.04683483378501901,
+        "coldProcessWallMs": 28002.3647,
+        "maximumExcludedNonSemanticVocalizationGapsAtLeast1500Ms": 2,
+        "maximumSampleCer": 0.2795604395604396,
+        "maximumSemanticSpeechGapsAtLeast1500Ms": 0,
+        "maximumTimelineErrors": 0,
+        "peakProcessRssBytes": 1656389632
+      },
+      "ownership": {
+        "emittedSegmentCount": 211,
+        "exactDuplicateDiscardedCount": 0,
+        "nonOwnerDiscardedCount": 67,
+        "parsedSegmentCount": 278,
+        "windowCount": 50
+      },
+      "sampleCounts": {
+        "cold": 1,
+        "warm": 0
+      }
+    },
+    {
+      "allApplicableGatesPass": true,
+      "caseId": "long-v2",
+      "gates": {
+        "acceleratedInferenceRtfAtMost0_5": true,
+        "cerAtMost0_35": true,
+        "peakRssAtMost6GiB": true,
+        "semanticSpeechGapsZero": true,
+        "shortColdWallAtMost120s": null,
+        "timelineErrorsZero": true
+      },
+      "ignoredRawSha256": "0a494f7e2d07d4abbf0ab49e5fcfab3c4e809f1bb2622fe346a5069495ea1bad",
+      "measurements": {
+        "acceleratedInferenceRtf": 0.042730172082422926,
+        "coldProcessWallMs": 182190.2081,
+        "maximumExcludedNonSemanticVocalizationGapsAtLeast1500Ms": 0,
+        "maximumSampleCer": 0.29478321818363873,
+        "maximumSemanticSpeechGapsAtLeast1500Ms": 0,
+        "maximumTimelineErrors": 0,
+        "peakProcessRssBytes": 1656418304
+      },
+      "ownership": {
+        "emittedSegmentCount": 1342,
+        "exactDuplicateDiscardedCount": 0,
+        "nonOwnerDiscardedCount": 466,
+        "parsedSegmentCount": 1808,
+        "windowCount": 415
+      },
+      "sampleCounts": {
+        "cold": 1,
+        "warm": 0
+      }
+    }
+  ],
+  "correctionLockSha256": "d9bc43b6a47743c7377e22d6676f5e4d9a119e07dbcb1ae7f0ebe9d6cfb1578a",
+  "disposition": "accepted-kotoba-algorithm-input",
+  "identity": {
+    "config": {
+      "beamSize": 5,
+      "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+      "conditionOnPreviousText": false,
+      "language": "ja",
+      "lengthPenalty": 1.0,
+      "logProbThreshold": -1.0,
+      "maxAppliedSeekDurationMs": 10000,
+      "maxAppliedSeekFrames": 1000,
+      "maxInitialTimestampIndex": 50,
+      "maxLength": 448,
+      "maxSourceFrames": 1500,
+      "maxSourceWindowDurationMs": 15000,
+      "modelWindowDurationMs": 30000,
+      "noRepeatNgramSize": 0,
+      "noSpeechThreshold": 0.6,
+      "overlapFloorFrames": 500,
+      "ownershipRule": "latest-start-half-open-v1",
+      "patience": 1.0,
+      "promptResetOnTemperature": 0.5,
+      "repetitionPenalty": 1.0,
+      "temperature": 0.0,
+      "timestampDrivenSeek": true,
+      "timestampResolutionMs": 20,
+      "vad": false
+    },
+    "inputLockSha256": "d55f363d69cf6ce29892c159e26556dcfecc00e207f7e7c9cd13425078d24c9a",
+    "model": {
+      "files": [
+        {
+          "name": "config.json",
+          "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+          "sizeBytes": 2394
+        },
+        {
+          "name": "model.bin",
+          "sha256": "60d2bc2e33de9d43f2745be09caefe1161acab670f6796d4a750d8d848382b36",
+          "sizeBytes": 1512927867
+        },
+        {
+          "name": "preprocessor_config.json",
+          "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+          "sizeBytes": 340
+        },
+        {
+          "name": "tokenizer.json",
+          "sha256": "f70c9740a90657b489cf05b0fa0605c1d497db542f11a70a8cc80a025c94c7d8",
+          "sizeBytes": 2481381
+        },
+        {
+          "name": "vocabulary.json",
+          "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+          "sizeBytes": 1068114
+        }
+      ],
+      "id": "kotoba-tech/kotoba-whisper-v2.0-faster",
+      "legacyCache": {
+        "layout": "huggingface-immutable-snapshot",
+        "revisionDirectoryVerified": true,
+        "usedInPlace": true
+      },
+      "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc"
+    },
+    "runtime": {
+      "cpu": {
+        "architecture": "x86_64",
+        "availableIsa": {
+          "avx": true,
+          "avx2": true,
+          "avx512f": false,
+          "fma": true,
+          "sse2": true
+        },
+        "logicalCores": 16,
+        "model": "AMD Ryzen 7 5800X 8-Core Processor"
+      },
+      "gpu": {
+        "computeCapability": "8.6",
+        "cudaDriverApiVersion": 13020,
+        "deviceIndex": 0,
+        "driverModuleVersion": "32.0.15.9649",
+        "float16Supported": true,
+        "name": "NVIDIA GeForce RTX 3070",
+        "visibleDeviceCount": 1
+      },
+      "loadedModules": [
+        {
+          "name": "ctranslate2.dll",
+          "rootRole": "task-local-runtime-bin",
+          "sha256": "0c0f1436489b656d893c0e7c186192526edbe6106b530c09753b981294c9a337",
+          "sizeBytes": 36974592,
+          "version": ""
+        },
+        {
+          "name": "cublas64_12.dll",
+          "rootRole": "cuda-toolkit-12.8-bin",
+          "sha256": "9513540e4ec4c51ee9e7304138c2cc255c29a8c181f9e80c38efa25738becd99",
+          "sizeBytes": 113716224,
+          "version": "6.14.11.1284"
+        },
+        {
+          "name": "cublasLt64_12.dll",
+          "rootRole": "cuda-toolkit-12.8-bin",
+          "sha256": "b199d1ff892a81b7fd3d57ba1781549609b41500b36008fef326038393ad46c7",
+          "sizeBytes": 674667520,
+          "version": "6.14.11.1284"
+        },
+        {
+          "name": "hikaru-asr-ctranslate2-tests.exe",
+          "rootRole": "task-local-runtime-bin",
+          "sha256": "314cb67dc87225787d480a6986da009f747d1e72b5cc122166fe292fb90f2b14",
+          "sizeBytes": 802816,
+          "version": ""
+        },
+        {
+          "name": "hikaru_asr_tokenizer.dll",
+          "rootRole": "task-local-runtime-bin",
+          "sha256": "7a767701e05b11fa4c2667409420eac513f2cf24fcdc52cf0d769ce752db2fea",
+          "sizeBytes": 2139136,
+          "version": ""
+        },
+        {
+          "name": "nvcuda.dll",
+          "rootRole": "windows-system32",
+          "sha256": "ec9942ff94bcf2a6714531932720d0d36bd1f362df768af9ae21f2388c08ef7c",
+          "sizeBytes": 4466920,
+          "version": "32.0.15.9649"
+        },
+        {
+          "name": "onnxruntime.dll",
+          "rootRole": "task-local-runtime-bin",
+          "sha256": "18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257",
+          "sizeBytes": 15809848,
+          "version": "1.28.0.724"
+        },
+        {
+          "name": "vcomp140.dll",
+          "rootRole": "windows-system32",
+          "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7",
+          "sizeBytes": 213064,
+          "version": "14.50.35719.0"
+        }
+      ],
+      "measurementExecutable": {
+        "sha256": "314cb67dc87225787d480a6986da009f747d1e72b5cc122166fe292fb90f2b14",
+        "sizeBytes": 802816
+      },
+      "pathPolicy": {
+        "name": "t07-windows-cuda-restricted-path-v1",
+        "orderedEntryRoles": [
+          "task-local-runtime-bin",
+          "cuda-toolkit-12.8-bin",
+          "windows-system32"
+        ],
+        "rootIdentitySha256": "307e7f236aeb7dc81b18bc42f292e1cac2ef58478f5beccb0a58ab19cff4eb22"
+      },
+      "productionWorker": {
+        "sha256": "93b8b6781ab419033695801f511e530467918fc0502f39494c92bf37116947bf",
+        "sizeBytes": 516096
+      },
+      "requiredDlls": [
+        {
+          "name": "ctranslate2.dll",
+          "sha256": "0c0f1436489b656d893c0e7c186192526edbe6106b530c09753b981294c9a337",
+          "sizeBytes": 36974592
+        },
+        {
+          "name": "hikaru_asr_tokenizer.dll",
+          "sha256": "7a767701e05b11fa4c2667409420eac513f2cf24fcdc52cf0d769ce752db2fea",
+          "sizeBytes": 2139136
+        },
+        {
+          "name": "onnxruntime.dll",
+          "sha256": "18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257",
+          "sizeBytes": 15809848
+        },
+        {
+          "name": "onnxruntime_providers_shared.dll",
+          "sha256": "599629fa643707defe9156140ae5edd73531f221aa97b7585b1c9bb0a93586f8",
+          "sizeBytes": 21856
+        }
+      ]
+    }
+  },
+  "k1LongV2GapCoordinateSetSha256": "7aeda829b3a12c3a52e48ec2db70e1bf48af08f69cf839fcae5f26312657350f",
+  "k1LongV2GapDiagnostics": [
+    {
+      "endMs": 945090,
+      "index": 1,
+      "startMs": 941630,
+      "status": "covered"
+    },
+    {
+      "endMs": 1278540,
+      "index": 2,
+      "startMs": 1276940,
+      "status": "covered"
+    },
+    {
+      "endMs": 1291540,
+      "index": 3,
+      "startMs": 1289540,
+      "status": "covered"
+    },
+    {
+      "endMs": 1458540,
+      "index": 4,
+      "startMs": 1456720,
+      "status": "covered"
+    },
+    {
+      "endMs": 1608540,
+      "index": 5,
+      "startMs": 1606830,
+      "status": "covered"
+    },
+    {
+      "endMs": 1847230,
+      "index": 6,
+      "startMs": 1845700,
+      "status": "covered"
+    },
+    {
+      "endMs": 4053460,
+      "index": 7,
+      "startMs": 4050480,
+      "status": "covered"
+    }
+  ],
+  "kind": "hikaru-ct2-kotoba-k2-candidate-result",
+  "limitations": [
+    "Windows x64 reviewed CUDA development lane only.",
+    "No VRAM gate is defined.",
+    "Production model management, runtime packs, routing, UI, installer, and release qualification remain downstream work."
+  ],
+  "manifest": {
+    "corpusId": "hikaru-user-ja-ground-truth-v1",
+    "sha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea"
+  },
+  "maxAppliedSeekDurationMs": 10000,
+  "maxAppliedSeekFrames": 1000,
+  "nextCase": null,
+  "overlapFloorFrames": 500,
+  "ownershipRule": "latest-start-half-open-v1",
+  "privacy": "sanitized hashes, identities, aggregates, dispositions, and limitations only; no transcript, token IDs, absolute paths, model bytes, or private media",
+  "publisherSha256": "554823099398df2b622cbbddca74d187a289931ec42fef1d1d9432951c80c2d7",
+  "qualificationComplete": true,
+  "releaseRouteEnabled": false,
+  "schemaVersion": 1
+}
