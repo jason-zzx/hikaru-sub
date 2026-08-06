@@ -709,3 +709,41 @@ Qualified the bounded-stride Kotoba K2 candidate on the reviewed CUDA lane, publ
 ### Next Steps
 
 - Consume the accepted K2 algorithm/cache handoff in downstream T12-T18 work; production routing remains unchanged.
+
+## Session 22: Correct CrispASR long-v2 evidence
+
+**Date**: 2026-08-06
+**Task**: Correct CrispASR long-v2 historical evidence
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Corrected the remaining T03 CrispASR benchmark authority from the mistakenly supplied `long.ass` to `long-v2.ass` without rerunning inference or rewriting historical reports.
+
+### Main Changes
+
+- Validated all nine retained T03 raw rows against the original compiled runtime/model identity, then rescored completed rows through the current shared comparator.
+- Published deterministic sanitized correction evidence: Parakeet remains `stop-revise`, ReazonSpeech remains `proceed-with-named-risks`, and Qwen remains `stop-revise` with medium/long-v2 unscored blockers.
+- Added mandatory compiled validation, complete canonical publication binding, semantic private-text rejection, coordinated mutation tests, and archive-byte immutability checks.
+- Updated the parent migration's current authority, repaired T08 archive links, and added the all-backend reference-supersession quality rule.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `71e57aa` | `test(asr): Correct CrispASR long-v2 evidence` |
+
+### Testing
+
+- Original compiled identity validator: 9/9 authoritative rows valid.
+- Correction publisher/mutation/privacy/determinism suite: 8/8.
+- ASR benchmark tests: 24/24; benchmark self-check, current manifest validation, task validation, privacy/ignore checks, `git diff --check`, and final independent review passed.
+- No inference, worker build, product route, frontend, Tauri, runtime-pack, or package change was performed.
+
+### Status
+
+[OK] **Completed and archived**
+
+### Next Steps
+
+- Parent native ASR migration now has 9/9 children complete; perform the parent integration/roadmap review before starting later backend productization. Release/default remains Python legacy.
