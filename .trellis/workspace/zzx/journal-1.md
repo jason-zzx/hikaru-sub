@@ -747,3 +747,36 @@ Corrected the remaining T03 CrispASR benchmark authority from the mistakenly sup
 ### Next Steps
 
 - Parent native ASR migration now has 9/9 children complete; perform the parent integration/roadmap review before starting later backend productization. Release/default remains Python legacy.
+
+
+## Session 23: Build and qualify CrispASR backend core
+
+**Date**: 2026-08-13
+**Task**: Build and qualify CrispASR backend core
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented the shared native CrispASR backend, strict Qwen capability boundary, Rust-host lifecycle coverage, and family-scoped CPU/CUDA development evidence. Both parakeet-family and qwen3-family are development-gpu-ready; Release/default routing remains Python legacy.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3fa54f4` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
