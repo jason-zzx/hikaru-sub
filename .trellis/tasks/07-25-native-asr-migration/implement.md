@@ -41,7 +41,7 @@ Allowed parallel groups:
 - T02 and T03 after T01.
 - T06 after T05. T07 starts after T06 exposes the production-worker seam and completes the CPU root-cause checkpoint; it does not depend on proving a CPU ceiling and does not wait for a GPU-required decision.
 - T08 Kotoba follows T07. T07 is now `development-gpu-ready` with short-v1/locked-120s GPU-to-CPU warmed-median ratios `0.1090/0.1313`, so repeated T08 quality iteration stays on GPU even when CER/gap/timeline gates fail. This does not imply that ordinary native faster-whisper is qualified or enabled.
-- T10 and T11 may overlap after T09 stabilizes both the CrispASR core and its ignored-local development GPU seam. An attested, repeatably faster GPU seam remains the development device through CER/gap/segmentation/alignment failures; required CPU regression and final publishable-device gates remain separate.
+- T10 and T11 may overlap after T09 stabilizes the CrispASR core and publishes independent ignored-local `parakeet-family` / `qwen3-family` development-device results. Each task consumes only its matching family result; an attested, repeatably faster family GPU seam remains the development device through CER/gap/segmentation/alignment failures. Required CPU regression and final publishable-device gates remain separate.
 - T12 may start from proven model formats and overlap engine productization; T13 waits for the T06 production worker, then may overlap T08～T11.
 - T14 starts after final backend/device inputs and the CPU package contract stabilize; T15 starts after engine pipelines and formal GPU packs are measurable.
 - T07/T09 development GPU artifacts are ignored-local evidence only. Formal GPU pack failure in T14/T15 records `stop-revise` and omits that pack without blocking unrelated qualified CPU routes.
@@ -289,17 +289,19 @@ Suggested slug: `native-asr-crispasr-backend`
 Deliverables:
 
 - Wrap the pinned public session/result/progress/segment/alignment C ABI subset.
-- Map callbacks to protocol events with cancellation and safe ownership.
-- Share audio/VAD/result normalization selected from stable CrispASR APIs and ground-truth evidence, without Python-parity product hacks.
-- Establish an ignored-local CrispASR development GPU execution path on the declared machine, preferring CUDA when supported; record requested/resolved device and actual loaded modules, and fail closed on CPU execution mislabeled as accelerated.
-- Record ABI/library commit in runtime manifest.
+- Map callbacks to protocol events with safe ownership; preserve T05 hard process-tree cancellation because pinned v0.8.22 exposes no cooperative cancel ABI, and do not claim session destructors run after termination.
+- Share audio/result normalization selected from stable CrispASR APIs and ground-truth evidence, without Python-parity product hacks. No CrispASR VAD candidate is selected in T09, so `useVad=true` fails closed instead of being ignored or pre-implementing T10/T11 policy.
+- Preserve the strict Qwen seam: prove session and ForcedAligner capability/ownership, but emit zero accepted timed output and `qwen_timeline_policy_not_implemented` until T11 owns grouping/timeline policy.
+- Establish ignored-local CUDA development execution and publish independent `parakeet-family` / `qwen3-family` results from the user-approved external module/device/performance/mutation envelope; do not claim a public ABI-resolved device.
+- Record ABI/library commit in task-local development locks and handoff; T14/T15 retain production runtime-manifest ownership.
+- Current T09 implementation handoff is `.trellis/tasks/08-07-native-asr-crispasr-backend/research/crispasr-backend-handoff.md`. It publishes `parakeet-family: development-gpu-ready` (short/locked-120s GPU-to-CPU warmed-median ratios `0.119318/0.110944`) and `qwen3-family: development-gpu-ready` (`0.211832/0.327830`) under one frozen runtime/runner/raw-index identity. T10/T11 consume only their matching family result; neither result is a publishable pack or quality qualification.
 
 Depends on: T03, T05, T06 production-worker seam.
 
 Exit criteria:
 
 - Backend opens/closes sessions safely and maps deterministic fake/native results to JSONL.
-- Publish `development-gpu-ready`, `development-gpu-unavailable` or `development-gpu-no-speedup` using the same paired warmed CPU/GPU performance rule as T07. Subtitle quality does not affect this development-device result; the path is not a managed pack or release qualification artifact.
+- For both `parakeet-family` and `qwen3-family`, independently publish `development-gpu-ready`, `development-gpu-unavailable` or `development-gpu-no-speedup` using the same paired warmed CPU/GPU performance rule as T07. Subtitle quality does not affect either result; the path is not a managed pack or release qualification artifact.
 - ABI errors, invalid models and cancellation do not crash the host application.
 
 Rollback point: keep all CrispASR engine routes disabled.
@@ -312,7 +314,7 @@ Deliverables:
 
 - Route Parakeet JA Q8_0 and ReazonSpeech Q8_0 through the shared backend.
 - Validate native timestamps, subtitle segment size and short/medium/long coverage against T01 truth.
-- Use T09's development GPU path for repeated model-backed quality iteration whenever its result is `development-gpu-ready`; CER, gap and segmentation failures stay on GPU. Reserve CPU runs for required regression/fallback evidence, final candidate gates, or a T09 unavailable/no-speedup result.
+- Use T09's `parakeet-family` development GPU path for repeated model-backed quality iteration whenever that family result is `development-gpu-ready`; CER, gap and segmentation failures stay on GPU. Reserve CPU runs for required regression/fallback evidence, final candidate gates, or a matching unavailable/no-speedup result.
 - Start from official/model-card/maintained community guidance; add only compensation demonstrated necessary by ground-truth failures.
 - Support final `segmentsReplace` when the selected pipeline performs a final correction; do not assume refresh is Parakeet-only. Current Reazon `>=60s` 45s/2s-overlap behavior is a diagnostic regression case, not a required native algorithm.
 
@@ -334,7 +336,7 @@ Deliverables:
 
 - Treat Qwen3 1.7B Q4_K and ForcedAligner 0.6B Q4_K as one model product.
 - Select chunking/alignment/segmentation from official/model-card/maintained community guidance and ground-truth results; Python synthetic or refresh behavior is diagnostic only.
-- Use T09's development GPU path for repeated Qwen3/ForcedAligner quality iteration whenever its result is `development-gpu-ready`; CER, gap and alignment failures stay on GPU. Reserve CPU runs for required regression/fallback evidence, final candidate gates, or a T09 unavailable/no-speedup result.
+- Use T09's `qwen3-family` development GPU path for repeated Qwen3/ForcedAligner quality iteration whenever that family result is `development-gpu-ready`; CER, gap and alignment failures stay on GPU. Reserve CPU runs for required regression/fallback evidence, final candidate gates, or a matching unavailable/no-speedup result.
 - Fail when alignment is missing/invalid; never synthesize timestamps.
 - Aggregate progress and allow a final `segmentsReplace` when required by the chosen pipeline.
 
@@ -575,7 +577,7 @@ Stage 0 child-task creation:
 - [x] T01-T03 were the first creation batch and remain immutable archived provenance; current long-v2 authority is carried by the T08 corrected CT2 and T03C corrected CrispASR handoffs.
 - [x] T02 proved the CTranslate2 backend/runtime viable while recording the current fixed-window algorithm as `stop-revise`.
 - [x] T03 proved the CrispASR ABI/runtime viable, with Reazon `proceed-with-named-risks` and Parakeet/Qwen `stop-revise`; Gate 0 backend/runtime feasibility is closed.
-- [x] User approved moving development GPU integration earlier: normal-numbered T07 provides CTranslate2 CUDA development immediately after the T06 CPU checkpoint and before T08 regardless of CPU-ceiling outcome; T09 provides the CrispASR development GPU seam before T10/T11. Formal packs/qualification remain T14/T15, and development GPU evidence never substitutes for release evidence.
+- [x] User approved moving development GPU integration earlier: normal-numbered T07 provides CTranslate2 CUDA development immediately after the T06 CPU checkpoint and before T08 regardless of CPU-ceiling outcome; T09 provides family-scoped CrispASR development GPU results before T10/T11. The user also approved T09's external device attestation and strict Qwen policy seam. Formal packs/qualification remain T14/T15, and development GPU evidence never substitutes for release evidence.
 - [x] User approved T06 hard gates for `large-v3` and `large-v2` long audio; ordinary faster-whisper remains mandatory and all models remain visible in T17 even when native qualification fails.
 - [x] T07 completed the ignored-local CTranslate2 CUDA lane and independently froze `development-gpu-ready`; T08 now uses GPU for repeated subtitle-quality iteration, while T14/T15 remain the only pack/release qualification owners.
 - [x] T04-T06 were created as the next planning batch and linked to this parent.

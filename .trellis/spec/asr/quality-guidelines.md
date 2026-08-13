@@ -50,7 +50,7 @@ crispasr_session_result_* / crispasr_align_words_abi
 crispasr_session_result_free / crispasr_alignment_result_free / crispasr_session_close
 ```
 
-Use the exact signatures and ABI version from the locked headers; the names above define the required proof surface, not a wrapper API.
+Use the exact signatures and ABI version from the locked headers; the names above define the historical T03 proof surface, not a wrapper API or a requirement that every later backend bind every callback. T09's shared backend binds exactly progress and segment callbacks, never the token callback, and derives reset counts from the successfully registered setters.
 
 ### 3. Contracts
 
@@ -66,7 +66,7 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 - One shared native identity validator must cover every completed, failed, derived, and negative record before scoring or publication. It binds manifest/case/audio, lock, executable, required DLLs, route model/aligner, CPU/GPU params, loaded modules, and restricted-PATH policy. Never merge rows from different executable/DLL/lock identities into one evidence set.
 - CrispASR CPU claims require public CPU-forced open params plus actual loaded-module inventory under a restricted PATH; DLL filenames alone do not prove which backend ran.
 - CrispASR callback contexts are reset on every success/error exit before destruction. Result/alignment/session cleanup evidence records created/free/close counts and derives exact-once status from those counts; do not publish a hard-coded boolean.
-- Qwen3 raw CJK character ranges are not subtitle segments. Preserve them, tokenize/group with the exact pinned upstream ranges and source-segment semantics, and accept only legal ForcedAligner-derived grouped segments. Session getter sentinel timing remains explicitly ineligible. A zero-duration final group fails closed; it is not repaired by synthetic expansion.
+- Qwen3 raw CJK character ranges are not subtitle segments. Preserve them, tokenize/group with the exact pinned upstream ranges and source-segment semantics, and accept only legal ForcedAligner-derived grouped segments. For T09 capability evidence only, unchanged raw ranges require only `0 <= start <= end` and have no audio-end upper bound; do not clip or promote them to accepted timing, and publish the maximum tail overrun as a diagnostic risk. Session getter sentinel timing remains explicitly ineligible. A zero-duration final group fails closed; it is not repaired by synthetic expansion.
 - Native top-level segments and nested word timing are separate capabilities. Report both distributions. One broad top-level segment can mathematically hide confirmed gaps but does not prove subtitle-scale segmentation readiness.
 - Controlled failed evidence retains the failing trace and source/model bounds. Validators reject empty placeholder traces, and the benchmark adapter must refuse failed evidence. An externally terminated long run with no atomic token result is process evidence only: keep its binary/lock/timeout/termination identity separate, mark it unscored, and never merge it into completed rows.
 - A sanitized publisher must recompute CER/timeline/gaps from the authoritative manifest/ASS through the shared T01 implementation; it must not trust mutable pre-adapted metric fields. Any inference source/config/binary/DLL/model identity change invalidates affected measurements and requires rerunning them before publication.
@@ -93,7 +93,8 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 | Input lock, model hashes, executable/DLL identity, CPU params, loaded modules, or PATH policy differs | Reject or classify as a separate evidence set |
 | Derived or negative record bypasses the shared identity validator | Reject publication even when its status/timeline looks valid |
 | CrispASR CPU run uses implicit/default GPU params | CPU gate is ineligible until rerun with explicit CPU params and module attestation |
-| Qwen raw character range is zero-duration | Retain as raw provenance; validate only after exact pinned source-segment grouping |
+| Qwen raw character range is zero-duration or ends after audio while remaining non-negative/non-reversed | Retain unchanged as raw provenance only, publish maximum tail overrun, and validate accepted timing only after exact pinned source-segment grouping |
+| Qwen raw character range is negative or reversed | Reject capability evidence |
 | Qwen grouped final segment is zero-duration or session-native/synthetic | Fail closed with zero accepted timeline |
 | Callback context exits without all registered callbacks reset | Reject lifecycle evidence |
 | Created result/alignment/session count does not match free/close count | Reject exact-once claim |
@@ -131,12 +132,16 @@ Native CTranslate2 production harnesses additionally assert:
 
 Native CrispASR harnesses additionally assert:
 
+- a default-off shared backend compile gate, exact pinned runtime DLL identity before load, explicit `parakeet|reazonspeech-nemo -> parakeet` and `qwen3-asr -> qwen3` mapping, and no filename-inferred route;
+- exactly progress/segment callback registration with reset before result/alignment/session release on every structured exit; hard cancellation proves process reap only, never in-process destructor counters;
+- Qwen copies source results plus raw ForcedAligner entries but emits zero accepted timed output and stable post-ready `qwen_timeline_policy_not_implemented` until the separately reviewed grouping policy exists;
 - mutation rejection for case/audio/manifest/lock/executable/DLL/model/aligner/CPU params/modules/PATH across completed, failed, derived, and negative records;
 - exact pinned CJK punctuation/mixed-script token counts and source-segment grouping;
 - Qwen session getter timing is ineligible and all accepted timing is ForcedAligner-derived;
 - real missing/corrupt/unloadable/empty/malformed/invalid-audio negatives accept zero timed output;
 - callback reset on success and error, plus created/free/close count-derived exact-once cleanup;
-- short cold + three warm samples, medium/long attempts or complete failed evidence, single final evidence identity, and byte-identical sanitized publication.
+- short cold + three warm samples, medium/long attempts or complete failed evidence, single final evidence identity, and byte-identical sanitized publication;
+- family-scoped development-device results never cross-authorize: T09 published `parakeet-family: development-gpu-ready` from both paired speed samples, while copied-result invalidity is no-result and must never be promoted to GPU unavailable.
 
 ### 7. Wrong vs Correct
 

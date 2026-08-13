@@ -1,0 +1,126 @@
+{
+  "entries": [
+    {
+      "device": "cpu",
+      "family": "parakeet-family",
+      "phase": "discovery",
+      "relativeRawIdentifier": "raw/discovery/parakeet-family/cpu/short-v1.json",
+      "rowRole": "discovery",
+      "sample": "short-v1",
+      "sha256": "f3122df6f705671e45fbfe59df35d5b34645f6c5e91c9cd3791d94c5637db33a",
+      "sizeBytes": 22169
+    },
+    {
+      "device": "cuda",
+      "family": "parakeet-family",
+      "phase": "discovery",
+      "relativeRawIdentifier": "raw/discovery/parakeet-family/cuda/short-v1.json",
+      "rowRole": "discovery",
+      "sample": "short-v1",
+      "sha256": "3fa544ec96f0d700b263d15f5222096bc6cef6c0d18114d248278e1755042cd0",
+      "sizeBytes": 35628
+    },
+    {
+      "device": "cpu",
+      "family": "qwen3-family",
+      "phase": "discovery",
+      "relativeRawIdentifier": "raw/discovery/qwen3-family/cpu/short-v1.json",
+      "rowRole": "discovery",
+      "sample": "short-v1",
+      "sha256": "9762c57a14f78734ecea80f24c213fe38281eadc56a1d556d0876ad8f7ec53df",
+      "sizeBytes": 35368
+    },
+    {
+      "device": "cuda",
+      "family": "qwen3-family",
+      "phase": "discovery",
+      "relativeRawIdentifier": "raw/discovery/qwen3-family/cuda/short-v1.json",
+      "rowRole": "discovery",
+      "sample": "short-v1",
+      "sha256": "80fcf43a4743656a01f9627579b97253d00d045837695e11299b4d4b6f5a9685",
+      "sizeBytes": 42122
+    },
+    {
+      "device": "cpu",
+      "family": "parakeet-family",
+      "phase": "formal",
+      "relativeRawIdentifier": "raw/formal/parakeet-family/cpu/short-v1.json",
+      "rowRole": "formal",
+      "sample": "short-v1",
+      "sha256": "f5963a0dd13598f9ea40c4ed993dd337a0352831f677045b33aecac9ae2126c3",
+      "sizeBytes": 23198
+    },
+    {
+      "device": "cuda",
+      "family": "parakeet-family",
+      "phase": "formal",
+      "relativeRawIdentifier": "raw/formal/parakeet-family/cuda/short-v1.json",
+      "rowRole": "formal",
+      "sample": "short-v1",
+      "sha256": "e454beadab88704e2ca644383e7c7ad90393bdc16e306cbfe1135efa5c283544",
+      "sizeBytes": 36658
+    },
+    {
+      "device": "cpu",
+      "family": "parakeet-family",
+      "phase": "formal",
+      "relativeRawIdentifier": "raw/formal/parakeet-family/cpu/medium-v1-first-120s.json",
+      "rowRole": "formal",
+      "sample": "medium-v1-first-120s",
+      "sha256": "59f8689fcc812d95b4e51fa5622bd487bbff5de5302f013d97eaf891ae7918e4",
+      "sizeBytes": 23224
+    },
+    {
+      "device": "cuda",
+      "family": "parakeet-family",
+      "phase": "formal",
+      "relativeRawIdentifier": "raw/formal/parakeet-family/cuda/medium-v1-first-120s.json",
+      "rowRole": "formal",
+      "sample": "medium-v1-first-120s",
+      "sha256": "43c3e0dad4d7a6f1eb4556f6c21e2617322919538b22a816d20ce1e4be7a165e",
+      "sizeBytes": 36681
+    },
+    {
+      "device": "cpu",
+      "family": "qwen3-family",
+      "phase": "formal",
+      "relativeRawIdentifier": "raw/formal/qwen3-family/cpu/short-v1.json",
+      "rowRole": "formal",
+      "sample": "short-v1",
+      "sha256": "65134a74e77fd8135fd0c87c2b650b5d166ceaf6fa4cb4350dc4b2511277b9fd",
+      "sizeBytes": 55650
+    },
+    {
+      "device": "cuda",
+      "family": "qwen3-family",
+      "phase": "formal",
+      "relativeRawIdentifier": "raw/formal/qwen3-family/cuda/short-v1.json",
+      "rowRole": "formal",
+      "sample": "short-v1",
+      "sha256": "fba077093f5aedd032b82c0aaa277f94b0d242991847cac64091a3bd9d1aa483",
+      "sizeBytes": 62254
+    },
+    {
+      "device": "cpu",
+      "family": "qwen3-family",
+      "phase": "formal",
+      "relativeRawIdentifier": "raw/formal/qwen3-family/cpu/medium-v1-first-120s.json",
+      "rowRole": "formal",
+      "sample": "medium-v1-first-120s",
+      "sha256": "718e2258dacb79daf1a7751247e47ecffb0a6fca0613df045c4200415a56e805",
+      "sizeBytes": 181898
+    },
+    {
+      "device": "cuda",
+      "family": "qwen3-family",
+      "phase": "formal",
+      "relativeRawIdentifier": "raw/formal/qwen3-family/cuda/medium-v1-first-120s.json",
+      "rowRole": "formal",
+      "sample": "medium-v1-first-120s",
+      "sha256": "0d5ddbaf3aff488aab9af5c0292d8b05fbd221432ff1e32f5a8084e99bfffd82",
+      "sizeBytes": 190630
+    }
+  ],
+  "frozen": true,
+  "schema": "hikaru-crispasr-development-raw-index-v1"
+}

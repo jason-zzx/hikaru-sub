@@ -29,7 +29,7 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - 安装包不得包含任何 ASR 模型权重或 CUDA/Vulkan runtime；正式 GPU runtime 以可选受管 pack 交付。
 - T07 在 T06 production-worker seam 和 CPU 根因 checkpoint 完成后立即提供 ignored-local development CTranslate2 CUDA execution；primary identity 使用 Windows CUDA 12.8、`WITH_CUDNN=OFF` 和 RTX 3070 device 0/FP16，不把 reviewed cuDNN 9.10.2 作为必装依赖。是否证明 CPU ceiling 只影响发布路线是否可标记为 GPU-required，不影响开发 CUDA 通道用于加速后续字幕质量迭代。只要 short-v1 与 locked 120s sample 的 GPU warmed median RTF 均至少比同配置 CPU 快 `20%`，后续字幕质量失败不得触发回退 CPU。
 - T07 已实机发布 `development-gpu-ready`：short-v1 CPU/GPU warmed median RTF 为 `0.577901/0.062971`，locked 120s 为 `0.591635/0.077707`，GPU/CPU ratio 分别为 `0.1090/0.1313`；实际 CUDA-only modules 为 `nvcuda.dll`、`cublas64_12.dll`、`cublasLt64_12.dll`，无 cuDNN。该结果只授权 T08 开发质量迭代优先使用 GPU，不构成 T14/T15 pack 或路线资格。
-- T09 在共享 CrispASR backend 稳定时同步建立 ignored-local development GPU execution，供 T10/T11 优先进行模型质量迭代；同样只有 GPU 不可用或相对 CPU 没有可复现性能收益时才允许开发回退 CPU，CER、漏段、分段和时间戳问题继续在 GPU 上迭代。T14/T15 后续分别负责正式可复现 GPU pack 与资格认证，开发期 GPU 证据不得替代发布证据。
+- T09 在共享 CrispASR backend 稳定时同步建立 ignored-local development GPU execution，并按真实执行族分别发布 `parakeet-family` 与 `qwen3-family` 的开发设备结论；T10/T11 只消费各自执行族的结果。每个执行族只有在 GPU 不可用或 short-v1/locked 120s 任一样本没有可复现的 `20%` 加速时才允许开发回退 CPU，CER、漏段、分段和时间戳问题不参与设备选择。由于 pinned v0.8.22 无 resolved-device getter，T09 使用用户批准的外部模块/设备/配对性能/mutation 证明，仅限 ignored-local 开发；T14/T15 后续负责正式可复现 GPU pack 与资格认证。
 - 普通 faster-whisper 只有在 T06 同二进制诊断证明 CPU ceiling、且正式 CUDA 路线达到质量与 accelerated RTF `<=0.5` 后，才可标记为 GPU-required。无 qualified GPU 的机器必须显示 route unavailable/原因，不得启用失败 CPU route或静默回退 Python。
 - 其他未达到质量、性能、稳定回退或许可证门槛的 GPU pack 标记为 `stop-revise` 并从发布清单移除，不阻塞已通过的 CPU 原生路线。
 - 首期同一时间只允许一个活跃 ASR 推理任务。
@@ -130,7 +130,7 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - [ ] Qwen3 的模型就绪状态同时要求 ASR 模型与 ForcedAligner，且对齐失败不会输出伪时间轴。
 - [ ] 模型 manifest、固定来源、大小、SHA-256、断点续传和多文件原子安装通过测试。
 - [ ] installed 与 portable 的 runtime/model/download 路径、probe/measure/cleanup 行为通过测试。
-- [ ] T07 在 T08 前完成 CTranslate2 development CUDA seam，T09 在 T10/T11 前完成 CrispASR development GPU seam。T07 已记录 `development-gpu-ready`（short-v1 GPU/CPU `0.1090`，locked 120s `0.1313`）；T09 仍未完成。只有 validated GPU unavailable envelope 或任一样本未达到 `20%` 加速时才允许下游开发回退 CPU；无效/不完整 evidence 不发布设备结论，CER、漏段、分段和时间戳失败不参与该决策。T14/T15 GPU packs 仍须具备固定构建身份、哈希、许可证、能力探测和适用的 CPU 回退/不可用说明，只有通过自身 `RTF <=0.5` 与质量门槛的 pack 才进入发布清单。
+- [x] T07 在 T08 前完成 CTranslate2 development CUDA seam，T09 在 T10/T11 前完成 CrispASR development GPU seam。T07 已记录 `development-gpu-ready`（short-v1 GPU/CPU `0.1090`，locked 120s `0.1313`）；T09 已分别发布 `parakeet-family` 与 `qwen3-family` 的 `development-gpu-ready` 结论。每个执行族只有 validated GPU unavailable envelope 或任一样本未达到 `20%` 加速时才允许匹配的下游任务开发回退 CPU；无效/不完整 evidence 不发布设备结论，CER、漏段、分段和时间戳失败不参与该决策。T09 外部设备证明不替代 T14/T15 的固定构建身份、哈希、许可证、能力探测和适用的 CPU 回退/不可用说明；只有通过正式 `RTF <=0.5` 与质量门槛的 pack 才进入发布清单。
 - [ ] 运行依赖和转录 UI 不再暴露 Python/venv，旧设置可安全加载并迁移；全部现有模型仍可见，但未通过原生资格的模型有明确状态且不能静默走 Python。
 - [ ] 五引擎质量、长音频覆盖、性能与资源矩阵直接对 T01 用户真值达到用户评审后冻结的绝对门槛；Python 数值只作为可选参考。
 - [ ] setup、portable 和解压 runtime 体积达到 R8 预算，安装包内模型权重为 0。
