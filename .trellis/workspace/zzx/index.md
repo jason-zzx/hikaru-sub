@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 22
-- **Last Active**: 2026-08-06
+- **Total Sessions**: 23
+- **Last Active**: 2026-08-13
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~749 | Active |
+| `journal-1.md` | ~782 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 23 | 2026-08-13 | Build and qualify CrispASR backend core | `3fa54f4` | `dev-crisp-asr` |
 | 22 | 2026-08-06 | Correct CrispASR long-v2 evidence | `71e57aa` | `dev-crisp-asr` |
 | 21 | 2026-08-06 | Qualify and archive Kotoba K2 | `4688624`, `ceefa99` | `dev-crisp-asr` |
 | 20 | 2026-08-05 | Complete T07 CTranslate2 CUDA development lane | `9645704`, `5b90d83`, `ad3482e` | `dev-crisp-asr` |
