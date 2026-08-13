@@ -1570,6 +1570,110 @@ mod tests {
         engine: String,
     }
 
+    struct CrispAsrWorkerInputs {
+        worker: PathBuf,
+        model: PathBuf,
+        aligner: Option<PathBuf>,
+        audio: PathBuf,
+        cancel_audio: PathBuf,
+        device: String,
+        engine: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct LockedCrispAsrPath {
+        path: PathBuf,
+        size_bytes: u64,
+        sha256: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CrispAsrWorkerInputFile {
+        worker: PathBuf,
+        model: LockedCrispAsrPath,
+        aligner: Option<LockedCrispAsrPath>,
+        audio: PathBuf,
+        cancel_audio: Option<PathBuf>,
+        device: String,
+        engine: String,
+    }
+
+    fn sha256_file_for_test(path: &Path) -> String {
+        use sha2::{Digest, Sha256};
+        let mut input = fs::File::open(path).expect("test input cannot be opened");
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            let count =
+                std::io::Read::read(&mut input, &mut buffer).expect("test input read failed");
+            if count == 0 {
+                break;
+            }
+            hasher.update(&buffer[..count]);
+        }
+        hex::encode(hasher.finalize())
+    }
+
+    fn crispasr_worker_inputs() -> Option<CrispAsrWorkerInputs> {
+        let input_path = std::env::var_os("HIKARU_ASR_CRISPASR_INPUTS").map(PathBuf::from)?;
+        let input: CrispAsrWorkerInputFile = serde_json::from_slice(
+            &fs::read(&input_path).expect("CrispASR input file cannot be read"),
+        )
+        .expect("CrispASR input file is invalid");
+        assert!(
+            matches!(input.device.as_str(), "cpu" | "cuda"),
+            "CrispASR device must be cpu or cuda"
+        );
+        assert!(
+            matches!(
+                input.engine.as_str(),
+                "parakeet" | "reazonspeech-nemo" | "qwen3-asr"
+            ),
+            "invalid CrispASR engine"
+        );
+        assert!(
+            input.worker.is_file() && input.audio.is_file(),
+            "CrispASR test inputs must be files"
+        );
+        assert_eq!(
+            input.engine == "qwen3-asr",
+            input.aligner.is_some(),
+            "only Qwen requires an aligner"
+        );
+        for (locked, role) in [
+            (&input.model, "model"),
+            (input.aligner.as_ref().unwrap_or(&input.model), "aligner"),
+        ] {
+            if role == "aligner" && input.aligner.is_none() {
+                continue;
+            }
+            assert_eq!(
+                fs::metadata(&locked.path).unwrap().len(),
+                locked.size_bytes,
+                "CrispASR {role} size drift"
+            );
+            assert_eq!(
+                sha256_file_for_test(&locked.path),
+                locked.sha256.to_ascii_lowercase(),
+                "CrispASR {role} hash drift"
+            );
+        }
+        if let Some(path) = &input.cancel_audio {
+            assert!(path.is_file(), "CrispASR cancel audio must be a file");
+        }
+        Some(CrispAsrWorkerInputs {
+            worker: input.worker,
+            model: input.model.path,
+            aligner: input.aligner.map(|value| value.path),
+            cancel_audio: input.cancel_audio.unwrap_or_else(|| input.audio.clone()),
+            audio: input.audio,
+            device: input.device,
+            engine: input.engine,
+        })
+    }
+
     fn production_worker_inputs() -> Option<ProductionWorkerInputs> {
         let values = [
             std::env::var_os("HIKARU_ASR_PRODUCTION_WORKER"),
@@ -1651,11 +1755,11 @@ mod tests {
         })
     }
 
-    fn production_launch(
+    fn model_backed_launch(
         temp: &TempDir,
         job_id: &str,
         engine: &str,
-        model: PathBuf,
+        model_paths: Vec<(String, PathBuf)>,
         source_audio: &Path,
         device: &str,
         use_vad: bool,
@@ -1671,7 +1775,7 @@ mod tests {
         ResolvedNativeLaunch::resolve(
             job_id.into(),
             engine.into(),
-            vec![("model".into(), model)],
+            model_paths,
             device.into(),
             "ja".into(),
             audio,
@@ -1681,6 +1785,63 @@ mod tests {
             vad_config,
         )
         .unwrap()
+    }
+
+    fn crispasr_models(inputs: &CrispAsrWorkerInputs) -> Vec<(String, PathBuf)> {
+        let mut models = vec![("model".into(), inputs.model.clone())];
+        if let Some(aligner) = inputs.aligner.clone() {
+            models.push(("aligner".into(), aligner));
+        }
+        models
+    }
+
+    fn run_crispasr_host_once(
+        inputs: &CrispAsrWorkerInputs,
+        source_audio: &Path,
+        job_id: &str,
+        engine: &str,
+        device: &str,
+    ) -> serde_json::Value {
+        let temp = tempfile::tempdir().unwrap();
+        let gate = Arc::new(ActiveJobGate::default());
+        let host = NativeAsrHost::new(inputs.worker.clone(), vec![], Arc::clone(&gate)).unwrap();
+        let launch = model_backed_launch(
+            &temp,
+            job_id,
+            engine,
+            crispasr_models(inputs),
+            source_audio,
+            device,
+            false,
+            None,
+        );
+        host.start(launch, gate.reserve().unwrap()).unwrap();
+        let snapshot = wait_terminal(&host, job_id);
+        assert!(host.is_reaped(job_id));
+        assert!(gate.current().is_none());
+        snapshot
+    }
+
+    fn production_launch(
+        temp: &TempDir,
+        job_id: &str,
+        engine: &str,
+        model: PathBuf,
+        source_audio: &Path,
+        device: &str,
+        use_vad: bool,
+        vad_config: Option<VadConfig>,
+    ) -> ResolvedNativeLaunch {
+        model_backed_launch(
+            temp,
+            job_id,
+            engine,
+            vec![("model".into(), model)],
+            source_audio,
+            device,
+            use_vad,
+            vad_config,
+        )
     }
 
     struct EnvVarGuard {
@@ -2413,6 +2574,134 @@ mod tests {
         assert!(snapshot["detectedLanguage"].is_null());
         assert!(!output.exists());
         assert!(host.is_reaped("production-ct2-cancel"));
+        assert!(gate.current().is_none());
+    }
+
+    #[test]
+    fn crispasr_host_resolver_rejects_missing_model_and_aligner_paths_before_launch() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = crispasr_worker_inputs() else {
+            return;
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let cache = temp.path().join("cache");
+        let workspace = cache.join("workspace").join("job");
+        let output = temp.path().join("output");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        let audio = workspace.join("audio.wav");
+        fs::copy(&inputs.audio, &audio).unwrap();
+        let resolve = |job_id: &str, models: Vec<(String, PathBuf)>| {
+            ResolvedNativeLaunch::resolve(
+                job_id.into(),
+                inputs.engine.clone(),
+                models,
+                inputs.device.clone(),
+                "ja".into(),
+                audio.clone(),
+                output.join(format!("{job_id}.ass")),
+                &cache,
+                false,
+                None,
+            )
+        };
+        assert!(resolve(
+            "production-crispasr-missing-model",
+            vec![("model".into(), temp.path().join("missing-model.gguf"))],
+        )
+        .is_err());
+        if inputs.engine == "qwen3-asr" {
+            assert!(resolve(
+                "production-crispasr-missing-aligner",
+                vec![
+                    ("model".into(), inputs.model),
+                    ("aligner".into(), temp.path().join("missing-aligner.gguf")),
+                ],
+            )
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn crispasr_worker_runs_through_the_existing_native_host_contract() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = crispasr_worker_inputs() else {
+            eprintln!("CrispASR worker/model/audio env not set; skipping real CrispASR host test");
+            return;
+        };
+        let snapshot = run_crispasr_host_once(
+            &inputs,
+            &inputs.audio,
+            "production-crispasr-selected",
+            &inputs.engine,
+            &inputs.device,
+        );
+        if inputs.engine == "qwen3-asr" {
+            assert_eq!(snapshot["status"], "failed");
+            assert!(snapshot["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("[qwen_timeline_policy_not_implemented]"));
+            assert_eq!(snapshot["segmentCount"], 0);
+        } else {
+            assert_eq!(snapshot["status"], "completed");
+            assert!(snapshot["segmentCount"].as_u64().unwrap() > 0);
+        }
+    }
+
+    #[test]
+    fn cancelling_the_real_crispasr_worker_proves_reap_not_destructors() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = crispasr_worker_inputs() else {
+            return;
+        };
+        if inputs.cancel_audio == inputs.audio {
+            eprintln!("CrispASR cancel audio env not set; skipping real hard-cancel smoke");
+            return;
+        }
+        let temp = tempfile::tempdir().unwrap();
+        let gate = Arc::new(ActiveJobGate::default());
+        let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
+        let mut models = vec![("model".into(), inputs.model)];
+        if let Some(aligner) = inputs.aligner {
+            models.push(("aligner".into(), aligner));
+        }
+        let job_id = "production-crispasr-cancel";
+        let launch = model_backed_launch(
+            &temp,
+            job_id,
+            &inputs.engine,
+            models,
+            &inputs.cancel_audio,
+            &inputs.device,
+            false,
+            None,
+        );
+        host.start(launch, gate.reserve().unwrap()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(60);
+        while host.snapshot(job_id, false).unwrap().unwrap()["durationMs"]
+            .as_i64()
+            .unwrap_or(0)
+            <= 0
+        {
+            assert!(
+                Instant::now() < deadline,
+                "real CrispASR worker did not reach ready"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let started = Instant::now();
+        host.cancel(job_id).unwrap();
+        assert!(started.elapsed() <= Duration::from_secs(2));
+        let snapshot = wait_terminal(&host, job_id);
+        assert_eq!(snapshot["status"], "cancelled");
+        assert!(host.is_reaped(job_id));
         assert!(gate.current().is_none());
     }
 

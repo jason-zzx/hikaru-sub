@@ -1,10 +1,15 @@
 #include "ctranslate2_whisper.hpp"
+#ifdef HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
+#include "crispasr_backend.hpp"
+#endif
 
 #include <hikaru_asr/protocol.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -127,6 +132,13 @@ void validate_candidate_b_config(const WorkerRequestV1& request) {
   }
 }
 
+std::optional<fs::path> request_model_path(const WorkerRequestV1& request, ModelRole role) {
+  for (const ModelPath& model : request.model_paths) {
+    if (model.role == role) return ctranslate2_compatible_path(fs::u8path(model.path));
+  }
+  return std::nullopt;
+}
+
 fs::path model_path(const WorkerRequestV1& request) {
   for (const ModelPath& model : request.model_paths) {
     if (model.role == ModelRole::Model) {
@@ -137,7 +149,7 @@ fs::path model_path(const WorkerRequestV1& request) {
   throw whisper::BackendError("missing_model_role", "model role is required");
 }
 
-int run_worker(const WorkerRequestV1& request) {
+int run_ctranslate2(const WorkerRequestV1& request) {
   const bool ordinary = request.engine == Engine::FasterWhisper;
   const bool kotoba = request.engine == Engine::KotobaFasterWhisper;
   if ((!ordinary && !kotoba) || request.backend != Backend::CTranslate2) {
@@ -238,6 +250,129 @@ int run_worker(const WorkerRequestV1& request) {
     emit_pre_ready_error("model_runtime_failed", "native ASR runtime failed");
     return 20;
   }
+}
+
+#ifdef HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
+int run_crispasr(const WorkerRequestV1& request) {
+  if (request.backend != Backend::CrispAsr
+      || (request.engine != Engine::Parakeet
+          && request.engine != Engine::ReazonSpeechNemo
+          && request.engine != Engine::Qwen3Asr)) {
+    emit_pre_ready_error("route_not_implemented", "requested CrispASR route is not implemented");
+    return 2;
+  }
+  if (request.use_vad) {
+    emit_pre_ready_error("crispasr_vad_not_implemented", "T09 does not implement CrispASR VAD");
+    return 2;
+  }
+  if (request.device == Device::Vulkan) {
+    emit_pre_ready_error("device_not_implemented", "T09 does not implement CrispASR Vulkan");
+    return 2;
+  }
+  std::unique_ptr<crisp::CrispAsrBackend> backend;
+  try {
+    const auto model = request_model_path(request, ModelRole::Model);
+    const auto aligner = request_model_path(request, ModelRole::Aligner);
+    if (!model) throw crisp::BackendError("missing_model_role", "model role is required");
+    backend = std::make_unique<crisp::CrispAsrBackend>(crisp::BackendConfig{
+        request.engine,
+        request.device,
+        ctranslate2_compatible_path(fs::u8path(request.audio_path)),
+        *model,
+        aligner,
+        current_executable_directory() / "crispasr.dll"});
+  } catch (const crisp::BackendError& error) {
+    emit_pre_ready_error(error.code(), error.what());
+    return 20;
+  } catch (const std::exception&) {
+    emit_pre_ready_error("crispasr_runtime_failed", "CrispASR runtime failed");
+    return 20;
+  }
+
+  const std::int64_t duration_ms = backend->duration_ms();
+  Emitter emitter(request);
+  EventV1 ready;
+  ready.type = EventType::Ready;
+  ready.backend = Backend::CrispAsr;
+  ready.device = request.device;
+  ready.duration_ms = duration_ms;
+  if (!emitter.emit(ready)) return 74;
+
+  try {
+    std::vector<Segment> previews;
+    const crisp::Result result = backend->transcribe(
+        [&](std::int64_t processed_ms) {
+          EventV1 progress;
+          progress.type = EventType::Progress;
+          progress.processed_ms = processed_ms;
+          progress.duration_ms = duration_ms;
+          if (!emitter.emit(progress)) {
+            throw crisp::BackendError("protocol_emit_failed", "progress event could not be emitted");
+          }
+        },
+        [&](const Segment& segment) {
+          previews.push_back(segment);
+          EventV1 event;
+          event.type = EventType::Segment;
+          event.segment = segment;
+          if (!emitter.emit(event)) {
+            throw crisp::BackendError("protocol_emit_failed", "segment event could not be emitted");
+          }
+        });
+
+    if (request.engine == Engine::Qwen3Asr) {
+      if (!emitter.emit(error_event(
+              "qwen_timeline_policy_not_implemented",
+              "Qwen backend and ForcedAligner capability passed; T11 timeline policy is required"))) {
+        return 74;
+      }
+      return 20;
+    }
+
+    std::vector<Segment> final_segments;
+    final_segments.reserve(result.source_segments.size());
+    for (const auto& source : result.source_segments) {
+      final_segments.push_back({source.raw_start_ms, source.raw_end_ms, source.text});
+    }
+    const bool previews_match = previews.size() == final_segments.size()
+        && std::equal(
+            previews.begin(), previews.end(), final_segments.begin(),
+            [](const Segment& left, const Segment& right) {
+              return left.start_ms == right.start_ms
+                  && left.end_ms == right.end_ms
+                  && left.text == right.text;
+            });
+    if (!previews_match) {
+      EventV1 replace;
+      replace.type = EventType::SegmentsReplace;
+      replace.segments = std::move(final_segments);
+      if (!emitter.emit(replace)) return 74;
+    }
+    EventV1 completed;
+    completed.type = EventType::Completed;
+    completed.duration_ms = duration_ms;
+    completed.detected_language = "ja";
+    if (!emitter.emit(completed)) return 74;
+    return 0;
+  } catch (const crisp::BackendError& error) {
+    if (!emitter.emit(error_event(error.code(), error.what()))) return 74;
+    return 20;
+  } catch (const std::exception&) {
+    if (!emitter.emit(error_event("crispasr_runtime_failed", "CrispASR runtime failed"))) return 74;
+    return 20;
+  }
+}
+#endif
+
+int run_worker(const WorkerRequestV1& request) {
+  if (request.backend == Backend::CTranslate2) return run_ctranslate2(request);
+#ifdef HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
+  if (request.backend == Backend::CrispAsr) return run_crispasr(request);
+#endif
+  emit_pre_ready_error(
+      "route_not_implemented",
+      "requested native ASR route is not implemented by this worker");
+  return 2;
 }
 
 }  // namespace

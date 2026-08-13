@@ -1,0 +1,16 @@
+{"file":".trellis/spec/asr/index.md","reason":"ASR inference ownership and layer checklist; T09 must not move product UI or orchestration into the wrong layer."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Authoritative native CrispASR ABI, lifecycle, Qwen timing, evidence identity, privacy, benchmark, and mutation contracts."}
+{"file":".trellis/spec/tauri/index.md","reason":"Tauri process-lifecycle ownership and Rust validation checklist."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Preserve the development-only native host, test-only model inputs, process-tree cancellation, recovery, active gate, and unchanged Release routing."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Rust path/process safety, full-suite verification, and honest reporting when GPU/model inputs are unavailable."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Keep worker protocol, Rust host, and product compatibility data flow explicit without frontend/command drift."}
+{"file":".trellis/tasks/07-25-native-asr-migration/prd.md","reason":"Parent requirements, quality gates, route ownership, package boundaries, and T09/T10/T11 dependency contract."}
+{"file":".trellis/tasks/07-25-native-asr-migration/design.md","reason":"Parent worker/process/runtime architecture, development GPU role, rollout, rollback, and no-production-cutover boundary."}
+{"file":".trellis/tasks/07-25-native-asr-migration/implement.md","reason":"Authoritative T09/T10/T11 ownership, dependencies, family-device handoff, exit criteria, and downstream ordering."}
+{"file":".trellis/tasks/08-07-native-asr-crispasr-backend/research/t09-planning-decisions.md","reason":"User-approved external GPU attestation, strict Qwen seam, family-scoped results, lifecycle facts, and minimal implementation direction."}
+{"file":".trellis/tasks/08-07-native-asr-crispasr-backend/research/crispasr-abi-ownership-device.md","reason":"Exact pinned public exports, private open-layout hazard, ownership order, route aliases, device limitation, error mapping, and residual risks."}
+{"file":".trellis/tasks/08-07-native-asr-crispasr-backend/research/worker-seam-and-test-hooks.md","reason":"Current worker/CMake/Rust seams, smallest concrete module, fake ABI tests, release boundary, and code anchors."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/abi-contract.md","reason":"Immutable T03 public ABI signatures, CPU params/modules, ownership evidence, callback behavior, Qwen alignment capability, and cancellation limitation."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/crispasr-poc-report.md","reason":"Measured backend capabilities, model/runtime identities, current route risks, performance baseline, and no-production-promotion conclusion."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/t03c-crispasr-long-v2-handoff.md","reason":"Current long-v2 authority and corrected Parakeet/Reazon/Qwen dispositions consumed by the T10/T11 handoff."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-rust-job-host/research/planning-evidence.md","reason":"T05 host lifecycle, protocol reduction, recovery, cancellation, debug/test-only injection, and compatibility evidence."}

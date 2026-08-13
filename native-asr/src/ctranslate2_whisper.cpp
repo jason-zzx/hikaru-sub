@@ -1,4 +1,5 @@
 #include "ctranslate2_whisper.hpp"
+#include "wav_audio.hpp"
 
 #ifndef _WIN32
 #error The CTranslate2 worker currently supports Windows x64 only.
@@ -62,11 +63,6 @@ namespace fs = std::filesystem;
 
 constexpr double pi = 3.141592653589793238462643383279502884;
 
-struct WavAudio {
-  std::vector<float> samples;
-  std::int64_t duration_ms = 0;
-};
-
 double elapsed_ms(const Clock::time_point start) {
   return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
@@ -116,99 +112,13 @@ class Tokenizer {
   HikaruTokenizerHandle* handle_ = nullptr;
 };
 
-std::uint16_t read_u16(std::istream& input) {
-  std::array<unsigned char, 2> bytes{};
-  if (!input.read(reinterpret_cast<char*>(bytes.data()), bytes.size())) {
-    throw BackendError("invalid_audio", "WAV file is truncated");
+wav::Audio read_wav(const fs::path& path) {
+  try {
+    return wav::read_pcm16_mono_16khz(path);
+  } catch (const wav::AudioError& error) {
+    throw BackendError(error.code(), error.what());
   }
-  return static_cast<std::uint16_t>(bytes[0] | (bytes[1] << 8));
 }
-
-std::uint32_t read_u32(std::istream& input) {
-  std::array<unsigned char, 4> bytes{};
-  if (!input.read(reinterpret_cast<char*>(bytes.data()), bytes.size())) {
-    throw BackendError("invalid_audio", "WAV file is truncated");
-  }
-  return static_cast<std::uint32_t>(bytes[0])
-      | (static_cast<std::uint32_t>(bytes[1]) << 8)
-      | (static_cast<std::uint32_t>(bytes[2]) << 16)
-      | (static_cast<std::uint32_t>(bytes[3]) << 24);
-}
-
-std::string read_fourcc(std::istream& input) {
-  std::array<char, 4> value{};
-  if (!input.read(value.data(), value.size())) {
-    throw BackendError("invalid_audio", "WAV file is truncated");
-  }
-  return std::string(value.data(), value.size());
-}
-
-WavAudio read_wav(const fs::path& path) {
-  std::ifstream input(path, std::ios::binary);
-  if (!input) {
-    throw BackendError("audio_open_failed", "WAV file could not be opened");
-  }
-  if (read_fourcc(input) != "RIFF") {
-    throw BackendError("invalid_audio", "Audio must be a RIFF WAV file");
-  }
-  static_cast<void>(read_u32(input));
-  if (read_fourcc(input) != "WAVE") {
-    throw BackendError("invalid_audio", "Audio must be a WAVE file");
-  }
-
-  bool format_ready = false;
-  bool data_ready = false;
-  WavAudio audio;
-  while (input && !data_ready) {
-    const std::string chunk = read_fourcc(input);
-    const std::uint32_t size = read_u32(input);
-    if (chunk == "fmt ") {
-      if (size < 16) {
-        throw BackendError("invalid_audio", "WAV fmt chunk is invalid");
-      }
-      const std::uint16_t format = read_u16(input);
-      const std::uint16_t channels = read_u16(input);
-      const std::uint32_t rate = read_u32(input);
-      static_cast<void>(read_u32(input));
-      static_cast<void>(read_u16(input));
-      const std::uint16_t bits = read_u16(input);
-      if (format != 1 || channels != 1 || rate != sample_rate || bits != 16) {
-        throw BackendError(
-            "unsupported_audio_format",
-            "Audio must be 16 kHz mono PCM16 WAV");
-      }
-      input.seekg(size - 16, std::ios::cur);
-      format_ready = true;
-    } else if (chunk == "data") {
-      if (!format_ready || size == 0 || size % sizeof(std::int16_t) != 0) {
-        throw BackendError("invalid_audio", "WAV data chunk is invalid");
-      }
-      std::vector<std::int16_t> pcm(size / sizeof(std::int16_t));
-      if (!input.read(reinterpret_cast<char*>(pcm.data()), size)) {
-        throw BackendError("invalid_audio", "WAV data is truncated");
-      }
-      audio.samples.resize(pcm.size());
-      std::transform(pcm.begin(), pcm.end(), audio.samples.begin(), [](std::int16_t value) {
-        return static_cast<float>(value) / 32768.0f;
-      });
-      data_ready = true;
-    } else {
-      input.seekg(size, std::ios::cur);
-    }
-    if (size % 2 != 0) {
-      input.seekg(1, std::ios::cur);
-    }
-  }
-
-  if (!format_ready || !data_ready || audio.samples.empty()) {
-    throw BackendError("invalid_audio", "WAV file is missing required chunks");
-  }
-  audio.duration_ms =
-      (static_cast<std::int64_t>(audio.samples.size()) * 1000 + sample_rate / 2)
-      / sample_rate;
-  return audio;
-}
-
 std::vector<float> mel_filters(int mel_bins) {
   if (mel_bins != 80 && mel_bins != 128) {
     throw BackendError("model_contract_mismatch", "Whisper model has unsupported mel bins");
@@ -1566,7 +1476,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     const SegmentCallback& on_segment,
     const CancellationCallback& is_cancelled) {
   check_cancelled(is_cancelled);
-  const WavAudio audio = read_wav(audio_path);
+  const wav::Audio audio = read_wav(audio_path);
   TranscriptionResult result;
   result.duration_ms = audio.duration_ms;
   result.original_sample_count = audio.samples.size();

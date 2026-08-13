@@ -1,0 +1,68 @@
+{
+  "identity": {
+    "inputLock": {
+      "sha256": "f08619c1e5c965f328d679bda7e6e9009d26056a963563f7bdd3d2da1ceb29ba",
+      "sizeBytes": 5480
+    },
+    "library": {
+      "sha256": "824b5d89fd38eac5f04a5fd65927bb11a0060ab8a001cc57766bf6c914ec334e",
+      "sizeBytes": 11414528
+    },
+    "modelByFamily": {
+      "parakeet-family": {
+        "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+        "sizeBytes": 667147072
+      },
+      "qwen3-family": {
+        "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+        "sizeBytes": 1490915200
+      }
+    },
+    "runner": {
+      "sha256": "5f0a54781c09436bf4139db1efc113388767fbf125c11f36e06822185ce86538",
+      "sizeBytes": 251904
+    },
+    "worker": {
+      "sha256": "e1f55919b46ad545ccd7d839e00d6e2533a766505cc9d814b7b0ad64cddd02f0",
+      "sizeBytes": 561152
+    }
+  },
+  "limitations": [
+    "Ignored-local development evidence only; not a runtime pack or Release qualification.",
+    "CrispASR v0.8.22 has no public resolved-compute-device getter.",
+    "Qwen raw alignment tail overruns are retained unchanged and reported diagnostically; they are never accepted timing.",
+    "Qwen timeline grouping remains T11-owned and zero accepted timed output is required here."
+  ],
+  "rawIndexSha256": "1a3058ae5dff92c9157961e809e75126335f5f76cd20a655ee8cf9b9cdc3c625",
+  "resolvedComputeDeviceAvailable": false,
+  "results": {
+    "parakeet-family": {
+      "gpuCpuRatio": {
+        "medium-v1-first-120s": 0.1109443558143703,
+        "short-v1": 0.11931823321739997
+      },
+      "result": "development-gpu-ready",
+      "warmMedianRtf": {
+        "cpu:medium-v1-first-120s": 0.1506182375,
+        "cpu:short-v1": 0.1518118703842005,
+        "cuda:medium-v1-first-120s": 0.016710243333333333,
+        "cuda:short-v1": 0.01811392415567173
+      }
+    },
+    "qwen3-family": {
+      "gpuCpuRatio": {
+        "medium-v1-first-120s": 0.3278299511886289,
+        "short-v1": 0.21183249607496518
+      },
+      "maxAlignmentTailOverrunMs": 29600,
+      "result": "development-gpu-ready",
+      "warmMedianRtf": {
+        "cpu:medium-v1-first-120s": 0.43321804333333336,
+        "cpu:short-v1": 0.43810495809476396,
+        "cuda:medium-v1-first-120s": 0.14202185,
+        "cuda:short-v1": 0.09280486681603187
+      }
+    }
+  },
+  "schema": "hikaru-crispasr-development-publication-v1"
+}
