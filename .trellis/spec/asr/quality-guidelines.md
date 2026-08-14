@@ -72,7 +72,7 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 - A sanitized publisher must recompute CER/timeline/gaps from the authoritative manifest/ASS through the shared T01 implementation; it must not trust mutable pre-adapted metric fields. Any inference source/config/binary/DLL/model identity change invalidates affected measurements and requires rerunning them before publication.
 - When an authoritative reference identity changes, inventory every backend and result family that consumed the superseded identity, including completed, failed, diagnostic, derived, and currently inactive routes. Preserve historical artifacts, then publish an identity-bound supersession or an explicit validated-unscored disposition for every authoritative row before any parent/spec/handoff may claim the migration uses the new reference. Correcting only the currently active backend is incomplete.
 - Missing confirmed-speech regions are semantic and gating by default. A region is diagnostic-only when every overlapping reference cue, after NFKC normalization and removal of whitespace, Unicode punctuation/symbols, and `ー` / `〜` / `~`, is exactly 1..6 repeats of one unit from `あ`, `う`, `え`, `お`, `ん`, `うん`, or `うあ`. Excluded regions remain in CER and publish separately; `はい`, laughter, mixed/lexical cues, and unknown forms remain semantic.
-- Product qualification stops after a mandatory gate fails for candidates whose required matrix ends at that gate. T08 Kotoba K1/K2 are explicit full-matrix candidates: short-v1, medium-v1, and long-v2 are all scored under one frozen inference identity even after an earlier failure; only the complete matrix publishes `accepted-kotoba-algorithm-input` or `stop-revise`. Partial prefixes remain diagnostic and identify the next case. Every later Kotoba candidate requires a newly reviewed identity that addresses the complete observed failure profile.
+- Every model candidate whose authoritative corpus is short-v1 / medium-v1 / long-v2 must complete all three cases under one frozen inference identity before quality disposition, even when an earlier case fails CER, timeline, semantic-gap, performance, resource, subtitle-size, or protocol-output gates. A quality failure is recorded and the matrix continues. Identity/input/runtime attestation drift, harness corruption, or an incomplete trace makes a row invalid and requires repair plus rerun of the affected case. By contrast, an identity-valid, candidate-caused structured failure with a complete trace—such as deterministic model load/compute rejection or a measured resource-limit failure—is valid failed evidence, counts as that case's attempted matrix row, and yields a non-qualified disposition without authorizing later-case truncation. External termination without atomic output remains unscored and must be rerun. Only the complete matrix may publish `accepted-*-algorithm-input`, `qualified`, `stop-revise`, or `unsupported-for-native-release`. A later candidate requires a newly reviewed identity that addresses the complete observed failure distribution. This full-matrix rule applies to T10 and all later model tasks; it does not retroactively alter archived evidence or require unrelated model identities to run in one combined candidate.
 - Frozen native gates: CER `<=0.35` per engine/case; CPU inference RTF `<=1.0`; accelerated GPU inference RTF `<=0.5`; short cold wall `<=120s`; peak RSS `<=6 GiB` for CTranslate2 or `<=12 GiB` for CrispASR; zero invalid/out-of-bounds segments; zero semantic confirmed-speech gaps `>=1500ms`; Qwen3 ForcedAligner median `<=150ms` and P95 `<=500ms`. No VRAM gate is defined.
 - Python references never establish expected output, relative CER/RTF gates, or missing annotations.
 
@@ -101,7 +101,9 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 | Failed envelope has no complete matching trace | Reject the evidence; do not summarize it as a blocker |
 | Long model process hits an external timeout before atomic raw publication | Record timeout/process identity separately and unscored; do not invent token traces or merge with completed rows |
 | Final CT2 source/config/binary identity differs from measured rows | Invalidate and rerun the affected minimum authoritative cases before publication |
-| Mandatory default-model gate fails | Stop the candidate ladder unless the reviewed next candidate addresses that failure class; mark remaining models `blocked-not-run` |
+| One case fails a mandatory quality gate | Record the failure, continue the same model candidate through the remaining short/medium/long-v2 cases, then publish the complete-matrix disposition |
+| Identity/input/runtime attestation drifts, harness output is corrupt, or the failure trace is incomplete | Invalid evidence; repair and rerun that case before any quality disposition |
+| Frozen identity produces a structured candidate-caused load/compute/resource failure with a complete trace | Count a valid failed row for that case, continue the remaining cases, and publish a non-qualified complete-matrix disposition |
 | Ordinary CT2 model exposes neither 80 nor 128 mels, or lacks both vocabulary formats | Reject as model contract mismatch; do not apply Kotoba readiness rules to repair it |
 | Coverage tag is absent or unconfirmed | Leave it absent and report the corpus-wide gap |
 
@@ -109,7 +111,7 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 
 - **Good:** native candidate uses the validated manifest identity, one exact lock/binary/DLL/model evidence set, shared recomputed metrics, and frozen absolute gates; source/model windows, CPU modules, Qwen raw-to-grouped provenance, and any WAV-end bound remain auditable. Python data is shown only as supplemental diagnostics.
 - **Base:** Python medium/long diagnostics are missing, an engine returns one broad legal segment, or a mandatory native long run times out before atomic publication; comparison reports the limitation and leaves incomplete evidence unscored.
-- **Bad:** regenerate reference text from a Python transcript, trust editable adapted metrics without recomputation, compare only against Python parity, average cases to hide one failing case, run every model after the mandatory algorithm gate already failed, add VAD to fix a CER/RTF blocker, treat runtime feasibility or one broad segment as subtitle readiness, publish derived/negative records without identity validation, treat Qwen character ranges as final cues, use a source-slice duration as the model timestamp range, or commit private media/raw results.
+- **Bad:** regenerate reference text from a Python transcript, trust editable adapted metrics without recomputation, compare only against Python parity, average cases to hide one failing case, stop a model candidate after the first quality failure instead of completing its frozen audio matrix, add VAD to fix a CER/RTF blocker without a new reviewed identity, treat runtime feasibility or one broad segment as subtitle readiness, publish derived/negative records without identity validation, treat Qwen character ranges as final cues, use a source-slice duration as the model timestamp range, or commit private media/raw results.
 
 ### 6. Tests Required
 
@@ -149,11 +151,86 @@ Native CrispASR harnesses additionally assert:
 Wrong: native passes because it differs from Python by less than 1%, because the runtime can execute all models, or because one broad segment covers the whole speech interval.
 Correct: native passes only when each route/case meets the frozen absolute gates against validated WAV+ASS ground truth, with one enforced lock/binary/DLL/model identity, auditable native timing, and separately reported subtitle-scale segmentation risks.
 
-Wrong: after the mandatory model fails CER/RTF, run every model anyway or add VAD because it is the next planned feature.
-Correct: stop the rejected algorithm, keep remaining models `blocked-not-run`, and activate a new candidate only when it addresses the observed failure class and has a newly frozen identity.
+Wrong: after short-v1 fails CER/RTF, stop that model candidate and infer that medium/long-v2 would add no evidence.
+Correct: keep the candidate identity frozen, complete medium-v1 and long-v2, publish the full per-case failure distribution, then activate a new candidate only when it addresses that complete profile.
 
 Wrong: use every Qwen aligner character range as a cue, expand zero-duration ranges, or publish session getter sentinel timing.
 Correct: retain raw ranges, reproduce the exact pinned upstream source grouping, accept only legal ForcedAligner-derived final segments, and fail closed otherwise.
+```
+
+## Scenario: Native CrispASR Parakeet-Family Window Policy
+
+### 1. Scope / Trigger
+
+Use this contract when `parakeet` or `reazonspeech-nemo` is evaluated above the shared CrispASR backend. T10's reviewed R1/P1 identities are both `stop-revise`; this scenario preserves their executable safety/evidence contracts for any later R2/P2. It does not enable Release/default routing, VAD, a formal GPU pack, or Qwen grouping.
+
+### 2. Signatures
+
+```cpp
+struct AudioWindow { std::int64_t start_ms; std::int64_t end_ms; };
+Result CrispAsrBackend::transcribe_window(
+    AudioWindow window,
+    const ProgressCallback& on_progress = {},
+    const SegmentCallback& on_segment = {});
+
+namespace parakeet_family {
+inline constexpr std::int64_t window_duration_ms = 15'000;
+inline constexpr std::size_t max_cue_code_points = 96;
+inline constexpr std::int64_t max_cue_duration_ms = 15'000;
+PolicyResult assemble_segments(
+    Engine engine,
+    const std::vector<WindowResult>& windows,
+    std::int64_t audio_duration_ms);
+}
+```
+
+The worker keeps protocol v1 and emits `ready -> progress* -> segmentsReplace -> completed`, or `ready -> progress* -> error`. It never emits Parakeet-family raw upstream `segment` previews.
+
+### 3. Contracts
+
+- Reuse one pinned session sequentially. Each exact 16 kHz PCM window owns one result; callbacks reset and the result frees before the next call. `transcribe()` remains the whole-audio thin wrapper.
+- Native result timing is window-local. The backend adds the window start exactly once, then rejects overflow, negative/reversed/zero top-level timing, or ranges outside the real window/audio. Never clamp, stretch, or proportionally synthesize timing.
+- Register the upstream segment callback for lifecycle compatibility, but copy/validate preview values only when the caller explicitly supplies `on_segment`. Product worker/evidence calls omit it because preview is not accepted state.
+- Frozen R1/P1 windows are contiguous `[0,15000) ...`, non-overlapping, and cover the audio. Every window supplies exactly one source segment. Reazon uses its legal top-level timing; Parakeet uses positive-duration word anchors and deterministic zero-duration text attachment without creating timing.
+- Final text is byte-conserved, valid UTF-8, non-empty, ordered, audio-bounded, at most 96 Unicode scalar values and 15000 ms per cue. Protocol v1's existing Emitter remains authoritative for text bytes, segment count, and event-line bytes.
+- Accumulate all windows before emitting one atomic `segmentsReplace`. Cancellation or any backend/policy/protocol failure before it leaves zero accepted output/recovery segments.
+- Evidence freezes manifest/comparator/input lock/runner/worker/runtime/model/candidate/device/PATH/modules/raw hashes. A partial structured failure publishes attempted duration/time only; it must not be labeled with full-case RTF. Both engines publish independent dispositions.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Window is empty, reversed, out of audio, or sample offset overflows | Stable backend error; no accepted output |
+| Window-local source/word timing is invalid or translates outside the window | Reject; no clamp or synthetic duration |
+| Unrequested raw preview is malformed | Ignore it as ineligible observation; validate the copied final result |
+| R1 top-level range is zero-duration, or P1 has no legal anchor/text conservation | Stable policy/backend failure; zero final segments |
+| Cue exceeds 96 scalars / 15000 ms, replacement exceeds protocol limits | Fail closed before emitting replacement |
+| A frozen case returns identity-valid structured failure with complete trace | Keep the failed row, continue remaining matrix cases, publish non-qualified disposition |
+| Manifest/comparator/binary/model/device/PATH/module/raw identity drifts | Evidence invalid; rerun affected cases |
+| Failure occurs before full audio is attempted | Publish attempted-through duration/RTF only, never full-case RTF |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** one frozen identity completes or validly fails all short/medium/long-v2 rows; publisher recomputes shared metrics, proves text/cue/protocol constraints, and emits sanitized independent results.
+- **Base:** a candidate completes some cases but a later native range or policy contract fails with a complete trace; publish `stop-revise`, keep the other engine independent, and leave routes disabled.
+- **Bad:** persist giant previews, distribute text proportionally over time, clamp a zero-duration range, mix binaries across cases, report a partial attempt as full-case performance, or promote one engine because the paired engine passed.
+
+### 6. Tests Required
+
+- Pure policy CTest: contiguous/final windows, UTF-8/scalar count, 96/15000 boundaries, Reazon top-level-only timing, Parakeet positive/zero anchor ownership, ordering/bounds, text conservation, empty output.
+- Fake ABI/backend: repeated calls on one session, per-call callback reset/result free, window offset exactly once, later-window failures, ignored unrequested previews, exact-once session close.
+- Worker contract: no raw preview, monotonic progress, exactly one replacement then completed, post-ready policy error with zero output, protocol text/count/event-line rejection, unchanged Qwen/VAD/Vulkan/default-off behavior.
+- Real Rust host: atomic replacement/recovery/ASS success, post-ready policy failure with zero segments, cancellation/reap within two seconds and zero accepted partial output.
+- Publisher: frozen identity/privacy/window/module/PATH/error mutations, result-promotion rejection, shared comparator recomputation, partial-vs-full RTF labeling, and byte-identical double generation.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: a callback preview is inside a 15-second request, so save it and repair its timing later.
+Correct: previews are ineligible; validate only the copied final result and atomically emit policy-approved output.
+
+Wrong: divide failed inference time by the full long-v2 duration and publish that as CUDA RTF.
+Correct: publish attempted time and attempted-through duration; full-case RTF exists only after full inference coverage.
 ```
 
 ## Scenario: Native Kotoba Bounded-Stride Overlap
@@ -313,6 +390,8 @@ Correct: invalid evidence publishes no result; subtitle quality remains GPU-side
 
 ## Scenario: Native Candidate B Silero V6 Evidence
 
+> Historical exception: this archived T06 candidate retained its reviewed stop-after-failure matrix. The general full-matrix rule above applies prospectively from T10 and does not rewrite archived evidence.
+
 ### 1. Scope / Trigger
 
 Use this contract when ordinary `faster-whisper` is measured with the native Candidate B VAD stage. It applies to the development CPU evidence path only; it does not enable Release routing, model download, packaging, GPU execution, or a Python fallback.
@@ -397,3 +476,4 @@ Correct: restore using the pinned integer sample/half-even 10 ms rule and fail c
 - Requiring CT2/model inputs for protocol-only builds, using locale-dependent Windows model paths, or extending Kotoba preprocessor readiness to ordinary Whisper
 - Treating raw Qwen character ranges, session sentinel timing, or one giant top-level segment as subtitle-ready output
 - Hard-coding exact-once cleanup or CPU-backend claims instead of deriving them from counts, params, and loaded modules
+- Stopping a frozen model candidate after one quality gate fails instead of completing short-v1 / medium-v1 / long-v2

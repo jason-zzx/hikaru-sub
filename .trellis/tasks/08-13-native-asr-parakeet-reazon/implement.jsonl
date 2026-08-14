@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/asr/quality-guidelines.md", "reason": "Native ASR evidence, timing, privacy, identity, and qualification contracts"}
+{"file": ".trellis/tasks/08-13-native-asr-parakeet-reazon/research/t10-current-state.md", "reason": "T10 code seams, blockers, candidate ladder, and exact repository anchors"}
+{"file": ".trellis/tasks/archive/2026-08/08-07-native-asr-crispasr-backend/research/crispasr-backend-handoff.md", "reason": "Stable T09 backend, lifecycle, route, device, and downstream boundaries"}
+{"file": ".trellis/tasks/archive/2026-08/08-06-crispasr-long-v2-correction/research/crispasr-long-v2-handoff.md", "reason": "Current long-v2 quality authority and independent route dispositions"}
+{"file": ".trellis/tasks/08-13-native-asr-parakeet-reazon/research/t10-window-contract.md", "reason": "Pinned repeated-session, per-call ownership, decoder reset, and window-local timing contract"}

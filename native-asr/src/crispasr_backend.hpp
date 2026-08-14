@@ -55,6 +55,11 @@ struct Result {
   std::vector<AlignmentEntry> alignment;
 };
 
+struct AudioWindow {
+  std::int64_t start_ms = 0;
+  std::int64_t end_ms = 0;
+};
+
 using ProgressCallback = std::function<void(std::int64_t processed_ms)>;
 using SegmentCallback = std::function<void(const Segment& segment)>;
 
@@ -68,6 +73,10 @@ class CrispAsrBackend {
 
   std::int64_t duration_ms() const;
   Result transcribe(
+      const ProgressCallback& on_progress = {},
+      const SegmentCallback& on_segment = {});
+  Result transcribe_window(
+      AudioWindow window,
       const ProgressCallback& on_progress = {},
       const SegmentCallback& on_segment = {});
 

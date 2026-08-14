@@ -25,6 +25,8 @@ struct FakeCounters {
   int cleanup_order = 0;
   int callback_reset_order = 0;
   int result_free_order = 0;
+  int transcribe_calls = 0;
+  int last_sample_count = 0;
 };
 
 FakeCounters counters;
@@ -60,6 +62,7 @@ struct crispasr_session {
 
 struct crispasr_session_result {
   std::vector<FakeSegment> segments;
+  std::vector<FakeSegment> words;
 };
 
 struct crispasr_align_result {
@@ -125,7 +128,14 @@ __declspec(dllexport) crispasr_session_result* crispasr_session_transcribe_lang(
     const float*,
     int sample_count,
     const char*) {
-  if (!session || sample_count <= 0 || session->model.find("transcribe-null") != std::string::npos) return nullptr;
+  if (!session || sample_count <= 0) return nullptr;
+  ++counters.transcribe_calls;
+  counters.last_sample_count = sample_count;
+  if (session->model.find("transcribe-null") != std::string::npos
+      || (session->model.find("second-null") != std::string::npos
+          && counters.transcribe_calls == 2)) {
+    return nullptr;
+  }
   if (session->progress) {
     session->progress(
         session->model.find("callback-failure") != std::string::npos ? -1 : 8000,
@@ -134,20 +144,34 @@ __declspec(dllexport) crispasr_session_result* crispasr_session_transcribe_lang(
     session->progress(4000, sample_count, session->progress_data);
     session->progress(sample_count, sample_count, session->progress_data);
   }
+  const std::int64_t duration_cs = sample_count / 160;
+  const std::int64_t preview_end_cs = std::min<std::int64_t>(50, duration_cs);
+  const std::int64_t final_end_cs = std::min<std::int64_t>(60, duration_cs);
+  const std::int64_t word_end_cs = std::min<std::int64_t>(10, duration_cs);
   if (session->segment && session->backend != "qwen3"
       && session->model.find("callback-failure") == std::string::npos) {
-    session->segment("preview", 0, 50, 0, session->segment_data);
+    session->segment("preview", 0, preview_end_cs, 0, session->segment_data);
   }
   auto* result = new crispasr_session_result;
   ++counters.results_created;
-  if (session->model.find("invalid-result") != std::string::npos) {
+  if (session->model.find("policy-empty") != std::string::npos) {
+    // Leave the copied result empty so the worker policy fails after ready.
+  } else if (session->model.find("invalid-result") != std::string::npos) {
     result->segments.push_back({"invalid", 20, 10});
+    result->words.push_back({"invalid", 0, word_end_cs});
   } else if (session->backend == "qwen3") {
     result->segments.push_back({"qwen-source", -1, -1});
+    result->words.push_back({"qwen-source", -1, -1});
+  } else if (session->model.find("oversized-text") != std::string::npos) {
+    const std::string text(17'000, 'x');
+    result->segments.push_back({text, 0, final_end_cs});
+    result->words.push_back({text, 0, word_end_cs});
   } else if (session->model.find("same-preview") != std::string::npos) {
-    result->segments.push_back({"preview", 0, 50});
+    result->segments.push_back({"preview", 0, preview_end_cs});
+    result->words.push_back({"preview", 0, word_end_cs});
   } else {
-    result->segments.push_back({"final", 0, 60});
+    result->segments.push_back({"final", 0, final_end_cs});
+    result->words.push_back({"final", 0, word_end_cs});
   }
   return result;
 }
@@ -171,13 +195,23 @@ __declspec(dllexport) std::int64_t crispasr_session_result_segment_t1(crispasr_s
       ? result->segments[index].t1 : -1;
 }
 
-__declspec(dllexport) int crispasr_session_result_n_words(crispasr_session_result*, int) { return 1; }
-__declspec(dllexport) const char* crispasr_session_result_word_text(crispasr_session_result*, int, int) { return "word"; }
-__declspec(dllexport) std::int64_t crispasr_session_result_word_t0(crispasr_session_result* result, int, int) {
-  return result && !result->segments.empty() && result->segments[0].text == "qwen-source" ? -1 : 0;
+__declspec(dllexport) int crispasr_session_result_n_words(crispasr_session_result* result, int) {
+  return result ? static_cast<int>(result->words.size()) : 0;
 }
-__declspec(dllexport) std::int64_t crispasr_session_result_word_t1(crispasr_session_result* result, int, int) {
-  return result && !result->segments.empty() && result->segments[0].text == "qwen-source" ? -1 : 10;
+__declspec(dllexport) const char* crispasr_session_result_word_text(
+    crispasr_session_result* result, int, int index) {
+  return result && index >= 0 && index < static_cast<int>(result->words.size())
+      ? result->words[index].text.c_str() : nullptr;
+}
+__declspec(dllexport) std::int64_t crispasr_session_result_word_t0(
+    crispasr_session_result* result, int, int index) {
+  return result && index >= 0 && index < static_cast<int>(result->words.size())
+      ? result->words[index].t0 : -1;
+}
+__declspec(dllexport) std::int64_t crispasr_session_result_word_t1(
+    crispasr_session_result* result, int, int index) {
+  return result && index >= 0 && index < static_cast<int>(result->words.size())
+      ? result->words[index].t1 : -1;
 }
 __declspec(dllexport) void crispasr_session_result_free(crispasr_session_result* result) {
   if (result) {
@@ -255,6 +289,8 @@ __declspec(dllexport) int hikaru_fake_crispasr_counter(int index) {
     case 9: return counters.segment_reset;
     case 10: return counters.callback_reset_order;
     case 11: return counters.result_free_order;
+    case 12: return counters.transcribe_calls;
+    case 13: return counters.last_sample_count;
     default: return -1;
   }
 }

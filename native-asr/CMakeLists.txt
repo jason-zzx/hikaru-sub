@@ -139,6 +139,10 @@ target_include_directories(hikaru-asr-crispasr
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CRISPASR_GENERATED_INCLUDE_DIR}")
 target_link_libraries(hikaru-asr-crispasr PUBLIC hikaru-asr-protocol hikaru-asr-wav-audio PRIVATE bcrypt)
 
+add_library(hikaru-asr-parakeet-family-policy STATIC src/parakeet_family_policy.cpp)
+target_include_directories(hikaru-asr-parakeet-family-policy PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(hikaru-asr-parakeet-family-policy PUBLIC hikaru-asr-protocol)
+
 add_library(hikaru-asr-crispasr-test-adapter STATIC src/crispasr_backend.cpp)
 target_include_directories(hikaru-asr-crispasr-test-adapter
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CRISPASR_GENERATED_INCLUDE_DIR}")
@@ -155,6 +159,8 @@ add_library(hikaru-asr-fake-crispasr-abi-broken SHARED tests/fake_crispasr_abi.c
 target_compile_definitions(hikaru-asr-fake-crispasr-abi-broken PRIVATE HIKARU_ASR_FAKE_CRISPASR_BROKEN=1)
 add_executable(hikaru-asr-crispasr-tests tests/crispasr_backend_tests.cpp)
 target_link_libraries(hikaru-asr-crispasr-tests PRIVATE hikaru-asr-crispasr-test-adapter)
+add_executable(hikaru-asr-parakeet-family-policy-tests tests/parakeet_family_policy_tests.cpp)
+target_link_libraries(hikaru-asr-parakeet-family-policy-tests PRIVATE hikaru-asr-parakeet-family-policy)
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   add_executable(hikaru-asr-crispasr-development-runner tests/crispasr_development_runner.cpp)
   target_include_directories(hikaru-asr-crispasr-development-runner SYSTEM PRIVATE
@@ -162,10 +168,14 @@ if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   file(TO_CMAKE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-07-native-asr-crispasr-backend/research/local"
     T09_LOCAL_ROOT)
+  file(TO_CMAKE_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-13-native-asr-parakeet-reazon/research/local"
+    T10_LOCAL_ROOT)
   target_compile_definitions(hikaru-asr-crispasr-development-runner PRIVATE
-    "T09_LOCAL_ROOT=\"${T09_LOCAL_ROOT}\"")
+    "T09_LOCAL_ROOT=\"${T09_LOCAL_ROOT}\""
+    "T10_LOCAL_ROOT=\"${T10_LOCAL_ROOT}\"")
   target_link_libraries(hikaru-asr-crispasr-development-runner
-    PRIVATE hikaru-asr-crispasr bcrypt psapi)
+    PRIVATE hikaru-asr-crispasr hikaru-asr-parakeet-family-policy bcrypt psapi)
 endif()
 
 if(HIKARU_ASR_BUILD_CT2_WORKER)
@@ -338,7 +348,25 @@ add_executable(hikaru-asr-worker src/main.cpp)
 target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-ctranslate2)
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   target_compile_definitions(hikaru-asr-worker PRIVATE HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1)
-  target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-crispasr)
+  target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-crispasr hikaru-asr-parakeet-family-policy)
+  add_executable(hikaru-asr-crispasr-contract-worker src/main.cpp)
+  set_target_properties(
+    hikaru-asr-crispasr-contract-worker PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/contract-bin")
+  foreach(configuration IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+    set_target_properties(
+      hikaru-asr-crispasr-contract-worker PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY_${configuration} "${CMAKE_BINARY_DIR}/contract-bin")
+  endforeach()
+  target_compile_definitions(
+    hikaru-asr-crispasr-contract-worker PRIVATE HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1)
+  target_link_libraries(
+    hikaru-asr-crispasr-contract-worker
+    PRIVATE hikaru-asr-ctranslate2 hikaru-asr-crispasr-test-adapter hikaru-asr-parakeet-family-policy)
+  add_executable(hikaru-asr-crispasr-worker-contract-tests tests/crispasr_worker_contract_tests.cpp)
+  target_include_directories(hikaru-asr-crispasr-worker-contract-tests SYSTEM PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+  target_link_libraries(hikaru-asr-crispasr-worker-contract-tests PRIVATE hikaru-asr-protocol)
   add_custom_command(TARGET hikaru-asr-worker POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${HIKARU_ASR_CRISPASR_RUNTIME_FILE}" "$<TARGET_FILE_DIR:hikaru-asr-worker>/crispasr.dll")
@@ -359,19 +387,6 @@ target_compile_definitions(hikaru-asr-ctranslate2-tests PRIVATE
   "T07_LOCAL_ROOT=\"${T07_LOCAL_ROOT}\""
   "T08_LOCAL_ROOT=\"${T08_LOCAL_ROOT}\"")
 
-foreach(target IN ITEMS hikaru-asr-worker hikaru-asr-ctranslate2-tests)
-  add_custom_command(TARGET ${target} POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "$<TARGET_FILE:ctranslate2>" "$<TARGET_FILE_DIR:${target}>"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "${TOKENIZER_DLL}" "$<TARGET_FILE_DIR:${target}>"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "${ORT_ROOT}/lib/onnxruntime.dll" "$<TARGET_FILE_DIR:${target}>"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "${ORT_ROOT}/lib/onnxruntime_providers_shared.dll" "$<TARGET_FILE_DIR:${target}>"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-            "${VAD_MODEL_SOURCE}" "$<TARGET_FILE_DIR:${target}>")
-endforeach()
 endif()
 
 if(MSVC)
@@ -381,11 +396,13 @@ if(MSVC)
       hikaru-asr-protocol-tests
       hikaru-asr-wav-audio
       hikaru-asr-crispasr
+      hikaru-asr-parakeet-family-policy
       hikaru-asr-crispasr-test-adapter
       hikaru-asr-fake-crispasr-abi
       hikaru-asr-fake-crispasr-cuda-marker
       hikaru-asr-fake-crispasr-abi-broken
-      hikaru-asr-crispasr-tests)
+      hikaru-asr-crispasr-tests
+      hikaru-asr-parakeet-family-policy-tests)
     target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
   endforeach()
   if(HIKARU_ASR_BUILD_CT2_WORKER)
@@ -395,10 +412,35 @@ if(MSVC)
         hikaru-asr-ctranslate2-tests)
       target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
     endforeach()
+    if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
+      target_compile_options(hikaru-asr-crispasr-contract-worker PRIVATE /W4 /permissive- /utf-8)
+    endif()
   endif()
   if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
     target_compile_options(hikaru-asr-crispasr-development-runner PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(hikaru-asr-crispasr-worker-contract-tests PRIVATE /W4 /permissive- /utf-8)
   endif()
+endif()
+
+# The worker binaries import the same CT2/tokenizer/ORT DLLs even when a test exercises only CrispASR.
+if(HIKARU_ASR_BUILD_CT2_WORKER)
+  set(HIKARU_ASR_RUNTIME_TARGETS hikaru-asr-worker hikaru-asr-ctranslate2-tests)
+  if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
+    list(APPEND HIKARU_ASR_RUNTIME_TARGETS hikaru-asr-crispasr-contract-worker)
+  endif()
+  foreach(target IN LISTS HIKARU_ASR_RUNTIME_TARGETS)
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+              "$<TARGET_FILE:ctranslate2>" "$<TARGET_FILE_DIR:${target}>"
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+              "${TOKENIZER_DLL}" "$<TARGET_FILE_DIR:${target}>"
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+              "${ORT_ROOT}/lib/onnxruntime.dll" "$<TARGET_FILE_DIR:${target}>"
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+              "${ORT_ROOT}/lib/onnxruntime_providers_shared.dll" "$<TARGET_FILE_DIR:${target}>"
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+              "${VAD_MODEL_SOURCE}" "$<TARGET_FILE_DIR:${target}>")
+  endforeach()
 endif()
 
 include(CTest)
@@ -415,11 +457,18 @@ if(BUILD_TESTING)
                    $<TARGET_FILE:hikaru-asr-fake-crispasr-abi>
                    $<TARGET_FILE:hikaru-asr-fake-crispasr-abi-broken>
                    $<TARGET_FILE:hikaru-asr-fake-crispasr-cuda-marker>)
-  set_tests_properties(protocol-core fake-worker-contract crispasr-backend-core PROPERTIES TIMEOUT 30)
+  add_test(NAME parakeet-family-policy COMMAND hikaru-asr-parakeet-family-policy-tests)
+  set_tests_properties(protocol-core fake-worker-contract crispasr-backend-core parakeet-family-policy PROPERTIES TIMEOUT 30)
   set_tests_properties(fake-worker-hang fake-worker-child-hang PROPERTIES TIMEOUT 15)
   if(HIKARU_ASR_BUILD_CT2_WORKER)
     add_test(NAME ctranslate2-whisper-core COMMAND hikaru-asr-ctranslate2-tests --self-check)
-    if(NOT HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
+    if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
+      add_test(NAME crispasr-worker-contract
+        COMMAND hikaru-asr-crispasr-worker-contract-tests
+          $<TARGET_FILE:hikaru-asr-crispasr-contract-worker>
+          $<TARGET_FILE:hikaru-asr-fake-crispasr-abi>)
+      set_tests_properties(crispasr-worker-contract PROPERTIES TIMEOUT 30)
+    else()
       find_package(Python3 REQUIRED COMPONENTS Interpreter)
       add_test(NAME crispasr-release-route-disabled
         COMMAND "${Python3_EXECUTABLE}"

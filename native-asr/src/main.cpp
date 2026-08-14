@@ -1,6 +1,7 @@
 #include "ctranslate2_whisper.hpp"
 #ifdef HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
 #include "crispasr_backend.hpp"
+#include "parakeet_family_policy.hpp"
 #endif
 
 #include <hikaru_asr/protocol.hpp>
@@ -298,29 +299,19 @@ int run_crispasr(const WorkerRequestV1& request) {
   ready.duration_ms = duration_ms;
   if (!emitter.emit(ready)) return 74;
 
-  try {
-    std::vector<Segment> previews;
-    const crisp::Result result = backend->transcribe(
-        [&](std::int64_t processed_ms) {
-          EventV1 progress;
-          progress.type = EventType::Progress;
-          progress.processed_ms = processed_ms;
-          progress.duration_ms = duration_ms;
-          if (!emitter.emit(progress)) {
-            throw crisp::BackendError("protocol_emit_failed", "progress event could not be emitted");
-          }
-        },
-        [&](const Segment& segment) {
-          previews.push_back(segment);
-          EventV1 event;
-          event.type = EventType::Segment;
-          event.segment = segment;
-          if (!emitter.emit(event)) {
-            throw crisp::BackendError("protocol_emit_failed", "segment event could not be emitted");
-          }
-        });
+  const auto emit_progress = [&](std::int64_t processed_ms) {
+    EventV1 progress;
+    progress.type = EventType::Progress;
+    progress.processed_ms = processed_ms;
+    progress.duration_ms = duration_ms;
+    if (!emitter.emit(progress)) {
+      throw crisp::BackendError("protocol_emit_failed", "progress event could not be emitted");
+    }
+  };
 
+  try {
     if (request.engine == Engine::Qwen3Asr) {
+      backend->transcribe(emit_progress);
       if (!emitter.emit(error_event(
               "qwen_timeline_policy_not_implemented",
               "Qwen backend and ForcedAligner capability passed; T11 timeline policy is required"))) {
@@ -329,25 +320,31 @@ int run_crispasr(const WorkerRequestV1& request) {
       return 20;
     }
 
-    std::vector<Segment> final_segments;
-    final_segments.reserve(result.source_segments.size());
-    for (const auto& source : result.source_segments) {
-      final_segments.push_back({source.raw_start_ms, source.raw_end_ms, source.text});
+    std::vector<parakeet_family::WindowResult> windows;
+    for (std::int64_t start_ms = 0; start_ms < duration_ms;) {
+      const std::int64_t end_ms = std::min(
+          start_ms + parakeet_family::window_duration_ms,
+          duration_ms);
+      crisp::Result result = backend->transcribe_window({start_ms, end_ms}, emit_progress);
+      windows.push_back({start_ms, end_ms, std::move(result.source_segments)});
+      emit_progress(end_ms);
+      start_ms = end_ms;
     }
-    const bool previews_match = previews.size() == final_segments.size()
-        && std::equal(
-            previews.begin(), previews.end(), final_segments.begin(),
-            [](const Segment& left, const Segment& right) {
-              return left.start_ms == right.start_ms
-                  && left.end_ms == right.end_ms
-                  && left.text == right.text;
-            });
-    if (!previews_match) {
-      EventV1 replace;
-      replace.type = EventType::SegmentsReplace;
-      replace.segments = std::move(final_segments);
-      if (!emitter.emit(replace)) return 74;
+
+    parakeet_family::PolicyResult policy =
+        parakeet_family::assemble_segments(request.engine, windows, duration_ms);
+    if (!policy.error_code.empty()) {
+      if (!emitter.emit(error_event(policy.error_code, "Parakeet-family subtitle policy rejected output"))) {
+        return 74;
+      }
+      return 20;
     }
+
+    EventV1 replace;
+    replace.type = EventType::SegmentsReplace;
+    replace.segments = std::move(policy.segments);
+    if (!emitter.emit(replace)) return 74;
+
     EventV1 completed;
     completed.type = EventType::Completed;
     completed.duration_ms = duration_ms;
