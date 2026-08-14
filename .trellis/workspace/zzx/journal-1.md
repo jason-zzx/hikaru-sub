@@ -780,3 +780,36 @@ Implemented the shared native CrispASR backend, strict Qwen capability boundary,
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: Complete T10 Parakeet and ReazonSpeech productization
+
+**Date**: 2026-08-14
+**Task**: Complete T10 Parakeet and ReazonSpeech productization
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented bounded CrispASR window transcription and Parakeet-family subtitle policy, suppressed raw previews, added atomic replacement and real-host coverage, published frozen full-matrix evidence with independent stop-revise results for ReazonSpeech R1 and Parakeet P1, simplified the implementation, and completed full native/Rust/frontend/privacy validation.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1fa2e15` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
