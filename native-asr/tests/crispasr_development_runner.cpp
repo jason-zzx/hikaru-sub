@@ -1,4 +1,5 @@
 #include "crispasr_backend.hpp"
+#include "parakeet_family_policy.hpp"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -219,6 +220,152 @@ Engine family_engine(const std::string& family) {
   throw std::runtime_error("invalid family");
 }
 
+Engine t10_engine(const std::string& name) {
+  if (name == "parakeet") return Engine::Parakeet;
+  if (name == "reazonspeech-nemo") return Engine::ReazonSpeechNemo;
+  throw std::runtime_error("invalid T10 engine");
+}
+
+void run_t10(const std::vector<std::string>& args) {
+  const auto process_started = Clock::now();
+  const std::string engine_name = required_arg(args, "--engine");
+  const std::string case_id = required_arg(args, "--case");
+  const std::string device_name = required_arg(args, "--device");
+  const std::string run_kind = required_arg(args, "--run-kind");
+  const int repeat_index = std::stoi(required_arg(args, "--repeat-index"));
+  check(case_id == "short-v1" || case_id == "medium-v1" || case_id == "long-v2", "invalid T10 case");
+  check(device_name == "cpu" || device_name == "cuda", "invalid T10 device");
+  check(run_kind == "cold" || run_kind == "warm" || run_kind == "measured", "invalid T10 run kind");
+  check(repeat_index >= 0, "invalid T10 repeat index");
+  const fs::path lock = fs::u8path(required_arg(args, "--input-lock"));
+  const fs::path expected_lock = fs::u8path(T10_LOCAL_ROOT).parent_path() / "t10-input-lock.md";
+  const fs::path library = fs::u8path(required_arg(args, "--library"));
+  const fs::path worker = fs::u8path(required_arg(args, "--worker"));
+  const fs::path model = fs::u8path(required_arg(args, "--model"));
+  const fs::path audio = fs::u8path(required_arg(args, "--audio"));
+  const fs::path output = fs::u8path(required_arg(args, "--output"));
+  check(output.extension() == ".json" && is_under(output, fs::u8path(T10_LOCAL_ROOT)),
+        "T10 output escapes the canonical task-local ignored root");
+  check(fs::is_regular_file(lock) && fs::equivalent(lock, expected_lock), "T10 input lock path drifted");
+  check(fs::is_regular_file(library) && fs::is_regular_file(worker), "T10 runtime/worker missing");
+  const Engine engine = t10_engine(engine_name);
+  if (engine == Engine::Parakeet) {
+    validate_identity(model, 673554880, "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17", "Parakeet model");
+  } else {
+    validate_identity(model, 667147072, "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2", "Reazon model");
+  }
+  const std::map<std::string, std::tuple<std::uintmax_t, const char*, std::int64_t>> cases{
+      {"short-v1", {771728, "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211", 24102}},
+      {"medium-v1", {15963982, "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458", 498872}},
+      {"long-v2", {132615588, "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e", 4144235}},
+  };
+  const auto& [audio_size, audio_hash, declared_duration] = cases.at(case_id);
+  validate_identity(audio, audio_size, audio_hash, "T10 audio");
+  const Device device = device_name == "cuda" ? Device::Cuda : Device::Cpu;
+  const fs::path runtime_bin = current_executable().parent_path();
+  const fs::path runtime_root = library.parent_path();
+  const fs::path cuda_bin = fs::u8path(R"(C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\bin)");
+  const fs::path system32 = fs::path(std::getenv("SystemRoot")) / "System32";
+
+  Json raw{
+      {"schema", "hikaru-t10-parakeet-family-attempt-v1"},
+      {"engine", engine_name}, {"resolvedBackend", upstream_backend(engine)},
+      {"caseId", case_id}, {"device", device_name},
+      {"runKind", run_kind}, {"repeatIndex", repeat_index},
+      {"candidateId", engine == Engine::Parakeet ? "P1-window15s-native-word-v1" : "R1-window15s-top-level-v1"},
+      {"inputLock", file_identity(lock)}, {"runner", file_identity(current_executable())},
+      {"worker", file_identity(worker)}, {"library", file_identity(library)},
+      {"model", file_identity(model)}, {"audio", file_identity(audio)},
+      {"windowDurationMs", parakeet_family::window_duration_ms}, {"overlapMs", 0},
+      {"maxCueCodePoints", parakeet_family::max_cue_code_points},
+      {"maxCueDurationMs", parakeet_family::max_cue_duration_ms},
+      {"sourceSegments", Json::array()}, {"finalSegments", Json::array()},
+      {"moduleCheckpoints", Json::array()},
+      {"status", "failed"}};
+  if (device == Device::Cuda) raw["cudaDevice"] = cuda_device_identity();
+
+  const auto open_started = Clock::now();
+  CrispAsrBackend backend(BackendConfig{engine, device, audio, model, std::nullopt, library});
+  raw["modelOpenMs"] = std::chrono::duration<double, std::milli>(Clock::now() - open_started).count();
+  check(backend.duration_ms() == declared_duration, "T10 audio duration drifted");
+  raw["moduleCheckpoints"].push_back(Json{{"stage", "post-session-open"},
+      {"modules", loaded_modules(runtime_bin, runtime_root, cuda_bin, system32)}});
+
+  std::vector<parakeet_family::WindowResult> windows;
+  const auto inference_started = Clock::now();
+  for (std::int64_t start_ms = 0; start_ms < backend.duration_ms();) {
+    const std::int64_t end_ms = std::min(
+        start_ms + parakeet_family::window_duration_ms, backend.duration_ms());
+    Result result;
+    try {
+      result = backend.transcribe_window({start_ms, end_ms});
+    } catch (const BackendError& error) {
+      raw["status"] = "validated-failed";
+      raw["errorCode"] = error.code();
+      raw["errorMessage"] = error.what();
+      raw["failedWindowStartMs"] = start_ms;
+      raw["failedWindowEndMs"] = end_ms;
+      raw["inferenceMs"] = std::chrono::duration<double, std::milli>(Clock::now() - inference_started).count();
+      raw["inferenceRtf"] = raw["inferenceMs"].get<double>() / static_cast<double>(backend.duration_ms());
+      PROCESS_MEMORY_COUNTERS_EX memory{};
+      memory.cb = sizeof(memory);
+      check(GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&memory), sizeof(memory)),
+            "T10 RSS query failed");
+      raw["peakProcessRssBytes"] = memory.PeakWorkingSetSize;
+      raw["runnerWallMs"] = std::chrono::duration<double, std::milli>(Clock::now() - process_started).count();
+      atomic_json(output, raw);
+      std::cout << Json{{"status", "validated-failed"}, {"engine", engine_name}, {"caseId", case_id},
+                         {"code", error.code()}}.dump() << '\n';
+      return;
+    }
+    Json source_segments = Json::array();
+    for (const NativeSegment& segment : result.source_segments) {
+      Json words = Json::array();
+      for (const NativeWord& word : segment.words) {
+        words.push_back(Json{{"text", word.text}, {"startMs", word.start_ms}, {"endMs", word.end_ms}});
+      }
+      source_segments.push_back(Json{{"text", segment.text}, {"startMs", segment.raw_start_ms},
+                                      {"endMs", segment.raw_end_ms}, {"words", words}});
+    }
+    raw["sourceSegments"].push_back(Json{{"windowStartMs", start_ms}, {"windowEndMs", end_ms},
+                                           {"segments", source_segments}});
+    windows.push_back({start_ms, end_ms, std::move(result.source_segments)});
+    start_ms = end_ms;
+  }
+  const double inference_ms = std::chrono::duration<double, std::milli>(Clock::now() - inference_started).count();
+  raw["inferenceMs"] = inference_ms;
+  raw["inferenceRtf"] = inference_ms / static_cast<double>(backend.duration_ms());
+  raw["moduleCheckpoints"].push_back(Json{{"stage", "post-transcribe"},
+      {"modules", loaded_modules(runtime_bin, runtime_root, cuda_bin, system32)}});
+
+  const parakeet_family::PolicyResult policy =
+      parakeet_family::assemble_segments(engine, windows, backend.duration_ms());
+  if (!policy.error_code.empty()) {
+    raw["status"] = "validated-failed";
+    raw["errorCode"] = policy.error_code;
+  } else {
+    EventV1 replacement;
+    replacement.type = EventType::SegmentsReplace;
+    replacement.segments = policy.segments;
+    std::string line;
+    ProtocolError error;
+    check(serialize_event(replacement, line, error), "T10 replacement is not protocol-serializable");
+    raw["replacementBytes"] = line.size();
+    for (const Segment& segment : policy.segments) {
+      raw["finalSegments"].push_back(Json{{"startMs", segment.start_ms}, {"endMs", segment.end_ms}, {"text", segment.text}});
+    }
+    raw["status"] = "completed";
+  }
+  PROCESS_MEMORY_COUNTERS_EX memory{};
+  memory.cb = sizeof(memory);
+  check(GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&memory), sizeof(memory)),
+        "T10 RSS query failed");
+  raw["peakProcessRssBytes"] = memory.PeakWorkingSetSize;
+  raw["runnerWallMs"] = std::chrono::duration<double, std::milli>(Clock::now() - process_started).count();
+  atomic_json(output, raw);
+  std::cout << Json{{"status", raw["status"]}, {"engine", engine_name}, {"caseId", case_id}}.dump() << '\n';
+}
+
 void run(const std::vector<std::string>& args) {
   check(std::find(args.begin(), args.end(), "--run-development-evidence") != args.end(), "invalid runner mode");
   const std::string phase = required_arg(args, "--phase");
@@ -353,7 +500,12 @@ void run(const std::vector<std::string>& args) {
 
 int main(int argc, char** argv) {
   try {
-    run(std::vector<std::string>(argv + 1, argv + argc));
+    const std::vector<std::string> args(argv + 1, argv + argc);
+    if (std::find(args.begin(), args.end(), "--run-t10-evidence") != args.end()) {
+      run_t10(args);
+    } else {
+      run(args);
+    }
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "crispasr development runner rejected: " << error.what() << '\n';

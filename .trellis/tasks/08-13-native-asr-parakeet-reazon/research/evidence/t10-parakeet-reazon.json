@@ -1,0 +1,299 @@
+{
+  "comparatorSha256": "b2ae880e693d16daf6a3e29f7be3f0058c2ce74068b333b90850be5798cef822",
+  "limitations": [
+    "Development CUDA quality evidence only; not a formal runtime pack/device qualification.",
+    "Validated-failed cases retain native failure provenance and are not assigned synthetic CER/timeline metrics; partial attempts are not reported as full-case RTF.",
+    "Release/default remains Python legacy."
+  ],
+  "manifestSha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea",
+  "rawIndexSha256": "ef1b0a811fc9544f0b7b1358f663db65690c99e7fadd4d604a5e22d8eefa4d3b",
+  "releaseRouteEnabled": false,
+  "results": {
+    "parakeet": {
+      "cases": [
+        {
+          "allApplicableGatesPass": true,
+          "caseId": "short-v1",
+          "cues": {
+            "codePoints": {
+              "max": 71,
+              "p50": 55.5,
+              "p95": 69.45
+            },
+            "count": 2,
+            "durationMs": {
+              "max": 13760,
+              "p50": 11320.0,
+              "p95": 13516.0
+            }
+          },
+          "gates": {
+            "acceleratedInferenceRtfAtMost0_5": true,
+            "cerAtMost0_35": true,
+            "cueCodePointsAtMost96": true,
+            "cueDurationAtMost15000Ms": true,
+            "peakRssAtMost12GiB": true,
+            "replacementBelowProtocolLineLimit": true,
+            "semanticSpeechGapsZero": true,
+            "shortColdWallAtMost120s": true,
+            "timelineErrorsZero": true
+          },
+          "measurements": {
+            "acceleratedInferenceRtf": 0.022135914032030538,
+            "coldProcessWallMs": 6245.1878,
+            "maximumExcludedVocalizationGapsAtLeast1500Ms": 0,
+            "maximumSampleCer": 0.16666666666666666,
+            "maximumSemanticSpeechGapsAtLeast1500Ms": 0,
+            "maximumTimelineErrors": 0,
+            "peakProcessRssBytes": 946786304,
+            "replacementBytes": 474
+          },
+          "sampleCounts": {
+            "cold": 1,
+            "measured": 0,
+            "warm": 3
+          },
+          "status": "completed"
+        },
+        {
+          "allApplicableGatesPass": false,
+          "caseId": "medium-v1",
+          "cues": {
+            "codePoints": {
+              "max": 84,
+              "p50": 48.5,
+              "p95": 75.14999999999998
+            },
+            "count": 34,
+            "durationMs": {
+              "max": 14880,
+              "p50": 13400.0,
+              "p95": 14828.0
+            }
+          },
+          "gates": {
+            "acceleratedInferenceRtfAtMost0_5": true,
+            "cerAtMost0_35": false,
+            "cueCodePointsAtMost96": true,
+            "cueDurationAtMost15000Ms": true,
+            "peakRssAtMost12GiB": true,
+            "replacementBelowProtocolLineLimit": true,
+            "semanticSpeechGapsZero": false,
+            "shortColdWallAtMost120s": null,
+            "timelineErrorsZero": true
+          },
+          "measurements": {
+            "acceleratedInferenceRtf": 0.017026716271909426,
+            "coldProcessWallMs": null,
+            "maximumExcludedVocalizationGapsAtLeast1500Ms": 1,
+            "maximumSampleCer": 0.39252747252747255,
+            "maximumSemanticSpeechGapsAtLeast1500Ms": 17,
+            "maximumTimelineErrors": 0,
+            "peakProcessRssBytes": 977121280,
+            "replacementBytes": 6460
+          },
+          "sampleCounts": {
+            "cold": 0,
+            "measured": 1,
+            "warm": 0
+          },
+          "status": "completed"
+        },
+        {
+          "allApplicableGatesPass": false,
+          "attemptedInferenceMs": 70065.4119,
+          "attemptedInferenceRtf": 0.01690671786228339,
+          "attemptedThroughMs": 4144235,
+          "attemptedWindowCount": 277,
+          "caseId": "long-v2",
+          "errorCode": "parakeet_family_text_conservation",
+          "failedWindowEndMs": null,
+          "failedWindowStartMs": null,
+          "fullCaseInferenceRtf": 0.01690671786228339,
+          "peakProcessRssBytes": 1210458112,
+          "status": "validated-failed"
+        }
+      ],
+      "disposition": "stop-revise",
+      "identity": {
+        "candidateId": "P1-window15s-native-word-v1",
+        "cudaDevice": {
+          "computeCapability": "8.6",
+          "driverApiVersion": 13020,
+          "index": 0,
+          "name": "NVIDIA GeForce RTX 3070"
+        },
+        "device": "cuda",
+        "inputLock": {
+          "sha256": "e342111bdc2cac5e0af6bc013a718f324cdc845577d587484020734db54ad9bd",
+          "sizeBytes": 5091
+        },
+        "library": {
+          "sha256": "824b5d89fd38eac5f04a5fd65927bb11a0060ab8a001cc57766bf6c914ec334e",
+          "sizeBytes": 11414528
+        },
+        "loadedModulesSha256": "2ac453f9da22ec0e8cd9173ca811e411aa248b25e821ffc14a30fac2a9796b92",
+        "maxCueCodePoints": 96,
+        "maxCueDurationMs": 15000,
+        "model": {
+          "sha256": "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17",
+          "sizeBytes": 673554880
+        },
+        "overlapMs": 0,
+        "pathPolicySha256": "1885aea2c3f30fdf5223725f9594bd277b99acbc12947113fa92e3f70c8d15a4",
+        "runner": {
+          "sha256": "845dc2e5f93f73a851789b0643d2e4e29aa6e29ea0835e037cfad047c58660c6",
+          "sizeBytes": 307712
+        },
+        "windowDurationMs": 15000,
+        "worker": {
+          "sha256": "57e8d02c17c5a7a268b6a0c391beecbd0356bbcd03c3f361540606223efdba5d",
+          "sizeBytes": 571904
+        }
+      }
+    },
+    "reazonspeech-nemo": {
+      "cases": [
+        {
+          "allApplicableGatesPass": false,
+          "caseId": "short-v1",
+          "cues": {
+            "codePoints": {
+              "max": 67,
+              "p50": 51.0,
+              "p95": 65.4
+            },
+            "count": 2,
+            "durationMs": {
+              "max": 13520,
+              "p50": 9120.0,
+              "p95": 13080.0
+            }
+          },
+          "gates": {
+            "acceleratedInferenceRtfAtMost0_5": true,
+            "cerAtMost0_35": true,
+            "cueCodePointsAtMost96": true,
+            "cueDurationAtMost15000Ms": true,
+            "peakRssAtMost12GiB": true,
+            "replacementBelowProtocolLineLimit": true,
+            "semanticSpeechGapsZero": false,
+            "shortColdWallAtMost120s": true,
+            "timelineErrorsZero": true
+          },
+          "measurements": {
+            "acceleratedInferenceRtf": 0.05845980416562941,
+            "coldProcessWallMs": 16934.1791,
+            "maximumExcludedVocalizationGapsAtLeast1500Ms": 0,
+            "maximumSampleCer": 0.225,
+            "maximumSemanticSpeechGapsAtLeast1500Ms": 1,
+            "maximumTimelineErrors": 0,
+            "peakProcessRssBytes": 1060065280,
+            "replacementBytes": 446
+          },
+          "sampleCounts": {
+            "cold": 1,
+            "measured": 0,
+            "warm": 3
+          },
+          "status": "completed"
+        },
+        {
+          "allApplicableGatesPass": false,
+          "caseId": "medium-v1",
+          "cues": {
+            "codePoints": {
+              "max": 75,
+              "p50": 48.0,
+              "p95": 73.05
+            },
+            "count": 34,
+            "durationMs": {
+              "max": 14880,
+              "p50": 11880.0,
+              "p95": 14407.999999999998
+            }
+          },
+          "gates": {
+            "acceleratedInferenceRtfAtMost0_5": true,
+            "cerAtMost0_35": false,
+            "cueCodePointsAtMost96": true,
+            "cueDurationAtMost15000Ms": true,
+            "peakRssAtMost12GiB": true,
+            "replacementBelowProtocolLineLimit": true,
+            "semanticSpeechGapsZero": false,
+            "shortColdWallAtMost120s": null,
+            "timelineErrorsZero": true
+          },
+          "measurements": {
+            "acceleratedInferenceRtf": 0.035689425143122885,
+            "coldProcessWallMs": null,
+            "maximumExcludedVocalizationGapsAtLeast1500Ms": 0,
+            "maximumSampleCer": 0.37714285714285717,
+            "maximumSemanticSpeechGapsAtLeast1500Ms": 22,
+            "maximumTimelineErrors": 0,
+            "peakProcessRssBytes": 970997760,
+            "replacementBytes": 6545
+          },
+          "sampleCounts": {
+            "cold": 0,
+            "measured": 1,
+            "warm": 0
+          },
+          "status": "completed"
+        },
+        {
+          "allApplicableGatesPass": false,
+          "attemptedInferenceMs": 27957.6191,
+          "attemptedInferenceRtf": 0.07766005305555555,
+          "attemptedThroughMs": 360000,
+          "attemptedWindowCount": 23,
+          "caseId": "long-v2",
+          "errorCode": "crispasr_result_invalid",
+          "failedWindowEndMs": 360000,
+          "failedWindowStartMs": 345000,
+          "peakProcessRssBytes": 1204248576,
+          "status": "validated-failed"
+        }
+      ],
+      "disposition": "stop-revise",
+      "identity": {
+        "candidateId": "R1-window15s-top-level-v1",
+        "cudaDevice": {
+          "computeCapability": "8.6",
+          "driverApiVersion": 13020,
+          "index": 0,
+          "name": "NVIDIA GeForce RTX 3070"
+        },
+        "device": "cuda",
+        "inputLock": {
+          "sha256": "e342111bdc2cac5e0af6bc013a718f324cdc845577d587484020734db54ad9bd",
+          "sizeBytes": 5091
+        },
+        "library": {
+          "sha256": "824b5d89fd38eac5f04a5fd65927bb11a0060ab8a001cc57766bf6c914ec334e",
+          "sizeBytes": 11414528
+        },
+        "loadedModulesSha256": "2ac453f9da22ec0e8cd9173ca811e411aa248b25e821ffc14a30fac2a9796b92",
+        "maxCueCodePoints": 96,
+        "maxCueDurationMs": 15000,
+        "model": {
+          "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+          "sizeBytes": 667147072
+        },
+        "overlapMs": 0,
+        "pathPolicySha256": "1885aea2c3f30fdf5223725f9594bd277b99acbc12947113fa92e3f70c8d15a4",
+        "runner": {
+          "sha256": "845dc2e5f93f73a851789b0643d2e4e29aa6e29ea0835e037cfad047c58660c6",
+          "sizeBytes": 307712
+        },
+        "windowDurationMs": 15000,
+        "worker": {
+          "sha256": "57e8d02c17c5a7a268b6a0c391beecbd0356bbcd03c3f361540606223efdba5d",
+          "sizeBytes": 571904
+        }
+      }
+    }
+  },
+  "schema": "hikaru-t10-parakeet-reazon-publication-v1"
+}

@@ -108,9 +108,9 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - 发出取消后 2 秒内 worker 退出；异常退出后可读取最后保存的恢复快照。
 - Windows setup 不超过 80 MB，portable ZIP 不超过 90 MB，解压后的 CPU ASR runtime 不超过 250 MB。
 - 迁移期间保留 `python-legacy` 源码开发/诊断路径；发布包不携带 Python runtime 或 venv。
-- 每个引擎分别通过用户真值和产品合同门槛后才能切换；单个 CrispASR 引擎失败不阻塞已达标的 CTranslate2 路径。
+- 每个引擎分别通过用户真值和产品合同门槛后才能切换；单个 CrispASR 引擎失败不阻塞已达标的 CTranslate2 路径，也不阻止同一产品化子任务为另一个已达标 CrispASR 引擎发布独立有效 handoff。失败引擎保持 `stop-revise` 和禁用状态。
 - ordinary faster-whisper 的 `large-v3` 默认模型和 `large-v2` 日语长音频是路线硬门槛且路线本身必须交付。T06 在归档前完成 CPU RTF 根因矩阵：CPU branch 由 T06 完成这些硬门槛；确认 CPU ceiling 时，T06 以 `gpu-required-pending` 完成 CPU handoff，并由 T14/T15 正式打包和完成同一硬门槛；若 production worker、selected CPU baseline、Candidate B reviewed stop-revise evidence、Python non-gating comparison、deterministic publishers、host/protocol tests 与 downstream handoff 完成但没有资格分支被证明，T06 可按 `migration-handoff-stop-revise` truthful handoff。无论 T06 采用哪个闭合分支，只要 production worker seam 与 CPU checkpoint 已完成，T07 都应先建立开发 CUDA 通道再进入重复 CT2 质量迭代；该开发顺序不代表 product qualification 或 GPU-required decision，未资格化的 native route 保持 disabled，Release/default 保持 Python legacy。
-- CPU branch 由 T06 实测其余模型；GPU-required branch 由 T15 实测全部七模型并标记 `qualified`、`stop-revise` 或 `unsupported-for-native-release`。非默认模型失败不阻塞已通过的原生 faster-whisper。
+- 从 T10 起及后续未归档模型任务，每个冻结模型候选都必须完成 short-v1 / medium-v1 / long-v2 全矩阵，单项质量门槛失败不截断后续音频；最终按完整矩阵标记 `qualified`、`stop-revise` 或 `unsupported-for-native-release`。不同模型 identity 仍独立判定，非默认模型失败不阻塞已通过的原生 faster-whisper。
 - T17 仍展示全部现有模型；资格状态控制原生可用性、禁用状态和说明，而不是从列表隐藏。发布版不得为未通过模型静默回退到 Python。
 
 ### R9 - 父子任务治理

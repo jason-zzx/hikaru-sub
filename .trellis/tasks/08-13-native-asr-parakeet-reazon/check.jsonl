@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/asr/quality-guidelines.md", "reason": "Check native evidence, timing, identity, privacy, and qualification compliance"}
+{"file": ".trellis/tasks/08-13-native-asr-parakeet-reazon/research/t10-current-state.md", "reason": "Check implementation against researched seams, blockers, exclusions, and test requirements"}
+{"file": ".trellis/tasks/archive/2026-08/08-07-native-asr-crispasr-backend/research/crispasr-backend-handoff.md", "reason": "Check preservation of T09 lifecycle, route, device, and default-off contracts"}
+{"file": ".trellis/tasks/archive/2026-08/08-06-crispasr-long-v2-correction/research/crispasr-long-v2-handoff.md", "reason": "Check quality claims against current long-v2 authority"}
+{"file": ".trellis/tasks/08-13-native-asr-parakeet-reazon/research/t10-window-contract.md", "reason": "Check implementation against pinned repeated-window and exact timing translation contract"}

@@ -33,8 +33,9 @@ void write_u32(std::ostream& output, std::uint32_t value) {
   for (int shift = 0; shift < 32; shift += 8) output.put(static_cast<char>((value >> shift) & 0xff));
 }
 
-void write_wav(const fs::path& path) {
-  const std::vector<std::int16_t> samples(wav::sample_rate, 0);
+void write_wav(const fs::path& path, std::int64_t duration_ms = 1000) {
+  const std::vector<std::int16_t> samples(
+      static_cast<std::size_t>(duration_ms * wav::sample_rate / 1000), 0);
   std::ofstream output(path, std::ios::binary);
   output.write("RIFF", 4);
   write_u32(output, 36 + static_cast<std::uint32_t>(samples.size() * 2));
@@ -188,6 +189,61 @@ void run_tests(
     check(result.source_segments[0].text == "preview", "matching preview/final drift");
   }
   check_counts(counters, {1, 1, 1, 1, 0, 0, 1, 1, 1, 1}, "matching preview success");
+
+  const fs::path window_audio = root / "window-audio.wav";
+  write_wav(window_audio, 20'000);
+  counters.reset();
+  {
+    CrispAsrBackend backend(config(Engine::Parakeet, window_audio, model, library));
+    check(backend.duration_ms() == 20'000, "window duration drift");
+    std::vector<std::int64_t> progress;
+    std::vector<Segment> previews;
+    const Result first = backend.transcribe_window(
+        {0, 15'000},
+        [&](std::int64_t value) { progress.push_back(value); },
+        [&](const Segment& segment) { previews.push_back(segment); });
+    const Result second = backend.transcribe_window(
+        {15'000, 20'000},
+        [&](std::int64_t value) { progress.push_back(value); },
+        [&](const Segment& segment) { previews.push_back(segment); });
+    check(progress == std::vector<std::int64_t>({500, 500, 15'000, 15'500, 15'500, 20'000}),
+          "window progress translation drift");
+    check(previews.size() == 2 && previews[1].start_ms == 15'000
+              && previews[1].end_ms == 15'500,
+          "window preview offset drift");
+    check(first.source_segments[0].raw_start_ms == 0
+              && first.source_segments[0].raw_end_ms == 600
+              && second.source_segments[0].raw_start_ms == 15'000
+              && second.source_segments[0].raw_end_ms == 15'600
+              && second.source_segments[0].words[0].start_ms == 15'000
+              && second.source_segments[0].words[0].end_ms == 15'100,
+          "window copied timing offset drift");
+  }
+  check_counts(counters, {1, 1, 2, 2, 0, 0, 2, 2, 2, 2}, "repeated window success");
+  check(counters.get(12) == 2 && counters.get(13) == 5'000 * wav::sample_rate / 1000,
+        "window sample slicing drift");
+
+  for (const AudioWindow invalid : std::vector<AudioWindow>{{-1, 1}, {0, 0}, {0, 20'001}}) {
+    expect_error("crispasr_window_invalid", [&] {
+      CrispAsrBackend backend(config(Engine::Parakeet, window_audio, model, library));
+      backend.transcribe_window(invalid);
+    });
+  }
+  expect_error("crispasr_window_invalid", [&] {
+    CrispAsrBackend backend(config(Engine::Qwen3Asr, audio, model, library, aligner));
+    backend.transcribe_window({0, 1000});
+  });
+
+  counters.reset();
+  const fs::path second_null = root / "second-null.gguf";
+  std::ofstream(second_null) << "model";
+  expect_error("crispasr_transcribe_failed", [&] {
+    CrispAsrBackend backend(config(Engine::Parakeet, window_audio, second_null, library));
+    backend.transcribe_window({0, 15'000});
+    backend.transcribe_window({15'000, 20'000});
+  });
+  check_counts(counters, {1, 1, 1, 1, 0, 0, 2, 2, 2, 2}, "second window failure");
+  check(counters.get(12) == 2, "second window was not attempted");
 
   expect_error("crispasr_device_unavailable", [&] {
     CrispAsrBackend backend(config(

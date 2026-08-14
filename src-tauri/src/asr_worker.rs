@@ -1578,6 +1578,7 @@ mod tests {
         cancel_audio: PathBuf,
         device: String,
         engine: String,
+        expected_error: Option<String>,
     }
 
     #[derive(Deserialize)]
@@ -1598,6 +1599,7 @@ mod tests {
         cancel_audio: Option<PathBuf>,
         device: String,
         engine: String,
+        expected_error: Option<String>,
     }
 
     fn sha256_file_for_test(path: &Path) -> String {
@@ -1671,6 +1673,7 @@ mod tests {
             audio: input.audio,
             device: input.device,
             engine: input.engine,
+            expected_error: input.expected_error,
         })
     }
 
@@ -1815,10 +1818,28 @@ mod tests {
             false,
             None,
         );
+        let recovery_path = launch.recovery_path.clone();
+        let output_ass_path = launch.output_ass_path.clone();
         host.start(launch, gate.reserve().unwrap()).unwrap();
-        let snapshot = wait_terminal(&host, job_id);
+        let snapshot = wait_terminal_with_timeout(&host, job_id, Duration::from_secs(60));
         assert!(host.is_reaped(job_id));
         assert!(gate.current().is_none());
+        if engine != "qwen3-asr" && snapshot["status"] == "completed" {
+            let with_segments = host.snapshot(job_id, true).unwrap().unwrap();
+            assert_eq!(
+                with_segments["segments"].as_array().unwrap().len(),
+                with_segments["segmentCount"].as_u64().unwrap() as usize
+            );
+            let recovery: serde_json::Value =
+                serde_json::from_slice(&fs::read(recovery_path).unwrap()).unwrap();
+            assert_eq!(recovery["status"], "completed");
+            assert_eq!(recovery["segmentCount"], with_segments["segmentCount"]);
+            let ass = fs::read_to_string(output_ass_path).unwrap();
+            assert_eq!(
+                ass.matches("Dialogue:").count(),
+                with_segments["segmentCount"].as_u64().unwrap() as usize
+            );
+        }
         snapshot
     }
 
@@ -1943,7 +1964,11 @@ mod tests {
     }
 
     fn wait_terminal(host: &NativeAsrHost, job_id: &str) -> Value {
-        let deadline = Instant::now() + Duration::from_secs(8);
+        wait_terminal_with_timeout(host, job_id, Duration::from_secs(8))
+    }
+
+    fn wait_terminal_with_timeout(host: &NativeAsrHost, job_id: &str, timeout: Duration) -> Value {
+        let deadline = Instant::now() + timeout;
         loop {
             let snapshot = host.snapshot(job_id, true).unwrap().unwrap();
             if matches!(
@@ -2633,6 +2658,10 @@ mod tests {
             eprintln!("CrispASR worker/model/audio env not set; skipping real CrispASR host test");
             return;
         };
+        if inputs.expected_error.is_some() {
+            eprintln!("CrispASR input selects a policy-failure case; skipping success test");
+            return;
+        }
         let snapshot = run_crispasr_host_once(
             &inputs,
             &inputs.audio,
@@ -2648,9 +2677,39 @@ mod tests {
                 .starts_with("[qwen_timeline_policy_not_implemented]"));
             assert_eq!(snapshot["segmentCount"], 0);
         } else {
-            assert_eq!(snapshot["status"], "completed");
-            assert!(snapshot["segmentCount"].as_u64().unwrap() > 0);
+            assert_eq!(snapshot["status"], "completed", "{snapshot:#}");
+            assert!(
+                snapshot["segmentCount"].as_u64().unwrap() > 0,
+                "{snapshot:#}"
+            );
         }
+    }
+
+    #[test]
+    fn crispasr_policy_failure_has_zero_accepted_output_through_the_real_host() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = crispasr_worker_inputs() else {
+            return;
+        };
+        let Some(expected_error) = inputs.expected_error.clone() else {
+            eprintln!("CrispASR input selects a success case; skipping policy-failure test");
+            return;
+        };
+        let snapshot = run_crispasr_host_once(
+            &inputs,
+            &inputs.audio,
+            "production-crispasr-policy-failure",
+            &inputs.engine,
+            &inputs.device,
+        );
+        assert_eq!(snapshot["status"], "failed");
+        assert!(snapshot["error"]
+            .as_str()
+            .unwrap()
+            .starts_with(&format!("[{expected_error}]")));
+        assert_eq!(snapshot["segmentCount"], 0);
     }
 
     #[test]
@@ -2701,6 +2760,7 @@ mod tests {
         assert!(started.elapsed() <= Duration::from_secs(2));
         let snapshot = wait_terminal(&host, job_id);
         assert_eq!(snapshot["status"], "cancelled");
+        assert_eq!(snapshot["segmentCount"], 0);
         assert!(host.is_reaped(job_id));
         assert!(gate.current().is_none());
     }

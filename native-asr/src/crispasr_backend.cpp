@@ -244,6 +244,7 @@ struct CallbackContext {
   std::int64_t duration_ms = 0;
   std::int64_t last_progress_ms = 0;
   bool qwen = false;
+  bool observe_segments = false;
   std::vector<Segment> previews;
   std::exception_ptr error;
 };
@@ -273,7 +274,7 @@ void segment_callback(
     void* user_data) noexcept {
   auto& context = *static_cast<CallbackContext*>(user_data);
   try {
-    if (context.qwen) return;
+    if (context.qwen || !context.observe_segments) return;
     Segment segment;
     segment.text = copy_text(text, "crispasr_result_invalid");
     segment.start_ms = centiseconds_to_ms(t0_cs);
@@ -319,7 +320,12 @@ std::vector<NativeSegment> copy_source_segments(
       if (segment.text.empty() || segment.raw_start_ms < 0
           || segment.raw_end_ms <= segment.raw_start_ms
           || segment.raw_end_ms > duration_ms || segment.raw_start_ms < previous) {
-        throw BackendError("crispasr_result_invalid", "CrispASR final result is invalid");
+        throw BackendError(
+            "crispasr_result_invalid",
+            "CrispASR final result is invalid: segment=" + std::to_string(index)
+                + " startMs=" + std::to_string(segment.raw_start_ms)
+                + " endMs=" + std::to_string(segment.raw_end_ms)
+                + " durationMs=" + std::to_string(duration_ms));
       }
       previous = segment.raw_start_ms;
     }
@@ -380,6 +386,41 @@ std::string join_source_text(const std::vector<NativeSegment>& segments) {
   std::string output;
   for (const auto& segment : segments) output += segment.text;
   return output;
+}
+
+std::int64_t checked_offset(std::int64_t value, std::int64_t offset) {
+  if (value < 0 || offset < 0 || value > std::numeric_limits<std::int64_t>::max() - offset) {
+    throw BackendError("crispasr_result_invalid", "CrispASR window timing is invalid");
+  }
+  return value + offset;
+}
+
+void translate_window_result(
+    Result& result,
+    AudioWindow window,
+    std::int64_t audio_duration_ms) {
+  std::int64_t previous_segment_start = -1;
+  for (auto& segment : result.source_segments) {
+    segment.raw_start_ms = checked_offset(segment.raw_start_ms, window.start_ms);
+    segment.raw_end_ms = checked_offset(segment.raw_end_ms, window.start_ms);
+    if (segment.raw_start_ms < window.start_ms || segment.raw_end_ms <= segment.raw_start_ms
+        || segment.raw_end_ms > window.end_ms || segment.raw_end_ms > audio_duration_ms
+        || segment.raw_start_ms < previous_segment_start) {
+      throw BackendError("crispasr_result_invalid", "CrispASR window segment is invalid");
+    }
+    previous_segment_start = segment.raw_start_ms;
+    std::int64_t previous_word_start = -1;
+    for (auto& word : segment.words) {
+      word.start_ms = checked_offset(word.start_ms, window.start_ms);
+      word.end_ms = checked_offset(word.end_ms, window.start_ms);
+      if (word.start_ms < window.start_ms || word.end_ms < word.start_ms
+          || word.end_ms > window.end_ms || word.end_ms > audio_duration_ms
+          || word.start_ms < previous_word_start) {
+        throw BackendError("crispasr_result_invalid", "CrispASR window word is invalid");
+      }
+      previous_word_start = word.start_ms;
+    }
+  }
 }
 
 }  // namespace
@@ -517,13 +558,108 @@ class CrispAsrBackend::Impl {
     }
   }
 
+  Result transcribe_window(
+      AudioWindow window,
+      const ProgressCallback& on_progress,
+      const SegmentCallback& on_segment) {
+    if (window.start_ms < 0 || window.end_ms <= window.start_ms
+        || window.end_ms > audio.duration_ms || config.engine == Engine::Qwen3Asr) {
+      throw BackendError("crispasr_window_invalid", "CrispASR audio window is invalid");
+    }
+    const auto sample_for_ms = [](std::int64_t value) {
+      if (value > std::numeric_limits<std::int64_t>::max() / wav::sample_rate) {
+        throw BackendError("crispasr_window_invalid", "CrispASR audio window overflows");
+      }
+      return value * wav::sample_rate / 1000;
+    };
+    const std::int64_t start_sample = sample_for_ms(window.start_ms);
+    const std::int64_t end_sample = window.end_ms == audio.duration_ms
+        ? static_cast<std::int64_t>(audio.samples.size())
+        : sample_for_ms(window.end_ms);
+    if (start_sample < 0 || end_sample <= start_sample
+        || end_sample > static_cast<std::int64_t>(audio.samples.size())
+        || end_sample - start_sample > std::numeric_limits<int>::max()) {
+      throw BackendError("crispasr_window_invalid", "CrispASR audio window is invalid");
+    }
+    const std::int64_t window_duration = window.end_ms - window.start_ms;
+    CallbackContext context{
+        on_progress
+            ? ProgressCallback([&, on_progress](std::int64_t processed_ms) {
+                on_progress(std::clamp(
+                    checked_offset(processed_ms, window.start_ms),
+                    window.start_ms,
+                    window.end_ms));
+              })
+            : ProgressCallback{},
+        on_segment
+            ? SegmentCallback([&, on_segment](const Segment& source) {
+                Segment translated{
+                    checked_offset(source.start_ms, window.start_ms),
+                    checked_offset(source.end_ms, window.start_ms),
+                    source.text};
+                if (translated.start_ms < window.start_ms || translated.end_ms > window.end_ms) {
+                  throw BackendError("crispasr_result_invalid", "CrispASR window preview is invalid");
+                }
+                on_segment(translated);
+              })
+            : SegmentCallback{},
+        window_duration,
+        0,
+        false,
+        static_cast<bool>(on_segment),
+        {},
+        {}};
+    api.set_progress_callback(session, progress_callback, &context);
+    ++registered_callbacks;
+    api.set_segment_callback(session, segment_callback, &context);
+    ++registered_callbacks;
+
+    struct ResultFree {
+      const Api& api;
+      crispasr_session_result* value = nullptr;
+      ~ResultFree() { if (value) api.result_free(value); }
+    } result_free{api};
+    struct CallbackReset {
+      Impl& owner;
+      ~CallbackReset() {
+        if (owner.registered_callbacks >= 2) owner.api.set_segment_callback(owner.session, nullptr, nullptr);
+        if (owner.registered_callbacks >= 1) owner.api.set_progress_callback(owner.session, nullptr, nullptr);
+        owner.registered_callbacks = 0;
+      }
+    } reset{*this};
+
+    crispasr_session_result* raw_result = api.transcribe_lang(
+        session,
+        audio.samples.data() + start_sample,
+        static_cast<int>(end_sample - start_sample),
+        "ja");
+    result_free.value = raw_result;
+    if (context.error) std::rethrow_exception(context.error);
+    if (raw_result == nullptr) {
+      throw BackendError("crispasr_transcribe_failed", "CrispASR transcription failed");
+    }
+
+    Result result;
+    result.source_segments = copy_source_segments(
+        api,
+        raw_result,
+        window_duration,
+        false);
+    translate_window_result(result, window, audio.duration_ms);
+    return result;
+  }
+
   Result transcribe(const ProgressCallback& on_progress, const SegmentCallback& on_segment) {
+    if (config.engine != Engine::Qwen3Asr) {
+      return transcribe_window({0, audio.duration_ms}, on_progress, on_segment);
+    }
     CallbackContext context{
         on_progress,
         on_segment,
         audio.duration_ms,
         0,
-        config.engine == Engine::Qwen3Asr,
+        true,
+        false,
         {},
         {}};
     api.set_progress_callback(session, progress_callback, &context);
@@ -562,13 +698,9 @@ class CrispAsrBackend::Impl {
     }
 
     Result result;
-    result.source_segments = copy_source_segments(
-        api,
-        raw_result,
-        audio.duration_ms,
-        config.engine == Engine::Qwen3Asr);
+    result.source_segments = copy_source_segments(api, raw_result, audio.duration_ms, true);
 
-    if (config.engine == Engine::Qwen3Asr) {
+    {
       const std::string transcript = join_source_text(result.source_segments);
       if (transcript.empty()) {
         throw BackendError("crispasr_alignment_failed", "Qwen3-ASR produced no text to align");
@@ -611,6 +743,13 @@ Result CrispAsrBackend::transcribe(
     const ProgressCallback& on_progress,
     const SegmentCallback& on_segment) {
   return impl_->transcribe(on_progress, on_segment);
+}
+
+Result CrispAsrBackend::transcribe_window(
+    AudioWindow window,
+    const ProgressCallback& on_progress,
+    const SegmentCallback& on_segment) {
+  return impl_->transcribe_window(window, on_progress, on_segment);
 }
 
 }  // namespace hikaru_asr::crisp

@@ -313,7 +313,7 @@ Suggested slug: `native-asr-parakeet-reazon`
 Deliverables:
 
 - Route Parakeet JA Q8_0 and ReazonSpeech Q8_0 through the shared backend.
-- Validate native timestamps, subtitle segment size and short/medium/long coverage against T01 truth.
+- Validate native timestamps, subtitle segment size and the complete short-v1 / medium-v1 / long-v2 matrix against T01 truth for both engines; a single quality-gate failure does not truncate the remaining cases.
 - Use T09's `parakeet-family` development GPU path for repeated model-backed quality iteration whenever that family result is `development-gpu-ready`; CER, gap and segmentation failures stay on GPU. Reserve CPU runs for required regression/fallback evidence, final candidate gates, or a matching unavailable/no-speedup result.
 - Start from official/model-card/maintained community guidance; add only compensation demonstrated necessary by ground-truth failures.
 - Support final `segmentsReplace` when the selected pipeline performs a final correction; do not assume refresh is Parakeet-only. Current Reazon `>=60s` 45s/2s-overlap behavior is a diagnostic regression case, not a required native algorithm.
@@ -322,11 +322,13 @@ Depends on: T09.
 
 Exit criteria:
 
-- Each engine meets T01 user-reviewed absolute CER/RTF/resource budgets.
-- No confirmed speech gap `>=1.5s` and no invalid/out-of-bounds timeline.
+- ReazonSpeech and Parakeet each receive an independent, identity-bound `qualified` or `stop-revise` disposition from their reviewed candidate gate. T10 may complete after both frozen full matrices publish truthful independent dispositions, including `stop-revise` for both; a failed engine remains disabled and supplies no accepted downstream algorithm input.
+- Every engine marked `qualified` meets T01 user-reviewed absolute CER/RTF/resource budgets, has no confirmed speech gap `>=1.5s`, and has no invalid/out-of-bounds timeline; a `stop-revise` engine remains disabled and is not promoted downstream.
 - No Q4 Parakeet repeated-loop default is introduced.
 
 Rollback point: engines switch independently; one failure does not disable the other.
+
+T10 implementation handoff: `.trellis/tasks/08-13-native-asr-parakeet-reazon/research/t10-handoff.md`. Frozen R1/P1 both publish `stop-revise`: Reazon short/medium fail semantic-gap/CER gates and long-v2 has a complete `crispasr_result_invalid` trace; Parakeet short passes, medium fails CER/gaps, and long-v2 fails closed on text conservation. Neither supplies an accepted T14/T15 algorithm input, and Release/default remains Python legacy.
 
 #### T11 - Productize Qwen3 With ForcedAligner
 
@@ -336,6 +338,7 @@ Deliverables:
 
 - Treat Qwen3 1.7B Q4_K and ForcedAligner 0.6B Q4_K as one model product.
 - Select chunking/alignment/segmentation from official/model-card/maintained community guidance and ground-truth results; Python synthetic or refresh behavior is diagnostic only.
+- Complete the same frozen Qwen3 candidate across short-v1 / medium-v1 / long-v2 even when an earlier case fails a quality gate; publish the disposition only from the full matrix.
 - Use T09's `qwen3-family` development GPU path for repeated Qwen3/ForcedAligner quality iteration whenever that family result is `development-gpu-ready`; CER, gap and alignment failures stay on GPU. Reserve CPU runs for required regression/fallback evidence, final candidate gates, or a matching unavailable/no-speedup result.
 - Fail when alignment is missing/invalid; never synthesize timestamps.
 - Aggregate progress and allow a final `segmentsReplace` when required by the chosen pipeline.
@@ -431,7 +434,7 @@ Deliverables:
 - Implement capability probing and resolved routing for the rebuilt candidate packs. Engines with a qualified CPU route may fall back to CPU; ordinary faster-whisper proven GPU-required is unavailable/explained when qualified CUDA is absent.
 - Record T14 `stop-revise`/unbuilt candidates as omitted without attempting to route them.
 - Validate actual loaded modules and device execution rather than trusting a requested device string.
-- Run the applicable T01 short/medium/long engine matrix on explicit hardware/driver identities; preserve the same CER/timeline/gap/Qwen gates and require accelerated inference RTF `<=0.5`.
+- Run the applicable complete T01 short-v1 / medium-v1 / long-v2 matrix for every selected engine/model candidate on explicit hardware/driver identities; preserve the same CER/timeline/gap/Qwen gates, require accelerated inference RTF `<=0.5`, and continue later cases after any single quality-gate failure.
 - If a reviewed device branch activates T15, it owns the complete seven-model ordinary faster-whisper CUDA dispositions: `large-v3` and `large-v2` short/medium/long-v2 remain hard gates; archived long-v1 observations are historical only. The other five models receive measured `qualified`, `stop-revise` or `unsupported-for-native-release` results.
 - Verify pack-load/runtime failure produces one nonfatal notice: engines with a qualified CPU route retry that bundled CPU path without losing job/recovery semantics, while ordinary faster-whisper proven GPU-required becomes unavailable without launching its unqualified CPU route.
 - Publish an independent `qualified`, `stop-revise` or `omitted-no-candidate` decision for CUDA and Vulkan; no non-qualified pack blocks CPU cutover.
@@ -523,7 +526,7 @@ This task is a release gate, not a place to finish missing engine or GPU impleme
 
 Deliverables:
 
-- Run the complete five-engine short/medium/long authoritative matrix on every selected publishable device; publish absolute quality/performance/resource results plus optional Python diagnostics.
+- Run the complete five-engine short-v1 / medium-v1 / long-v2 authoritative matrix on every selected publishable device; no single quality-gate failure truncates the remaining cases, and publication includes absolute quality/performance/resource results plus optional Python diagnostics.
 - Verify cancel, crash, recovery, qualified CPU fallback or GPU-required unavailability, offline cached-model use, installed and portable behavior.
 - Switch production packaging/default routes only for qualified engines and packs; stop bundling Python sidecar/runtime/venv.
 - Freeze a complete source/dependency/compiler/algorithm-config input lock, rebuild and attest the final immutable CPU runtime from accepted engine identities, and re-verify every publishable GPU artifact matches the exact T15-qualified hash; then verify setup/portable/runtime sizes, third-party licenses and zero bundled model weights while CUDA/Vulkan remain external packs.

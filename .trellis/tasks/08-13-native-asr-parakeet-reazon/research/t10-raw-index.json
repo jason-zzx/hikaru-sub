@@ -1,0 +1,114 @@
+{
+  "entries": [
+    {
+      "caseId": "short-v1",
+      "engine": "reazonspeech-nemo",
+      "relativeRawIdentifier": "raw/reazonspeech-nemo/short-v1/cold-0.json",
+      "repeatIndex": 0,
+      "runKind": "cold",
+      "sha256": "14b17c4cc029ef5b3fe6f69b11d47472a929e5a818f04398cd0eec6aeae320b8",
+      "sizeBytes": 45436
+    },
+    {
+      "caseId": "short-v1",
+      "engine": "reazonspeech-nemo",
+      "relativeRawIdentifier": "raw/reazonspeech-nemo/short-v1/warm-1.json",
+      "repeatIndex": 1,
+      "runKind": "warm",
+      "sha256": "52d02954a1f35cd283ff004635d090518e12ddd51fa2c86e880b3a6644c7b4b5",
+      "sizeBytes": 45438
+    },
+    {
+      "caseId": "short-v1",
+      "engine": "reazonspeech-nemo",
+      "relativeRawIdentifier": "raw/reazonspeech-nemo/short-v1/warm-2.json",
+      "repeatIndex": 2,
+      "runKind": "warm",
+      "sha256": "ffd852ea36731b4b26cb110d8beaa031dbde99085ab63c5f6553ae1df4f95224",
+      "sizeBytes": 45437
+    },
+    {
+      "caseId": "short-v1",
+      "engine": "reazonspeech-nemo",
+      "relativeRawIdentifier": "raw/reazonspeech-nemo/short-v1/warm-3.json",
+      "repeatIndex": 3,
+      "runKind": "warm",
+      "sha256": "93e1042834d62c3361817b2396ed7fde028d91770e72c7d0dcddc9dfb98dfd9d",
+      "sizeBytes": 45437
+    },
+    {
+      "caseId": "medium-v1",
+      "engine": "reazonspeech-nemo",
+      "relativeRawIdentifier": "raw/reazonspeech-nemo/medium-v1/measured-0.json",
+      "repeatIndex": 0,
+      "runKind": "measured",
+      "sha256": "1da27fe19337aab62af990b53bb016dd13afd404f42601151396495531b2d5a4",
+      "sizeBytes": 191807
+    },
+    {
+      "caseId": "long-v2",
+      "engine": "reazonspeech-nemo",
+      "relativeRawIdentifier": "raw/reazonspeech-nemo/long-v2/measured-0.json",
+      "repeatIndex": 0,
+      "runKind": "measured",
+      "sha256": "2a80b258a661c1c83993c7caf3eac96ff3dfee0471a256905ef09c787b0c21b9",
+      "sizeBytes": 126944
+    },
+    {
+      "caseId": "short-v1",
+      "engine": "parakeet",
+      "relativeRawIdentifier": "raw/parakeet/short-v1/cold-0.json",
+      "repeatIndex": 0,
+      "runKind": "cold",
+      "sha256": "a8c15925e6fe34408e85f971dc9e573291b24d5ff3058ba1c9d830e03bbe5510",
+      "sizeBytes": 46232
+    },
+    {
+      "caseId": "short-v1",
+      "engine": "parakeet",
+      "relativeRawIdentifier": "raw/parakeet/short-v1/warm-1.json",
+      "repeatIndex": 1,
+      "runKind": "warm",
+      "sha256": "6d38d54436e2a7d1649c897faee2233b4017c4b105953b6d597a354071143f6e",
+      "sizeBytes": 46232
+    },
+    {
+      "caseId": "short-v1",
+      "engine": "parakeet",
+      "relativeRawIdentifier": "raw/parakeet/short-v1/warm-2.json",
+      "repeatIndex": 2,
+      "runKind": "warm",
+      "sha256": "a159c3b6490e130cd085beea8c5f8f62a8422e44eb3ac2b5f9280bb3c9e2e9f9",
+      "sizeBytes": 46233
+    },
+    {
+      "caseId": "short-v1",
+      "engine": "parakeet",
+      "relativeRawIdentifier": "raw/parakeet/short-v1/warm-3.json",
+      "repeatIndex": 3,
+      "runKind": "warm",
+      "sha256": "1e813bc1805238ceb43c09de88c78b56f0bf4e368b2fc9e7cda48c16415ebc97",
+      "sizeBytes": 46233
+    },
+    {
+      "caseId": "medium-v1",
+      "engine": "parakeet",
+      "relativeRawIdentifier": "raw/parakeet/medium-v1/measured-0.json",
+      "repeatIndex": 0,
+      "runKind": "measured",
+      "sha256": "ce8ef8eec1c351bfcd0dec8877c75bf8bd08b1173b31c69671f816d3e9e74af1",
+      "sizeBytes": 195464
+    },
+    {
+      "caseId": "long-v2",
+      "engine": "parakeet",
+      "relativeRawIdentifier": "raw/parakeet/long-v2/measured-0.json",
+      "repeatIndex": 0,
+      "runKind": "measured",
+      "sha256": "650eb7cabcee11193eecb0238f4cd84ea12bd8b7cf0e6d4e50172af11d353d78",
+      "sizeBytes": 1362997
+    }
+  ],
+  "frozen": true,
+  "schema": "hikaru-t10-raw-index-v1"
+}

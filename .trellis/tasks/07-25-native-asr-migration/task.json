@@ -28,7 +28,8 @@
     "08-04-native-asr-ctranslate2-cuda-development",
     "08-05-native-asr-kotoba-compatibility",
     "08-06-crispasr-long-v2-correction",
-    "08-07-native-asr-crispasr-backend"
+    "08-07-native-asr-crispasr-backend",
+    "08-13-native-asr-parakeet-reazon"
   ],
   "parent": null,
   "relatedFiles": [],
