@@ -453,6 +453,41 @@ struct PendingCompleted {
     detected_language: String,
 }
 
+#[cfg(test)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum TestWorkerEventKind {
+    Ready,
+    Progress,
+    Segment,
+    SegmentsReplace,
+    Completed,
+    Error,
+}
+
+#[cfg(test)]
+impl TestWorkerEventKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Progress => "progress",
+            Self::Segment => "segment",
+            Self::SegmentsReplace => "segmentsReplace",
+            Self::Completed => "completed",
+            Self::Error => "error",
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct TestWorkerTrace {
+    event_kinds: Vec<TestWorkerEventKind>,
+    ready_duration_ms: Option<i64>,
+    progress_ms: Vec<i64>,
+    segment_events: usize,
+    replacement_events: usize,
+}
+
 struct NativeAsrJob {
     snapshot: AsrJobSnapshot,
     pid: Option<u32>,
@@ -470,6 +505,8 @@ struct NativeAsrJob {
     max_segments: usize,
     recovery_path: PathBuf,
     output_ass_path: PathBuf,
+    #[cfg(test)]
+    test_trace: TestWorkerTrace,
 }
 
 struct JobRecord {
@@ -507,6 +544,8 @@ impl JobRecord {
                 max_segments,
                 recovery_path: launch.recovery_path.clone(),
                 output_ass_path: launch.output_ass_path.clone(),
+                #[cfg(test)]
+                test_trace: TestWorkerTrace::default(),
             }),
             reaped: Condvar::new(),
         }
@@ -853,6 +892,21 @@ impl NativeAsrHost {
             .and_then(|record| record.inner.lock().ok().map(|job| job.reaped))
             .unwrap_or(false)
     }
+
+    #[cfg(test)]
+    fn event_trace(&self, job_id: &str) -> TestWorkerTrace {
+        self.inner
+            .jobs
+            .lock()
+            .unwrap()
+            .get(job_id)
+            .unwrap()
+            .inner
+            .lock()
+            .unwrap()
+            .test_trace
+            .clone()
+    }
 }
 
 #[derive(Serialize)]
@@ -1163,6 +1217,8 @@ fn apply_worker_event(
 
     match event {
         WorkerEvent::Error { code, message } => {
+            #[cfg(test)]
+            job.test_trace.event_kinds.push(TestWorkerEventKind::Error);
             job.worker_terminal_seen = true;
             job.worker_error_code = Some(code.clone());
             let snapshot = commit_terminal_locked(
@@ -1188,6 +1244,11 @@ fn apply_worker_event(
                     "ready_route_mismatch",
                     "Worker ready route differs from the request",
                 ));
+            }
+            #[cfg(test)]
+            {
+                job.test_trace.event_kinds.push(TestWorkerEventKind::Ready);
+                job.test_trace.ready_duration_ms = Some(duration_ms);
             }
             job.ready = true;
             job.snapshot.status = AsrJobStatus::Running;
@@ -1218,6 +1279,13 @@ fn apply_worker_event(
                 ));
             }
             job.worker_processed_ms = processed_ms;
+            #[cfg(test)]
+            {
+                job.test_trace
+                    .event_kinds
+                    .push(TestWorkerEventKind::Progress);
+                job.test_trace.progress_ms.push(processed_ms);
+            }
             advance_product_progress(&mut job.snapshot, processed_ms);
             Ok(PersistAction::None)
         }
@@ -1230,6 +1298,13 @@ fn apply_worker_event(
                 ));
             }
             validate_segment_sequence(&job, &segment)?;
+            #[cfg(test)]
+            {
+                job.test_trace
+                    .event_kinds
+                    .push(TestWorkerEventKind::Segment);
+                job.test_trace.segment_events += 1;
+            }
             job.last_segment_start_ms = segment.start_ms;
             let end_ms = segment.end_ms;
             job.snapshot.segments.push(segment);
@@ -1249,6 +1324,13 @@ fn apply_worker_event(
                         "Replacement segment exceeds ready duration",
                     ));
                 }
+            }
+            #[cfg(test)]
+            {
+                job.test_trace
+                    .event_kinds
+                    .push(TestWorkerEventKind::SegmentsReplace);
+                job.test_trace.replacement_events += 1;
             }
             let last_start = segments
                 .last()
@@ -1279,6 +1361,10 @@ fn apply_worker_event(
                     "Worker completed duration differs from ready",
                 ));
             }
+            #[cfg(test)]
+            job.test_trace
+                .event_kinds
+                .push(TestWorkerEventKind::Completed);
             job.worker_terminal_seen = true;
             job.pending_completed = Some(PendingCompleted {
                 duration_ms,
@@ -1553,7 +1639,12 @@ pub(crate) fn native_job_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
     use tempfile::TempDir;
+
+    const R2_STEP6_MANIFEST_SHA256: &str =
+        "aa28e40c65c029c2c7c651121606f9334daddf21ee839c59954455d3bb5bb33c";
+    const R2_STEP6_CANDIDATE: &str = "R2-vad12-pad30-overlap-top-level-v1";
 
     fn fake_worker() -> Option<PathBuf> {
         let path = std::env::var_os("HIKARU_ASR_FAKE_WORKER").map(PathBuf::from)?;
@@ -1581,6 +1672,26 @@ mod tests {
         expected_error: Option<String>,
     }
 
+    struct R2Step6Inputs {
+        lane_id: String,
+        worker: PathBuf,
+        model: PathBuf,
+        vad: PathBuf,
+        runtime_dlls: Vec<PathBuf>,
+        audio: PathBuf,
+        device: String,
+        engine: String,
+        stage_vad: bool,
+        expected_status: String,
+        expected_error: Option<String>,
+        expected_duration_ms: i64,
+        expected_ready: bool,
+        expected_event_kinds: Vec<String>,
+        event_kinds_mode: String,
+        expected_progress_ms: Vec<i64>,
+        progress_mode: String,
+    }
+
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct LockedCrispAsrPath {
@@ -1600,6 +1711,54 @@ mod tests {
         device: String,
         engine: String,
         expected_error: Option<String>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct R2Step6Expected {
+        status: String,
+        error_code: Option<String>,
+        duration_ms: i64,
+        ready: bool,
+        event_kinds: Vec<String>,
+        event_kinds_mode: String,
+        progress_ms: Vec<i64>,
+        progress_mode: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct R2Step6Lane {
+        kind: String,
+        worker: String,
+        model: String,
+        aligner: Option<String>,
+        vad: String,
+        runtime_dlls: Vec<String>,
+        audio: String,
+        device: String,
+        engine: String,
+        stage_vad: bool,
+        expected: R2Step6Expected,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct R2Step6Manifest {
+        schema_version: u64,
+        candidate_id: String,
+        artifacts: BTreeMap<String, LockedCrispAsrPath>,
+        lanes: BTreeMap<String, R2Step6Lane>,
+    }
+
+    fn assert_r2_step6_lane_identity(lane_id: &str, kind: &str, aligner: Option<&str>) {
+        assert_eq!(kind, lane_id, "Step 6 lane kind/id drift");
+        assert!(aligner.is_none(), "R2 Step 6 does not accept an aligner");
+    }
+
+    fn sha256_bytes_for_test(bytes: &[u8]) -> String {
+        use sha2::{Digest, Sha256};
+        hex::encode(Sha256::digest(bytes))
     }
 
     fn sha256_file_for_test(path: &Path) -> String {
@@ -1674,6 +1833,157 @@ mod tests {
             device: input.device,
             engine: input.engine,
             expected_error: input.expected_error,
+        })
+    }
+
+    fn r2_step6_inputs() -> Option<R2Step6Inputs> {
+        let manifest_path = std::env::var_os("HIKARU_ASR_R2_STEP6_MANIFEST").map(PathBuf::from);
+        let required = std::env::var_os("HIKARU_ASR_R2_STEP6_REQUIRED");
+        let lane_id = std::env::var("HIKARU_ASR_R2_STEP6_LANE").ok();
+        let Some(manifest_path) = manifest_path else {
+            assert!(
+                required.is_none() && lane_id.is_none(),
+                "required R2 Step 6 mode needs HIKARU_ASR_R2_STEP6_MANIFEST"
+            );
+            return None;
+        };
+        assert_eq!(
+            required.as_deref(),
+            Some(std::ffi::OsStr::new("1")),
+            "R2 Step 6 inputs require HIKARU_ASR_R2_STEP6_REQUIRED=1"
+        );
+        let lane_id = lane_id.expect("HIKARU_ASR_R2_STEP6_LANE is required");
+        let bytes = fs::read(&manifest_path).expect("R2 Step 6 manifest cannot be read");
+        assert_eq!(
+            sha256_bytes_for_test(&bytes),
+            R2_STEP6_MANIFEST_SHA256,
+            "R2 Step 6 manifest identity drift"
+        );
+        let manifest: R2Step6Manifest =
+            serde_json::from_slice(&bytes).expect("R2 Step 6 manifest is invalid");
+        assert_eq!(manifest.schema_version, 1, "invalid Step 6 manifest schema");
+        assert_eq!(
+            manifest.candidate_id, R2_STEP6_CANDIDATE,
+            "Step 6 candidate identity drift"
+        );
+        assert_eq!(
+            manifest
+                .lanes
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec![
+                "cancellation",
+                "post-ready-policy",
+                "post-ready-protocol",
+                "post-ready-vad",
+                "pre-ready-negative",
+                "success",
+            ],
+            "Step 6 lane set drift"
+        );
+        let lane = manifest
+            .lanes
+            .get(&lane_id)
+            .unwrap_or_else(|| panic!("unknown R2 Step 6 lane: {lane_id}"));
+        assert_eq!(lane.engine, "reazonspeech-nemo", "Step 6 engine drift");
+        let expected_device = match lane_id.as_str() {
+            "post-ready-policy" | "post-ready-protocol" => "cpu",
+            _ => "cuda",
+        };
+        assert_eq!(lane.device, expected_device, "Step 6 device drift");
+        assert_r2_step6_lane_identity(&lane_id, &lane.kind, lane.aligner.as_deref());
+        assert!(
+            matches!(
+                lane.expected.status.as_str(),
+                "completed" | "failed" | "cancelled"
+            ),
+            "invalid Step 6 expected status"
+        );
+        assert!(
+            matches!(lane.expected.event_kinds_mode.as_str(), "exact" | "prefix")
+                && matches!(lane.expected.progress_mode.as_str(), "exact" | "prefix"),
+            "invalid Step 6 expectation mode"
+        );
+
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("repository root missing")
+            .canonicalize()
+            .expect("repository root cannot be canonicalized");
+        let resolve = |role: &str| {
+            let locked = manifest
+                .artifacts
+                .get(role)
+                .unwrap_or_else(|| panic!("missing Step 6 artifact role: {role}"));
+            assert!(
+                locked.path.is_relative()
+                    && !locked
+                        .path
+                        .components()
+                        .any(|part| matches!(part, std::path::Component::ParentDir)),
+                "Step 6 artifact paths must be safe repository-relative paths"
+            );
+            let path = repo_root.join(&locked.path);
+            let canonical = path
+                .canonicalize()
+                .unwrap_or_else(|_| panic!("Step 6 artifact is missing: {role}"));
+            assert!(
+                canonical.starts_with(&repo_root) && canonical.is_file(),
+                "Step 6 artifact escaped the repository or is not a file: {role}"
+            );
+            assert_eq!(
+                fs::metadata(&canonical).unwrap().len(),
+                locked.size_bytes,
+                "Step 6 artifact size drift: {role}"
+            );
+            assert_eq!(
+                sha256_file_for_test(&canonical),
+                locked.sha256.to_ascii_lowercase(),
+                "Step 6 artifact hash drift: {role}"
+            );
+            canonical
+        };
+        let worker = resolve(&lane.worker);
+        let model = resolve(&lane.model);
+        let vad = resolve(&lane.vad);
+        let audio = resolve(&lane.audio);
+        let runtime_dlls = lane
+            .runtime_dlls
+            .iter()
+            .map(|role| {
+                let path = resolve(role);
+                assert!(
+                    path.extension()
+                        .and_then(|value| value.to_str())
+                        .is_some_and(|value| value.eq_ignore_ascii_case("dll")),
+                    "Step 6 runtime artifact must be a DLL: {role}"
+                );
+                path
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            !runtime_dlls.is_empty(),
+            "R2 Step 6 host lanes require locked runtime dependencies"
+        );
+        Some(R2Step6Inputs {
+            lane_id,
+            worker,
+            model,
+            vad,
+            runtime_dlls,
+            audio,
+            device: lane.device.clone(),
+            engine: lane.engine.clone(),
+            stage_vad: lane.stage_vad,
+            expected_status: lane.expected.status.clone(),
+            expected_error: lane.expected.error_code.clone(),
+            expected_duration_ms: lane.expected.duration_ms,
+            expected_ready: lane.expected.ready,
+            expected_event_kinds: lane.expected.event_kinds.clone(),
+            event_kinds_mode: lane.expected.event_kinds_mode.clone(),
+            expected_progress_ms: lane.expected.progress_ms.clone(),
+            progress_mode: lane.expected.progress_mode.clone(),
         })
     }
 
@@ -1798,6 +2108,41 @@ mod tests {
         models
     }
 
+    fn r2_step6_models(inputs: &R2Step6Inputs) -> Vec<(String, PathBuf)> {
+        vec![("model".into(), inputs.model.clone())]
+    }
+
+    fn assert_ass_dialogues_match_replacement(path: &Path, segments: &Value) {
+        let dialogues = fs::read_to_string(path)
+            .unwrap()
+            .lines()
+            .filter(|line| line.starts_with("Dialogue:"))
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let expected = segments
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|segment| {
+                let body = segment["text"]
+                    .as_str()
+                    .unwrap()
+                    .replace("\r\n", "\\N")
+                    .replace(['\r', '\n'], "\\N");
+                format!(
+                    "Dialogue: 0,{},{},Primary,,0,0,0,,{}",
+                    format_ass_time(segment["startMs"].as_i64().unwrap()),
+                    format_ass_time(segment["endMs"].as_i64().unwrap()),
+                    body
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            dialogues, expected,
+            "ASS dialogue order/duplicates differ from the final replacement"
+        );
+    }
+
     fn run_crispasr_host_once(
         inputs: &CrispAsrWorkerInputs,
         source_audio: &Path,
@@ -1843,6 +2188,55 @@ mod tests {
         snapshot
     }
 
+    fn write_silent_pcm16_wav(path: &Path, duration_ms: u32) {
+        let sample_count = duration_ms * 16;
+        let data_bytes = sample_count * 2;
+        let mut wav = Vec::with_capacity(44 + data_bytes as usize);
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36 + data_bytes).to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&16_000u32.to_le_bytes());
+        wav.extend_from_slice(&32_000u32.to_le_bytes());
+        wav.extend_from_slice(&2u16.to_le_bytes());
+        wav.extend_from_slice(&16u16.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&data_bytes.to_le_bytes());
+        wav.resize(44 + data_bytes as usize, 0);
+        fs::write(path, wav).unwrap();
+    }
+
+    fn prepared_r2_step6_worker(
+        temp: &TempDir,
+        inputs: &R2Step6Inputs,
+        include_vad: bool,
+        corrupt_vad: bool,
+    ) -> PathBuf {
+        let directory = temp.path().join("crispasr-worker");
+        fs::create_dir_all(&directory).unwrap();
+        let stage = |source: &Path| {
+            let target = directory.join(source.file_name().unwrap());
+            let _ = fs::remove_file(&target);
+            if fs::hard_link(source, &target).is_err() {
+                fs::copy(source, target).unwrap();
+            }
+        };
+        let worker_name = inputs.worker.file_name().unwrap();
+        stage(&inputs.worker);
+        for source in &inputs.runtime_dlls {
+            stage(source);
+        }
+        let vad_target = directory.join("ggml-silero-v6.2.0.bin");
+        if corrupt_vad {
+            fs::write(vad_target, b"corrupt").unwrap();
+        } else if include_vad {
+            fs::copy(&inputs.vad, vad_target).unwrap();
+        }
+        directory.join(worker_name)
+    }
+
     fn production_launch(
         temp: &TempDir,
         job_id: &str,
@@ -1877,6 +2271,18 @@ mod tests {
                 None => std::env::remove_var(self.key),
             }
         }
+    }
+
+    fn replace_env(key: &'static str, value: Option<&str>) -> EnvVarGuard {
+        let guard = EnvVarGuard {
+            key,
+            previous: std::env::var_os(key),
+        };
+        match value {
+            Some(value) => std::env::set_var(key, value),
+            None => std::env::remove_var(key),
+        }
+        guard
     }
 
     fn restricted_cuda_path(worker: &Path) -> EnvVarGuard {
@@ -1946,6 +2352,30 @@ mod tests {
         .unwrap()
     }
 
+    fn crispasr_fixture_launch(temp: &TempDir, job_id: &str) -> ResolvedNativeLaunch {
+        let cache = temp.path().join("cache");
+        let workspace = cache.join("workspace").join("job");
+        let output = temp.path().join("output");
+        let model = temp.path().join("model.gguf");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        fs::write(workspace.join("audio.wav"), b"fake").unwrap();
+        fs::write(&model, b"fake").unwrap();
+        ResolvedNativeLaunch::resolve(
+            job_id.into(),
+            "reazonspeech-nemo".into(),
+            vec![("model".into(), model)],
+            "cpu".into(),
+            "ja".into(),
+            workspace.join("audio.wav"),
+            output.join("result.ass"),
+            &cache,
+            false,
+            None,
+        )
+        .unwrap()
+    }
+
     fn job_record(launch: &ResolvedNativeLaunch, pid: u32) -> JobRecord {
         JobRecord::new(
             launch,
@@ -1981,6 +2411,142 @@ mod tests {
             assert!(Instant::now() < deadline, "job {job_id} did not terminate");
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    fn assert_expected_sequence<T: PartialEq + std::fmt::Debug>(
+        actual: &[T],
+        expected: &[T],
+        mode: &str,
+        label: &str,
+    ) {
+        match mode {
+            "exact" => assert_eq!(actual, expected, "{label} sequence drift"),
+            "prefix" => assert!(
+                actual.starts_with(expected),
+                "{label} prefix drift: actual={actual:?} expected={expected:?}"
+            ),
+            _ => panic!("invalid {label} comparison mode: {mode}"),
+        }
+    }
+
+    fn assert_strict_r2_success_order(trace: &TestWorkerTrace) {
+        assert_eq!(
+            trace.event_kinds.first(),
+            Some(&TestWorkerEventKind::Ready),
+            "R2 success did not start with ready"
+        );
+        assert_eq!(
+            trace.event_kinds.last(),
+            Some(&TestWorkerEventKind::Completed),
+            "R2 success did not end with completed"
+        );
+        let replacement = trace
+            .event_kinds
+            .iter()
+            .position(|kind| *kind == TestWorkerEventKind::SegmentsReplace)
+            .expect("R2 success did not emit a replacement");
+        assert_eq!(
+            replacement + 2,
+            trace.event_kinds.len(),
+            "R2 replacement was not immediately followed by completed"
+        );
+        assert!(
+            trace.event_kinds[1..replacement]
+                .iter()
+                .all(|kind| *kind == TestWorkerEventKind::Progress),
+            "R2 success emitted a non-progress event before replacement"
+        );
+        assert!(replacement > 1, "R2 success emitted no progress events");
+    }
+
+    #[test]
+    #[should_panic(expected = "R2 Step 6 does not accept an aligner")]
+    fn r2_step6_manifest_rejects_aligner() {
+        assert_r2_step6_lane_identity("success", "success", Some("aligner"));
+    }
+
+    #[test]
+    fn required_crispasr_mode_never_skips_a_missing_manifest() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let _required = replace_env("HIKARU_ASR_R2_STEP6_REQUIRED", Some("1"));
+        let _manifest = replace_env("HIKARU_ASR_R2_STEP6_MANIFEST", None);
+        let _lane = replace_env("HIKARU_ASR_R2_STEP6_LANE", Some("success"));
+        assert!(
+            std::panic::catch_unwind(r2_step6_inputs).is_err(),
+            "required R2 Step 6 mode silently skipped a missing manifest"
+        );
+    }
+
+    #[test]
+    fn generic_crispasr_parakeet_and_qwen_inputs_remain_decodable() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let worker = temp.path().join("worker.exe");
+        let audio = temp.path().join("audio.wav");
+        let model = temp.path().join("model.gguf");
+        let aligner = temp.path().join("aligner.gguf");
+        for path in [&worker, &audio, &model, &aligner] {
+            fs::write(path, path.file_name().unwrap().to_string_lossy().as_bytes()).unwrap();
+        }
+        let locked = |path: &Path| {
+            serde_json::json!({
+                "path": path,
+                "sizeBytes": fs::metadata(path).unwrap().len(),
+                "sha256": sha256_file_for_test(path),
+            })
+        };
+        for (engine, aligner_value) in [("parakeet", Value::Null), ("qwen3-asr", locked(&aligner))]
+        {
+            let input_path = temp.path().join(format!("{engine}.json"));
+            fs::write(
+                &input_path,
+                serde_json::to_vec(&serde_json::json!({
+                    "worker": worker,
+                    "model": locked(&model),
+                    "aligner": aligner_value,
+                    "audio": audio,
+                    "cancelAudio": null,
+                    "device": "cuda",
+                    "engine": engine,
+                    "expectedError": null,
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            let _inputs = replace_env(
+                "HIKARU_ASR_CRISPASR_INPUTS",
+                Some(input_path.to_str().unwrap()),
+            );
+            let decoded = crispasr_worker_inputs().expect("generic CrispASR input skipped");
+            assert_eq!(decoded.engine, engine);
+            assert_eq!(decoded.aligner.is_some(), engine == "qwen3-asr");
+        }
+    }
+
+    #[test]
+    fn r2_step6_inputs_cannot_replace_or_cross_authorize_generic_crispasr_inputs() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let generic = temp.path().join("generic.json");
+        fs::write(&generic, b"{}").unwrap();
+        let _generic = replace_env("HIKARU_ASR_CRISPASR_INPUTS", None);
+        let _manifest = replace_env(
+            "HIKARU_ASR_R2_STEP6_MANIFEST",
+            Some(generic.to_str().unwrap()),
+        );
+        let _required = replace_env("HIKARU_ASR_R2_STEP6_REQUIRED", Some("1"));
+        let _lane = replace_env("HIKARU_ASR_R2_STEP6_LANE", Some("success"));
+        assert!(crispasr_worker_inputs().is_none());
+        assert!(
+            std::panic::catch_unwind(r2_step6_inputs).is_err(),
+            "generic bytes cross-authorized R2 Step 6"
+        );
     }
 
     #[test]
@@ -2330,6 +2896,204 @@ mod tests {
     }
 
     #[test]
+    fn post_ready_protocol_failure_keeps_reazon_output_atomic() {
+        let _guard = FAKE_WORKER_TEST_LOCK.lock().unwrap();
+        let Some(worker) = fake_worker() else {
+            eprintln!("HIKARU_ASR_FAKE_WORKER not set; skipping Reazon protocol failure test");
+            return;
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let job_id = "reazon-protocol-failure";
+        let gate = Arc::new(ActiveJobGate::default());
+        let host = host_for(&worker, "invalid-segment", Arc::clone(&gate));
+        let launch = crispasr_fixture_launch(&temp, job_id);
+        let recovery = launch.recovery_path.clone();
+        let output = launch.output_ass_path.clone();
+        host.start(launch, gate.reserve().unwrap()).unwrap();
+        let snapshot = wait_terminal(&host, job_id);
+        let trace = host.event_trace(job_id);
+        let recovered: Value = serde_json::from_slice(&fs::read(recovery).unwrap()).unwrap();
+        assert_eq!(snapshot["status"], "failed");
+        assert!(snapshot["error"]
+            .as_str()
+            .unwrap()
+            .starts_with("[invalid_segment]"));
+        assert_eq!(snapshot["segmentCount"], 0);
+        assert_eq!(trace.segment_events, 0);
+        assert_eq!(trace.replacement_events, 0);
+        assert_eq!(recovered["segments"].as_array().unwrap().len(), 0);
+        assert!(!output.exists());
+        assert!(gate.current().is_none());
+    }
+
+    #[test]
+    fn r2_step6_real_worker_lane() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = r2_step6_inputs() else {
+            eprintln!("R2 Step 6 manifest env not set; skipping explicit real-worker lane");
+            return;
+        };
+        let temp = tempfile::tempdir().unwrap();
+        let gate = Arc::new(ActiveJobGate::default());
+        let worker = prepared_r2_step6_worker(&temp, &inputs, inputs.stage_vad, false);
+        let host = NativeAsrHost::new(worker, vec![], Arc::clone(&gate)).unwrap();
+        let job_id = format!("r2-step6-{}", inputs.lane_id);
+        let launch = model_backed_launch(
+            &temp,
+            &job_id,
+            &inputs.engine,
+            r2_step6_models(&inputs),
+            &inputs.audio,
+            &inputs.device,
+            false,
+            None,
+        );
+        let recovery = launch.recovery_path.clone();
+        let output = launch.output_ass_path.clone();
+        host.start(launch, gate.reserve().unwrap()).unwrap();
+
+        let mut cancellation_elapsed_ms = None;
+        if inputs.lane_id == "cancellation" {
+            let deadline = Instant::now() + Duration::from_secs(120);
+            loop {
+                let snapshot = host.snapshot(&job_id, false).unwrap().unwrap();
+                let trace = host.event_trace(&job_id);
+                if trace.ready_duration_ms.is_some()
+                    && !trace.progress_ms.is_empty()
+                    && snapshot["status"] == "running"
+                {
+                    break;
+                }
+                assert!(
+                    matches!(snapshot["status"].as_str(), Some("pending" | "running")),
+                    "R2 cancellation lane terminated before cancellation: {snapshot}"
+                );
+                assert!(
+                    Instant::now() < deadline,
+                    "R2 cancellation lane did not reach positive progress"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let started = Instant::now();
+            host.cancel(&job_id).unwrap();
+            let elapsed = started.elapsed();
+            assert!(elapsed <= TERMINATION_TIMEOUT);
+            cancellation_elapsed_ms = Some(elapsed.as_millis());
+        }
+
+        let snapshot = wait_terminal_with_timeout(&host, &job_id, Duration::from_secs(180));
+        let trace = host.event_trace(&job_id);
+        let actual_event_kinds = trace
+            .event_kinds
+            .iter()
+            .map(TestWorkerEventKind::as_str)
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        assert_expected_sequence(
+            &actual_event_kinds,
+            &inputs.expected_event_kinds,
+            &inputs.event_kinds_mode,
+            "event kind",
+        );
+        assert_expected_sequence(
+            &trace.progress_ms,
+            &inputs.expected_progress_ms,
+            &inputs.progress_mode,
+            "progress",
+        );
+        assert_eq!(snapshot["status"], inputs.expected_status);
+        assert_eq!(snapshot["durationMs"], inputs.expected_duration_ms);
+        if inputs.expected_ready {
+            assert_eq!(trace.ready_duration_ms, Some(inputs.expected_duration_ms));
+            assert!(
+                trace.ready_duration_ms.unwrap_or(0) > 0,
+                "claimed post-ready lane did not have a positive ready duration"
+            );
+            assert_eq!(
+                trace.event_kinds.first(),
+                Some(&TestWorkerEventKind::Ready),
+                "claimed post-ready lane did not start with ready"
+            );
+        } else {
+            assert_eq!(trace.ready_duration_ms, None);
+        }
+        match inputs.expected_error.as_deref() {
+            Some(code) => assert!(
+                snapshot["error"]
+                    .as_str()
+                    .is_some_and(|error| error.starts_with(&format!("[{code}]"))),
+                "Step 6 error code drift: {}",
+                snapshot["error"]
+            ),
+            None => assert!(snapshot["error"].is_null()),
+        }
+        assert_eq!(trace.segment_events, 0, "raw preview reached the host");
+
+        let recovered: Value = serde_json::from_slice(&fs::read(&recovery).unwrap()).unwrap();
+        assert_eq!(recovered["status"], snapshot["status"]);
+        let ass_matches_replacement = if inputs.lane_id == "success" {
+            assert_strict_r2_success_order(&trace);
+            assert_eq!(trace.replacement_events, 1);
+            assert_eq!(snapshot["processedMs"], inputs.expected_duration_ms);
+            assert_eq!(snapshot["progress"], 1.0);
+            assert!(snapshot["segmentCount"].as_u64().unwrap() > 0);
+            assert_eq!(recovered["segments"], snapshot["segments"]);
+            assert_ass_dialogues_match_replacement(&output, &snapshot["segments"]);
+            Some(true)
+        } else {
+            if inputs.lane_id.starts_with("post-ready-") {
+                assert_eq!(
+                    trace.event_kinds.last(),
+                    Some(&TestWorkerEventKind::Error),
+                    "post-ready failure did not end with a worker error"
+                );
+            }
+            assert_eq!(trace.replacement_events, 0);
+            assert_eq!(snapshot["segmentCount"], 0);
+            assert_eq!(recovered["segments"].as_array().unwrap().len(), 0);
+            assert!(!output.exists());
+            None
+        };
+        assert!(host.is_reaped(&job_id));
+        assert!(gate.current().is_none());
+        assert!(gate.reserve().is_ok());
+
+        let error_code = snapshot["error"]
+            .as_str()
+            .and_then(|error| error.strip_prefix('['))
+            .and_then(|error| error.split_once(']'))
+            .map(|(code, _)| code);
+        println!(
+            "R2_STEP6_OBSERVED {}",
+            serde_json::to_string(&serde_json::json!({
+                "schemaVersion": 1,
+                "lane": inputs.lane_id,
+                "status": snapshot["status"],
+                "errorCode": error_code,
+                "durationMs": snapshot["durationMs"],
+                "readyDurationMs": trace.ready_duration_ms,
+                "eventKinds": actual_event_kinds,
+                "progressMs": trace.progress_ms,
+                "processedMs": snapshot["processedMs"],
+                "segmentEvents": trace.segment_events,
+                "replacementEvents": trace.replacement_events,
+                "segmentCount": snapshot["segmentCount"],
+                "recoverySegmentCount": recovered["segments"].as_array().unwrap().len(),
+                "outputExists": output.exists(),
+                "recoveryMatchesSnapshot": recovered["segments"] == snapshot["segments"],
+                "assMatchesReplacement": ass_matches_replacement,
+                "zeroAcceptedOutput": inputs.lane_id != "success",
+                "reaped": host.is_reaped(&job_id),
+                "gateReleased": gate.current().is_none(),
+                "cancellationElapsedMs": cancellation_elapsed_ms,
+            }))
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn production_worker_runs_the_selected_device_through_the_native_host() {
         let _guard = FAKE_WORKER_TEST_LOCK
             .lock()
@@ -2647,6 +3411,103 @@ mod tests {
             )
             .is_err());
         }
+    }
+
+    #[test]
+    fn reazon_missing_or_corrupt_vad_fails_before_ready_through_the_real_host() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = r2_step6_inputs() else {
+            return;
+        };
+        if inputs.lane_id != "success" {
+            eprintln!("R2 Step 6 input is not the success lane; skipping VAD identity failures");
+            return;
+        }
+        for corrupt_vad in [false, true] {
+            let temp = tempfile::tempdir().unwrap();
+            let worker = prepared_r2_step6_worker(&temp, &inputs, false, corrupt_vad);
+            let gate = Arc::new(ActiveJobGate::default());
+            let host = NativeAsrHost::new(worker, vec![], Arc::clone(&gate)).unwrap();
+            let job_id = if corrupt_vad {
+                "production-reazon-corrupt-vad"
+            } else {
+                "production-reazon-missing-vad"
+            };
+            let launch = model_backed_launch(
+                &temp,
+                job_id,
+                &inputs.engine,
+                r2_step6_models(&inputs),
+                &inputs.audio,
+                &inputs.device,
+                false,
+                None,
+            );
+            let recovery = launch.recovery_path.clone();
+            let output = launch.output_ass_path.clone();
+            host.start(launch, gate.reserve().unwrap()).unwrap();
+            let snapshot = wait_terminal(&host, job_id);
+            let trace = host.event_trace(job_id);
+            let recovered: Value = serde_json::from_slice(&fs::read(recovery).unwrap()).unwrap();
+            assert_eq!(snapshot["status"], "failed");
+            assert!(snapshot["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("[crispasr_vad_model_invalid]"));
+            assert_eq!(snapshot["durationMs"], 0);
+            assert_eq!(snapshot["segmentCount"], 0);
+            assert_eq!(trace.event_kinds, vec![TestWorkerEventKind::Error]);
+            assert_eq!(trace.ready_duration_ms, None);
+            assert!(trace.progress_ms.is_empty());
+            assert_eq!(trace.segment_events, 0);
+            assert_eq!(trace.replacement_events, 0);
+            assert_eq!(recovered["segments"].as_array().unwrap().len(), 0);
+            assert!(!output.exists());
+            assert!(gate.current().is_none());
+        }
+    }
+
+    #[test]
+    fn reazon_vad_failure_after_ready_has_zero_accepted_output_through_the_real_host() {
+        let _guard = FAKE_WORKER_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(inputs) = r2_step6_inputs() else {
+            return;
+        };
+        if inputs.lane_id != "success" {
+            eprintln!("R2 Step 6 input is not the success lane; skipping VAD failure");
+            return;
+        }
+        let source = tempfile::tempdir().unwrap();
+        let silent_audio = source.path().join("silence.wav");
+        write_silent_pcm16_wav(&silent_audio, 2_000);
+        let temp = tempfile::tempdir().unwrap();
+        let gate = Arc::new(ActiveJobGate::default());
+        let worker = prepared_r2_step6_worker(&temp, &inputs, true, false);
+        let host = NativeAsrHost::new(worker, vec![], Arc::clone(&gate)).unwrap();
+        let job_id = "production-reazon-vad-failure";
+        let launch = model_backed_launch(
+            &temp,
+            job_id,
+            &inputs.engine,
+            r2_step6_models(&inputs),
+            &silent_audio,
+            &inputs.device,
+            false,
+            None,
+        );
+        host.start(launch, gate.reserve().unwrap()).unwrap();
+        let snapshot = wait_terminal(&host, job_id);
+        assert_eq!(snapshot["status"], "failed");
+        assert!(snapshot["error"]
+            .as_str()
+            .unwrap()
+            .starts_with("[crispasr_vad_no_result]"));
+        assert_eq!(snapshot["durationMs"], 2_000);
+        assert_eq!(snapshot["segmentCount"], 0);
     }
 
     #[test]

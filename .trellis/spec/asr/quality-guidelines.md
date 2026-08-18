@@ -233,6 +233,85 @@ Wrong: divide failed inference time by the full long-v2 duration and publish tha
 Correct: publish attempted time and attempted-through duration; full-case RTF exists only after full inference coverage.
 ```
 
+## Scenario: Native ReazonSpeech Pad30 VAD Windows
+
+### 1. Scope / Trigger
+
+Use this contract for ReazonSpeech candidates that call the pinned CrispASR VAD C ABI and then transcribe each returned speech window through one reused session. The reviewed R2 identity is `R2-vad12-pad30-overlap-top-level-v1`; it is a development candidate only and does not enable Release/default routing, VAD delivery, or a T14/T15 algorithm handoff.
+
+### 2. Signatures
+
+```cpp
+std::vector<AudioWindow> CrispAsrBackend::detect_reazon_vad_windows(
+    const std::filesystem::path& vad_model_path);
+
+Result CrispAsrBackend::transcribe_window(AudioWindow window, ...);
+
+inline constexpr std::int64_t reazon_vad_core_max_duration_ms = 12'000;
+inline constexpr std::int64_t reazon_vad_padded_max_duration_ms = 12'060;
+inline constexpr std::int64_t reazon_vad_max_adjacent_overlap_ms = 60;
+```
+
+Frozen inference environment:
+
+```text
+CRISPASR_SESSION_UNIFIED_DISPATCH=0
+CRISPASR_PARAKEET_STREAM_THRESHOLD=13
+```
+
+Evidence publication emits independent `qualityDisposition` and `relativeSelection`; a failed row records actual attempted/completed window counts, `attemptedThroughMs`, partial-attempt timing, and a derived failure subtype/fingerprint.
+
+### 3. Contracts
+
+- Keep the pinned Q8_0 model/runtime, CUDA development device, Silero `30ms` speech pad, threshold `0.5`, minimum speech `250ms`, minimum silence `100ms`, and energy-minimum 12-second rechunking.
+- `crispasr_vad_slices` applies final padding after rechunking. Convert each returned float endpoint to integer milliseconds exactly once, then derive the PCM offsets as `ms * 16`. Do not separately validate float-derived sample offsets: binary float noise can turn a legal `60ms` boundary into a spurious `961`-sample overlap.
+- The unpadded core cap is `12000ms`; padded inference windows are `<=12060ms`. Starts and ends must strictly increase, ranges must stay inside audio, only adjacent ABI-native overlap `<=60ms` is legal, and non-adjacent overlap is rejected.
+- Each legal padded window receives exactly one direct `parakeet_transcribe_ex` call on one session. Unified dispatch, streamed/reactive fallback, fixed windows, caller-created overlap, ownership rewriting, dedup, stitching and gap-fill are absent from this identity.
+- Each window supplies exactly one legal top-level result. Preserve source text byte-for-byte; enforce UTF-8, nondecreasing cue starts, window/audio bounds, 96 Unicode scalars, 15000ms and protocol-v1 replacement limits.
+- The worker emits no raw preview, accumulates all results, then emits one atomic `segmentsReplace` and `completed`. Every failure before replacement leaves zero accepted output.
+- Raw source/result text, paths, audio, models, binaries and stderr remain under the canonical ignored task-local root. Tracked evidence contains only identities, hashes, aggregate metrics and sanitized failure provenance.
+- Failure-code equality is not proof of the same failure class. Derive and bind the subtype, window index/range, local source range and result-trace hash. Relative selection may treat R1/R2 failures as the same class only when the reviewed subtype fingerprint matches the immutable authority.
+- Formal performance uses full-case RTF only for completed coverage. A partial failure publishes `partial-attempt`, the exact `attemptedThroughMs`, and no full-case RTF.
+- The reviewed result is `stop-revise + better-than-r1` from medium-v1 CER reduction. Long-v2 still fails on the same reviewed `zero_duration_top_level_result` class; short/medium retain semantic gaps. Therefore the route stays disabled and no accepted algorithm handoff exists.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| ABI float endpoint has sub-millisecond/sample noise | Round once to ms; derive actual inference samples from ms |
+| Canonical window exceeds `12060ms`, adjacent overlap exceeds `60ms`, or any non-adjacent overlap exists | `crispasr_vad_result_invalid`; zero accepted output |
+| VAD returns zero without distinguishable cause | Neutral `crispasr_vad_no_result`; never guess “no speech” |
+| VAD asset is missing, wrong size or wrong hash | Stable pre-ready rejection |
+| Source result is empty/multiple/invalid UTF-8/zero-duration/outside its window | Stable candidate failure before replacement |
+| Replacement validation or serialization fails after `ready` | Emit exactly one structured `error`; no replacement/completed |
+| Error code matches R1 but subtype/range/timing/trace fingerprint differs | New safety failure; suppress every relative reason |
+| Candidate fails after 61 completed windows on the 62nd attempt | Record zero-based index `61`, `62 attempted / 61 completed`, and the real attempted frontier |
+| Identity/harness/module/PATH/protocol trace is invalid or incomplete | Invalid evidence; repair and reacquire, never publish as candidate failure |
+
+### 5. Good / Base / Bad Cases
+
+- **Good:** one frozen identity completes the required `1 cold + 3 warm / 1 / 1` matrix; every row binds worker/runtime/model/VAD/device/PATH/modules/tools/raw hashes, source/final conservation and deterministic shared-T01 metrics.
+- **Base:** long-v2 returns an identity-valid zero-duration top-level failure after partial coverage; publish the partial attempt truthfully, retain any valid R1-relative improvement, and keep the route disabled.
+- **Bad:** reject a legal boundary from direct float-to-sample noise, call every `crispasr_result_invalid` the same failure class, synthesize a full-case RTF from partial coverage, or promote `better-than-r1` into release qualification.
+
+### 6. Tests Required
+
+- Backend/fake ABI: exact `[510970,522930] / [522870,533630]` boundary passes as `60ms`; `61ms`, `12061ms`, non-adjacent overlap, invalid asset, zero result and exact-once free/reset/session lifecycle fail correctly.
+- Policy/worker: bounded overlap/gaps, one result per window, UTF-8/96/15000/text conservation, exact progress, no previews, one replacement, structured protocol failure and unchanged Parakeet/Qwen/default-off lanes.
+- Rust host: separate R2-only required manifest lanes for success, pre-ready negative, post-ready VAD/protocol/policy and cancellation; exact recovery/ASS equality, reap, gate release and zero partial output.
+- Publisher: complete role matrix, raw/source/final hashes, ms/sample window derivation, path/reparse containment, module/device/PATH identity, partial/full RTF, subtype/fingerprint mutation rejection, result-promotion rejection and byte-identical double publication.
+- Required validation includes protocol-only, CT2 CPU, CT2 CUDA development, task-local R2 CTest, full Rust/release check, frontend tests/build, benchmark self-check/tests, privacy/ignore/task/diff/no-staged checks.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong: ABI floats imply a 961-sample overlap, so reject the window before inference.
+Correct: convert ABI endpoints to canonical milliseconds once; the actual inference windows overlap by 60ms / 960 samples.
+
+Wrong: R1 and R2 both emitted crispasr_result_invalid, so the failure class is unchanged.
+Correct: derive and bind zero_duration_top_level_result plus its window/local timing and trace fingerprint before applying the R1-relative rule.
+```
+
 ## Scenario: Native Kotoba Bounded-Stride Overlap
 
 ### 1. Scope / Trigger

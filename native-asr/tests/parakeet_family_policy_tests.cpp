@@ -54,11 +54,12 @@ void run_tests() {
   {
     const PolicyResult result = assemble_segments(
         Engine::ReazonSpeechNemo,
-        {window(0, 15'000, {source("最初", 100, 14'000, {{"最", 0, 0}, {"初", 0, 0}})}),
-         window(15'000, 20'000, {source("最後", 15'100, 19'900, {{"最", 15'100, 15'100}})})},
+        {window(100, 10'000, {source("最初", 200, 9'900, {{"最", 0, 0}, {"初", 0, 0}})}),
+         window(9'940, 20'000, {source("最後", 9'950, 19'900, {{"最", 9'950, 9'950}})})},
         20'000);
-    check(result.error_code.empty() && result.segments.size() == 2, "Reazon multi-window failed");
-    check(result.segments[1].start_ms == 15'100 && result.segments[1].text == "最後",
+    check(result.error_code.empty() && result.segments.size() == 2,
+          "Reazon gapped/native-overlap windows failed");
+    check(result.segments[1].start_ms == 9'950 && result.segments[1].text == "最後",
           "Reazon top-level timing/text drift");
   }
 
@@ -99,6 +100,12 @@ void run_tests() {
   expect_error("parakeet_family_invalid_input", Engine::Parakeet, {window(0, 1'000, {})}, 1'000);
   expect_error(
       "parakeet_family_invalid_input",
+      Engine::Parakeet,
+      {window(0, 1'000, {source("a", 0, 1'000, {{"a", 0, 1'000}})}),
+       window(2'000, 3'000, {source("b", 2'000, 3'000, {{"b", 2'000, 3'000}})})},
+      3'000);
+  expect_error(
+      "parakeet_family_invalid_input",
       Engine::ReazonSpeechNemo,
       {window(0, 500, {source("a", 0, 500)}),
        window(400, 1'000, {source("b", 400, 1'000)})},
@@ -106,13 +113,31 @@ void run_tests() {
   expect_error(
       "parakeet_family_invalid_input",
       Engine::ReazonSpeechNemo,
-      {window(1, 1'000, {source("x", 1, 900)})},
+      {window(-1, 1'000, {source("x", 0, 900)})},
       1'000);
   expect_error(
       "parakeet_family_invalid_input",
       Engine::ReazonSpeechNemo,
+      {window(0, 12'061, {source("a", 0, 12'000)})},
+      12'061);
+  expect_error(
+      "parakeet_family_invalid_input",
+      Engine::ReazonSpeechNemo,
+      {window(0, 10'000, {source("a", 0, 9'900)}),
+       window(9'939, 20'000, {source("b", 9'950, 19'000)})},
+      20'000);
+  expect_error(
+      "parakeet_family_invalid_input",
+      Engine::ReazonSpeechNemo,
       {window(0, 10'000, {source("a", 0, 9'000)}),
-       window(10'000, 20'000, {source("b", 10'000, 19'000)})},
+       window(9'940, 10'010, {source("b", 9'940, 10'000)}),
+       window(9'990, 10'020, {source("c", 9'990, 10'020)})},
+      10'020);
+  expect_error(
+      "parakeet_family_invalid_input",
+      Engine::ReazonSpeechNemo,
+      {window(0, 10'000, {source("a", 9'990, 10'000)}),
+       window(9'940, 20'000, {source("b", 9'950, 10'100)})},
       20'000);
   expect_error(
       "parakeet_family_invalid_input",
@@ -215,10 +240,10 @@ void run_tests() {
   {
     const PolicyResult exact = assemble_segments(
         Engine::ReazonSpeechNemo,
-        {window(0, 15'000, {source("境界", 0, 15'000)})},
-        15'000);
-    check(exact.error_code.empty() && exact.segments.front().end_ms == 15'000,
-          "exact 15-second boundary failed");
+        {window(0, 12'060, {source("境界", 0, 12'060)})},
+        12'060);
+    check(exact.error_code.empty() && exact.segments.front().end_ms == 12'060,
+          "exact padded Reazon boundary failed");
   }
 
   {

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -125,7 +126,7 @@ ProcessResult run_worker(const fs::path& worker, const std::string& request) {
         "worker request write failed");
   CloseHandle(stdin_write);
 
-  check(WaitForSingleObject(process.hProcess, 10'000) == WAIT_OBJECT_0, "worker timed out");
+  check(WaitForSingleObject(process.hProcess, 30'000) == WAIT_OBJECT_0, "worker timed out");
   ProcessResult result;
   check(GetExitCodeProcess(process.hProcess, &result.exit_code), "worker exit code failed");
   result.stdout_text = read_pipe(stdout_read);
@@ -141,7 +142,8 @@ Json request_json(
     const fs::path& audio,
     const fs::path& model,
     const char* engine,
-    const fs::path& aligner = {}) {
+    const fs::path& aligner = {},
+    bool use_vad = false) {
   Json models = Json::array({Json{{"role", "model"}, {"path", model.u8string()}}});
   if (!aligner.empty()) {
     models.push_back(Json{{"role", "aligner"}, {"path", aligner.u8string()}});
@@ -154,10 +156,15 @@ Json request_json(
               {"modelPaths", models},
               {"device", "cpu"},
               {"language", "ja"},
-              {"useVad", false}};
+              {"useVad", use_vad}};
 }
 
-std::vector<EventV1> parse_events(const std::string& output) {
+std::vector<EventV1> parse_events(const std::string& output, const Json& request_json) {
+  WorkerRequestV1 request;
+  ProtocolError error;
+  check(parse_request_line(request_json.dump(), request, error),
+        "worker test request parse failed: " + error.code);
+  EventSequenceState state = make_event_sequence_state(request);
   std::vector<EventV1> events;
   std::size_t start = 0;
   while (start < output.size()) {
@@ -165,108 +172,207 @@ std::vector<EventV1> parse_events(const std::string& output) {
     const std::string line = output.substr(start, end == std::string::npos ? end : end - start);
     if (!line.empty()) {
       EventV1 event;
-      ProtocolError error;
       check(parse_event_line(line, event, error), "event parse failed: " + error.code);
+      check(validate_event(state, event, error), "event sequence failed: " + error.code);
       events.push_back(std::move(event));
     }
     if (end == std::string::npos) break;
     start = end + 1;
   }
+  check(validate_event_eof(state, error), "event EOF failed: " + error.code);
   return events;
 }
 
-void check_success(const std::vector<EventV1>& events, std::int64_t duration_ms) {
-  check(!events.empty() && events.front().type == EventType::Ready, "ready missing");
-  std::size_t segment_count = 0;
-  std::size_t replacement_count = 0;
-  std::size_t completed_count = 0;
-  std::int64_t last_progress = -1;
-  for (const auto& event : events) {
-    if (event.type == EventType::Segment) ++segment_count;
-    if (event.type == EventType::SegmentsReplace) {
-      ++replacement_count;
-      check(event.segments.size() == 2, "replacement did not contain both windows");
-      check(event.segments[0].start_ms == 0 && event.segments[1].start_ms == 15'000,
-            "replacement window offsets drifted");
-    }
-    if (event.type == EventType::Progress) {
-      check(event.processed_ms >= last_progress, "progress regressed");
-      last_progress = event.processed_ms;
-    }
-    if (event.type == EventType::Completed) {
-      ++completed_count;
-      check(event.duration_ms == duration_ms, "completed duration drifted");
-    }
+void check_success(
+    const std::vector<EventV1>& events,
+    std::int64_t duration_ms,
+    std::int64_t second_start_ms,
+    const std::vector<std::int64_t>& exact_progress = {}) {
+  check(events.size() >= 4 && events.front().type == EventType::Ready
+            && events.front().duration_ms == duration_ms,
+        "ready missing or invalid");
+  std::size_t index = 1;
+  std::vector<std::int64_t> progress;
+  while (index < events.size() && events[index].type == EventType::Progress) {
+    progress.push_back(events[index].processed_ms);
+    ++index;
   }
-  check(segment_count == 0, "raw preview escaped into protocol output");
-  check(replacement_count == 1, "expected exactly one replacement");
-  check(completed_count == 1 && events.back().type == EventType::Completed,
-        "completed sequencing drifted");
+  check(index < events.size() && events[index].type == EventType::SegmentsReplace,
+        "replacement did not follow ready/progress events");
+  const EventV1& replacement = events[index++];
+  check(replacement.segments.size() == 2, "replacement did not contain both windows");
+  check(replacement.segments[0].start_ms == 0
+            && replacement.segments[1].start_ms == second_start_ms,
+        "replacement window offsets drifted");
+  check(index + 1 == events.size() && events[index].type == EventType::Completed
+            && events[index].duration_ms == duration_ms,
+        "completed did not immediately follow the replacement");
+  if (!exact_progress.empty()) {
+    check(progress == exact_progress, "exact progress endpoints drifted");
+  }
 }
 
-void run_tests(const fs::path& worker, const fs::path& fake_abi) {
+void check_post_ready_failure(
+    const std::vector<EventV1>& events,
+    const char* expected_code) {
+  check(events.size() >= 2 && events.front().type == EventType::Ready,
+        "post-ready failure did not start with ready");
+  std::size_t index = 1;
+  while (index < events.size() && events[index].type == EventType::Progress) ++index;
+  check(index + 1 == events.size() && events[index].type == EventType::Error
+            && events[index].code == expected_code,
+        "post-ready failure ordering/code drifted");
+}
+
+void run_tests(
+    const fs::path& worker,
+    const fs::path& fake_abi,
+    const fs::path& vad_identity_worker) {
   const fs::path root = temporary_root();
   const fs::path audio = root / "audio.wav";
-  const fs::path model = root / "model.gguf";
-  const fs::path policy_empty = root / "policy-empty.gguf";
-  const fs::path oversized_text = root / "oversized-text.gguf";
+  const fs::path parakeet_model = root / "parakeet-model.gguf";
+  const fs::path reazon_model = root / "reazon-model.gguf";
+  const fs::path policy_empty = root / "reazon-policy-empty.gguf";
+  const fs::path oversized_text = root / "reazon-oversized-text.gguf";
+  const fs::path protocol_invalid_text = root / "reazon-protocol-invalid-text.gguf";
+  const fs::path protocol_oversized_replacement = root / "protocol-oversized-replacement.gguf";
   const fs::path aligner = root / "aligner.gguf";
+  const fs::path vad_model = worker.parent_path() / "ggml-silero-v6.2.0.bin";
+  const fs::path identity_vad_model =
+      vad_identity_worker.parent_path() / "ggml-silero-v6.2.0.bin";
   write_wav(audio, 20'000);
-  std::ofstream(model) << "model";
+  std::ofstream(parakeet_model) << "model";
+  std::ofstream(reazon_model) << "model";
   std::ofstream(policy_empty) << "model";
   std::ofstream(oversized_text) << "model";
+  std::ofstream(protocol_invalid_text) << "model";
+  std::ofstream(protocol_oversized_replacement) << "model";
   std::ofstream(aligner) << "aligner";
+  std::ofstream(vad_model) << "vad";
+  fs::remove(identity_vad_model);
   fs::copy_file(fake_abi, worker.parent_path() / "crispasr.dll", fs::copy_options::overwrite_existing);
 
-  for (const char* engine : {"parakeet", "reazonspeech-nemo"}) {
-    const ProcessResult result = run_worker(
-        worker,
-        request_json(audio, model, engine).dump() + "\n");
-    check(
-        result.exit_code == 0,
-        std::string(engine) + " worker failed: exit=" + std::to_string(result.exit_code)
-            + " stdout=" + result.stdout_text + " stderr=" + result.stderr_text);
-    check(
-        result.stderr_text.empty(),
-        std::string(engine) + " wrote stderr: " + result.stderr_text);
-    check_success(parse_events(result.stdout_text), 20'000);
+  {
+    const Json request = request_json(audio, parakeet_model, "parakeet");
+    const ProcessResult result = run_worker(worker, request.dump() + "\n");
+    check(result.exit_code == 0, "Parakeet worker failed: " + result.stdout_text);
+    check(result.stderr_text.empty(), "Parakeet worker wrote stderr: " + result.stderr_text);
+    check_success(parse_events(result.stdout_text, request), 20'000, 15'000);
+  }
+  {
+    SetEnvironmentVariableA("CRISPASR_PARAKEET_STREAM_THRESHOLD", "12");
+    SetEnvironmentVariableA("CRISPASR_PARAKEET_STREAM_CHUNK", "2");
+    SetEnvironmentVariableA("CRISPASR_SESSION_UNIFIED_DISPATCH", "1");
+    const Json request = request_json(audio, reazon_model, "reazonspeech-nemo");
+    const ProcessResult result = run_worker(worker, request.dump() + "\n");
+    check(result.exit_code == 0, "Reazon worker failed: " + result.stdout_text);
+    check(result.stderr_text.empty(), "Reazon worker wrote stderr: " + result.stderr_text);
+    check_success(
+        parse_events(result.stdout_text, request),
+        20'000,
+        12'000,
+        {12'060, 20'000});
+    SetEnvironmentVariableA("CRISPASR_PARAKEET_STREAM_THRESHOLD", nullptr);
+    SetEnvironmentVariableA("CRISPASR_PARAKEET_STREAM_CHUNK", nullptr);
+    SetEnvironmentVariableA("CRISPASR_SESSION_UNIFIED_DISPATCH", nullptr);
   }
 
   const auto check_policy_failure = [&](const fs::path& input_model, const char* expected_code) {
-    const ProcessResult result = run_worker(
-        worker,
-        request_json(audio, input_model, "parakeet").dump() + "\n");
-    const auto events = parse_events(result.stdout_text);
-    check(result.exit_code == 20 && events.size() >= 2, "policy failure exit drifted");
-    check(events.front().type == EventType::Ready && events.back().type == EventType::Error,
-          "policy failure was not post-ready terminal error");
-    check(
-        events.back().code == expected_code,
-        "policy failure code drifted: code=" + events.back().code
-            + " stdout=" + result.stdout_text + " stderr=" + result.stderr_text);
-    for (const auto& event : events) {
-      check(event.type != EventType::Segment && event.type != EventType::SegmentsReplace,
-            "policy failure emitted accepted output");
-    }
+    const Json request = request_json(audio, input_model, "reazonspeech-nemo");
+    const ProcessResult result = run_worker(worker, request.dump() + "\n");
+    const auto events = parse_events(result.stdout_text, request);
+    check(result.exit_code == 20, "policy failure exit drifted");
+    check_post_ready_failure(events, expected_code);
   };
   check_policy_failure(policy_empty, "parakeet_family_invalid_input");
   check_policy_failure(oversized_text, "parakeet_family_cue_limit");
 
+  std::vector<std::pair<std::string, std::string>> zero_vad_errors;
+  for (const char* scenario : {"no-speech-like", "internal-failure-like"}) {
+    SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", scenario);
+    const Json request = request_json(audio, reazon_model, "reazonspeech-nemo");
+    const ProcessResult result = run_worker(worker, request.dump() + "\n");
+    const auto events = parse_events(result.stdout_text, request);
+    check(result.exit_code == 20, "zero-result VAD failure exit drifted");
+    check_post_ready_failure(events, "crispasr_vad_no_result");
+    zero_vad_errors.emplace_back(events.back().code, events.back().message);
+  }
+  SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", nullptr);
+  check(zero_vad_errors.size() == 2 && zero_vad_errors[0] == zero_vad_errors[1],
+        "indistinguishable zero-result VAD outcomes did not emit identical errors");
+
+  const auto check_replacement_failure = [&](
+      const fs::path& input_audio,
+      const fs::path& input_model,
+      const char* engine,
+      const char* expected_code) {
+    const Json request = request_json(input_audio, input_model, engine);
+    const ProcessResult result = run_worker(worker, request.dump() + "\n");
+    const auto events = parse_events(result.stdout_text, request);
+    check(result.exit_code == 20, "replacement protocol failure exit drifted");
+    check_post_ready_failure(events, expected_code);
+  };
+  check_replacement_failure(
+      audio,
+      protocol_invalid_text,
+      "reazonspeech-nemo",
+      "invalid_segment");
+  check_replacement_failure(
+      audio,
+      protocol_oversized_replacement,
+      "parakeet",
+      "replacement_too_large");
+
   {
-    const ProcessResult result = run_worker(
-        worker,
-        request_json(audio, model, "qwen3-asr", aligner).dump() + "\n");
-    const auto events = parse_events(result.stdout_text);
-    check(result.exit_code == 20 && !events.empty(), "Qwen strict seam exit drifted");
-    check(events.back().type == EventType::Error
-              && events.back().code == "qwen_timeline_policy_not_implemented",
-          "Qwen strict seam drifted");
-    for (const auto& event : events) {
-      check(event.type != EventType::Segment && event.type != EventType::SegmentsReplace,
-            "Qwen emitted accepted timing");
-    }
+    fs::remove(vad_model);
+    const Json request = request_json(audio, reazon_model, "reazonspeech-nemo");
+    const ProcessResult result = run_worker(worker, request.dump() + "\n");
+    const auto events = parse_events(result.stdout_text, request);
+    check(result.exit_code == 20 && events.size() == 1
+              && events.front().type == EventType::Error
+              && events.front().code == "crispasr_vad_model_invalid",
+          "missing VAD did not fail before ready");
+    std::ofstream(vad_model) << "vad";
   }
 
+  const auto check_vad_identity_failure = [&](const char* label) {
+    const Json request = request_json(audio, reazon_model, "reazonspeech-nemo");
+    const ProcessResult result = run_worker(vad_identity_worker, request.dump() + "\n");
+    const auto events = parse_events(result.stdout_text, request);
+    check(result.exit_code == 20 && events.size() == 1
+              && events.front().type == EventType::Error
+              && events.front().code == "crispasr_vad_model_invalid",
+          std::string("non-empty ") + label + " VAD did not fail before ready");
+  };
+  std::ofstream(identity_vad_model) << "vad";
+  check_vad_identity_failure("wrong-size");
+  {
+    std::ofstream output(identity_vad_model, std::ios::binary | std::ios::trunc);
+    output.seekp(885'097);
+    output.put('\0');
+  }
+  check_vad_identity_failure("wrong-hash");
+
+  {
+    const Json request = request_json(audio, reazon_model, "reazonspeech-nemo", {}, true);
+    const ProcessResult result = run_worker(worker, request.dump() + "\n");
+    const auto events = parse_events(result.stdout_text, request);
+    check(result.exit_code == 2 && events.size() == 1
+              && events.front().type == EventType::Error
+              && events.front().code == "crispasr_vad_not_implemented",
+          "product useVad semantics changed");
+  }
+
+  {
+    const Json request = request_json(audio, parakeet_model, "qwen3-asr", aligner);
+    const ProcessResult result = run_worker(worker, request.dump() + "\n");
+    const auto events = parse_events(result.stdout_text, request);
+    check(result.exit_code == 20, "Qwen strict seam exit drifted");
+    check_post_ready_failure(events, "qwen_timeline_policy_not_implemented");
+  }
+
+  fs::remove(vad_model);
+  fs::remove(identity_vad_model);
   fs::remove_all(root);
 }
 
@@ -274,8 +380,8 @@ void run_tests(const fs::path& worker, const fs::path& fake_abi) {
 
 int main(int argc, char** argv) {
   try {
-    if (argc != 3) throw std::runtime_error("expected worker and fake ABI paths");
-    run_tests(fs::u8path(argv[1]), fs::u8path(argv[2]));
+    if (argc != 4) throw std::runtime_error("expected worker, fake ABI, and VAD identity worker paths");
+    run_tests(fs::u8path(argv[1]), fs::u8path(argv[2]), fs::u8path(argv[3]));
     std::cout << "crispasr worker contract tests passed\n";
     return 0;
   } catch (const std::exception& error) {

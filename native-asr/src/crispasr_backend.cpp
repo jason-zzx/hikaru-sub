@@ -15,7 +15,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <sstream>
 #include <utility>
@@ -61,6 +63,9 @@ struct Api {
   void (*set_progress_callback)(crispasr_session*, ProgressFn, void*) = nullptr;
   void (*set_segment_callback)(crispasr_session*, SegmentFn, void*) = nullptr;
   crispasr_session_result* (*transcribe_lang)(crispasr_session*, const float*, int, const char*) = nullptr;
+  int (*vad_slices)(
+      const char*, const float*, int, int, float, int, int, int, float, int, float**) = nullptr;
+  void (*vad_free)(float*) = nullptr;
   int (*result_n_segments)(crispasr_session_result*) = nullptr;
   const char* (*result_segment_text)(crispasr_session_result*, int) = nullptr;
   std::int64_t (*result_segment_t0)(crispasr_session_result*, int) = nullptr;
@@ -89,6 +94,40 @@ std::string digest_hex(const unsigned char* digest, std::size_t size) {
     output << static_cast<int>(digest[index]);
   }
   return output.str();
+}
+
+std::string sha256_bytes(std::string_view value) {
+  BCRYPT_ALG_HANDLE algorithm = nullptr;
+  BCRYPT_HASH_HANDLE hash = nullptr;
+  ULONG object_length = 0;
+  ULONG returned = 0;
+  if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) != 0
+      || BCryptGetProperty(
+             algorithm,
+             BCRYPT_OBJECT_LENGTH,
+             reinterpret_cast<PUCHAR>(&object_length),
+             sizeof(object_length),
+             &returned,
+             0) != 0) {
+    if (algorithm) BCryptCloseAlgorithmProvider(algorithm, 0);
+    throw BackendError("hash_failed", "SHA-256 provider is unavailable");
+  }
+  std::vector<unsigned char> object(object_length);
+  std::array<unsigned char, 32> digest{};
+  const bool created = BCryptCreateHash(
+      algorithm, &hash, object.data(), object_length, nullptr, 0, 0) == 0;
+  const bool hashed = created
+      && BCryptHashData(
+             hash,
+             reinterpret_cast<PUCHAR>(const_cast<char*>(value.data())),
+             static_cast<ULONG>(value.size()),
+             0) == 0;
+  const bool finished = hashed
+      && BCryptFinishHash(hash, digest.data(), static_cast<ULONG>(digest.size()), 0) == 0;
+  if (hash) BCryptDestroyHash(hash);
+  BCryptCloseAlgorithmProvider(algorithm, 0);
+  if (!finished) throw BackendError("hash_failed", "SHA-256 failed");
+  return digest_hex(digest.data(), digest.size());
 }
 
 std::string sha256_file(const fs::path& path) {
@@ -217,6 +256,8 @@ Api bind_api(HMODULE module) {
   BIND(set_progress_callback, "crispasr_session_set_progress_callback");
   BIND(set_segment_callback, "crispasr_session_set_segment_callback");
   BIND(transcribe_lang, "crispasr_session_transcribe_lang");
+  BIND(vad_slices, "crispasr_vad_slices");
+  BIND(vad_free, "crispasr_vad_free");
   BIND(result_n_segments, "crispasr_session_result_n_segments");
   BIND(result_segment_text, "crispasr_session_result_segment_text");
   BIND(result_segment_t0, "crispasr_session_result_segment_t0");
@@ -320,12 +361,27 @@ std::vector<NativeSegment> copy_source_segments(
       if (segment.text.empty() || segment.raw_start_ms < 0
           || segment.raw_end_ms <= segment.raw_start_ms
           || segment.raw_end_ms > duration_ms || segment.raw_start_ms < previous) {
+        std::optional<ResultFailureDetail> detail;
+        if (!segment.text.empty() && segment.raw_start_ms >= 0
+            && segment.raw_end_ms == segment.raw_start_ms) {
+          const std::string trace = "segmentIndex=" + std::to_string(index)
+              + "\nlocalStartMs=" + std::to_string(segment.raw_start_ms)
+              + "\nlocalEndMs=" + std::to_string(segment.raw_end_ms)
+              + "\nwindowDurationMs=" + std::to_string(duration_ms);
+          detail = ResultFailureDetail{
+              "zero_duration_top_level_result",
+              index,
+              segment.raw_start_ms,
+              segment.raw_end_ms,
+              sha256_bytes(trace)};
+        }
         throw BackendError(
             "crispasr_result_invalid",
             "CrispASR final result is invalid: segment=" + std::to_string(index)
                 + " startMs=" + std::to_string(segment.raw_start_ms)
                 + " endMs=" + std::to_string(segment.raw_end_ms)
-                + " durationMs=" + std::to_string(duration_ms));
+                + " durationMs=" + std::to_string(duration_ms),
+            std::move(detail));
       }
       previous = segment.raw_start_ms;
     }
@@ -395,6 +451,47 @@ std::int64_t checked_offset(std::int64_t value, std::int64_t offset) {
   return value + offset;
 }
 
+std::int64_t round_half_even(double value) {
+  if (!std::isfinite(value) || value < 0
+      || value > static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
+    throw BackendError("crispasr_vad_result_invalid", "CrispASR VAD timing is invalid");
+  }
+  const double lower = std::floor(value);
+  const double fraction = value - lower;
+  std::int64_t rounded = static_cast<std::int64_t>(lower);
+  if (fraction > 0.5 || (fraction == 0.5 && rounded % 2 != 0)) ++rounded;
+  return rounded;
+}
+
+void configure_reazon_single_pass_environment() {
+  constexpr wchar_t prefix[] = L"CRISPASR_PARAKEET_";
+  LPWCH environment = GetEnvironmentStringsW();
+  if (environment == nullptr) {
+    throw BackendError("crispasr_strategy_invalid", "CrispASR strategy environment is unavailable");
+  }
+  std::vector<std::wstring> inherited;
+  for (const wchar_t* cursor = environment; *cursor != L'\0';) {
+    const std::wstring entry(cursor);
+    cursor += entry.size() + 1;
+    const std::size_t separator = entry.find(L'=');
+    if (separator != std::wstring::npos
+        && entry.size() >= std::size(prefix) - 1
+        && _wcsnicmp(entry.c_str(), prefix, std::size(prefix) - 1) == 0) {
+      inherited.push_back(entry.substr(0, separator));
+    }
+  }
+  FreeEnvironmentStringsW(environment);
+  for (const auto& name : inherited) {
+    if (!SetEnvironmentVariableW(name.c_str(), nullptr)) {
+      throw BackendError("crispasr_strategy_invalid", "CrispASR strategy environment could not be cleared");
+    }
+  }
+  if (!SetEnvironmentVariableW(L"CRISPASR_PARAKEET_STREAM_THRESHOLD", L"13")
+      || !SetEnvironmentVariableW(L"CRISPASR_SESSION_UNIFIED_DISPATCH", L"0")) {
+    throw BackendError("crispasr_strategy_invalid", "CrispASR strategy environment could not be frozen");
+  }
+}
+
 void translate_window_result(
     Result& result,
     AudioWindow window,
@@ -425,11 +522,24 @@ void translate_window_result(
 
 }  // namespace
 
-BackendError::BackendError(std::string code, std::string message)
-    : std::runtime_error(std::move(message)), code_(std::move(code)) {}
+std::string sha256_text(std::string_view text) {
+  return sha256_bytes(text);
+}
+
+BackendError::BackendError(
+    std::string code,
+    std::string message,
+    std::optional<ResultFailureDetail> result_failure)
+    : std::runtime_error(std::move(message)),
+      code_(std::move(code)),
+      result_failure_(std::move(result_failure)) {}
 
 const std::string& BackendError::code() const noexcept {
   return code_;
+}
+
+const std::optional<ResultFailureDetail>& BackendError::result_failure() const noexcept {
+  return result_failure_;
 }
 
 bool runtime_identity_matches(
@@ -440,6 +550,21 @@ bool runtime_identity_matches(
   return fs::is_regular_file(path, error) && !error
       && fs::file_size(path, error) == expected_size && !error
       && sha256_file(path) == expected_sha256;
+}
+
+bool reazon_vad_identity_matches(const fs::path& path) {
+  return runtime_identity_matches(
+      path,
+      885'098,
+      "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987");
+}
+
+bool reazon_vad_identity_permitted(const fs::path& path) {
+#ifdef HIKARU_ASR_CRISPASR_TEST_VAD_IDENTITY_BYPASS
+  return regular_nonempty(path);
+#else
+  return reazon_vad_identity_matches(path);
+#endif
 }
 
 fs::path upstream_compatible_path(const fs::path& path) {
@@ -558,6 +683,90 @@ class CrispAsrBackend::Impl {
     }
   }
 
+  std::vector<AudioWindow> detect_reazon_vad_windows(const fs::path& vad_model_path) {
+    if (config.engine != Engine::ReazonSpeechNemo) {
+      throw BackendError("crispasr_vad_not_supported", "CrispASR VAD is only valid for ReazonSpeech R2");
+    }
+    if (!reazon_vad_identity_permitted(vad_model_path)) {
+      throw BackendError("crispasr_vad_model_invalid", "The frozen ReazonSpeech VAD asset is unavailable");
+    }
+    const std::string model = upstream_compatible_path(vad_model_path).u8string();
+    float* raw_spans = nullptr;
+    const int count = api.vad_slices(
+        model.c_str(),
+        audio.samples.data(),
+        static_cast<int>(audio.samples.size()),
+        wav::sample_rate,
+        0.5f,
+        250,
+        100,
+        30,
+        static_cast<float>(reazon_vad_core_max_duration_ms) / 1000.0f,
+        16,
+        &raw_spans);
+    struct VadFree {
+      const Api& api;
+      float* value;
+      ~VadFree() { if (value) api.vad_free(value); }
+    } free_spans{api, raw_spans};
+    if (count < 0) {
+      throw BackendError("crispasr_vad_failed", "CrispASR VAD failed");
+    }
+    if (count == 0) {
+      throw BackendError(
+          "crispasr_vad_no_result",
+          "CrispASR VAD returned no distinguishable result");
+    }
+    if (raw_spans == nullptr
+        || static_cast<std::size_t>(count) > limits::max_replacement_segments) {
+      throw BackendError("crispasr_vad_result_invalid", "CrispASR VAD result is invalid");
+    }
+
+    std::vector<AudioWindow> windows;
+    windows.reserve(static_cast<std::size_t>(count));
+    std::int64_t previous_start_ms = -1;
+    std::int64_t previous_end_ms = -1;
+    std::int64_t two_back_end_ms = -1;
+    constexpr std::int64_t samples_per_ms = wav::sample_rate / 1000;
+    static_assert(wav::sample_rate % 1000 == 0);
+    for (int index = 0; index < count; ++index) {
+      const double start_seconds = raw_spans[index * 2];
+      const double end_seconds = raw_spans[index * 2 + 1];
+      if (!std::isfinite(start_seconds) || !std::isfinite(end_seconds)
+          || start_seconds < 0 || end_seconds <= start_seconds) {
+        throw BackendError("crispasr_vad_result_invalid", "CrispASR VAD timing is invalid");
+      }
+      const AudioWindow window{
+          round_half_even(start_seconds * 1000.0),
+          round_half_even(end_seconds * 1000.0)};
+      if (window.start_ms > std::numeric_limits<std::int64_t>::max() / samples_per_ms
+          || window.end_ms > std::numeric_limits<std::int64_t>::max() / samples_per_ms) {
+        throw BackendError("crispasr_vad_result_invalid", "CrispASR VAD timing is invalid");
+      }
+      const std::int64_t start_sample = window.start_ms * samples_per_ms;
+      const std::int64_t end_sample = window.end_ms * samples_per_ms;
+      const std::int64_t duration_ms = window.end_ms - window.start_ms;
+      if (start_sample < 0 || end_sample <= start_sample
+          || end_sample > static_cast<std::int64_t>(audio.samples.size())
+          || window.start_ms < 0 || window.end_ms <= window.start_ms
+          || window.end_ms > audio.duration_ms
+          || end_sample - start_sample > reazon_vad_max_samples
+          || duration_ms > reazon_vad_padded_max_duration_ms
+          || (index > 0
+              && (window.start_ms <= previous_start_ms
+                  || window.end_ms <= previous_end_ms
+                  || previous_end_ms - window.start_ms > reazon_vad_max_adjacent_overlap_ms))
+          || (index > 1 && window.start_ms < two_back_end_ms)) {
+        throw BackendError("crispasr_vad_result_invalid", "CrispASR VAD window is invalid");
+      }
+      windows.push_back(window);
+      two_back_end_ms = previous_end_ms;
+      previous_start_ms = window.start_ms;
+      previous_end_ms = window.end_ms;
+    }
+    return windows;
+  }
+
   Result transcribe_window(
       AudioWindow window,
       const ProgressCallback& on_progress,
@@ -566,20 +775,28 @@ class CrispAsrBackend::Impl {
         || window.end_ms > audio.duration_ms || config.engine == Engine::Qwen3Asr) {
       throw BackendError("crispasr_window_invalid", "CrispASR audio window is invalid");
     }
+    constexpr std::int64_t samples_per_ms = wav::sample_rate / 1000;
+    static_assert(wav::sample_rate % 1000 == 0);
     const auto sample_for_ms = [](std::int64_t value) {
-      if (value > std::numeric_limits<std::int64_t>::max() / wav::sample_rate) {
+      if (value > std::numeric_limits<std::int64_t>::max() / samples_per_ms) {
         throw BackendError("crispasr_window_invalid", "CrispASR audio window overflows");
       }
-      return value * wav::sample_rate / 1000;
+      return value * samples_per_ms;
     };
     const std::int64_t start_sample = sample_for_ms(window.start_ms);
-    const std::int64_t end_sample = window.end_ms == audio.duration_ms
+    const std::int64_t end_sample = config.engine != Engine::ReazonSpeechNemo
+            && window.end_ms == audio.duration_ms
         ? static_cast<std::int64_t>(audio.samples.size())
         : sample_for_ms(window.end_ms);
     if (start_sample < 0 || end_sample <= start_sample
         || end_sample > static_cast<std::int64_t>(audio.samples.size())
-        || end_sample - start_sample > std::numeric_limits<int>::max()) {
+        || end_sample - start_sample > std::numeric_limits<int>::max()
+        || (config.engine == Engine::ReazonSpeechNemo
+            && end_sample - start_sample > reazon_vad_max_samples)) {
       throw BackendError("crispasr_window_invalid", "CrispASR audio window is invalid");
+    }
+    if (config.engine == Engine::ReazonSpeechNemo) {
+      configure_reazon_single_pass_environment();
     }
     const std::int64_t window_duration = window.end_ms - window.start_ms;
     CallbackContext context{
@@ -750,6 +967,11 @@ Result CrispAsrBackend::transcribe_window(
     const ProgressCallback& on_progress,
     const SegmentCallback& on_segment) {
   return impl_->transcribe_window(window, on_progress, on_segment);
+}
+
+std::vector<AudioWindow> CrispAsrBackend::detect_reazon_vad_windows(
+    const fs::path& vad_model_path) {
+  return impl_->detect_reazon_vad_windows(vad_model_path);
 }
 
 }  // namespace hikaru_asr::crisp

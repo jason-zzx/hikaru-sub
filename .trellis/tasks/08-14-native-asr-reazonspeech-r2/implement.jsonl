@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/asr/index.md", "reason": "ASR layer boundaries and validation entry point"}
+{"file": ".trellis/spec/asr/quality-guidelines.md", "reason": "Native ASR benchmark, complete-matrix, identity, timing and evidence contracts"}
+{"file": ".trellis/spec/tauri/media-ffmpeg-asr.md", "reason": "Native worker host, recovery, cancellation and release-boundary contracts"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse current CrispASR backend/policy seams and avoid duplicate VAD infrastructure"}
+{"file": ".trellis/tasks/08-14-native-asr-reazonspeech-r2/research/reazonspeech-r2-evidence.md", "reason": "R1 baseline, upstream recommendations and reviewed R2 candidate ladder"}
