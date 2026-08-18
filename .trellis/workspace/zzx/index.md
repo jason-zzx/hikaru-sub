@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
-- **Last Active**: 2026-08-14
+- **Total Sessions**: 25
+- **Last Active**: 2026-08-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~815 | Active |
+| `journal-1.md` | ~849 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-08-18 | Optimize ReazonSpeech transcription R2 | `b86ed33`, `8e5ee95` | `dev-crisp-asr` |
 | 24 | 2026-08-14 | Complete T10 Parakeet and ReazonSpeech productization | `1fa2e15` | `dev-crisp-asr` |
 | 23 | 2026-08-13 | Build and qualify CrispASR backend core | `3fa54f4` | `dev-crisp-asr` |
 | 22 | 2026-08-06 | Correct CrispASR long-v2 evidence | `71e57aa` | `dev-crisp-asr` |

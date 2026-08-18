@@ -813,3 +813,37 @@ Implemented bounded CrispASR window transcription and Parakeet-family subtitle p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 25: Optimize ReazonSpeech transcription R2
+
+**Date**: 2026-08-18
+**Task**: Optimize ReazonSpeech transcription R2
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented the reviewed R2-vad12-pad30-overlap-top-level-v1 development candidate, completed all six formal roles under one frozen identity, published stop-revise + better-than-r1 with medium CER improvement, restored generic CrispASR test seam, applied Ponytail simplifications, and updated ASR/Tauri specs. Route remains disabled and no T14/T15 handoff is accepted.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b86ed33` | (see git log) |
+| `8e5ee95` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
