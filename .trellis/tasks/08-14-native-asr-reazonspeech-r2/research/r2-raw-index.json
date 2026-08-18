@@ -1,0 +1,55 @@
+{
+  "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+  "entries": [
+    {
+      "caseId": "short-v1",
+      "relativeRawPath": "formal/raw/short-v1/cold-0.json",
+      "repeatIndex": 0,
+      "runKind": "cold",
+      "sha256": "2da547923efff0012d9923359cfa36c4c40703779e0cbc4df9e50f2b82a39edc",
+      "sizeBytes": 34132
+    },
+    {
+      "caseId": "short-v1",
+      "relativeRawPath": "formal/raw/short-v1/warm-1.json",
+      "repeatIndex": 1,
+      "runKind": "warm",
+      "sha256": "f966a17314b0ef7e27e24ba18b42dc758d7c4872423346e16176360153d98a21",
+      "sizeBytes": 34133
+    },
+    {
+      "caseId": "short-v1",
+      "relativeRawPath": "formal/raw/short-v1/warm-2.json",
+      "repeatIndex": 2,
+      "runKind": "warm",
+      "sha256": "ab73363a079cfe0bb22ed2bc18e862d64a8dc408155dda0f1bd2b14969fa0abf",
+      "sizeBytes": 34135
+    },
+    {
+      "caseId": "short-v1",
+      "relativeRawPath": "formal/raw/short-v1/warm-3.json",
+      "repeatIndex": 3,
+      "runKind": "warm",
+      "sha256": "30bb1470a532c320d19df6fc48cea233127511fc4bf5f879b11bb06c52355cdf",
+      "sizeBytes": 34131
+    },
+    {
+      "caseId": "medium-v1",
+      "relativeRawPath": "formal/raw/medium-v1/measured-0.json",
+      "repeatIndex": 0,
+      "runKind": "measured",
+      "sha256": "c744571c68f38e9087f73b361530a1ac9f58335c908c9050e5c5e4d5feafed88",
+      "sizeBytes": 124750
+    },
+    {
+      "caseId": "long-v2",
+      "relativeRawPath": "formal/raw/long-v2/measured-0.json",
+      "repeatIndex": 0,
+      "runKind": "measured",
+      "sha256": "fe491128605137b18f0e6693f20fda9518ec0cc8ccf1ba73ab41edd91bebc208",
+      "sizeBytes": 192146
+    }
+  ],
+  "frozen": true,
+  "schema": "hikaru-reazonspeech-r2-raw-index-v1"
+}

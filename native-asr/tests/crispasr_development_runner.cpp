@@ -94,6 +94,19 @@ bool is_under(const fs::path& path, const fs::path& root) {
   return !relative.empty() && *relative.begin() != "..";
 }
 
+bool is_under_declared_local_root(const fs::path& path, const fs::path& root) {
+  const std::array<fs::path, 3> declared{
+      fs::u8path(T09_LOCAL_ROOT), fs::u8path(T10_LOCAL_ROOT), fs::u8path(T10R_LOCAL_ROOT)};
+  std::error_code error;
+  const fs::path canonical_root = fs::weakly_canonical(root, error);
+  if (error) return false;
+  const bool known = std::any_of(declared.begin(), declared.end(), [&](const fs::path& candidate) {
+    std::error_code candidate_error;
+    return fs::weakly_canonical(candidate, candidate_error) == canonical_root && !candidate_error;
+  });
+  return known && is_under(path, canonical_root);
+}
+
 fs::path current_executable() {
   std::vector<wchar_t> buffer(32768);
   const DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
@@ -244,7 +257,8 @@ void run_t10(const std::vector<std::string>& args) {
   const fs::path model = fs::u8path(required_arg(args, "--model"));
   const fs::path audio = fs::u8path(required_arg(args, "--audio"));
   const fs::path output = fs::u8path(required_arg(args, "--output"));
-  check(output.extension() == ".json" && is_under(output, fs::u8path(T10_LOCAL_ROOT)),
+  check(output.extension() == ".json"
+            && is_under_declared_local_root(output, fs::u8path(T10_LOCAL_ROOT)),
         "T10 output escapes the canonical task-local ignored root");
   check(fs::is_regular_file(lock) && fs::equivalent(lock, expected_lock), "T10 input lock path drifted");
   check(fs::is_regular_file(library) && fs::is_regular_file(worker), "T10 runtime/worker missing");
@@ -385,8 +399,9 @@ void run(const std::vector<std::string>& args) {
   const fs::path output = fs::u8path(required_arg(args, "--output"));
   const fs::path stderr_log = fs::u8path(required_arg(args, "--stderr-log"));
   check(output.extension() == ".json", "output must be JSON");
-  check(is_under(output, fs::u8path(T09_LOCAL_ROOT)), "output escapes the canonical task-local ignored root");
-  check(is_under(stderr_log, fs::u8path(T09_LOCAL_ROOT)),
+  check(is_under_declared_local_root(output, fs::u8path(T09_LOCAL_ROOT)),
+        "output escapes the canonical task-local ignored root");
+  check(is_under_declared_local_root(stderr_log, fs::u8path(T09_LOCAL_ROOT)),
         "stderr log is outside the ignored root");
   if (!fs::exists(stderr_log)) {
     fs::create_directories(stderr_log.parent_path());

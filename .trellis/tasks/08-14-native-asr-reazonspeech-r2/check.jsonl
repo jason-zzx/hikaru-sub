@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/asr/quality-guidelines.md", "reason": "Verify complete-matrix, identity, evidence, timing and relative-selection correctness"}
+{"file": ".trellis/spec/tauri/index.md", "reason": "Tauri quality entry point for any host test changes"}
+{"file": ".trellis/spec/tauri/media-ffmpeg-asr.md", "reason": "Verify host lifecycle, recovery, cancel/reap and default-off routing"}
+{"file": ".trellis/spec/tauri/quality-guidelines.md", "reason": "Rust safety, validation and no-unverified-claim requirements"}
+{"file": ".trellis/tasks/08-14-native-asr-reazonspeech-r2/research/reazonspeech-r2-evidence.md", "reason": "Review implementation against the evidence-backed primary/secondary boundary"}

@@ -148,8 +148,9 @@ target_include_directories(hikaru-asr-crispasr-test-adapter
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CRISPASR_GENERATED_INCLUDE_DIR}")
 target_link_libraries(hikaru-asr-crispasr-test-adapter
   PUBLIC hikaru-asr-protocol hikaru-asr-wav-audio PRIVATE bcrypt)
-target_compile_definitions(hikaru-asr-crispasr-test-adapter
-  PRIVATE HIKARU_ASR_CRISPASR_TEST_RUNTIME_IDENTITY_BYPASS=1)
+target_compile_definitions(hikaru-asr-crispasr-test-adapter PRIVATE
+  HIKARU_ASR_CRISPASR_TEST_RUNTIME_IDENTITY_BYPASS=1
+  HIKARU_ASR_CRISPASR_TEST_VAD_IDENTITY_BYPASS=1)
 
 add_library(hikaru-asr-fake-crispasr-abi SHARED tests/fake_crispasr_abi.cpp)
 add_library(hikaru-asr-fake-crispasr-cuda-marker SHARED tests/fake_crispasr_cuda_marker.cpp)
@@ -171,9 +172,25 @@ if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   file(TO_CMAKE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-13-native-asr-parakeet-reazon/research/local"
     T10_LOCAL_ROOT)
+  file(TO_CMAKE_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-14-native-asr-reazonspeech-r2/research/local"
+    T10R_LOCAL_ROOT)
+  set(T10R_VAD_MODEL "${T10R_LOCAL_ROOT}/vad/ggml-silero-v6.2.0.bin")
+  set(T10R_VAD_MODEL_AVAILABLE OFF)
+  if(EXISTS "${T10R_VAD_MODEL}")
+    file(SIZE "${T10R_VAD_MODEL}" T10R_VAD_MODEL_SIZE)
+    file(SHA256 "${T10R_VAD_MODEL}" T10R_VAD_MODEL_SHA256)
+    if(NOT T10R_VAD_MODEL_SIZE EQUAL 885098
+        OR NOT T10R_VAD_MODEL_SHA256 STREQUAL
+          "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987")
+      message(FATAL_ERROR "ReazonSpeech R2 Silero VAD identity drifted")
+    endif()
+    set(T10R_VAD_MODEL_AVAILABLE ON)
+  endif()
   target_compile_definitions(hikaru-asr-crispasr-development-runner PRIVATE
     "T09_LOCAL_ROOT=\"${T09_LOCAL_ROOT}\""
-    "T10_LOCAL_ROOT=\"${T10_LOCAL_ROOT}\"")
+    "T10_LOCAL_ROOT=\"${T10_LOCAL_ROOT}\""
+    "T10R_LOCAL_ROOT=\"${T10R_LOCAL_ROOT}\"")
   target_link_libraries(hikaru-asr-crispasr-development-runner
     PRIVATE hikaru-asr-crispasr hikaru-asr-parakeet-family-policy bcrypt psapi)
 endif()
@@ -358,11 +375,27 @@ if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
       hikaru-asr-crispasr-contract-worker PROPERTIES
       RUNTIME_OUTPUT_DIRECTORY_${configuration} "${CMAKE_BINARY_DIR}/contract-bin")
   endforeach()
-  target_compile_definitions(
-    hikaru-asr-crispasr-contract-worker PRIVATE HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1)
+  target_compile_definitions(hikaru-asr-crispasr-contract-worker PRIVATE
+    HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1
+    HIKARU_ASR_CRISPASR_WORKER_CONTRACT_TEST=1)
   target_link_libraries(
     hikaru-asr-crispasr-contract-worker
     PRIVATE hikaru-asr-ctranslate2 hikaru-asr-crispasr-test-adapter hikaru-asr-parakeet-family-policy)
+  add_executable(hikaru-asr-crispasr-vad-identity-contract-worker src/main.cpp)
+  set_target_properties(
+    hikaru-asr-crispasr-vad-identity-contract-worker PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/identity-contract-bin")
+  foreach(configuration IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+    set_target_properties(
+      hikaru-asr-crispasr-vad-identity-contract-worker PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY_${configuration} "${CMAKE_BINARY_DIR}/identity-contract-bin")
+  endforeach()
+  target_compile_definitions(
+    hikaru-asr-crispasr-vad-identity-contract-worker
+    PRIVATE HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1)
+  target_link_libraries(
+    hikaru-asr-crispasr-vad-identity-contract-worker
+    PRIVATE hikaru-asr-ctranslate2 hikaru-asr-crispasr hikaru-asr-parakeet-family-policy)
   add_executable(hikaru-asr-crispasr-worker-contract-tests tests/crispasr_worker_contract_tests.cpp)
   target_include_directories(hikaru-asr-crispasr-worker-contract-tests SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
@@ -370,6 +403,11 @@ if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   add_custom_command(TARGET hikaru-asr-worker POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${HIKARU_ASR_CRISPASR_RUNTIME_FILE}" "$<TARGET_FILE_DIR:hikaru-asr-worker>/crispasr.dll")
+  if(T10R_VAD_MODEL_AVAILABLE)
+    add_custom_command(TARGET hikaru-asr-worker POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+              "${T10R_VAD_MODEL}" "$<TARGET_FILE_DIR:hikaru-asr-worker>/ggml-silero-v6.2.0.bin")
+  endif()
 endif()
 
 add_executable(hikaru-asr-ctranslate2-tests tests/ctranslate2_whisper_tests.cpp)
@@ -414,6 +452,7 @@ if(MSVC)
     endforeach()
     if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
       target_compile_options(hikaru-asr-crispasr-contract-worker PRIVATE /W4 /permissive- /utf-8)
+      target_compile_options(hikaru-asr-crispasr-vad-identity-contract-worker PRIVATE /W4 /permissive- /utf-8)
     endif()
   endif()
   if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
@@ -426,7 +465,9 @@ endif()
 if(HIKARU_ASR_BUILD_CT2_WORKER)
   set(HIKARU_ASR_RUNTIME_TARGETS hikaru-asr-worker hikaru-asr-ctranslate2-tests)
   if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
-    list(APPEND HIKARU_ASR_RUNTIME_TARGETS hikaru-asr-crispasr-contract-worker)
+    list(APPEND HIKARU_ASR_RUNTIME_TARGETS
+      hikaru-asr-crispasr-contract-worker
+      hikaru-asr-crispasr-vad-identity-contract-worker)
   endif()
   foreach(target IN LISTS HIKARU_ASR_RUNTIME_TARGETS)
     add_custom_command(TARGET ${target} POST_BUILD
@@ -466,7 +507,8 @@ if(BUILD_TESTING)
       add_test(NAME crispasr-worker-contract
         COMMAND hikaru-asr-crispasr-worker-contract-tests
           $<TARGET_FILE:hikaru-asr-crispasr-contract-worker>
-          $<TARGET_FILE:hikaru-asr-fake-crispasr-abi>)
+          $<TARGET_FILE:hikaru-asr-fake-crispasr-abi>
+          $<TARGET_FILE:hikaru-asr-crispasr-vad-identity-contract-worker>)
       set_tests_properties(crispasr-worker-contract PROPERTIES TIMEOUT 30)
     else()
       find_package(Python3 REQUIRED COMPONENTS Interpreter)

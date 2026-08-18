@@ -1,0 +1,276 @@
+{
+  "absoluteGates": {
+    "acceleratedInferenceRtfMax": 0.5,
+    "cerMax": 0.35,
+    "crispasrPeakRssBytesMax": 12884901888,
+    "maxAdjacentNativePaddingOverlapMs": 60,
+    "maxCueCodePoints": 96,
+    "maxCueDurationMs": 15000,
+    "paddedMaxInferenceWindowMs": 12060,
+    "semanticGapsMax": 0,
+    "shortColdWallMsMax": 120000,
+    "timelineErrorsMax": 0
+  },
+  "acceptedAlgorithmHandoff": false,
+  "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+  "cases": [
+    {
+      "allApplicableGatesPass": false,
+      "caseId": "short-v1",
+      "cues": {
+        "countRange": [
+          3,
+          3
+        ],
+        "maximumAdjacentOverlapMs": 0,
+        "maximumCodePoints": 42,
+        "maximumDurationMs": 8320
+      },
+      "gates": {
+        "acceleratedInferenceRtfAtMost0_5": true,
+        "adjacentNativePaddingOverlapAtMost60Ms": true,
+        "cerAtMost0_35": true,
+        "cueAdjacentOverlapAtMost60Ms": true,
+        "cueCodePointsAtMost96": true,
+        "cueDurationAtMost15000Ms": true,
+        "cueStartsOrderedAndAudioBounded": true,
+        "oneAtomicReplacement": true,
+        "oneCallAndCuePerVadWindow": true,
+        "paddedWindowAtMost12060Ms": true,
+        "peakRssAtMost12GiB": true,
+        "replacementWithinProtocol": true,
+        "semanticSpeechGapsZero": false,
+        "shortColdWallAtMost120s": true,
+        "sourceResultsMatchFinalCues": true,
+        "textConservation": true,
+        "timelineErrorsZero": true
+      },
+      "measurements": {
+        "acceleratedInferenceRtf": 0.03161298647432285,
+        "coldProcessWallMs": 3936.0415000046487,
+        "maximumCueOverlapMs": 0,
+        "maximumExcludedVocalizationGapsAtLeast1500Ms": 0,
+        "maximumReplacementBytes": 451,
+        "maximumSampleCer": 0.26666666666666666,
+        "maximumSemanticSpeechGapsAtLeast1500Ms": 1,
+        "maximumTimelineErrors": 0,
+        "maximumVadWindowDurationMs": 10260,
+        "maximumVadWindowOverlapMs": 60,
+        "peakProcessRssBytes": 941690880
+      },
+      "sampleCounts": {
+        "cold": 1,
+        "measured": 0,
+        "warm": 3
+      },
+      "status": "completed"
+    },
+    {
+      "allApplicableGatesPass": false,
+      "caseId": "medium-v1",
+      "cues": {
+        "countRange": [
+          53,
+          53
+        ],
+        "maximumAdjacentOverlapMs": 0,
+        "maximumCodePoints": 75,
+        "maximumDurationMs": 11600
+      },
+      "gates": {
+        "acceleratedInferenceRtfAtMost0_5": true,
+        "adjacentNativePaddingOverlapAtMost60Ms": true,
+        "cerAtMost0_35": true,
+        "cueAdjacentOverlapAtMost60Ms": true,
+        "cueCodePointsAtMost96": true,
+        "cueDurationAtMost15000Ms": true,
+        "cueStartsOrderedAndAudioBounded": true,
+        "oneAtomicReplacement": true,
+        "oneCallAndCuePerVadWindow": true,
+        "paddedWindowAtMost12060Ms": true,
+        "peakRssAtMost12GiB": true,
+        "replacementWithinProtocol": true,
+        "semanticSpeechGapsZero": false,
+        "shortColdWallAtMost120s": null,
+        "sourceResultsMatchFinalCues": true,
+        "textConservation": true,
+        "timelineErrorsZero": true
+      },
+      "measurements": {
+        "acceleratedInferenceRtf": 0.021827599464389967,
+        "coldProcessWallMs": null,
+        "maximumCueOverlapMs": 0,
+        "maximumExcludedVocalizationGapsAtLeast1500Ms": 1,
+        "maximumReplacementBytes": 8085,
+        "maximumSampleCer": 0.2953846153846154,
+        "maximumSemanticSpeechGapsAtLeast1500Ms": 19,
+        "maximumTimelineErrors": 0,
+        "maximumVadWindowDurationMs": 11870,
+        "maximumVadWindowOverlapMs": 60,
+        "peakProcessRssBytes": 972058624
+      },
+      "sampleCounts": {
+        "cold": 0,
+        "measured": 1,
+        "warm": 0
+      },
+      "status": "completed"
+    },
+    {
+      "allApplicableGatesPass": false,
+      "caseId": "long-v2",
+      "errorCode": "crispasr_result_invalid",
+      "failures": [
+        {
+          "allApplicableGatesPass": false,
+          "attemptedInferenceMs": 35090.54979999928,
+          "attemptedInferenceRtf": 0.045656934046344876,
+          "attemptedThroughMs": 768570,
+          "attemptedWindowCount": 62,
+          "caseId": "long-v2",
+          "completedWindowCount": 61,
+          "errorCode": "crispasr_result_invalid",
+          "peakProcessRssBytes": 1205370880,
+          "ready": true,
+          "resultFailure": {
+            "fingerprintSha256": "35b1f992ca3619d7e985ee3e9bb33f01280bed48829766bafbe01ee1892dc93e",
+            "localEndMs": 2160,
+            "localStartMs": 2160,
+            "resultTraceSha256": "f3179c7ab489bfcc211b4779fa15fb481354850dd08cbf2286b64c00f13c45bb",
+            "segmentIndex": 0,
+            "subtype": "zero_duration_top_level_result",
+            "windowEndMs": 768570,
+            "windowStartMs": 763590,
+            "zeroBasedWindowIndex": 61
+          },
+          "rtfScope": "partial-attempt",
+          "status": "validated-failed"
+        }
+      ],
+      "peakProcessRssBytes": 1205370880,
+      "sampleCounts": {
+        "cold": 0,
+        "completed": 0,
+        "failed": 1,
+        "measured": 1,
+        "warm": 0
+      },
+      "status": "validated-failed"
+    }
+  ],
+  "identity": {
+    "acquisitionRunner": {
+      "sha256": "c3f6439d2cc708f4ab48713249056eab7f30e392e8a6ca60b52a69292416a5b7",
+      "sizeBytes": 53869
+    },
+    "algorithmSha256": "7385ac8086d22057c97d4c436a270049ffcfc885ef8e4b4b5b2d3430ea4f93cf",
+    "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+    "comparator": {
+      "sha256": "b2ae880e693d16daf6a3e29f7be3f0058c2ce74068b333b90850be5798cef822",
+      "sizeBytes": 101313
+    },
+    "device": {
+      "computeCapability": "8.6",
+      "driverApiVersion": 13020,
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 3070"
+    },
+    "deviceSelectionEnvironmentSha256": "2f70a6736857d863896571375bb717bda7b5d5dbad70239b897476900c7198cf",
+    "formalToolsSha256": "be531e6251f9f7c3bcd1a47849aa8dc21ed53b5b0db96a28102fd6e942be3fc0",
+    "inputLock": {
+      "sha256": "42039347f43d8b6faa2b9ab2f9acb3a2e021fb0e350eefa67e1bd38dde5bfd3f",
+      "sizeBytes": 24189
+    },
+    "loadedModulesSha256": "233f9a4cc44af829e55a83f2619f52ec5ab9c87db1c79f1fe37fd754d5400c38",
+    "manifest": {
+      "sha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea",
+      "sizeBytes": 2868
+    },
+    "model": {
+      "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+      "sizeBytes": 667147072
+    },
+    "pathPolicy": "task-runtime-cuda12.8-system32-v1",
+    "protocolLimits": {
+      "sha256": "435c4eb649dc7e8939c38fc0eb778d2428bf2646a028abfe636c62f43302b464",
+      "sizeBytes": 262
+    },
+    "runtimeFilesSha256": "55b293e1e1211f87eb92b3af4b9fde4abc7d3730449ab9fe8c1efd4f5e5a629d",
+    "sourceFilesSha256": "eca5b9d0857d5f7a9b9d79dbbcd78c08a3a2c8570981a7c4eab46b3222abb432",
+    "vad": {
+      "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+      "sizeBytes": 885098
+    },
+    "worker": {
+      "sha256": "e86c199e8a01cfead31d36f34d576fe89be52e0fd6f3d29163383ee94023c274",
+      "sizeBytes": 623616
+    }
+  },
+  "limitations": [
+    "Development CUDA evidence only; runtime pack, VAD delivery, and device qualification remain downstream.",
+    "Validated structured failures retain attempted-through timing and are never promoted to completed metrics.",
+    "Release/default remains Python legacy and the Reazon native route remains disabled."
+  ],
+  "publisher": {
+    "sha256": "96936767759df2576a7058b96d9d7d64103bec08c6b777b44fdf6c00b823fb49",
+    "sizeBytes": 57392
+  },
+  "qualityDisposition": "stop-revise",
+  "r1Authority": {
+    "baseline": {
+      "candidateId": "R1-window15s-top-level-v1",
+      "long-v2": {
+        "errorCode": "crispasr_result_invalid",
+        "resultFailureFingerprintSha256": "6c76aa3a15660de07b377754a75c9938add1a71edb58d3b1a988ab5c75935716",
+        "resultFailureSubtype": "zero_duration_top_level_result",
+        "status": "validated-failed"
+      },
+      "medium-v1": {
+        "cer": 0.37714285714285717,
+        "semanticGaps": 22,
+        "status": "completed",
+        "timelineErrors": 0
+      },
+      "short-v1": {
+        "cer": 0.225,
+        "semanticGaps": 1,
+        "status": "completed",
+        "timelineErrors": 0
+      }
+    },
+    "candidateId": "R1-window15s-top-level-v1",
+    "longRaw": {
+      "sha256": "2a80b258a661c1c83993c7caf3eac96ff3dfee0471a256905ef09c787b0c21b9",
+      "sizeBytes": 126944
+    },
+    "publication": {
+      "sha256": "ca7512e91b8b69197ff22acbcb5f5b45434c4b5c9b92c1307e479d6a50d246af",
+      "sizeBytes": 10349
+    },
+    "relativeThresholds": {
+      "antiRegressionCerIncreaseMax": 0.02,
+      "cerAbsoluteReductionMin": 0.02,
+      "mediumSemanticGapMaximum": 17,
+      "shortSemanticGapMaximum": 0
+    },
+    "reviewedLongFailure": {
+      "fingerprintSha256": "6c76aa3a15660de07b377754a75c9938add1a71edb58d3b1a988ab5c75935716",
+      "localEndMs": 14800,
+      "localStartMs": 14800,
+      "resultTraceSha256": "3bfbc7e4f380eea9c5f7940def40e576dcb80caa458f093bef247eca6c76889b",
+      "segmentIndex": 0,
+      "subtype": "zero_duration_top_level_result",
+      "windowEndMs": 360000,
+      "windowStartMs": 345000,
+      "zeroBasedWindowIndex": 23
+    }
+  },
+  "rawIndexSha256": "ac860d5a44725158505db3568588dff500d112b69fe601e8d8fe34d798e81ed6",
+  "relativeAntiRegressionFindings": [],
+  "relativeReasons": [
+    "medium-v1_cer_reduction"
+  ],
+  "relativeSelection": "better-than-r1",
+  "releaseRouteEnabled": false,
+  "schema": "hikaru-reazonspeech-r2-publication-v1"
+}

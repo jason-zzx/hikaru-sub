@@ -73,6 +73,9 @@ bool append_text(std::string& target, std::size_t& code_points, const std::strin
 
 PolicyResult assemble_reazon(const std::vector<WindowResult>& windows) {
   PolicyResult output;
+  std::string selected_text;
+  std::string final_text;
+  std::int64_t previous_start_ms = -1;
   for (const auto& window : windows) {
     if (window.source_segments.size() != 1) return failure("parakeet_family_invalid_input");
     const auto& source = window.source_segments.front();
@@ -85,13 +88,20 @@ PolicyResult assemble_reazon(const std::vector<WindowResult>& windows) {
             window.window_end_ms)) {
       return failure("parakeet_family_invalid_input");
     }
+    if (source.raw_start_ms < previous_start_ms) {
+      return failure("parakeet_family_invalid_input");
+    }
     if (text.code_points > max_cue_code_points
         || source.raw_end_ms - source.raw_start_ms > max_cue_duration_ms) {
       return failure("parakeet_family_cue_limit");
     }
+    previous_start_ms = source.raw_start_ms;
+    selected_text += source.text;
     output.segments.push_back({source.raw_start_ms, source.raw_end_ms, source.text});
   }
   if (output.segments.empty()) return failure("parakeet_family_empty_output");
+  for (const auto& segment : output.segments) final_text += segment.text;
+  if (selected_text != final_text) return failure("parakeet_family_text_conservation");
   return output;
 }
 
@@ -203,25 +213,45 @@ PolicyResult assemble_segments(
     const std::vector<WindowResult>& windows,
     std::int64_t audio_duration_ms) {
   if (audio_duration_ms <= 0 || windows.empty()) return failure("parakeet_family_empty_output");
-  std::int64_t expected_start = 0;
-  for (const auto& window : windows) {
-    const std::int64_t duration = window.window_end_ms - window.window_start_ms;
-    const bool final_window = window.window_end_ms == audio_duration_ms;
-    if (window.window_start_ms != expected_start
-        || duration <= 0
-        || window.window_end_ms > audio_duration_ms
-        || duration > window_duration_ms
-        || (!final_window && duration != window_duration_ms)) {
-      return failure("parakeet_family_invalid_input");
-    }
-    expected_start = window.window_end_ms;
-  }
-  if (expected_start != audio_duration_ms) return failure("parakeet_family_invalid_input");
-
   if (engine == Engine::ReazonSpeechNemo) {
+    std::int64_t previous_start_ms = -1;
+    std::int64_t previous_end_ms = -1;
+    std::int64_t two_back_end_ms = -1;
+    for (const auto& window : windows) {
+      const std::int64_t duration = window.window_end_ms - window.window_start_ms;
+      if (window.window_start_ms < 0
+          || duration <= 0
+          || window.window_end_ms > audio_duration_ms
+          || duration > crisp::reazon_vad_padded_max_duration_ms
+          || (previous_start_ms >= 0
+              && (window.window_start_ms <= previous_start_ms
+                  || window.window_end_ms <= previous_end_ms
+                  || previous_end_ms - window.window_start_ms
+                      > crisp::reazon_vad_max_adjacent_overlap_ms))
+          || (two_back_end_ms >= 0 && window.window_start_ms < two_back_end_ms)) {
+        return failure("parakeet_family_invalid_input");
+      }
+      two_back_end_ms = previous_end_ms;
+      previous_start_ms = window.window_start_ms;
+      previous_end_ms = window.window_end_ms;
+    }
     return assemble_reazon(windows);
   }
   if (engine == Engine::Parakeet) {
+    std::int64_t expected_start = 0;
+    for (const auto& window : windows) {
+      const std::int64_t duration = window.window_end_ms - window.window_start_ms;
+      const bool final_window = window.window_end_ms == audio_duration_ms;
+      if (window.window_start_ms != expected_start
+          || duration <= 0
+          || window.window_end_ms > audio_duration_ms
+          || duration > window_duration_ms
+          || (!final_window && duration != window_duration_ms)) {
+        return failure("parakeet_family_invalid_input");
+      }
+      expected_start = window.window_end_ms;
+    }
+    if (expected_start != audio_duration_ms) return failure("parakeet_family_invalid_input");
     return assemble_parakeet(windows);
   }
   return failure("parakeet_family_invalid_input");

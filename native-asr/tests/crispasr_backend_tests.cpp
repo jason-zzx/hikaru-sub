@@ -12,6 +12,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -137,8 +138,10 @@ void run_tests(
   write_wav(audio);
   check(wav::read_pcm16_mono_16khz(audio).duration_ms == 1000, "shared WAV duration drift");
   const fs::path model = root / "model.gguf";
+  const fs::path reazon_model = root / "reazon-model.gguf";
   const fs::path aligner = root / "aligner.gguf";
   std::ofstream(model) << "model";
+  std::ofstream(reazon_model) << "model";
   std::ofstream(aligner) << "aligner";
   const fs::path stereo = root / "stereo.wav";
   write_bad_wav(stereo, 2, wav::sample_rate);
@@ -166,7 +169,7 @@ void run_tests(
 
   counters.reset();
   {
-    CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, audio, model, library));
+    CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, audio, reazon_model, library));
     check(backend.duration_ms() == 1000, "duration drift");
     std::vector<std::int64_t> progress;
     std::vector<Segment> previews;
@@ -223,6 +226,132 @@ void run_tests(
   check(counters.get(12) == 2 && counters.get(13) == 5'000 * wav::sample_rate / 1000,
         "window sample slicing drift");
 
+  const fs::path vad_model = root / "ggml-silero-v6.2.0.bin";
+  std::ofstream(vad_model) << "vad";
+  check(!reazon_vad_identity_matches(vad_model),
+        "production VAD identity accepted a wrong-size non-empty asset");
+  check(reazon_vad_identity_permitted(vad_model),
+        "generic VAD test identity bypass was not isolated from runtime identity");
+  const fs::path wrong_hash_vad = root / "wrong-hash-vad.bin";
+  {
+    std::ofstream output(wrong_hash_vad, std::ios::binary);
+    output.seekp(885'097);
+    output.put('\0');
+  }
+  check(fs::file_size(wrong_hash_vad) == 885'098
+            && !reazon_vad_identity_matches(wrong_hash_vad),
+        "production VAD identity accepted a correct-size wrong-hash asset");
+  counters.reset();
+  SetEnvironmentVariableA("CRISPASR_PARAKEET_STREAM_THRESHOLD", "12");
+  SetEnvironmentVariableA("CRISPASR_PARAKEET_STREAM_CHUNK", "2");
+  SetEnvironmentVariableA("CRISPASR_SESSION_UNIFIED_DISPATCH", "1");
+  {
+    CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, window_audio, reazon_model, library));
+    const std::vector<AudioWindow> windows = backend.detect_reazon_vad_windows(vad_model);
+    check(windows.size() == 2
+              && windows[0].start_ms == 0 && windows[0].end_ms == 12'060
+              && windows[1].start_ms == 12'000 && windows[1].end_ms == 20'000,
+          "Reazon VAD windows drifted");
+    for (const auto& window : windows) backend.transcribe_window(window);
+  }
+  check_counts(counters, {1, 1, 2, 2, 0, 0, 2, 2, 2, 2}, "Reazon VAD success");
+  check(counters.get(14) == 1 && counters.get(15) == 1,
+        "VAD spans were not freed exactly once");
+  check(counters.get(16) == 500 && counters.get(17) == 250
+            && counters.get(18) == 100 && counters.get(19) == 30
+            && counters.get(20) == 12'000 && counters.get(21) == 16,
+        "frozen VAD parameters drifted");
+  check(counters.get(22) == 2 && counters.get(23) == 0,
+        "Reazon exact single-pass strategy drifted");
+  char inherited[8]{};
+  check(GetEnvironmentVariableA("CRISPASR_PARAKEET_STREAM_CHUNK", inherited, sizeof(inherited)) == 0,
+        "inherited Parakeet strategy knob was not cleared");
+
+  const fs::path long_window_audio = root / "long-window-audio.wav";
+  write_wav(long_window_audio, 540'000);
+  SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", "long-float-boundary");
+  {
+    CrispAsrBackend backend(config(
+        Engine::ReazonSpeechNemo, long_window_audio, reazon_model, library));
+    const std::vector<AudioWindow> windows = backend.detect_reazon_vad_windows(vad_model);
+    check(windows.size() == 2
+              && windows[0].start_ms == 510'970 && windows[0].end_ms == 522'930
+              && windows[1].start_ms == 522'870 && windows[1].end_ms == 533'630,
+          "real long-v2 float endpoint regression drifted");
+  }
+  for (const char* scenario : {"long-float-overlap61", "long-float-too-long"}) {
+    SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", scenario);
+    expect_error("crispasr_vad_result_invalid", [&] {
+      CrispAsrBackend backend(config(
+          Engine::ReazonSpeechNemo, long_window_audio, reazon_model, library));
+      backend.detect_reazon_vad_windows(vad_model);
+    });
+  }
+
+  SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", "energy-split");
+  {
+    CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, window_audio, reazon_model, library));
+    const std::vector<AudioWindow> windows = backend.detect_reazon_vad_windows(vad_model);
+    check(windows.size() == 2
+              && windows[0].end_ms == 11'870 && windows[1].start_ms == 11'810,
+          "upstream energy-minimum split window drifted");
+  }
+  SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", nullptr);
+
+  expect_error("crispasr_vad_not_supported", [&] {
+    CrispAsrBackend backend(config(Engine::Parakeet, window_audio, model, library));
+    backend.detect_reazon_vad_windows(vad_model);
+  });
+  expect_error("crispasr_vad_model_invalid", [&] {
+    CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, window_audio, reazon_model, library));
+    backend.detect_reazon_vad_windows(root / "missing-vad.bin");
+  });
+  expect_error("crispasr_window_invalid", [&] {
+    CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, window_audio, reazon_model, library));
+    backend.transcribe_window({0, 12'061});
+  });
+
+  std::vector<std::pair<std::string, std::string>> zero_results;
+  for (const char* scenario : {"no-speech-like", "internal-failure-like"}) {
+    counters.reset();
+    SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", scenario);
+    try {
+      CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, window_audio, reazon_model, library));
+      backend.detect_reazon_vad_windows(vad_model);
+      throw std::runtime_error("zero-result VAD scenario unexpectedly succeeded");
+    } catch (const BackendError& error) {
+      zero_results.emplace_back(error.code(), error.what());
+    }
+    check(counters.get(14) == 1 && counters.get(15) == 0,
+          std::string("zero-result VAD cleanup drifted for ") + scenario);
+  }
+  check(zero_results.size() == 2 && zero_results[0] == zero_results[1]
+            && zero_results[0].first == "crispasr_vad_no_result",
+        "indistinguishable zero-result VAD outcomes did not fail identically");
+
+  for (const auto& [scenario, code, expected_frees] :
+       std::vector<std::tuple<const char*, const char*, int>>{
+           {"error", "crispasr_vad_failed", 0},
+           {"error-with-spans", "crispasr_vad_failed", 1},
+           {"nonfinite", "crispasr_vad_result_invalid", 1},
+           {"negative", "crispasr_vad_result_invalid", 1},
+           {"reversed", "crispasr_vad_result_invalid", 1},
+           {"outside", "crispasr_vad_result_invalid", 1},
+           {"unordered", "crispasr_vad_result_invalid", 1},
+           {"overlap61", "crispasr_vad_result_invalid", 1},
+           {"nonadjacent", "crispasr_vad_result_invalid", 1},
+           {"too-long", "crispasr_vad_result_invalid", 1}}) {
+    counters.reset();
+    SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", scenario);
+    expect_error(code, [&] {
+      CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, window_audio, reazon_model, library));
+      backend.detect_reazon_vad_windows(vad_model);
+    });
+    check(counters.get(14) == 1 && counters.get(15) == expected_frees,
+          std::string("VAD cleanup drifted for ") + scenario);
+  }
+  SetEnvironmentVariableA("HIKARU_FAKE_CRISPASR_VAD_SCENARIO", nullptr);
+
   for (const AudioWindow invalid : std::vector<AudioWindow>{{-1, 1}, {0, 0}, {0, 20'001}}) {
     expect_error("crispasr_window_invalid", [&] {
       CrispAsrBackend backend(config(Engine::Parakeet, window_audio, model, library));
@@ -247,7 +376,7 @@ void run_tests(
 
   expect_error("crispasr_device_unavailable", [&] {
     CrispAsrBackend backend(config(
-        Engine::ReazonSpeechNemo, audio, model, library, std::nullopt, Device::Cuda));
+        Engine::ReazonSpeechNemo, audio, reazon_model, library, std::nullopt, Device::Cuda));
   });
   HMODULE marker = LoadLibraryExW(
       fs::absolute(cuda_marker).c_str(),
@@ -256,7 +385,7 @@ void run_tests(
   check(marker != nullptr, "fake CUDA marker could not be loaded");
   {
     CrispAsrBackend backend(config(
-        Engine::ReazonSpeechNemo, audio, model, library, std::nullopt, Device::Cuda));
+        Engine::ReazonSpeechNemo, audio, reazon_model, library, std::nullopt, Device::Cuda));
   }
   FreeLibrary(marker);
 
@@ -299,6 +428,28 @@ void run_tests(
   check_counts(counters, {1, 1, 1, 1, 0, 0, 1, 1, 1, 1}, "callback failure");
   check(counters.get(10) > 0 && counters.get(11) > counters.get(10),
         "callbacks were not reset before result cleanup");
+
+  counters.reset();
+  const fs::path zero_duration = root / "zero-duration-result.gguf";
+  std::ofstream(zero_duration) << "model";
+  try {
+    CrispAsrBackend backend(config(Engine::ReazonSpeechNemo, audio, zero_duration, library));
+    backend.transcribe_window({0, 1000});
+    throw std::runtime_error("zero-duration result unexpectedly passed");
+  } catch (const BackendError& error) {
+    const auto& detail = error.result_failure();
+    check(error.code() == "crispasr_result_invalid" && detail.has_value(),
+          "zero-duration result did not retain structured failure detail");
+    const std::string trace = "segmentIndex=0\nlocalStartMs=2160\nlocalEndMs=2160"
+        "\nwindowDurationMs=1000";
+    check(detail->subtype == "zero_duration_top_level_result"
+              && detail->segment_index == 0
+              && detail->local_start_ms == 2160
+              && detail->local_end_ms == 2160
+              && detail->result_trace_sha256 == sha256_text(trace),
+          "zero-duration result fingerprint drifted");
+  }
+  check_counts(counters, {1, 1, 1, 1, 0, 0, 1, 1, 1, 1}, "zero-duration result");
 
   for (const auto& [name, code] : std::vector<std::pair<std::string, std::string>>{
            {"open-null.gguf", "crispasr_model_load_failed"},
