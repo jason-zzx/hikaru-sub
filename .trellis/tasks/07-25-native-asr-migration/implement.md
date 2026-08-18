@@ -1,6 +1,6 @@
 # 原生 ASR 迁移实施总计划
 
-> 状态：父任务保持 `planning`；Gate 0/1 已关闭。当前 benchmark authority 使用 long-v2：T08 corrected CT2 handoff 使 selected Candidate A short/medium/long-v2 通过并将 Candidate B 保持 diagnostic-only，Kotoba K2 为 `accepted-kotoba-algorithm-input`；T03C corrected CrispASR handoff 保持 ReazonSpeech `proceed-with-named-risks`、Parakeet/Qwen `stop-revise`。所有 historical long-v1 数值仅为 superseded provenance。native routes 仍未切换，ORT/VAD 不进入 T13，Release/default 保持 Python legacy；父任务不直接启动实现。
+> 状态：父任务保持 `planning`；Gate 0/1 已关闭。当前 benchmark authority 使用 long-v2：T08 corrected CT2 handoff 使 selected Candidate A short/medium/long-v2 通过并将 Candidate B 保持 diagnostic-only，Kotoba K2 为 `accepted-kotoba-algorithm-input`；T10 的 ReazonSpeech R1 与 Parakeet P1 均为 `stop-revise`。T10R ReazonSpeech R2 的 false sample-overlap failure 已在同一 candidate 内纠正并重跑完整矩阵，现发布 `stop-revise + better-than-r1`：medium CER 有实质改善，long-v2 通过 VAD 后仍因与 R1 同类的上游 zero-duration top-level result 合法失败。它只作为首选开发基础，不向 T14/T15 提供 accepted Reazon input。所有 historical long-v1 数值仅为 superseded provenance。native routes 仍未切换，ORT/VAD 不进入 T13，Release/default 保持 Python legacy；父任务不直接启动实现。
 
 ## Execution Policy
 
@@ -24,16 +24,17 @@ Gate 2: engine productization + development acceleration
   T05 -> T06 CPU diagnosis/device decision
   T06 CPU checkpoint -> T07 development CUDA -> T08
   T06 -> T09 CrispASR core + development GPU -> T10 + T11
+  T10 Reazon R1 stop-revise -> T10R Reazon R2
 
 Gate 3: models, CPU/GPU runtime and UI
   T02 + T03 -> T12
   T06 -> T13
-  T06 + T07 + T08 + T10 + T11 + T13 -> T14
-  T06 + T07 + T08 + T10 + T11 + T14 -> T15
+  T06 + T07 + T08 + T10R + T11 + T13 -> T14
+  T06 + T07 + T08 + T10R + T11 + T14 -> T15
   T05 + T12 + T13 + T15 -> T16 -> T17
 
 Gate 4: release cutover
-  T06..T17 -> T18
+  T06..T17 + T10R -> T18
 ```
 
 Allowed parallel groups:
@@ -41,7 +42,7 @@ Allowed parallel groups:
 - T02 and T03 after T01.
 - T06 after T05. T07 starts after T06 exposes the production-worker seam and completes the CPU root-cause checkpoint; it does not depend on proving a CPU ceiling and does not wait for a GPU-required decision.
 - T08 Kotoba follows T07. T07 is now `development-gpu-ready` with short-v1/locked-120s GPU-to-CPU warmed-median ratios `0.1090/0.1313`, so repeated T08 quality iteration stays on GPU even when CER/gap/timeline gates fail. This does not imply that ordinary native faster-whisper is qualified or enabled.
-- T10 and T11 may overlap after T09 stabilizes the CrispASR core and publishes independent ignored-local `parakeet-family` / `qwen3-family` development-device results. Each task consumes only its matching family result; an attested, repeatably faster family GPU seam remains the development device through CER/gap/segmentation/alignment failures. Required CPU regression and final publishable-device gates remain separate.
+- T10 and T11 may overlap after T09 stabilizes the CrispASR core and publishes independent ignored-local `parakeet-family` / `qwen3-family` development-device results. T10R follows T10's Reazon R1 `stop-revise` evidence while T11 may continue independently. Each task consumes only its matching family result; an attested, repeatably faster family GPU seam remains the development device through CER/gap/segmentation/alignment failures. Required CPU regression and final publishable-device gates remain separate.
 - T12 may start from proven model formats and overlap engine productization; T13 waits for the T06 production worker, then may overlap T08～T11.
 - T14 starts after final backend/device inputs and the CPU package contract stabilize; T15 starts after engine pipelines and formal GPU packs are measurable.
 - T07/T09 development GPU artifacts are ignored-local evidence only. Formal GPU pack failure in T14/T15 records `stop-revise` and omits that pack without blocking unrelated qualified CPU routes.
@@ -330,6 +331,31 @@ Rollback point: engines switch independently; one failure does not disable the o
 
 T10 implementation handoff: `.trellis/tasks/08-13-native-asr-parakeet-reazon/research/t10-handoff.md`. Frozen R1/P1 both publish `stop-revise`: Reazon short/medium fail semantic-gap/CER gates and long-v2 has a complete `crispasr_result_invalid` trace; Parakeet short passes, medium fails CER/gaps, and long-v2 fails closed on text conservation. Neither supplies an accepted T14/T15 algorithm input, and Release/default remains Python legacy.
 
+#### T10R - Optimize ReazonSpeech R2 Quality
+
+Suggested slug: `native-asr-reazonspeech-r2`
+
+Deliverables:
+
+- Replace R1's arbitrary fixed 15-second inference boundaries with the smallest reviewed official/community-backed candidate; primary direction is pinned CrispASR Silero-VAD speech slices capped at 12 seconds and cut at energy minima.
+- Keep Q8_0, the current pinned CrispASR runtime, CUDA development lane, protocol v1, atomic final replacement, T01 comparator and `96 code points / 15000ms` cue limits unchanged for the primary candidate.
+- Complete short-v1 / medium-v1 / long-v2 under one frozen R2 identity, even when an earlier quality gate fails.
+- Publish both the existing absolute quality disposition and a separate R1-relative selection result. A candidate that is materially better than R1 may be retained for further development without being qualified or enabled.
+- Activate a gap-fill, F16, official subword decoder or other secondary candidate only after the primary matrix identifies the remaining causal blocker and a new identity is reviewed.
+
+Depends on: T09 and completed T10 R1 evidence.
+
+Exit criteria:
+
+- R2 has a complete identity-valid matrix and independent `qualified | stop-revise` disposition.
+- R2 additionally publishes `better-than-r1 | no-material-improvement` using explicit CER/gap/completion non-regression rules from the child task.
+- `better-than-r1 + stop-revise` remains disabled and supplies no accepted T14/T15 algorithm input; it is only the preferred basis for a later revision.
+- No Parakeet, Qwen, release route, downloader, settings, frontend, installer or runtime-pack work is mixed into T10R.
+
+Rollback point: restore R1/T09's disabled Reazon route and discard only the R2 candidate/evidence; keep T10 history immutable.
+
+T10R implementation handoff: `.trellis/tasks/08-14-native-asr-reazonspeech-r2/research/reazonspeech-r2-handoff.md`. The same frozen candidate publishes `stop-revise + better-than-r1` after final-check fixes restored the generic T09/T10 CrispASR decoder, separated the R2-only Step 6 required decoder, and replaced broad error-code equality with an identity-bound failure fingerprint. Short-v1 CER/gaps remain `0.266667 / 1`, medium-v1 `0.295385 / 19`, and long-v2 completes 61 calls before its 62nd attempt—zero-based window `61`, `[763590,768570]ms`—returns the reviewed `zero_duration_top_level_result` fingerprint `35b1f992ca3619d7e985ee3e9bb33f01280bed48829766bafbe01ee1892dc93e`. Medium CER improves by `0.081758` absolute with no PRD-R5 anti-regression finding. Reazon remains disabled, supplies no accepted T14/T15 algorithm input, and no gap-fill/F16/decoder/ownership candidate is activated without a new user-reviewed plan.
+
 #### T11 - Productize Qwen3 With ForcedAligner
 
 Suggested slug: `native-asr-qwen3-aligner`
@@ -412,7 +438,7 @@ Deliverables:
 - Reuse protocol v1 resolved device values (`cpu`, `cuda`, `vulkan`); do not introduce a second worker protocol or backend-specific host executable.
 - Add deterministic pack preparation/verification suitable for managed download; end-user machines never compile native dependencies.
 
-Depends on: completed T06 CPU/device decision, T07 CTranslate2 development CUDA result, T09 CrispASR development GPU result, accepted T08/T10/T11 engine inputs, and the T13 packaging contract.
+Depends on: completed T06 CPU/device decision, T07 CTranslate2 development CUDA result, T09 CrispASR development GPU result, accepted T08/T11 engine inputs, the completed T10R disposition, and the T13 packaging contract. T10R contributes Reazon input only when `qualified`; `better-than-r1 + stop-revise` and other non-qualified results are recorded as omitted and do not block unrelated engines.
 
 Exit criteria:
 
@@ -439,7 +465,7 @@ Deliverables:
 - Verify pack-load/runtime failure produces one nonfatal notice: engines with a qualified CPU route retry that bundled CPU path without losing job/recovery semantics, while ordinary faster-whisper proven GPU-required becomes unavailable without launching its unqualified CPU route.
 - Publish an independent `qualified`, `stop-revise` or `omitted-no-candidate` decision for CUDA and Vulkan; no non-qualified pack blocks CPU cutover.
 
-Depends on: completed T06 CPU/device decision, T07, T08, T10, T11, and T14. T07 is consumed as development evidence regardless of whether ordinary faster-whisper becomes `gpu-required-pending`; this dependency never requires T06 to contain GPU qualification evidence.
+Depends on: completed T06 CPU/device decision, T07, T08, the completed T10R disposition, T11, and T14. T10R contributes a Reazon route only when `qualified`; otherwise Reazon is omitted without blocking other engine/device qualifications. T07 is consumed as development evidence regardless of whether ordinary faster-whisper becomes `gpu-required-pending`; this dependency never requires T06 to contain GPU qualification evidence.
 
 Exit criteria:
 
@@ -496,7 +522,7 @@ Deliverables:
 - Remove production copy referencing Python, venv, pip and service directories.
 - Cover old settings/default fallback and companion download aggregation.
 
-Depends on: T12, T16; engine/model/device metadata from T06～T11 and T15 must be stable.
+Depends on: T12, T16; engine/model/device metadata from T06～T11, T10R and T15 must be stable. A non-qualified T10R result keeps Reazon visible but unavailable for native release.
 
 Exit criteria:
 
@@ -534,7 +560,7 @@ Deliverables:
 - Update README/notices and, only after architecture lands, update `AGENTS.md` and `.trellis/spec/{asr,tauri,frontend}`.
 - Run final cross-child contract review against the parent PRD.
 
-Depends on: T06, T07, T08, T10, T11, T12, T13, T14, T15, T16, T17.
+Depends on: T06, T07, T08, T10, T10R, T11, T12, T13, T14, T15, T16, T17. T18 consumes T10R's final disposition: only `qualified` Reazon is eligible for cutover; `better-than-r1 + stop-revise` remains disabled and omitted.
 
 Exit criteria:
 
