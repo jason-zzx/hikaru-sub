@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/asr/quality-guidelines.md", "reason": "Review scoped quality-only Python comparison without relaxing security or absolute performance gates."}
+{"file": ".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md", "reason": "Verify shared metrics, result identity, privacy and deterministic publication reuse."}
+{"file": ".trellis/tasks/07-25-native-asr-migration/prd.md", "reason": "Check parent acceptance and Whisper family unlock wording."}
+{"file": ".trellis/tasks/07-25-native-asr-migration/design.md", "reason": "Check architecture and compatibility boundary."}
+{"file": ".trellis/tasks/07-25-native-asr-migration/implement.md", "reason": "Check downstream gate and validation updates."}

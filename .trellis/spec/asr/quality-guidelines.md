@@ -28,7 +28,7 @@ When optional engines or models are absent, report that limitation instead of cl
 
 ### 1. Scope / Trigger
 
-Use this contract whenever a Python or native ASR candidate is measured for migration feasibility. User-provided `.asr-benchmark` WAV+ASS pairs are the only text, speech-region, and timeline truth; current Python output is diagnostic only.
+Use this contract whenever a Python or native ASR candidate is measured for migration feasibility. User-provided `.asr-benchmark` WAV+ASS pairs remain the only text, speech-region, and timeline truth. The authoritative model-level handoff in `.trellis/tasks/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json` establishes a scoped subtitle-quality non-regression gate only for complete, identity-bound `python-legacy-cuda-v1` rows; Python output never creates or repairs reference annotations.
 
 ### 2. Signatures
 
@@ -73,8 +73,9 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 - When an authoritative reference identity changes, inventory every backend and result family that consumed the superseded identity, including completed, failed, diagnostic, derived, and currently inactive routes. Preserve historical artifacts, then publish an identity-bound supersession or an explicit validated-unscored disposition for every authoritative row before any parent/spec/handoff may claim the migration uses the new reference. Correcting only the currently active backend is incomplete.
 - Missing confirmed-speech regions are semantic and gating by default. A region is diagnostic-only when every overlapping reference cue, after NFKC normalization and removal of whitespace, Unicode punctuation/symbols, and `ー` / `〜` / `~`, is exactly 1..6 repeats of one unit from `あ`, `う`, `え`, `お`, `ん`, `うん`, or `うあ`. Excluded regions remain in CER and publish separately; `はい`, laughter, mixed/lexical cues, and unknown forms remain semantic.
 - Every model candidate whose authoritative corpus is short-v1 / medium-v1 / long-v2 must complete all three cases under one frozen inference identity before quality disposition, even when an earlier case fails CER, timeline, semantic-gap, performance, resource, subtitle-size, or protocol-output gates. A quality failure is recorded and the matrix continues. Identity/input/runtime attestation drift, harness corruption, or an incomplete trace makes a row invalid and requires repair plus rerun of the affected case. By contrast, an identity-valid, candidate-caused structured failure with a complete trace—such as deterministic model load/compute rejection or a measured resource-limit failure—is valid failed evidence, counts as that case's attempted matrix row, and yields a non-qualified disposition without authorizing later-case truncation. External termination without atomic output remains unscored and must be rerun. Only the complete matrix may publish `accepted-*-algorithm-input`, `qualified`, `stop-revise`, or `unsupported-for-native-release`. A later candidate requires a newly reviewed identity that addresses the complete observed failure distribution. This full-matrix rule applies to T10 and all later model tasks; it does not retroactively alter archived evidence or require unrelated model identities to run in one combined candidate.
-- Frozen native gates: CER `<=0.35` per engine/case; CPU inference RTF `<=1.0`; accelerated GPU inference RTF `<=0.5`; short cold wall `<=120s`; peak RSS `<=6 GiB` for CTranslate2 or `<=12 GiB` for CrispASR; zero invalid/out-of-bounds segments; zero semantic confirmed-speech gaps `>=1500ms`; Qwen3 ForcedAligner median `<=150ms` and P95 `<=500ms`. No VRAM gate is defined.
-- Python references never establish expected output, relative CER/RTF gates, or missing annotations.
+- Native subtitle-quality qualification is per `logicalModelIdentity × case × comparisonProfile`: CER and S/D/I, empty text, semantic confirmed-speech gaps, and eligible Qwen3 ForcedAligner median/P95 must each be no worse than the matching `python-legacy-cuda-v1` row. No average, family-only match, cross-model row, missing row, or ineligible timing provenance may authorize release. Historical absolute CER/gap/Qwen limits remain diagnostics rather than the new subtitle-quality release decision.
+- Frozen non-quality and structural native gates remain absolute: CPU inference RTF `<=1.0`; accelerated GPU inference RTF `<=0.5`; short cold wall `<=120s`; peak RSS `<=6 GiB` for CTranslate2 or `<=12 GiB` for CrispASR; zero invalid/out-of-bounds/negative/reversed/zero-duration timeline segments; valid UTF-8, text conservation, subtitle/protocol legality, complete matrix coverage, and all identity/process/path/privacy/license/cancellation/recovery contracts. No VRAM gate is defined, and Python measurements never relax these gates.
+- Python legacy never establishes expected output, relative performance/resource gates, or missing annotations. Missing, invalid, identity-drifted, or provenance-ineligible baseline evidence yields `baseline-incomplete` or `unscored`, never qualification.
 
 ### 4. Validation & Error Matrix
 
@@ -109,9 +110,9 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 
 ### 5. Good / Base / Bad Cases
 
-- **Good:** native candidate uses the validated manifest identity, one exact lock/binary/DLL/model evidence set, shared recomputed metrics, and frozen absolute gates; source/model windows, CPU modules, Qwen raw-to-grouped provenance, and any WAV-end bound remain auditable. Python data is shown only as supplemental diagnostics.
-- **Base:** Python medium/long diagnostics are missing, an engine returns one broad legal segment, or a mandatory native long run times out before atomic publication; comparison reports the limitation and leaves incomplete evidence unscored.
-- **Bad:** regenerate reference text from a Python transcript, trust editable adapted metrics without recomputation, compare only against Python parity, average cases to hide one failing case, stop a model candidate after the first quality failure instead of completing its frozen audio matrix, add VAD to fix a CER/RTF blocker without a new reviewed identity, treat runtime feasibility or one broad segment as subtitle readiness, publish derived/negative records without identity validation, treat Qwen character ranges as final cues, use a source-slice duration as the model timestamp range, or commit private media/raw results.
+- **Good:** native candidate uses the validated manifest identity, one exact lock/binary/DLL/model evidence set, shared recomputed metrics, and the matching model/case `python-legacy-cuda-v1` quality row; every relative field is reported independently while structural, performance, security and evidence gates remain absolute. Source/model windows, CPU modules, Qwen raw-to-grouped provenance, and any WAV-end bound remain auditable.
+- **Base:** a required Python row or eligible Qwen timing provenance is missing, an engine returns one broad legal segment, or a mandatory native long run times out before atomic publication; comparison reports `baseline-incomplete`/`unscored` or the independent structural limitation and does not qualify the route.
+- **Bad:** regenerate reference text from a Python transcript, trust editable adapted metrics without recomputation, use a family/cross-model/missing Python row, average cases to hide one failing metric, use Python performance to waive an absolute gate, stop a model candidate after the first quality failure instead of completing its frozen audio matrix, add VAD without a new reviewed identity, treat runtime feasibility or one broad segment as subtitle readiness, publish derived/negative records without identity validation, treat Qwen character ranges as final cues, use a source-slice duration as the model timestamp range, or commit private media/raw results.
 
 ### 6. Tests Required
 
@@ -148,8 +149,8 @@ Native CrispASR harnesses additionally assert:
 ### 7. Wrong vs Correct
 
 ```text
-Wrong: native passes because it differs from Python by less than 1%, because the runtime can execute all models, or because one broad segment covers the whole speech interval.
-Correct: native passes only when each route/case meets the frozen absolute gates against validated WAV+ASS ground truth, with one enforced lock/binary/DLL/model identity, auditable native timing, and separately reported subtitle-scale segmentation risks.
+Wrong: native passes because its family average is near Python, because it borrows another model's row, because Python performance is slow, or because one broad segment covers the whole speech interval.
+Correct: native subtitle quality passes only when every applicable metric is no worse than the same logical model and case under `python-legacy-cuda-v1`; the candidate must also independently pass the frozen structural, performance/resource, identity, protocol, path, cancellation/recovery, privacy and license gates against validated WAV+ASS truth.
 
 Wrong: after short-v1 fails CER/RTF, stop that model candidate and infer that medium/long-v2 would add no evidence.
 Correct: keep the candidate identity frozen, complete medium-v1 and long-v2, publish the full per-case failure distribution, then activate a new candidate only when it addresses that complete profile.
@@ -549,7 +550,7 @@ Correct: restore using the pinned integer sample/half-even 10 ms rule and fail c
 - Silent Kotoba cache “ready” without `preprocessor_config.json`
 - Changing job snapshot shape without cross-layer type updates
 - Adding GPU-only code paths without documenting CPU/optional install reality
-- Reimplementing benchmark metrics or using Python parity as native quality truth
+- Reimplementing benchmark metrics, using an unbound/cross-model Python row, or using Python performance to relax native absolute gates
 - Publishing native derived/negative evidence outside the same identity validator used for authoritative results
 - Trusting pre-adapted metric JSON instead of recomputing sanitized publication from the authoritative local manifest/ASS
 - Requiring CT2/model inputs for protocol-only builds, using locale-dependent Windows model paths, or extending Kotoba preprocessor readiness to ordinary Whisper
