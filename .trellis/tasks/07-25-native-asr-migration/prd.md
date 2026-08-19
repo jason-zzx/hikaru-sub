@@ -16,7 +16,7 @@
 
 ## Evidence And Implementation Authority
 
-冲突按以下层级解决：用户 `.asr-benchmark` WAV+ASS 真值；官方文档/稳定 API/模型卡；维护良好的社区推荐实践；同一真值上的实测选择；按具体模型 identity 冻结的 Python legacy 质量基线。`.trellis/tasks/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json` 是后续 native 字幕质量比较的唯一 Python authority：只允许同 `logicalModelIdentity × case × python-legacy-cuda-v1` 的逐项非回退比较。Python 不得生成或修补 reference，也不构成相对性能/资源 gate。
+冲突按以下层级解决：用户 `.asr-benchmark` WAV+ASS 真值；官方文档/稳定 API/模型卡；维护良好的社区推荐实践；同一真值上的实测选择；按具体模型 identity 冻结的 Python legacy 质量基线。`.trellis/tasks/archive/2026-08/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json` 是后续 native 字幕质量比较的唯一 Python authority：只允许同 `logicalModelIdentity × case × python-legacy-cuda-v1` 的逐项非回退比较。归档的 `.trellis/tasks/archive/2026-08/08-19-native-asr-legacy-quality-reevaluation/research/evidence/native-asr-legacy-quality-reevaluation.json` 是当前前瞻性 native disposition authority；它只重解释冻结 evidence，不改写 T06/T08/T10/T10R/T03C 历史 artifacts。Python 不得生成或修补 reference，也不构成相对性能/资源 gate。
 
 React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同是独立的产品兼容权威，不因算法来源层级变化而降级。
 
@@ -110,22 +110,25 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - 发出取消后 2 秒内 worker 退出；异常退出后可读取最后保存的恢复快照。
 - Windows setup 不超过 80 MB，portable ZIP 不超过 90 MB，解压后的 CPU ASR runtime 不超过 250 MB。
 - 迁移期间保留 `python-legacy` 源码开发/诊断路径；发布包不携带 Python runtime 或 venv。
-- 每个引擎分别通过用户真值和产品合同门槛后才能切换；单个 CrispASR 引擎失败不阻塞已达标的 CTranslate2 路径，也不阻止同一产品化子任务为另一个已达标 CrispASR 引擎发布独立有效 handoff。失败引擎保持 `stop-revise` 和禁用状态。
-- ordinary faster-whisper 的 `large-v3` 默认模型和 `large-v2` 日语长音频是路线硬门槛且路线本身必须交付。T06 在归档前完成 CPU RTF 根因矩阵：CPU branch 由 T06 完成这些硬门槛；确认 CPU ceiling 时，T06 以 `gpu-required-pending` 完成 CPU handoff，并由 T14/T15 正式打包和完成同一硬门槛；若 production worker、selected CPU baseline、Candidate B reviewed stop-revise evidence、Python non-gating comparison、deterministic publishers、host/protocol tests 与 downstream handoff 完成但没有资格分支被证明，T06 可按 `migration-handoff-stop-revise` truthful handoff。无论 T06 采用哪个闭合分支，只要 production worker seam 与 CPU checkpoint 已完成，T07 都应先建立开发 CUDA 通道再进入重复 CT2 质量迭代；该开发顺序不代表 product qualification 或 GPU-required decision，未资格化的 native route 保持 disabled，Release/default 保持 Python legacy。
-- 从 T10 起及后续未归档模型任务，每个冻结模型候选都必须完成 short-v1 / medium-v1 / long-v2 全矩阵，单项质量门槛失败不截断后续音频；最终按完整矩阵标记 `qualified`、`stop-revise` 或 `unsupported-for-native-release`。不同模型 identity 仍独立判定，非默认模型失败不阻塞已通过的原生 faster-whisper。
-- T17 仍展示全部现有模型；资格状态控制原生可用性、禁用状态和说明，而不是从列表隐藏。发布版不得为未通过模型静默回退到 Python。
+- 首个 native release 采用 quality-first qualified-subset 治理，但 ordinary faster-whisper 是 mandatory route：`large-v3` 与 `large-v2` 必须分别完成 short-v1 / medium-v1 / long-v2、逐项不劣于各自 Python rows，并通过独立硬门禁。T18 可以发布非空 subset，但不得省略该 mandatory route。
+- 当前 archived legacy-relative authority 下没有 subtitle-quality qualified native candidate：large-v3 Candidate A 与 Kotoba K2 为 `stop-revise`；Parakeet P1、ReazonSpeech R2、Qwen T03C 的 observed disposition 也为 `stop-revise`，且后三者在 T12 mapping 冻结前 identity-aware 为 `baseline-incomplete`。Production/default 继续使用 Python legacy。
+- T06R 必须建立新的 ordinary Faster-Whisper candidate identity，修复逐项 S/D/I/CER 回退并完成 large-v3 与 large-v2 双 anchor 全矩阵；T07 只保留开发 GPU seam，正式设备/pack 资格仍归 T14/T15。
+- T08R 必须建立 Kotoba K3 identity，继承 K2 已审查的 bounded-stride/ownership/exact-dedup 安全合同并完成三 case legacy-relative 矩阵；不得修改 K2 历史结论、reference-match、backfill 或以 reference-based repair 获得通过。
+- Kotoba 与 Qwen 只有新候选通过后才进入 pack/route qualification。Parakeet P1 与 ReazonSpeech R2 在首版保持 `visible-unavailable / omitted-current-candidate`；P2/R3 推迟到单独的用户评审决定，pending T12 mapping 不是其唯一 blocker。
+- 从 T10 起及后续未归档模型任务，每个冻结模型候选都必须完成 short-v1 / medium-v1 / long-v2 全矩阵，单项质量门槛失败不截断后续音频；最终按完整矩阵标记 `qualified`、`stop-revise` 或 `unsupported-for-native-release`。不同模型 identity 独立判定，非 mandatory 模型失败不阻塞已通过的 ordinary faster-whisper。
+- T17 仍展示全部现有模型；资格状态控制原生可用性、禁用状态和说明，而不是从列表隐藏。发布版不得隐藏未通过模型或为其静默回退到 Python。
 
 ### R9 - 父子任务治理
 
-- 父任务不作为日常实现目标；实现工作拆为 18 个独立子任务。
+- 父任务不作为日常实现目标；required、optional、correction、baseline、reassessment 和 governance work 均由可独立验收的 child 承担，不以固定 child 数量作为完成合同。
 - 每个子任务必须有可测试的验收标准、明确前置条件、验证命令和回退点。
 - 父子关系只表达交付物归属；依赖顺序必须写入子任务规划，不能依赖目录顺序推断。
-- PoC、任务框架、引擎产品化、分发/UI 和发布切换之间设置硬门禁。
-- 子任务应逐个或按允许的并行组进入 `in_progress`，完成检查后独立归档。
+- PoC、任务框架、质量恢复、模型 identity、pack、分发/UI 和发布切换之间设置硬门禁。
+- 子任务应逐个或按允许的并行组进入 `in_progress`，完成检查后独立归档；父任务仅在 T18 通过、所有 required children 独立归档，且每个 optional/deferred lane 都有 `qualified`、`omitted-current-candidate` 或 `unsupported-for-native-release` disposition 后完成。
 
 ## Acceptance Criteria
 
-- [x] T06 已在独立审查后选择 `migration-handoff-stop-revise`：worker、Candidate A selected CPU baseline、Candidate B reviewed stop-revise evidence、Python non-gating comparison、deterministic publishers、host/protocol tests 与 downstream handoff 已完成，但 qualification 未被证明。该选择保留原始 `cpu-qualified`/`gpu-required-pending` 要求、large-v3/large-v2 hard gates、Candidate A long 的 7 个 confirmed gaps、Candidate B medium 的 1 个 confirmed gap、其余模型 `blocked-not-run`、`low-volume` 限制、native disabled 和 Python legacy/default；下一步先执行 T07 development CUDA seam，再进入 T08 的重复 CT2 质量迭代。
+- [x] T06 已按历史门禁完成 `migration-handoff-stop-revise`，T07/T08 也保留各自已审查的开发证据；归档 legacy-relative 重评现前瞻性 supersede 其下游质量解释，Candidate A/K2 不再是 accepted final input，native routes 仍 disabled，production/default 仍为 Python legacy。
 - [ ] 发布版全新安装无需 Python、pip、PyTorch、NeMo 或 FastAPI 即可使用已缓存模型转录。
 - [ ] React 使用的 Tauri command、任务状态和 `AsrJobSnapshot` 合同保持兼容。
 - [ ] Worker protocol v1、单任务管理、进程树取消、异常退出和恢复快照均有自动化覆盖。
@@ -133,12 +136,13 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - [ ] 模型 manifest、固定来源、大小、SHA-256、断点续传和多文件原子安装通过测试。
 - [ ] installed 与 portable 的 runtime/model/download 路径、probe/measure/cleanup 行为通过测试。
 - [x] T07 在 T08 前完成 CTranslate2 development CUDA seam，T09 在 T10/T11 前完成 CrispASR development GPU seam。T07 已记录 `development-gpu-ready`（short-v1 GPU/CPU `0.1090`，locked 120s `0.1313`）；T09 已分别发布 `parakeet-family` 与 `qwen3-family` 的 `development-gpu-ready` 结论。每个执行族只有 validated GPU unavailable envelope 或任一样本未达到 `20%` 加速时才允许匹配的下游任务开发回退 CPU；无效/不完整 evidence 不发布设备结论，CER、漏段、分段和时间戳失败不参与该决策。T09 外部设备证明不替代 T14/T15 的固定构建身份、哈希、许可证、能力探测和适用的 CPU 回退/不可用说明；只有通过正式 `RTF <=0.5` 与质量门槛的 pack 才进入发布清单。
+- [ ] T06R 恢复 mandatory ordinary Faster-Whisper 路线，T08R/T11 仅在各自新候选通过后进入 pack qualification；Parakeet/Reazon 当前候选保持 visible/unavailable，P2/R3 deferred。
 - [ ] 运行依赖和转录 UI 不再暴露 Python/venv，旧设置可安全加载并迁移；全部现有模型仍可见，但未通过原生资格的模型有明确状态且不能静默走 Python。
 - [ ] 五引擎及 Whisper 双 anchor 的 short-v1/medium-v1/long-v2 矩阵使用同模型同 case `python-legacy-cuda-v1` 字幕质量非回退 gate；结构/证据安全和性能资源矩阵继续满足冻结的绝对门槛，缺失或跨模型 baseline 不得授权发布。
 - [ ] setup、portable 和解压 runtime 体积达到 R8 预算，安装包内模型权重为 0。
 - [ ] `pnpm test`、`pnpm build`、`cargo test --manifest-path src-tauri/Cargo.toml` 和 worker CTest 全部通过。
 - [ ] 第三方许可证、attribution、`THIRD_PARTY_NOTICES.md`、`AGENTS.md` 和相关 Trellis specs 与最终架构一致。
-- [ ] 18 个子任务均已独立验收并归档，父任务完成最终跨子任务集成审查。
+- [ ] T18 通过，所有 required children 均已独立验收归档，所有 optional/deferred lanes 均有明确 qualified/omitted/unsupported disposition，父任务完成最终跨子任务集成审查。
 
 ## Out of Scope
 
@@ -157,9 +161,9 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - T01 `native-asr-benchmark-baseline`、T02 `native-asr-ctranslate2-poc` 与 T03 `native-asr-crispasr-poc` 均已完成、独立检查、提交并归档；Gate 0 的 runtime/ABI 可行性阶段关闭，算法质量风险移交 T06/T08/T10/T11。
 - T01 ground-truth contract、per-case coverage 与共享指标实现保持权威；历史 T02/T03 disposition 不改写。本任务新增的 model-level `python-legacy-cuda-v1` handoff supersedes 旧 short-only/non-gating Python 报告，仅前瞻性改变后续 native 字幕质量资格判定，非质量绝对门槛与安全合同不变。
 - T02 已证明 CTranslate2 + oneDNN native CPU backend/runtime 可行，但当前最小 fixed-window 算法为 `stop-revise`：large-v3 short CER 略超门槛，large-v3/Kotoba 中长音频均有 confirmed speech gaps。T06 必须修订算法并重测，不能把 runtime 可执行等同于产品质量通过。
-- T03 archived evidence（historical manifest `e4656b82...`）修正了两个 harness interpretation：Reazon GGUF 应通过 public `parakeet` session backend；Qwen 使用 pinned upstream grouping 后 short/leading/boundary timeline legal，但 medium/long grouped source segments fail closed。当前质量权威改为 T03C long-v2 supersession：Parakeet corrected CER `0.4917/0.6123/0.5962`，仍为 `stop-revise`；ReazonSpeech `0.1333/0.2857/0.2944` 且原 T03 gates 全通过，但单巨段与大量 zero-duration native words 仅支持 `proceed-with-named-risks`；Qwen short CER `0.2083` 但 ForcedAligner timing 失败，medium/long-v2 保持 validated unscored blocker，因此仍为 `stop-revise`。没有 CrispASR route 可据此直接切换 production default；当前 handoff 为 `research/t03c-crispasr-long-v2-handoff.md`。
+- T03/T03C archived evidence（historical manifest `e4656b82...`）保留其 runtime、ABI、grouping 与 long-v2 provenance；其旧 absolute/proceed interpretation 不再是当前下游质量 authority。归档 legacy-relative 重评将 Parakeet P1、ReazonSpeech R2、Qwen T03C 的 observed disposition 均定为 `stop-revise`，其中 T12 mapping pending 使 identity-aware status 为 `baseline-incomplete`，但不消除已观察到的质量或结构失败。
 - GPU 加速不再另建后续父任务：正常编号 T07 在 T06 production-worker/CPU diagnosis checkpoint 后立即提供 development CTranslate2 CUDA execution，优先于 T08 的重复质量迭代且不以 CPU ceiling 为激活条件；T09 同步建立 CrispASR development GPU seam，供 T10/T11 GPU-first 迭代。T14 负责可复现 CUDA/Vulkan runtime packs，T15 负责设备路由、不可用说明/CPU fallback 和 pack 独立资格矩阵。
 - T04 `native-asr-worker-protocol` 与 T05 `native-asr-rust-job-host` 均已实现、检查、提交并归档；final protocol/limits、generic Rust host、active gate、recovery 和 process-tree cancellation 已成为 T06 handoff。
 - T06 已完成同二进制 warmed 120s CPU 根因矩阵：no-history A/B RTF `0.842/0.916` 通过，full-history beam5 C 为 `1.321`，beam1 D 为 `0.988`。因此当前证据排除固有 CT2 CPU ceiling，确认 full-history prefill 为主回归因子，并证明 beam 5 在 full-history 配置中显著增加总成本；四格矩阵不单独证明 beam/history 交互效应。
-- T06 后续 bounded short decode selection 只改变 beam size：timestamp/no-history beam 1 以 CER/RTF `0.2667/0.632` 通过，beam 5 以 `0.3583/0.811` 失败，均为 0 timeline/gap；因此未扩展 beam 3/10。独立审查修正 diagnostic-default drift 并强化 evidence identity 后，修订 lock 下的 beam-1/no-history CPU candidate 已通过 authoritative large-v3 short（CER `0.2667`、warm RTF `0.623`、cold `28.342s`、RSS `3.43 GB`、0 timeline/gap）和 medium（CER `0.1134`、RTF `0.559`、RSS `3.43 GB`、0 timeline/gap），其 historical long-v1（现已 superseded）虽通过 CER `0.2653`、RTF `0.550`、RSS `3.43 GB` 与 timeline 0，曾报告 7 个 confirmed gap `>=1500ms`；当前 T08 corrected authority 对同一 retained output 的 long-v2 重评分为 CER `0.1509`、0 semantic gaps、0 timeline errors，解除该参考错误造成的 blocker。随后唯一 Candidate B 已以 direct official ORT 1.28.0 CPU + ordinary faster-whisper 1.2.1 Silero V6 实现；最后独立审查 blocker 修复后的 final lock `e687ead6...` 绑定实际 CPU/module paths、restricted PATH roots `77f4714a...` 和 module layout `a650e185...`，并通过包含 correlated all-root rewrite 的 21 项 mutation matrix。它的 historical T06 publication 中 large-v3 short 全通过（CER `0.2667`、warm RTF `0.654`、cold `29.544s`、RSS `3.44 GB`、0 timeline/gap），medium 的 1 个旧 confirmed gap 在当前 vocalization policy 下为 excluded diagnostic；因此 Candidate B 现为 diagnostic-only，long 不再需要。ordinary seven-model qualification 仍未完成，route 保持未 qualified/未启用，ORT/VAD 不进入 T13 package input。
-- T06 已完成 Candidate B reviewed `stop-revise` checkpoint 与迁移交接所需的 worker、publisher、host/protocol、Python non-gating 和 downstream handoff 材料，并已在独立复核后选择 `migration-handoff-stop-revise`；该选择不改变 ordinary faster-whisper mandatory、`low-volume` limitation 或 T13 排除 ORT/VAD 的边界。T07 development CUDA 已完成并记录 `development-gpu-ready`；T08 Kotoba K2 已成为 `accepted-kotoba-algorithm-input`。T08 corrected CT2 handoff 与 T03C corrected CrispASR handoff 共同构成当前 long-v2 backend authority；Release/default 仍为 Python legacy。
+- T06/T08 的 Candidate A、Candidate B 与 Kotoba K2 结果保留为不可变历史 provenance：Candidate A/K2 的结构、窗口、ownership、dedup、worker 和开发 GPU 证据可供新候选复用，但 archived legacy-relative 重评已将 Candidate A 与 K2 的当前 subtitle-quality disposition 都定为 `stop-revise`；Candidate B 仍为 diagnostic-only，ORT/VAD 不进入 T13。
+- 当前没有 subtitle-quality qualified native candidate。下一质量恢复 workstream 为 T06R 新 ordinary Faster-Whisper candidate 与 T08R Kotoba K3；T12 并行冻结 CT2/GGUF/Qwen companion identity，T11 final publication 必须消费该 mapping。Parakeet P1/ReazonSpeech R2 首版保持 visible/unavailable，P2/R3 deferred；Release/default 仍为 Python legacy。

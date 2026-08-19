@@ -32,7 +32,13 @@
     "08-13-native-asr-parakeet-reazon",
     "08-14-native-asr-reazonspeech-r2",
     "08-18-native-asr-python-legacy-baseline",
-    "08-19-native-asr-legacy-quality-reevaluation"
+    "08-19-native-asr-legacy-quality-reevaluation",
+    "08-19-native-asr-roadmap-reprioritization",
+    "08-20-native-asr-whisper-quality-revision",
+    "08-20-native-asr-model-manager",
+    "08-20-native-asr-qwen3-aligner",
+    "08-20-native-asr-kotoba-quality-revision",
+    "08-20-native-asr-cpu-runtime-package"
   ],
   "parent": null,
   "relatedFiles": [],

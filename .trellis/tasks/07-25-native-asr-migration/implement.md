@@ -1,13 +1,13 @@
 # 原生 ASR 迁移实施总计划
 
-> 状态：父任务保持 `planning`；Gate 0/1 已关闭。当前 benchmark authority 使用 long-v2：T08 corrected CT2 handoff 使 selected Candidate A short/medium/long-v2 通过并将 Candidate B 保持 diagnostic-only，Kotoba K2 为 `accepted-kotoba-algorithm-input`；T10 的 ReazonSpeech R1 与 Parakeet P1 均为 `stop-revise`。T10R ReazonSpeech R2 的 false sample-overlap failure 已在同一 candidate 内纠正并重跑完整矩阵，现发布 `stop-revise + better-than-r1`：medium CER 有实质改善，long-v2 通过 VAD 后仍因与 R1 同类的上游 zero-duration top-level result 合法失败。它只作为首选开发基础，不向 T14/T15 提供 accepted Reazon input。所有 historical long-v1 数值仅为 superseded provenance。native routes 仍未切换，ORT/VAD 不进入 T13，Release/default 保持 Python legacy；父任务不直接启动实现。
+> 状态：父任务保持 `planning`；Gate 0/1 已关闭。归档 legacy-relative 重评是当前前瞻性质量 authority：large-v3 Candidate A、Kotoba K2、Parakeet P1、ReazonSpeech R2 与 Qwen T03C 的 observed disposition 均为 `stop-revise`，其中后三者在 T12 mapping 冻结前 identity-aware 为 `baseline-incomplete`。当前没有 subtitle-quality qualified native candidate；native routes 仍未切换，ORT/VAD 不进入 T13，Release/default 保持 Python legacy。下一阶段先恢复 mandatory ordinary Faster-Whisper 质量并并行冻结模型 identity，再进入 accepted-lane pack、设置、前端和 T18 cutover。
 
 ## Execution Policy
 
-- 后续 native 发布资格必须先消费 `.trellis/tasks/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json`：字幕质量只按同 `logicalModelIdentity × case × python-legacy-cuda-v1` 逐项非回退；结构/证据安全、性能资源、协议、取消恢复、路径、隐私和许可证继续使用既有绝对硬门禁。历史归档 evidence 不改写，仅由父任务和新 handoff 前瞻性 reinterpret。
-- 最新历史 evidence 重评 authority 为 `.trellis/tasks/08-19-native-asr-legacy-quality-reevaluation/research/evidence/native-asr-legacy-quality-reevaluation.json`：large-v3 Candidate A 与 Kotoba K2 在逐指标 legacy-relative gate 下均为 `stop-revise`；Parakeet P1、ReazonSpeech R2 与 Qwen T03C 的 observed metrics 也为 `stop-revise`，且因 T12 mapping pending，identity-aware subtitle disposition 保持 `baseline-incomplete`。large-v2、T11、T12、T14/T15/T18 边界和全部 production routes 不变。
+- 后续 native 发布资格必须先消费 `.trellis/tasks/archive/2026-08/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json`：字幕质量只按同 `logicalModelIdentity × case × python-legacy-cuda-v1` 逐项非回退；结构/证据安全、性能资源、协议、取消恢复、路径、隐私和许可证继续使用既有绝对硬门禁。历史归档 evidence 不改写，仅由父任务和新 handoff 前瞻性 reinterpret。
+- 最新历史 evidence 重评 authority 为 `.trellis/tasks/archive/2026-08/08-19-native-asr-legacy-quality-reevaluation/research/evidence/native-asr-legacy-quality-reevaluation.json`：large-v3 Candidate A 与 Kotoba K2 在逐指标 legacy-relative gate 下均为 `stop-revise`；Parakeet P1、ReazonSpeech R2 与 Qwen T03C 的 observed metrics 也为 `stop-revise`，且因 T12 mapping pending，identity-aware subtitle disposition 保持 `baseline-incomplete`。large-v2、T11、T12、T14/T15/T18 边界和全部 production routes 不变。
 - 本父任务保存总需求、总体设计、任务地图和跨任务门禁，通常不执行 `task.py start`。
-- 子任务按阶段及时创建，不一次性把 18 个任务全部置为活跃；创建近期任务时使用 `--parent <parent-dir> --no-start`。
+- 子任务按 gate 增量创建，不一次性激活未来任务，也不使用固定 child 数量作为完成合同；创建近期任务时使用 `--parent <parent-dir> --no-start`。
 - 每个子任务在启动前必须完成自己的 `prd.md`、`design.md`、`implement.md` 和上下文清单。
 - 任务树不表达依赖。下表的 `Depends on` 必须复制到对应子任务规划。
 - 一个子任务只有在自己的验收和相关质量检查通过后才能归档。
@@ -22,33 +22,35 @@ Gate 0: feasibility
 Gate 1: native task foundation
   T02 + T03 -> T04 -> T05
 
-Gate 2: engine productization + development acceleration
-  T05 -> T06 CPU diagnosis/device decision
-  T06 CPU checkpoint -> T07 development CUDA -> T08
-  T06 -> T09 CrispASR core + development GPU -> T10 + T11
-  T10 Reazon R1 stop-revise -> T10R Reazon R2
-  model-level Python baseline -> T08-19 frozen-evidence reinterpretation -> T06/T08/T10/T10R/T11 forward status
+Gate 2: archived engine evidence + quality recovery
+  T05 -> T06 -> T07; archived T06/T07 + legacy reassessment -> T06R
+  T07 -> archived T08; archived T08 + legacy reassessment -> T08R
+  T06 -> T09 -> archived T10/T10R
+  T09 -> T11 development; T12 frozen Qwen + ForcedAligner mapping -> T11 final publication
+  T02 + T03 + archived identity manifest -> T12
 
-Gate 3: models, CPU/GPU runtime and UI
-  T02 + T03 -> T12
-  T06 -> T13
-  T06 + T07 + T08 + T10R + T11 + T13 -> T14
-  T06 + T07 + T08 + T10R + T11 + T14 -> T15
-  T05 + T12 + T13 + T15 -> T16 -> T17
+Gate 3: provisional package, accepted-lane packs and UI
+  T04 + T06 -> T13 provisional packaging pipeline
+  T12 + T13 + at least one accepted T06R/T08R/T11 lane -> T14
+  T14 candidate-built packs + exact accepted lane identities -> T15
+  T12 + T13 + T15 -> T16
+  T12 + T16 + stable qualification metadata -> T17
 
 Gate 4: release cutover
-  T06..T17 + T10R -> T18
+  all required infrastructure + ordinary Faster-Whisper qualified + explicit visible-lane dispositions -> T18
 ```
 
 Allowed parallel groups:
 
 - T02 and T03 after T01.
 - T06 after T05. T07 starts after T06 exposes the production-worker seam and completes the CPU root-cause checkpoint; it does not depend on proving a CPU ceiling and does not wait for a GPU-required decision.
-- T08 Kotoba follows T07. T07 is now `development-gpu-ready` with short-v1/locked-120s GPU-to-CPU warmed-median ratios `0.1090/0.1313`, so repeated T08 quality iteration stays on GPU even when CER/gap/timeline gates fail. This does not imply that ordinary native faster-whisper is qualified or enabled.
-- T10 and T11 may overlap after T09 stabilizes the CrispASR core and publishes independent ignored-local `parakeet-family` / `qwen3-family` development-device results. T10R follows T10's Reazon R1 `stop-revise` evidence while T11 may continue independently. Each task consumes only its matching family result; an attested, repeatably faster family GPU seam remains the development device through CER/gap/segmentation/alignment failures. Required CPU regression and final publishable-device gates remain separate.
-- T12 may start from proven model formats and overlap engine productization; T13 waits for the T06 production worker, then may overlap T08～T11.
-- T14 starts after final backend/device inputs, the CPU package contract and model-level Python baseline mapping stabilize; T15 starts after engine pipelines and formal GPU packs are measurable. Missing native artifact/companion mapping leaves the affected subtitle-quality row `baseline-incomplete`.
-- T07/T09 development GPU artifacts are ignored-local evidence only. Formal GPU pack failure in T14/T15 records `stop-revise` and omits that pack without blocking unrelated qualified CPU routes.
+- T06R starts from archived T06/T07 plus the Python baseline and legacy-relative reassessment. It creates a new candidate identity; T07's `development-gpu-ready` result accelerates iteration but is not T15 qualification.
+- T08R starts from archived T07/T08 safety evidence plus the same baseline/reassessment. K3 inherits bounded stride, ownership and exact-dedup contracts without changing K2 history or using reference-based repair.
+- T12 may start immediately from proven model formats and the archived identity manifest. It freezes CT2, GGUF, license/file-role and Qwen companion identities without changing any quality disposition.
+- T11 may develop from T09 while T12 runs, but final evidence cannot publish until the exact T12-frozen Qwen + ForcedAligner pair is consumed.
+- T13 waits only for the T04/T06 worker seam and may run provisionally in parallel; T18 owns the final worker/runtime rebuild and attestation.
+- T14/T15 wait for T12/T13 and at least one accepted final T06R/T08R/T11 lane. Parakeet P1 and ReazonSpeech R2 are omitted-current-candidate by default; no P2/R3 is implied.
+- T16 then T17 remain staged on T12/T13/T15 and stable qualification metadata. T07/T09 development GPU artifacts never substitute for formal pack evidence.
 
 ## Task Map
 
@@ -140,11 +142,11 @@ Rollback point: discard PoC without affecting CT2 work or production ASR.
 Verified T03 Gate 0 result:
 
 - CrispASR v0.8.22 public CPU C ABI, callback/reset/cleanup lifecycle and all three model routes are executable under one immutable Windows x64 binary/runtime identity.
-- Current T03C long-v2 correction retains Reazon `proceed-with-named-risks`: corrected CER `0.1333/0.2857/0.2944` and original text/performance/timeline/gap gates pass, but top-level output remains one oversized segment and native words are mostly zero-duration.
+- Historical T03C long-v2 correction recorded Reazon `proceed-with-named-risks`: corrected CER `0.1333/0.2857/0.2944` and original text/performance/timeline/gap gates passed, but top-level output remained one oversized segment and native words were mostly zero-duration. The later legacy-relative authority supersedes this as a current release disposition.
 - Parakeet remains `stop-revise` after corrected CER `0.4917/0.6123/0.5962`; top-level output remains one giant segment despite useful native word getters.
 - Qwen remains `stop-revise`: corrected short CER `0.2083` passes but ForcedAligner start timing fails severely; medium/long-v2 remain validated unscored `segment-legality-failed` blockers. Synthetic timing remains prohibited.
 
-**Gate 0:** Closed for backend/runtime feasibility. T04/T05 may proceed because CT2 and CrispASR can execute safely in isolated native processes. Route quality blockers are mandatory inputs to T06/T08/T10/T11 and still prevent production promotion; a future finding of fundamental ABI, license or package non-viability reopens Gate 0.
+**Gate 0:** Closed for backend/runtime feasibility. T04/T05 proceeded because CT2 and CrispASR can execute safely in isolated native processes. Archived route quality blockers now feed T06R/T08R/T11 or explicit omitted dispositions and still prevent production promotion; a future finding of fundamental ABI, license or package non-viability reopens Gate 0.
 
 ### Phase 1 - Worker Protocol And Rust Task Foundation
 
@@ -228,7 +230,7 @@ Exit criteria:
 
 Rollback point: retain Python faster-whisper as development default.
 
-T06 checkpoint: Candidate A remains a separate historical provisional `stop-revise` set (short CER `0.3583`, medium RTF `1.100`, unscored long timeout). The warmed same-binary matrix rejects an inherent CPU ceiling and identifies full-history prefill as the dominant regression. A bounded same-binary short beam 1/5 selection then chose timestamp/no-history/beam 1 (`0.2667` CER, `0.632` RTF, 0 timeline/gap) over beam 5 (`0.3583`, `0.811`); beam 3/10 were not activated. The selected identity passes authoritative large-v3 short/medium; its historical long-v1 7-gap result is superseded by the current retained-output long-v2 correction (`0.1509` CER, zero semantic gaps/timeline errors). The sole Candidate B then implemented direct official ORT 1.28.0 CPU and ordinary faster-whisper 1.2.1 Silero V6. Last-review replacement lock `e687ead6...` binds actual CPU/module paths, restricted PATH roots `77f4714a...`, and fixed module layout `a650e185...`; the 21-case mutation matrix rejects the correlated all-module/all-root rewrite. Short passes (`0.2667` CER, `0.654` warm RTF, `29.544s` cold, `3.44 GB`, 0 timeline/gap), medium passes CER `0.1055`, RTF `0.599`, RSS `3.44 GB` and timeline 0 but fails with 1 confirmed gap. Candidate B is diagnostic-only under current corrected authority; its long run remains unnecessary, the seven-model qualification matrix remains follow-up work, the route remains disabled, and ORT/VAD is excluded from T13 package input.
+T06 checkpoint is immutable historical provenance: it established the production worker seam, root-cause diagnostics, Candidate A/B evidence and T07 development handoff, but did not qualify ordinary Faster-Whisper. The archived legacy-relative reassessment now classifies the latest large-v3 Candidate A as `stop-revise`; Candidate B remains diagnostic-only, ORT/VAD stays outside T13, the route remains disabled, and T06R owns the next candidate rather than rewriting T06.
 
 #### T07 - Integrate Development CTranslate2 CUDA Execution
 
@@ -263,6 +265,27 @@ Verified T07 result:
 - locked medium-v1 first-120s CPU/GPU warmed median RTF `0.591635/0.077707` (`0.1313` ratio).
 - CUDA-only module set: `nvcuda.dll`, `cublas64_12.dll`, `cublasLt64_12.dll`; no cuDNN. Development evidence is non-publishable and quality-independent.
 
+#### T06R - Revise Ordinary Faster-Whisper Quality
+
+Suggested slug: `native-asr-whisper-quality-revision`
+
+Deliverables:
+
+- Create a new reviewed candidate identity; do not edit Candidate A/B artifacts or dispositions.
+- Explain and address every observed large-v3 legacy-relative S/D/I/CER regression without reference-derived text/timing repair.
+- Complete large-v3 and large-v2 short-v1 / medium-v1 / long-v2 matrices under frozen identities, continuing after individual quality failures.
+- Reuse T07 only as a development GPU seam; leave formal device/pack qualification to T14/T15.
+
+Depends on: archived T06 and T07, the identity-bound Python legacy baseline, and the archived native legacy-quality reassessment.
+
+Exit criteria:
+
+- Both anchors independently meet their same-model/same-case Python non-regression matrix and all absolute structural, performance/resource, identity, path, protocol, cancellation/recovery, privacy and license gates.
+- Ordinary Faster-Whisper remains disabled and blocks T18 if either anchor is not qualified; other Whisper models are not unlocked early.
+- Publication uses a new candidate identity and preserves all T06 evidence unchanged.
+
+Rollback point: discard only the new T06R candidate/evidence and keep T06/T07 plus Python legacy/default unchanged.
+
 #### T08 - Productize Kotoba And Legacy CT2 Cache Compatibility
 
 Suggested slug: `native-asr-kotoba-compatibility`
@@ -284,6 +307,29 @@ Exit criteria:
 - Old valid CT2 caches are reusable and malformed caches fail safely.
 
 Rollback point: disable only Kotoba native routing.
+
+Historical T08 handoff: K2's bounded-stride, latest-start ownership and exact-dedup mechanics remain reviewed safety provenance, but the archived legacy-relative reassessment classifies K2 as `stop-revise`; it is not an accepted T14/T15 input.
+
+#### T08R - Revise Kotoba K3 Quality
+
+Suggested slug: `native-asr-kotoba-quality-revision`
+
+Deliverables:
+
+- Create a new K3 identity while inheriting K2's reviewed bounded-stride/ownership/exact-dedup contracts.
+- Address the complete observed legacy-relative text regression distribution without changing K2 evidence.
+- Complete short-v1 / medium-v1 / long-v2 under one frozen K3 identity, continuing after individual quality failures.
+- Forbid reference matching, fuzzy/reference-based dedup, backfill, gap fill or synthetic timing used to obtain a pass.
+
+Depends on: archived T07 and T08, the identity-bound Python legacy baseline, and the archived native legacy-quality reassessment.
+
+Exit criteria:
+
+- K3 is independently no worse than its same-model Python rows for every required quality field and passes all absolute engineering gates.
+- Only a qualified K3 may become an accepted T14/T15 lane; otherwise Kotoba remains visible/unavailable.
+- K2 history and its raw/tracked evidence remain unchanged.
+
+Rollback point: discard only K3 candidate/evidence and retain K2 as immutable disabled historical provenance.
 
 ### Phase 3 - CrispASR Productization
 
@@ -366,20 +412,21 @@ Suggested slug: `native-asr-qwen3-aligner`
 
 Deliverables:
 
-- Treat Qwen3 1.7B Q4_K and ForcedAligner 0.6B Q4_K as one model product.
+- Treat the exact T12-frozen Qwen3 1.7B Q4_K and ForcedAligner 0.6B Q4_K mapping as one model product; development may precede T12, but final evidence may not.
 - Select chunking/alignment/segmentation from official/model-card/maintained community guidance and ground-truth results; Python synthetic or refresh behavior is diagnostic only.
 - Complete the same frozen Qwen3 candidate across short-v1 / medium-v1 / long-v2 even when an earlier case fails a quality gate; publish the disposition only from the full matrix.
 - Use T09's `qwen3-family` development GPU path for repeated Qwen3/ForcedAligner quality iteration whenever that family result is `development-gpu-ready`; CER, gap and alignment failures stay on GPU. Reserve CPU runs for required regression/fallback evidence, final candidate gates, or a matching unavailable/no-speedup result.
 - Fail when alignment is missing/invalid; never synthesize timestamps.
 - Aggregate progress and allow a final `segmentsReplace` when required by the chosen pipeline.
 
-Depends on: T09.
+Depends on: T09 for development capability; T12 for final Qwen + ForcedAligner artifact/companion authority.
 
 Exit criteria:
 
 - Qwen3 CER/S-D-I, empty text and semantic gaps are independently no worse than the same-model Python legacy row for every case; RTF/resource and all engineering gates remain absolute.
 - Start-time median/P95 are compared only when both Python and native rows have eligible ForcedAligner provenance; mixed/synthetic/unknown timing yields `unscored`/`baseline-incomplete`, never qualification.
-- Missing companion, alignment failure, leading silence and chunk-boundary cases are tested; timeline remains legal and the ASR/aligner native artifact pair must match the frozen mapping.
+- Missing companion, alignment failure, leading silence and chunk-boundary cases are tested; timeline remains legal and the ASR/aligner native artifact pair exactly matches T12's frozen mapping.
+- No final `qualified` or accepted algorithm handoff is published before T12 completes.
 
 Rollback point: disable only Qwen3 native routing.
 
@@ -393,7 +440,7 @@ Suggested slug: `native-asr-model-manager`
 
 Deliverables:
 
-- Add versioned `asr-model-sources.json` with fixed revision, URL, size, SHA-256, license and file roles.
+- Add versioned `asr-model-sources.json` with fixed revision, URL, size, SHA-256, license and file roles for CT2 and GGUF artifacts, including the exact Qwen ASR + ForcedAligner companion pair.
 - Implement official/China source resolution, safe `.part` resume, verification, atomic moves and multi-file readiness markers.
 - Coalesce duplicate model downloads and preserve verified companion files after partial failure.
 - Measure all of `deps/models`, including legacy cache, without marking incompatible weights ready.
@@ -404,7 +451,8 @@ Exit criteria:
 
 - Routing/readiness/hash/atomic-install/legacy-cache/portable-path tests pass.
 - Cleanup cannot escape managed `deps/`.
-- No floating `main` is the sole release lock.
+- No floating `main` is the sole release lock; every Qwen final evidence row can bind the exact frozen ASR/aligner pair.
+- Mapping completion does not promote an observed `stop-revise` candidate or repair missing/illegal timing.
 
 Rollback point: retain existing model downloader while native engines remain development-only.
 
@@ -442,7 +490,7 @@ Deliverables:
 - Reuse protocol v1 resolved device values (`cpu`, `cuda`, `vulkan`); do not introduce a second worker protocol or backend-specific host executable.
 - Add deterministic pack preparation/verification suitable for managed download; end-user machines never compile native dependencies.
 
-Depends on: completed T06 CPU/device decision, T07 CTranslate2 development CUDA result, T09 CrispASR development GPU result, accepted T08/T11 engine inputs, the completed T10R disposition, the T13 packaging contract, and the model-level Python legacy authority. T10R contributes Reazon input only when `qualified`; `better-than-r1 + stop-revise` and other non-qualified results are recorded as omitted and do not block unrelated engines. Native GGUF/CT2 revisions and companion hashes must complete the baseline mapping before T15 quality scoring.
+Depends on: completed T12 and T13, plus at least one accepted final algorithm input from T06R, T08R or T11. T07/T09 development GPU evidence may inform builds but is not qualification. Parakeet P1 and ReazonSpeech R2 are `omitted-current-candidate` unless a later separately reviewed candidate qualifies; no P2/R3 is implied.
 
 Exit criteria:
 
@@ -469,7 +517,7 @@ Deliverables:
 - Verify pack-load/runtime failure produces one nonfatal notice: engines with a qualified CPU route retry that bundled CPU path without losing job/recovery semantics, while ordinary faster-whisper proven GPU-required becomes unavailable without launching its unqualified CPU route.
 - Publish an independent `qualified`, `stop-revise` or `omitted-no-candidate` decision for CUDA and Vulkan; no non-qualified pack blocks CPU cutover.
 
-Depends on: completed T06 CPU/device decision, T07, T08, the completed T10R disposition, T11, and T14. T10R contributes a Reazon route only when `qualified`; otherwise Reazon is omitted without blocking other engine/device qualifications. T07 is consumed as development evidence regardless of whether ordinary faster-whisper becomes `gpu-required-pending`; this dependency never requires T06 to contain GPU qualification evidence.
+Depends on: T12, T13, T14 candidate-built packs, and the exact accepted T06R/T08R/T11 lane identities included by T14. Omitted or non-qualified lanes are recorded without routing attempts. Ordinary Faster-Whisper remains mandatory for release even if another optional lane qualifies first.
 
 Exit criteria:
 
@@ -493,7 +541,7 @@ Deliverables:
 - Expose per-model native qualification metadata without removing any current model identity.
 - Update command/types/wrappers as one cross-layer contract where required.
 
-Depends on: T05, T12, T13, T15.
+Depends on: T12, T13 and T15; T05 remains inherited host foundation, not a substitute for these completion gates.
 
 Exit criteria:
 
@@ -526,7 +574,7 @@ Deliverables:
 - Remove production copy referencing Python, venv, pip and service directories.
 - Cover old settings/default fallback and companion download aggregation.
 
-Depends on: T12, T16; engine/model/device metadata from T06～T11, T10R and T15 must be stable. A non-qualified T10R result keeps Reazon visible but unavailable for native release.
+Depends on: T12, T16 and stable T15 qualification metadata. T06R/T08R/T11 accepted or omitted dispositions drive availability; Parakeet P1 and ReazonSpeech R2 remain visible but unavailable unless a later candidate qualifies.
 
 Exit criteria:
 
@@ -544,7 +592,7 @@ pnpm build
 
 Rollback point: UI can continue exposing the legacy setup path until backend contracts are stable; do not ship a mixed UI/runtime contract.
 
-**Gate 3:** Do not enter release cutover until native model delivery, CPU packaging, GPU pack decisions, settings migration and frontend UX work together on installed and portable layouts. A `stop-revise` GPU pack is omitted and does not block unrelated CPU routes; an ordinary faster-whisper GPU-required decision must have a T15-qualified CUDA pack. Any shared contract mismatch returns to T12～T17.
+**Gate 3:** Do not enter release cutover until T12 identity delivery, T13 provisional packaging, T15 accepted-lane qualification, T16 settings backend and T17 visible/unavailable UX work together on installed and portable layouts. Ordinary Faster-Whisper must be qualified; optional failed lanes are explicitly omitted/visible-unavailable rather than hidden or silently routed to Python. Any shared contract mismatch returns to its owning T12～T17 child.
 
 ### Phase 6 - Integration And Release Cutover
 
@@ -556,22 +604,23 @@ This task is a release gate, not a place to finish missing engine or GPU impleme
 
 Deliverables:
 
-- Run the complete five-engine short-v1 / medium-v1 / long-v2 authoritative matrix on every selected publishable device; no single quality-gate failure truncates the remaining cases. Publication includes per-model/per-case Python baseline/native/delta/direction/provenance/disposition for subtitle quality plus independent absolute structural, performance/resource and engineering results.
+- Run the complete authoritative matrix for every selected publishable lane; no single quality-gate failure truncates the remaining cases. Publication includes per-model/per-case Python baseline/native/delta/direction/provenance/disposition plus independent absolute structural, performance/resource and engineering results. The released subset must include qualified ordinary Faster-Whisper; optional lanes may be omitted only with explicit disposition.
 - Verify cancel, crash, recovery, qualified CPU fallback or GPU-required unavailability, offline cached-model use, installed and portable behavior.
-- Switch production packaging/default routes only for qualified engines and packs; stop bundling Python sidecar/runtime/venv.
+- Switch production packaging/default routes only for qualified engines and packs; keep every failed model visible/unavailable with no silent Python fallback, then stop bundling Python sidecar/runtime/venv.
 - Freeze a complete source/dependency/compiler/algorithm-config input lock, rebuild and attest the final immutable CPU runtime from accepted engine identities, and re-verify every publishable GPU artifact matches the exact T15-qualified hash; then verify setup/portable/runtime sizes, third-party licenses and zero bundled model weights while CUDA/Vulkan remain external packs.
 - Remove or stop packaging obsolete production setup resources while retaining source-level legacy baseline for one stable release cycle.
 - Update README/notices and, only after architecture lands, update `AGENTS.md` and `.trellis/spec/{asr,tauri,frontend}`.
 - Run final cross-child contract review against the parent PRD.
 
-Depends on: T06, T07, T08, T10, T10R, T11, T12, T13, T14, T15, T16, T17. T18 consumes T10R's final disposition: only `qualified` Reazon is eligible for cutover; `better-than-r1 + stop-revise` remains disabled and omitted.
+Depends on: all required infrastructure children, T12/T13/T14/T15/T16/T17, qualified mandatory T06R, and final dispositions for T08R/T11 plus every visible Parakeet/Reazon/device lane. T18 consumes only accepted engine identities; omitted-current-candidate and unsupported lanes remain disabled and visible.
 
 Exit criteria:
 
 - Every parent acceptance criterion is evidenced or explicitly blocks release.
+- Ordinary Faster-Whisper is included and both large-v3/large-v2 anchors are qualified; the optional subset is non-empty only in addition to that mandatory route.
 - All required test commands and worker CTest pass.
 - No unresolved P0/P1 quality, data-loss, path-security or license issue on the CPU baseline or any publishable GPU pack.
-- Failed engines return to their owning child; failed GPU packs are omitted according to T15 rather than patched ad hoc here.
+- Failed engines return to their owning child and remain visible/unavailable; failed GPU packs are omitted according to T15 rather than patched ad hoc here.
 
 Final validation:
 
@@ -584,7 +633,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 Rollback point: restore the previous production package inputs and per-engine/pack route without rewriting user projects or deleting caches. Never require a destructive settings/model migration for rollback.
 
-**Gate 4:** Archive the parent only after T18 passes and all 18 child tasks are independently archived.
+**Gate 4:** Archive the parent only after T18 passes, all required children are independently accepted/archived, and every optional/deferred lane has an explicit `qualified`, `omitted-current-candidate` or `unsupported-for-native-release` disposition.
 
 ## Cross-Task Review Checklist
 
@@ -598,7 +647,10 @@ Rollback point: restore the previous production package inputs and per-engine/pa
 - [ ] CPU package and optional GPU packs contain runtime only, no model weights; GPU packs are not bundled in the main installer.
 - [ ] GPU routing proves actual loaded acceleration, preserves qualified CPU fallback, enforces GPU-required route unavailability, and omits failed packs without blocking unrelated CPU release routes.
 - [ ] Every current model remains visible in T17 with qualification-driven availability; no unsupported model silently falls back to Python.
-- [ ] Python legacy remains development-only during the agreed rollback window.
+- [ ] T06R and T08R use new identities without rewriting T06/T08 evidence; T11 final evidence binds T12's exact Qwen/ForcedAligner pair.
+- [ ] T13 artifacts remain provisional; T14/T15 contain only accepted selected lanes; T18 owns the final rebuild/attestation.
+- [ ] Ordinary Faster-Whisper is mandatory, while Parakeet P1/ReazonSpeech R2 and any other failed optional lane have explicit visible/unavailable dispositions.
+- [ ] Python legacy remains production/default until T18 and development-only during the agreed post-cutover rollback window.
 - [ ] Current-state specs are updated only when their owning architecture change lands.
 - [ ] No child was treated as complete with failing or unavailable mandatory checks.
 
@@ -607,12 +659,15 @@ Rollback point: restore the previous production package inputs and per-engine/pa
 Stage 0 child-task creation:
 
 - [x] User reviewed and approved the parent `prd.md`, `design.md` and task map.
-- [x] T01-T03 were the first creation batch and remain immutable archived provenance; current long-v2 authority is carried by the T08 corrected CT2 and T03C corrected CrispASR handoffs.
+- [x] T01-T03 were the first creation batch and remain immutable archived provenance; T08 corrected CT2 and T03C corrected CrispASR remain historical long-v2 backend evidence, while the archived legacy-relative reassessment is the current forward quality authority.
 - [x] T02 proved the CTranslate2 backend/runtime viable while recording the current fixed-window algorithm as `stop-revise`.
-- [x] T03 proved the CrispASR ABI/runtime viable, with Reazon `proceed-with-named-risks` and Parakeet/Qwen `stop-revise`; Gate 0 backend/runtime feasibility is closed.
+- [x] T03 proved the CrispASR ABI/runtime viable and historically recorded Reazon `proceed-with-named-risks` plus Parakeet/Qwen `stop-revise`; Gate 0 backend/runtime feasibility is closed, and the later legacy-relative authority controls current release disposition.
 - [x] User approved moving development GPU integration earlier: normal-numbered T07 provides CTranslate2 CUDA development immediately after the T06 CPU checkpoint and before T08 regardless of CPU-ceiling outcome; T09 provides family-scoped CrispASR development GPU results before T10/T11. The user also approved T09's external device attestation and strict Qwen policy seam. Formal packs/qualification remain T14/T15, and development GPU evidence never substitutes for release evidence.
 - [x] User approved T06 hard gates for `large-v3` and `large-v2` long audio; ordinary faster-whisper remains mandatory and all models remain visible in T17 even when native qualification fails.
-- [x] T07 completed the ignored-local CTranslate2 CUDA lane and independently froze `development-gpu-ready`; T08 now uses GPU for repeated subtitle-quality iteration, while T14/T15 remain the only pack/release qualification owners.
+- [x] User approved the legacy-relative roadmap reprioritization: no latest native candidate is currently subtitle-quality qualified; ordinary Faster-Whisper remains mandatory; optional failed models remain visible/unavailable; production/default remains Python legacy.
+- [x] The next planning batch is T06R, T12, T11, T08R and T13. T14～T18 remain map entries created incrementally after their gates; Parakeet P2 and ReazonSpeech R3 are deferred pending a separate user-reviewed investment decision.
+- [x] T11 final publication requires T12's exact Qwen + ForcedAligner mapping; T13 is provisional-only; T14/T15 consume accepted T06R/T08R/T11 lanes; T18 owns final immutable runtime rebuild/attestation.
+- [x] T07 completed the ignored-local CTranslate2 CUDA lane and independently froze `development-gpu-ready`; archived T08 uses that development seam, while T14/T15 remain the only pack/release qualification owners.
 - [x] T04-T06 were created as the next planning batch and linked to this parent.
 - [x] T04 completed protocol/limits/fake-worker implementation, independent check, commit and archive.
 - [x] T05 completed generic Rust host/active gate/reducer/recovery/process-tree lifecycle, independent check, commit and archive; Gate 1 is closed.
