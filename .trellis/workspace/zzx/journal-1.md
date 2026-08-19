@@ -847,3 +847,41 @@ Implemented the reviewed R2-vad12-pad30-overlap-top-level-v1 development candida
 ### Next Steps
 
 - None - task complete
+
+---
+
+**Date**: 2026-08-19
+**Task**: 建立模型级 Python legacy ASR 基线并修订 native 资格门槛 (08-18-native-asr-python-legacy-baseline)
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Established the authoritative model-identity Python legacy baseline for the native ASR migration. Froze the model identity manifest (2 Whisper anchors, 4 engine-model gates, 5 family-unlock-only models), repaired the benchmark runner to bind its own acquisition-time SHA-256, reacquired all 18 rows (6 models × short-v1/medium-v1/long-v2) on the CUDA profile `python-legacy-cuda-v1` with the frozen runner SHA `2e0dbee811f28e18…c45c`, and published `research/python-legacy-baseline.json` + deterministic sanitized Markdown with byte-identical double generation. Updated the parent migration task artifacts and `.trellis/spec/asr/quality-guidelines.md` so native subtitle quality is gated per logicalModelIdentity × case against the baseline while all structural/performance/security gates remain absolute. Independent trellis-check review (run f07ef919) passed all 6 items including the critical no-gate-relaxation check. Task archived to `archive/2026-08/`.
+
+### Main Changes
+
+- `scripts/asr-benchmark.py`: emit acquisition-time runner identity (sourcePath + SHA-256); whisper_inference_session correctness fix; loaded long-mode compute identity recorded after lazy load; UTF-8 JSON transport.
+- `scripts/asr-legacy-baseline.py` (new): stdlib-only publisher/comparator; recomputes metrics via T01, rejects identity/profile/artifact/companion/metric drift.
+- `asr-service/tests/test_asr_legacy_baseline.py` (new): 8 publication/mutation/determinism tests.
+- Task artifacts: `model-identity-manifest.json`, 18-row baseline handoff JSON/MD, prd/design/implement.
+- Parent task + ASR spec updated to the scoped quality-only relative gate.
+
+### Git Commits
+
+| Hash | Message |
+| `75953e3` | feat(asr): Bind benchmark runner identity and add Python legacy baseline publisher |
+| `f12ca8f` | docs(task): Publish python-legacy-cuda-v1 baseline and revise native quality gates |
+
+### Testing
+
+- benchmark self-check + manifest validate: passed
+- test_asr_benchmark.py + test_asr_legacy_baseline.py: OK; full sidecar suite 247 tests OK
+- byte-identical double generation verified; task.py validate + git diff --check clean
+
+### Status
+
+[OK] **Completed and archived**
+
+### Next Steps
+
+- Parent 07-25-native-asr-migration: plan T12 (native model manifest + downloader) to freeze GGUF artifact identities currently `pending-t12` in the baseline mapping; T13 may overlap per the allowed parallel groups.
