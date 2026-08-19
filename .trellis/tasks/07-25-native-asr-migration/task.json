@@ -31,7 +31,8 @@
     "08-07-native-asr-crispasr-backend",
     "08-13-native-asr-parakeet-reazon",
     "08-14-native-asr-reazonspeech-r2",
-    "08-18-native-asr-python-legacy-baseline"
+    "08-18-native-asr-python-legacy-baseline",
+    "08-19-native-asr-legacy-quality-reevaluation"
   ],
   "parent": null,
   "relatedFiles": [],
