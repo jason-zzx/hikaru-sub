@@ -918,3 +918,36 @@ Published an identity-bound historical evidence reassessment for large-v3 Candid
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: Reprioritize native ASR migration roadmap
+
+**Date**: 2026-08-20
+**Task**: Reprioritize native ASR migration roadmap
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Reconciled the native ASR parent roadmap with the python-legacy-cuda-v1 reassessment. Added quality-first subset governance, new T06R Faster-Whisper and T08R Kotoba revision lanes, corrected T11-T18 dependencies, kept T13 provisional, and replaced fixed child-count completion with explicit required/optional dispositions. Created five unstarted planning children for Whisper quality, model management, Qwen+ForcedAligner, Kotoba K3, and CPU runtime packaging; deferred Parakeet P2, ReazonSpeech R3, and T14-T18.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c14d934` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
