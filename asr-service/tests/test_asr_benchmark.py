@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import importlib.util
 import io
@@ -484,6 +485,8 @@ class BenchmarkRunnerContractTests(unittest.TestCase):
             compute_type = None
             use_vad = False
             vad_config = {}
+            _loaded_compute_type = None
+            _loaded_long_mode = None
 
             @staticmethod
             def is_available():
@@ -498,6 +501,8 @@ class BenchmarkRunnerContractTests(unittest.TestCase):
 
             def transcribe(self, audio_path, *, language):
                 calls.append(("transcribe", audio_path, language))
+                self._loaded_compute_type = "int8_float16"
+                self._loaded_long_mode = True
                 return SimpleNamespace(
                     language="ja",
                     duration_ms=1000,
@@ -514,6 +519,14 @@ class BenchmarkRunnerContractTests(unittest.TestCase):
         base_module.TranscriptSegmentRefresh = Refresh
         registry_module = types.ModuleType("engines.registry")
         registry_module.create_engine = create_engine
+        whisper_runtime_module = types.ModuleType("engines.whisper_runtime")
+
+        @contextlib.contextmanager
+        def whisper_inference_session(engine_name):
+            calls.append(("session", engine_name))
+            yield
+
+        whisper_runtime_module.whisper_inference_session = whisper_inference_session
         request = {
             "engine": "faster-whisper",
             "model": "fake-model",
@@ -531,7 +544,12 @@ class BenchmarkRunnerContractTests(unittest.TestCase):
             "repeatCount": 1,
         }
         stdout = io.StringIO()
-        modules = {"engines": engines_package, "engines.base": base_module, "engines.registry": registry_module}
+        modules = {
+            "engines": engines_package,
+            "engines.base": base_module,
+            "engines.registry": registry_module,
+            "engines.whisper_runtime": whisper_runtime_module,
+        }
         with mock.patch.dict(sys.modules, modules), mock.patch.object(
             sys, "stdin", io.StringIO(json.dumps(request))
         ), mock.patch.object(sys, "stdout", stdout), mock.patch.object(
@@ -551,8 +569,68 @@ class BenchmarkRunnerContractTests(unittest.TestCase):
         self.assertEqual(response["status"], "completed")
         self.assertEqual(calls[0][0], "create")
         self.assertEqual(calls.count("load"), 1)
+        self.assertIn(("session", "faster-whisper"), calls)
+        self.assertEqual(response["resolvedParameters"]["effectiveComputeType"], "int8_float16")
+        self.assertTrue(response["resolvedParameters"]["engineSpecific"]["loadedLongMode"])
         self.assertEqual(response["samples"][0]["segments"], [{"startMs": 100, "endMs": 900, "text": "final"}])
         self.assertEqual(response["samples"][0]["missingSpeechRegions"], [])
+
+    def test_child_process_forces_utf8_stdio(self):
+        completed = SimpleNamespace(
+            stdout=benchmark.CHILD_SENTINEL + json.dumps({"status": "completed"}),
+            stderr="",
+            returncode=0,
+        )
+        with mock.patch.object(benchmark.subprocess, "run", return_value=completed) as run:
+            self.assertEqual(benchmark._invoke_child({"text": "・"})["status"], "completed")
+        kwargs = run.call_args.kwargs
+        self.assertEqual(kwargs["encoding"], "utf-8")
+        self.assertEqual(kwargs["env"]["PYTHONUTF8"], "1")
+        self.assertEqual(kwargs["env"]["PYTHONIOENCODING"], "utf-8")
+
+    def test_run_envelope_emits_acquisition_time_runner_identity(self):
+        captured = {}
+        events = []
+        runner_identity = benchmark.benchmark_runner_identity()
+        args = SimpleNamespace(
+            output="ignored-result.json",
+            expected_interpreter=sys.executable,
+            manifest="manifest.json",
+            corpus_root="corpus",
+            case="case-v1",
+            warm_runs=0,
+            engine="faster-whisper",
+            model="large-v3",
+            device="cuda",
+            compute_type=None,
+            language="ja",
+            use_vad=False,
+            hf_home="cache",
+        )
+        validation = {
+            "manifest": {"corpusId": "corpus", "cases": [{"durationClass": "short", "tags": ["clear-japanese"]}]},
+            "manifestSha256": "a" * 64,
+            "corpusRoot": Path("corpus"),
+            "cases": [{"id": "case-v1", "durationClass": "short", "audio": "case.wav"}],
+            "warnings": [],
+        }
+        with mock.patch.object(benchmark, "_require_ignored_raw_output"), mock.patch.object(
+            benchmark, "benchmark_runner_identity", side_effect=lambda: events.append("identity") or runner_identity
+        ), mock.patch.object(
+            benchmark, "validate_manifest", return_value=validation
+        ), mock.patch.object(
+            benchmark,
+            "_case_result",
+            side_effect=lambda *_args: events.append("inference")
+            or ({"caseId": "case-v1", "status": "completed"}, {"os": "test"}),
+        ), mock.patch.object(
+            benchmark, "atomic_write_json", side_effect=lambda _path, value: captured.update(value)
+        ), mock.patch.object(benchmark, "utc_now", return_value="2026-08-18T00:00:00Z"):
+            self.assertEqual(benchmark.command_run(args), 0)
+        self.assertEqual(events, ["identity", "inference"])
+        self.assertEqual(captured["acquisitionTool"], runner_identity)
+        self.assertEqual(captured["acquisitionTool"]["sourcePath"], "scripts/asr-benchmark.py")
+        self.assertEqual(captured["acquisitionTool"]["sha256"], benchmark.sha256_file(benchmark.Path(benchmark.__file__).resolve()))
 
     def test_case_runner_uses_ass_derived_reference_and_separate_processes(self):
         requests = []

@@ -49,3 +49,4 @@ docs/superpowers/
 /.trellis/tasks/**/08-07-native-asr-crispasr-backend/research/local/
 /.trellis/tasks/**/08-13-native-asr-parakeet-reazon/research/local/
 /.trellis/tasks/**/08-14-native-asr-reazonspeech-r2/research/local/
+/.trellis/tasks/**/08-18-native-asr-python-legacy-baseline/research/local/
