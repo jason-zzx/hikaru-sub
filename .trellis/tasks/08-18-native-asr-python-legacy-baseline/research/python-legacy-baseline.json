@@ -1,0 +1,2976 @@
+{
+  "authority": {
+    "benchmarkManifestSha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea",
+    "benchmarkRunnerSha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+    "corpusId": "hikaru-user-ja-ground-truth-v1",
+    "historicalEvidencePolicy": "archived reports remain immutable; this handoff changes only prospective native subtitle-quality qualification",
+    "identityManifestSha256": "7b46e0a983b7cc71e302e898d3f90d77b3c9159be2fe538585cd038e31c0a8f0",
+    "publisherSha256": "e1624bed04782968c5b572992938f725e882f760aea4051b8e87fbf25b2c6393",
+    "qualitySampleReduction": "the single completed cold sample is authoritative; three short warm samples are performance/reproducibility evidence",
+    "supersedes": [
+      ".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/python-reference-report.md"
+    ]
+  },
+  "authorityDisposition": "complete",
+  "comparisonProfile": "python-legacy-cuda-v1",
+  "generatedAt": "2026-08-19T05:41:38Z",
+  "kind": "hikaru-asr-python-legacy-baseline",
+  "limitations": [
+    "low-volume remains absent from the authoritative corpus coverage",
+    "Python CUDA performance and resource values are diagnostic only and never establish relative native gates",
+    "Qwen3 long-v2 uses mixed timestamp provenance, so its baseline timing fields are ineligible while its text/gap quality fields remain published",
+    "native GGUF revisions/hashes marked pending in the identity manifest must be frozen before those model comparisons can qualify"
+  ],
+  "models": [
+    {
+      "baselineDisposition": "complete",
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "corpusIdentity": {
+            "assSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+            "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+            "dialogueCount": 8,
+            "durationMs": 24102,
+            "tags": [
+              "clear-japanese"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.40694778441623464,
+            "coldProcessWallMs": 19997.403,
+            "coldTotalRtf": 0.7953828478964184,
+            "peakProcessRssBytes": 4481679360,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": 0.0967841257988238
+          },
+          "quality": {
+            "cer": 0.24166666666666667,
+            "deletions": 18,
+            "emptyTextCount": 0,
+            "insertions": 0,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 11
+          },
+          "rawResultSha256": "6fa18a41d495871aefde78953d543fb470ba87d4b094d7433c3f8d43cbd999e8",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "faster-whisper",
+            "language": "ja",
+            "model": "large-v2",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "int8_float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "loadedLongMode": false,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 4,
+            "warmSampleCount": 3
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 1,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 4
+            },
+            "timestampProvenance": "engine-native"
+          }
+        },
+        {
+          "caseId": "medium-v1",
+          "corpusIdentity": {
+            "assSha256": "d8849bcdb3f2c65a96fa2721d29ddcc919ac6532af20cba1d20fc7b82602404e",
+            "audioSha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+            "dialogueCount": 165,
+            "durationMs": 498872,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "english",
+              "proper-nouns"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.1293859585224295,
+            "coldProcessWallMs": 76747.105,
+            "coldTotalRtf": 0.15213211364838863,
+            "peakProcessRssBytes": 4482007040,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.09494505494505495,
+            "deletions": 66,
+            "emptyTextCount": 0,
+            "insertions": 67,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 83
+          },
+          "rawResultSha256": "39f5fb62516d1a7f415ced38428a0353ae49bd6d283045db81a6a7475b7f55f7",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "faster-whisper",
+            "language": "ja",
+            "model": "large-v2",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "int8_float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "loadedLongMode": false,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 207
+            },
+            "timestampProvenance": "engine-native"
+          }
+        },
+        {
+          "caseId": "long-v2",
+          "corpusIdentity": {
+            "assSha256": "46b4891a4f86c70c1fe54ba4dcfbd776b361f73bb774f1d14e0f2bb53659d04b",
+            "audioSha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+            "dialogueCount": 681,
+            "durationMs": 4144235,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "continuous-speech-over-30s",
+              "english",
+              "long-silence",
+              "numbers",
+              "person-names",
+              "proper-nouns",
+              "rapid-dialogue"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.1332784110215757,
+            "coldProcessWallMs": 589451.451,
+            "coldTotalRtf": 0.141954621419876,
+            "peakProcessRssBytes": 4915367936,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.11399819765695404,
+            "deletions": 1191,
+            "emptyTextCount": 0,
+            "insertions": 581,
+            "semanticGapCount": 24,
+            "semanticGapDurationMs": 78330,
+            "substitutions": 505
+          },
+          "rawResultSha256": "526b7eb75306f6d5b2a667a511ef00c224cc842485e64331ee4850a96928d3ac",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "faster-whisper",
+            "language": "ja",
+            "model": "large-v2",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "int8_float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "loadedLongMode": true,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 489
+            },
+            "timestampProvenance": "engine-native"
+          }
+        }
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "whisper",
+      "logicalModelIdentity": "faster-whisper/large-v2",
+      "mappingRule": "same-artifact：Python 与 native 使用同一 CT2 snapshot（同 repo 同 revision）；Silero V4 仅是 Python long-mode 组件，不构成 native companion。禁止与任何其他 whisper 尺寸/variant 比较。",
+      "nativeMapping": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-large-v2",
+          "revision": "f0fe81560cb8b68660e564f55dd99207059c092e"
+        },
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "companion": null,
+        "engine": "ctranslate2"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-large-v2",
+          "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+          "snapshotHash": "f0fe81560cb8b68660e564f55dd99207059c092e"
+        },
+        "companion": {
+          "file": "silero_vad.onnx",
+          "identity": "silero-vad-v4",
+          "role": "large-v2+ja 长音频（>=600000ms）long-mode 的必需 VAD 组件",
+          "sha256": "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28"
+        },
+        "engine": "faster-whisper",
+        "model": "large-v2"
+      },
+      "qualityGate": "whisper-anchor"
+    },
+    {
+      "baselineDisposition": "complete",
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "corpusIdentity": {
+            "assSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+            "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+            "dialogueCount": 8,
+            "durationMs": 24102,
+            "tags": [
+              "clear-japanese"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.11665745166365649,
+            "coldProcessWallMs": 14390.201,
+            "coldTotalRtf": 0.5565695129036112,
+            "peakProcessRssBytes": 3821871104,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": 0.09737654136591979
+          },
+          "quality": {
+            "cer": 0.35833333333333334,
+            "deletions": 16,
+            "emptyTextCount": 0,
+            "insertions": 2,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 25
+          },
+          "rawResultSha256": "d9dd89836eaf5e98e1d7697f7ed804f832b70e90f3809b94b2dfa3d8c89621fb",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "faster-whisper",
+            "language": "ja",
+            "model": "large-v3",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "loadedLongMode": false,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 4,
+            "warmSampleCount": 3
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 1,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 4
+            },
+            "timestampProvenance": "engine-native"
+          }
+        },
+        {
+          "caseId": "medium-v1",
+          "corpusIdentity": {
+            "assSha256": "d8849bcdb3f2c65a96fa2721d29ddcc919ac6532af20cba1d20fc7b82602404e",
+            "audioSha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+            "dialogueCount": 165,
+            "durationMs": 498872,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "english",
+              "proper-nouns"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.14296858372488228,
+            "coldProcessWallMs": 85858.775,
+            "coldTotalRtf": 0.17031500946134534,
+            "peakProcessRssBytes": 3821559808,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.10021978021978022,
+            "deletions": 92,
+            "emptyTextCount": 0,
+            "insertions": 64,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 72
+          },
+          "rawResultSha256": "98797b2a713b8c2f8c4604d4ed5b4bff5cdcd7f1029150243dea84d2b7b0922f",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "faster-whisper",
+            "language": "ja",
+            "model": "large-v3",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "loadedLongMode": false,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 1,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 257
+            },
+            "timestampProvenance": "engine-native"
+          }
+        },
+        {
+          "caseId": "long-v2",
+          "corpusIdentity": {
+            "assSha256": "46b4891a4f86c70c1fe54ba4dcfbd776b361f73bb774f1d14e0f2bb53659d04b",
+            "audioSha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+            "dialogueCount": 681,
+            "durationMs": 4144235,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "continuous-speech-over-30s",
+              "english",
+              "long-silence",
+              "numbers",
+              "person-names",
+              "proper-nouns",
+              "rapid-dialogue"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.12987479201831034,
+            "coldProcessWallMs": 554031.066,
+            "coldTotalRtf": 0.13348524379047028,
+            "peakProcessRssBytes": 4538273792,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.17953339341143487,
+            "deletions": 1686,
+            "emptyTextCount": 0,
+            "insertions": 942,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 958
+          },
+          "rawResultSha256": "29d36d654a3870542b913f8c638e57741585ab1254b2d6c65658ecc1ab34fe3b",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "faster-whisper",
+            "language": "ja",
+            "model": "large-v3",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "loadedLongMode": false,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 1,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 1011
+            },
+            "timestampProvenance": "engine-native"
+          }
+        }
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "whisper",
+      "logicalModelIdentity": "faster-whisper/large-v3",
+      "mappingRule": "same-artifact：Python 与 native 使用同一 CT2 snapshot（同 repo 同 revision）。禁止与任何其他 whisper 尺寸/variant 比较。",
+      "nativeMapping": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-large-v3",
+          "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478"
+        },
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "companion": null,
+        "engine": "ctranslate2"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-large-v3",
+          "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+          "snapshotHash": "edaa852ec7e145841d8ffdb056a99866b5f0a478"
+        },
+        "companion": null,
+        "engine": "faster-whisper",
+        "model": "large-v3"
+      },
+      "qualityGate": "whisper-anchor"
+    },
+    {
+      "baselineDisposition": "complete",
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "corpusIdentity": {
+            "assSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+            "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+            "dialogueCount": 8,
+            "durationMs": 24102,
+            "tags": [
+              "clear-japanese"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.04335023649489798,
+            "coldProcessWallMs": 9839.156,
+            "coldTotalRtf": 0.3695216330595145,
+            "peakProcessRssBytes": 2253049856,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": 0.03831786158824894
+          },
+          "quality": {
+            "cer": 0.325,
+            "deletions": 22,
+            "emptyTextCount": 0,
+            "insertions": 1,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 16
+          },
+          "rawResultSha256": "739343348cfecbb1940ffeafd9894ac47176a6d216a63eb23354b82eddb72b2b",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "kotoba-faster-whisper",
+            "language": "ja",
+            "model": "kotoba-tech/kotoba-whisper-v2.0-faster",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "chunkLengthSeconds": 15,
+                "conditionOnPreviousText": false,
+                "loadedLongMode": false,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 4,
+            "warmSampleCount": 3
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 8
+            },
+            "timestampProvenance": "engine-native"
+          }
+        },
+        {
+          "caseId": "medium-v1",
+          "corpusIdentity": {
+            "assSha256": "d8849bcdb3f2c65a96fa2721d29ddcc919ac6532af20cba1d20fc7b82602404e",
+            "audioSha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+            "dialogueCount": 165,
+            "durationMs": 498872,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "english",
+              "proper-nouns"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.03117584610882225,
+            "coldProcessWallMs": 24003.634,
+            "coldTotalRtf": 0.04620651148992035,
+            "peakProcessRssBytes": 2253729792,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.22153846153846155,
+            "deletions": 259,
+            "emptyTextCount": 0,
+            "insertions": 69,
+            "semanticGapCount": 1,
+            "semanticGapDurationMs": 1590,
+            "substitutions": 176
+          },
+          "rawResultSha256": "ca682492ef35c5a7e1e5dcaa85f29dc7e9a9b3202b35485c130c96bdf58df90b",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "kotoba-faster-whisper",
+            "language": "ja",
+            "model": "kotoba-tech/kotoba-whisper-v2.0-faster",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "chunkLengthSeconds": 15,
+                "conditionOnPreviousText": false,
+                "loadedLongMode": false,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 193
+            },
+            "timestampProvenance": "engine-native"
+          }
+        },
+        {
+          "caseId": "long-v2",
+          "corpusIdentity": {
+            "assSha256": "46b4891a4f86c70c1fe54ba4dcfbd776b361f73bb774f1d14e0f2bb53659d04b",
+            "audioSha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+            "dialogueCount": 681,
+            "durationMs": 4144235,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "continuous-speech-over-30s",
+              "english",
+              "long-silence",
+              "numbers",
+              "person-names",
+              "proper-nouns",
+              "rapid-dialogue"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.027645453672390817,
+            "coldProcessWallMs": 129657.802,
+            "coldTotalRtf": 0.031080991280658467,
+            "peakProcessRssBytes": 4545347584,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.23445479122859716,
+            "deletions": 3156,
+            "emptyTextCount": 0,
+            "insertions": 440,
+            "semanticGapCount": 13,
+            "semanticGapDurationMs": 32270,
+            "substitutions": 1087
+          },
+          "rawResultSha256": "9785e696de568525ed56d6d1ba3d4fe7478bacf39faaa1871df0add89249b39d",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "kotoba-faster-whisper",
+            "language": "ja",
+            "model": "kotoba-tech/kotoba-whisper-v2.0-faster",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float16",
+              "engineSpecific": {
+                "beamSize": 5,
+                "chunkLengthSeconds": 15,
+                "conditionOnPreviousText": false,
+                "loadedLongMode": false,
+                "vadFilter": true
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 1,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 1,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 1177
+            },
+            "timestampProvenance": "engine-native"
+          }
+        }
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "kotoba",
+      "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+      "mappingRule": "same-artifact：Python 与 native 使用同一 CT2 snapshot（同 repo 同 revision，含 preprocessor_config.json 就绪要求）。",
+      "nativeMapping": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "kotoba-tech/kotoba-whisper-v2.0-faster",
+          "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc"
+        },
+        "backend": "hikaru-asr-worker CT2 Whisper backend（Kotoba profile）",
+        "companion": null,
+        "engine": "ctranslate2"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "kotoba-tech/kotoba-whisper-v2.0-faster",
+          "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+          "snapshotHash": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc"
+        },
+        "companion": null,
+        "engine": "kotoba-faster-whisper",
+        "model": "kotoba-tech/kotoba-whisper-v2.0-faster"
+      },
+      "qualityGate": "engine-model"
+    },
+    {
+      "baselineDisposition": "complete",
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "corpusIdentity": {
+            "assSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+            "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+            "dialogueCount": 8,
+            "durationMs": 24102,
+            "tags": [
+              "clear-japanese"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.06800054767242354,
+            "coldProcessWallMs": 40018.334,
+            "coldTotalRtf": 1.5762637664924097,
+            "peakProcessRssBytes": 3734224896,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": 0.005357708903819501
+          },
+          "quality": {
+            "cer": 0.7583333333333333,
+            "deletions": 90,
+            "emptyTextCount": 0,
+            "insertions": 0,
+            "semanticGapCount": 5,
+            "semanticGapDurationMs": 10620,
+            "substitutions": 1
+          },
+          "rawResultSha256": "a86c8220d0493a5eea3142a1755492f5c7784f216ae6ca0087d48225f9611358",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "parakeet",
+            "language": "ja",
+            "model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "44edb27eea9317daf89333e75eb830db4b1cc298",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float32",
+              "engineSpecific": {
+                "backfillMinGapMs": 2500,
+                "backfillMinUncoveredMs": 1500,
+                "chunkMs": 45000,
+                "chunkOverlapMs": 2000,
+                "chunkingMinDurationMs": 60000
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 4,
+            "warmSampleCount": 3
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 1
+            },
+            "timestampProvenance": "engine-native-or-synthetic-fallback"
+          }
+        },
+        {
+          "caseId": "medium-v1",
+          "corpusIdentity": {
+            "assSha256": "d8849bcdb3f2c65a96fa2721d29ddcc919ac6532af20cba1d20fc7b82602404e",
+            "audioSha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+            "dialogueCount": 165,
+            "durationMs": 498872,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "english",
+              "proper-nouns"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.019218626020301485,
+            "coldProcessWallMs": 39140.876,
+            "coldTotalRtf": 0.0742644441860844,
+            "peakProcessRssBytes": 3731873792,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.28175824175824177,
+            "deletions": 189,
+            "emptyTextCount": 0,
+            "insertions": 198,
+            "semanticGapCount": 12,
+            "semanticGapDurationMs": 31120,
+            "substitutions": 254
+          },
+          "rawResultSha256": "3495554b3b3ad1c4d9d5d5111588acd6e0d9f24a56fa98e2a225b89570d754d5",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "parakeet",
+            "language": "ja",
+            "model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "44edb27eea9317daf89333e75eb830db4b1cc298",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float32",
+              "engineSpecific": {
+                "backfillMinGapMs": 2500,
+                "backfillMinUncoveredMs": 1500,
+                "chunkMs": 45000,
+                "chunkOverlapMs": 2000,
+                "chunkingMinDurationMs": 60000
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 171
+            },
+            "timestampProvenance": "engine-native-or-synthetic-fallback"
+          }
+        },
+        {
+          "caseId": "long-v2",
+          "corpusIdentity": {
+            "assSha256": "46b4891a4f86c70c1fe54ba4dcfbd776b361f73bb774f1d14e0f2bb53659d04b",
+            "audioSha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+            "dialogueCount": 681,
+            "durationMs": 4144235,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "continuous-speech-over-30s",
+              "english",
+              "long-silence",
+              "numbers",
+              "person-names",
+              "proper-nouns",
+              "rapid-dialogue"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.01705122081638723,
+            "coldProcessWallMs": 104903.86,
+            "coldTotalRtf": 0.02481159215150688,
+            "peakProcessRssBytes": 3732934656,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.31661159507359565,
+            "deletions": 1851,
+            "emptyTextCount": 0,
+            "insertions": 2210,
+            "semanticGapCount": 57,
+            "semanticGapDurationMs": 192470,
+            "substitutions": 2263
+          },
+          "rawResultSha256": "477a8c49f384e16d2fef0ff9b05bc3281e2f33e9072aed68dd1261d3a573591a",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "parakeet",
+            "language": "ja",
+            "model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "44edb27eea9317daf89333e75eb830db4b1cc298",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float32",
+              "engineSpecific": {
+                "backfillMinGapMs": 2500,
+                "backfillMinUncoveredMs": 1500,
+                "chunkMs": 45000,
+                "chunkOverlapMs": 2000,
+                "chunkingMinDurationMs": 60000
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 1,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 1338
+            },
+            "timestampProvenance": "engine-native-or-synthetic-fallback"
+          }
+        }
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "parakeet",
+      "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+      "mappingRule": "explicit-cross-format：nvidia/parakeet-tdt_ctc-0.6b-ja（NeMo）↔ cstr/parakeet-tdt-0.6b-ja-GGUF 的 parakeet-tdt-0.6b-ja-q8_0.gguf。native artifact revision/hash 待 T12 manifest 固定后回填；回填前 native 只能记 baseline-incomplete/unscored。",
+      "nativeMapping": {
+        "artifact": {
+          "fileName": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+          "format": "gguf",
+          "identityStatus": "pending-t12-native-model-manifest",
+          "quantization": "q8_0",
+          "repository": "cstr/parakeet-tdt-0.6b-ja-GGUF",
+          "revision": null,
+          "sha256": null
+        },
+        "backend": "hikaru-asr-worker CrispASR parakeet backend",
+        "companion": null,
+        "engine": "crispasr"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "nemo",
+          "repository": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+          "revision": "44edb27eea9317daf89333e75eb830db4b1cc298",
+          "snapshotHash": "44edb27eea9317daf89333e75eb830db4b1cc298"
+        },
+        "companion": null,
+        "engine": "parakeet",
+        "model": "nvidia/parakeet-tdt_ctc-0.6b-ja"
+      },
+      "qualityGate": "engine-model"
+    },
+    {
+      "baselineDisposition": "complete",
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "corpusIdentity": {
+            "assSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+            "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+            "dialogueCount": 8,
+            "durationMs": 24102,
+            "tags": [
+              "clear-japanese"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.4307175711559283,
+            "coldProcessWallMs": 34055.448,
+            "coldTotalRtf": 1.3400297485685948,
+            "peakProcessRssBytes": 5358247936,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": 0.27218292672809324
+          },
+          "quality": {
+            "cer": 0.25,
+            "deletions": 16,
+            "emptyTextCount": 0,
+            "insertions": 0,
+            "qwenForcedAlignerTiming": {
+              "eligible": true,
+              "medianStartErrorMs": 140.0,
+              "p95StartErrorMs": 2060.0,
+              "provenance": "forced-aligner",
+              "unavailableReason": null
+            },
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 14
+          },
+          "rawResultSha256": "abe89eada6df0fa5b2f50b7f4be833ab368d767acad459e5cd6827483fff349b",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "qwen3-asr",
+            "language": "ja",
+            "model": "Qwen/Qwen3-ASR-1.7B",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {
+                "Qwen/Qwen3-ForcedAligner-0.6B": {
+                  "revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
+                  "unavailableReason": null
+                }
+              },
+              "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "bfloat16",
+              "engineSpecific": {
+                "chunkMs": 45000,
+                "chunkOverlapMs": 2000,
+                "forcedAligner": "Qwen/Qwen3-ForcedAligner-0.6B",
+                "maxNewTokens": 4096
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 4,
+            "warmSampleCount": 3
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 6
+            },
+            "timestampProvenance": "forced-aligner"
+          }
+        },
+        {
+          "caseId": "medium-v1",
+          "corpusIdentity": {
+            "assSha256": "d8849bcdb3f2c65a96fa2721d29ddcc919ac6532af20cba1d20fc7b82602404e",
+            "audioSha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+            "dialogueCount": 165,
+            "durationMs": 498872,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "english",
+              "proper-nouns"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.2297653802979514,
+            "coldProcessWallMs": 137800.658,
+            "coldTotalRtf": 0.2729409892717983,
+            "peakProcessRssBytes": 5358526464,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.12571428571428572,
+            "deletions": 81,
+            "emptyTextCount": 0,
+            "insertions": 73,
+            "qwenForcedAlignerTiming": {
+              "eligible": true,
+              "medianStartErrorMs": 295.0,
+              "p95StartErrorMs": 3542.999999999998,
+              "provenance": "forced-aligner",
+              "unavailableReason": null
+            },
+            "semanticGapCount": 3,
+            "semanticGapDurationMs": 5420,
+            "substitutions": 132
+          },
+          "rawResultSha256": "b0223fae466edb3cabeaf79e6a4ec0903850eb2fbf07bb23347e098278898d3a",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "qwen3-asr",
+            "language": "ja",
+            "model": "Qwen/Qwen3-ASR-1.7B",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {
+                "Qwen/Qwen3-ForcedAligner-0.6B": {
+                  "revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
+                  "unavailableReason": null
+                }
+              },
+              "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "bfloat16",
+              "engineSpecific": {
+                "chunkMs": 45000,
+                "chunkOverlapMs": 2000,
+                "forcedAligner": "Qwen/Qwen3-ForcedAligner-0.6B",
+                "maxNewTokens": 4096
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 1,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 201
+            },
+            "timestampProvenance": "forced-aligner"
+          }
+        },
+        {
+          "caseId": "long-v2",
+          "corpusIdentity": {
+            "assSha256": "46b4891a4f86c70c1fe54ba4dcfbd776b361f73bb774f1d14e0f2bb53659d04b",
+            "audioSha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+            "dialogueCount": 681,
+            "durationMs": 4144235,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "continuous-speech-over-30s",
+              "english",
+              "long-silence",
+              "numbers",
+              "person-names",
+              "proper-nouns",
+              "rapid-dialogue"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.5546238178095595,
+            "coldProcessWallMs": 2320006.708,
+            "coldTotalRtf": 0.5594135932928515,
+            "peakProcessRssBytes": 5360271360,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.19950936217082207,
+            "deletions": 1619,
+            "emptyTextCount": 0,
+            "insertions": 1218,
+            "qwenForcedAlignerTiming": {
+              "eligible": false,
+              "medianStartErrorMs": null,
+              "p95StartErrorMs": null,
+              "provenance": "mixed",
+              "unavailableReason": "qwen3 timing requires forced-aligner provenance, got mixed"
+            },
+            "semanticGapCount": 12,
+            "semanticGapDurationMs": 25440,
+            "substitutions": 1148
+          },
+          "rawResultSha256": "2171fb8f7757ad4642a2b88052c76658735621251231c9a5293cc0f4d21f790e",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "qwen3-asr",
+            "language": "ja",
+            "model": "Qwen/Qwen3-ASR-1.7B",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {
+                "Qwen/Qwen3-ForcedAligner-0.6B": {
+                  "revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
+                  "unavailableReason": null
+                }
+              },
+              "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "bfloat16",
+              "engineSpecific": {
+                "chunkMs": 45000,
+                "chunkOverlapMs": 2000,
+                "forcedAligner": "Qwen/Qwen3-ForcedAligner-0.6B",
+                "maxNewTokens": 4096
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 1299
+            },
+            "timestampProvenance": "mixed"
+          }
+        }
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "qwen3",
+      "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+      "mappingRule": "explicit-cross-format：Qwen/Qwen3-ASR-1.7B ↔ cstr/qwen3-asr-1.7b-GGUF 的 qwen3-asr-1.7b-q4_k.gguf；companion Qwen/Qwen3-ForcedAligner-0.6B ↔ cstr/qwen3-forced-aligner-0.6b-GGUF 的 qwen3-forced-aligner-0.6b-q4_k.gguf。两侧 companion identity 单独绑定，不得交叉。",
+      "nativeMapping": {
+        "artifact": {
+          "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+          "format": "gguf",
+          "identityStatus": "pending-t12-native-model-manifest",
+          "quantization": "q4_k",
+          "repository": "cstr/qwen3-asr-1.7b-GGUF",
+          "revision": null,
+          "sha256": null
+        },
+        "backend": "hikaru-asr-worker CrispASR qwen3 backend",
+        "companion": {
+          "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+          "format": "gguf",
+          "identity": "qwen3-forced-aligner-0.6b-q4_k",
+          "identityStatus": "pending-t12-native-model-manifest",
+          "quantization": "q4_k",
+          "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+          "revision": null,
+          "role": "必需 companion；Qwen3 timing 比较只在两侧 ForcedAligner provenance 均 eligible 时进行",
+          "sha256": null
+        },
+        "engine": "crispasr"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "huggingface-qwen-asr",
+          "repository": "Qwen/Qwen3-ASR-1.7B",
+          "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
+          "snapshotHash": "7278e1e70fe206f11671096ffdd38061171dd6e5"
+        },
+        "companion": {
+          "format": "huggingface",
+          "identity": "Qwen/Qwen3-ForcedAligner-0.6B",
+          "repository": "Qwen/Qwen3-ForcedAligner-0.6B",
+          "revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
+          "role": "必需 ForcedAligner；缺失或失败时任务失败，不生成伪造时间戳",
+          "snapshotHash": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7"
+        },
+        "engine": "qwen3-asr",
+        "model": "Qwen/Qwen3-ASR-1.7B"
+      },
+      "qualityGate": "engine-model"
+    },
+    {
+      "baselineDisposition": "complete",
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "corpusIdentity": {
+            "assSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+            "audioSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+            "dialogueCount": 8,
+            "durationMs": 24102,
+            "tags": [
+              "clear-japanese"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.12096539291342145,
+            "coldProcessWallMs": 33142.118,
+            "coldTotalRtf": 1.275079980914457,
+            "peakProcessRssBytes": 3653337088,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": 0.08092827151277035
+          },
+          "quality": {
+            "cer": 0.10833333333333334,
+            "deletions": 11,
+            "emptyTextCount": 0,
+            "insertions": 0,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 2
+          },
+          "rawResultSha256": "6ece024aa9defbc4a1890a2551efa80e5ea81655014df105eea126ccddbe8bf0",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "reazonspeech-nemo",
+            "language": "ja",
+            "model": "reazon-research/reazonspeech-nemo-v2",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "33693408be76b7cba9fd4a7546a0a8772430211b",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float32",
+              "engineSpecific": {
+                "padSeconds": 0.5,
+                "phonemicBreakSeconds": 0.5,
+                "secondsPerStep": 0.08,
+                "subwordsPerSegment": 10
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 4,
+            "warmSampleCount": 3
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 8
+            },
+            "timestampProvenance": "engine-native"
+          }
+        },
+        {
+          "caseId": "medium-v1",
+          "corpusIdentity": {
+            "assSha256": "d8849bcdb3f2c65a96fa2721d29ddcc919ac6532af20cba1d20fc7b82602404e",
+            "audioSha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+            "dialogueCount": 165,
+            "durationMs": 498872,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "english",
+              "proper-nouns"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.0708778985391043,
+            "coldProcessWallMs": 63580.759,
+            "coldTotalRtf": 0.12345918973203597,
+            "peakProcessRssBytes": 3654344704,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.5010989010989011,
+            "deletions": 967,
+            "emptyTextCount": 0,
+            "insertions": 52,
+            "semanticGapCount": 46,
+            "semanticGapDurationMs": 137230,
+            "substitutions": 121
+          },
+          "rawResultSha256": "886f4a253f6e8e35c7efaddf2aa7e60b2335d80b205dbe5d5c3decc4e7537528",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "reazonspeech-nemo",
+            "language": "ja",
+            "model": "reazon-research/reazonspeech-nemo-v2",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "33693408be76b7cba9fd4a7546a0a8772430211b",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float32",
+              "engineSpecific": {
+                "padSeconds": 0.5,
+                "phonemicBreakSeconds": 0.5,
+                "secondsPerStep": 0.08,
+                "subwordsPerSegment": 10
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 3,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 73
+            },
+            "timestampProvenance": "engine-native"
+          }
+        },
+        {
+          "caseId": "long-v2",
+          "corpusIdentity": {
+            "assSha256": "46b4891a4f86c70c1fe54ba4dcfbd776b361f73bb774f1d14e0f2bb53659d04b",
+            "audioSha256": "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e",
+            "dialogueCount": 681,
+            "durationMs": 4144235,
+            "tags": [
+              "background-noise",
+              "clear-japanese",
+              "continuous-speech-over-30s",
+              "english",
+              "long-silence",
+              "numbers",
+              "person-names",
+              "proper-nouns",
+              "rapid-dialogue"
+            ]
+          },
+          "performanceDiagnostics": {
+            "coldInferenceRtf": 0.06766834704113056,
+            "coldProcessWallMs": 313925.879,
+            "coldTotalRtf": 0.07528129691004486,
+            "peakProcessRssBytes": 3652632576,
+            "peakProcessRssMethod": "Windows PeakWorkingSetSize",
+            "peakVramBytes": null,
+            "peakVramUnavailableReason": "nvidia-smi process sampling failed",
+            "warmInferenceRtfMedian": null
+          },
+          "quality": {
+            "cer": 0.2649444277560829,
+            "deletions": 3486,
+            "emptyTextCount": 0,
+            "insertions": 694,
+            "semanticGapCount": 83,
+            "semanticGapDurationMs": 282730,
+            "substitutions": 1112
+          },
+          "rawResultSha256": "9cedf428d4978b1e70828b2088b9b4276fda4a525ccf0b957f2706c0569f1afc",
+          "runIdentity": {
+            "acquisitionTool": {
+              "kind": "python-source",
+              "schemaVersion": 1,
+              "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+              "sourcePath": "scripts/asr-benchmark.py"
+            },
+            "device": "cuda",
+            "engine": "reazonspeech-nemo",
+            "language": "ja",
+            "model": "reazon-research/reazonspeech-nemo-v2",
+            "modelCache": {
+              "checkUnavailableReason": null,
+              "companions": {},
+              "revision": "33693408be76b7cba9fd4a7546a0a8772430211b",
+              "revisionUnavailableReason": null,
+              "status": "ready"
+            },
+            "resolvedParameters": {
+              "effectiveComputeType": "float32",
+              "engineSpecific": {
+                "padSeconds": 0.5,
+                "phonemicBreakSeconds": 0.5,
+                "secondsPerStep": 0.08,
+                "subwordsPerSegment": 10
+              },
+              "requestedComputeType": null,
+              "resolvedDevice": "cuda",
+              "useVad": false,
+              "vadConfig": {}
+            },
+            "runtime": {
+              "gitDirty": true,
+              "gitRevision": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+              "gpu": {
+                "devices": [
+                  {
+                    "driverVersion": "596.49",
+                    "memoryTotalMiB": 8192,
+                    "name": "NVIDIA GeForce RTX 3070"
+                  }
+                ],
+                "method": "nvidia-smi",
+                "unavailableReason": null
+              },
+              "hfHomeIdentity": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+              "interpreterIdentity": "<repo>/asr-service/.venv/Scripts/python.exe",
+              "observedPackages": {
+                "av": "17.1.0",
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "huggingface-hub": "0.36.2",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "qwen-asr": "0.0.6",
+                "safetensors": "0.8.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "packages": {
+                "ctranslate2": "4.8.0",
+                "faster-whisper": "1.2.1",
+                "librosa": "0.11.0",
+                "nemo-toolkit": "2.7.3",
+                "numpy": "2.4.6",
+                "onnxruntime": "1.26.0",
+                "qwen-asr": "0.0.6",
+                "qwen-omni-utils": "0.0.9",
+                "soundfile": "0.14.0",
+                "tokenizers": "0.22.2",
+                "torch": "2.12.0+cu126",
+                "torchaudio": "2.11.0+cu126",
+                "transformers": "4.57.6"
+              },
+              "pythonVersion": "3.11.15",
+              "resourceSampling": {
+                "rss": "Windows PeakWorkingSetSize",
+                "vram": "nvidia-smi compute-app polling at 250 ms; unavailable values remain explicit"
+              }
+            },
+            "useVad": false
+          },
+          "sampleContract": {
+            "qualitySample": "cold",
+            "sampleCount": 1,
+            "warmSampleCount": 0
+          },
+          "status": "completed",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 1,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 874
+            },
+            "timestampProvenance": "engine-native"
+          }
+        }
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "reazonspeech",
+      "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+      "mappingRule": "explicit-cross-format：reazon-research/reazonspeech-nemo-v2（NeMo）↔ cstr/reazonspeech-nemo-v2-GGUF 的 reazonspeech-nemo-v2-q8_0.gguf。native artifact revision/hash 待 T12 manifest 固定后回填。",
+      "nativeMapping": {
+        "artifact": {
+          "fileName": "reazonspeech-nemo-v2-q8_0.gguf",
+          "format": "gguf",
+          "identityStatus": "pending-t12-native-model-manifest",
+          "quantization": "q8_0",
+          "repository": "cstr/reazonspeech-nemo-v2-GGUF",
+          "revision": null,
+          "sha256": null
+        },
+        "backend": "hikaru-asr-worker CrispASR parakeet backend（ReazonSpeech 路由）",
+        "companion": null,
+        "engine": "crispasr"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "nemo",
+          "repository": "reazon-research/reazonspeech-nemo-v2",
+          "revision": "33693408be76b7cba9fd4a7546a0a8772430211b",
+          "snapshotHash": "33693408be76b7cba9fd4a7546a0a8772430211b"
+        },
+        "companion": null,
+        "engine": "reazonspeech-nemo",
+        "model": "reazon-research/reazonspeech-nemo-v2"
+      },
+      "qualityGate": "engine-model"
+    },
+    {
+      "baselineDisposition": "family-gated-no-baseline",
+      "cases": [],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "whisper",
+      "logicalModelIdentity": "faster-whisper/tiny",
+      "mappingRule": "same-artifact；不采集独立 Python baseline，发布资格由 whisper family gate（large-v2 + large-v3 双 anchor）解锁，仍须满足既有非质量绝对门槛与 identity/协议/路径/取消/恢复/隐私/许可证证据。",
+      "nativeMapping": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-tiny",
+          "revision": null
+        },
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "companion": null,
+        "engine": "ctranslate2"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-tiny",
+          "revision": null,
+          "snapshotHash": null
+        },
+        "companion": null,
+        "engine": "faster-whisper",
+        "model": "tiny"
+      },
+      "qualityGate": "whisper-family-unlock-only"
+    },
+    {
+      "baselineDisposition": "family-gated-no-baseline",
+      "cases": [],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "whisper",
+      "logicalModelIdentity": "faster-whisper/base",
+      "mappingRule": "same-artifact；whisper-family-unlock-only，无独立 Python baseline。",
+      "nativeMapping": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-base",
+          "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
+        },
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "companion": null,
+        "engine": "ctranslate2"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-base",
+          "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+          "snapshotHash": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
+        },
+        "companion": null,
+        "engine": "faster-whisper",
+        "model": "base"
+      },
+      "qualityGate": "whisper-family-unlock-only"
+    },
+    {
+      "baselineDisposition": "family-gated-no-baseline",
+      "cases": [],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "whisper",
+      "logicalModelIdentity": "faster-whisper/small",
+      "mappingRule": "same-artifact；whisper-family-unlock-only，无独立 Python baseline。",
+      "nativeMapping": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-small",
+          "revision": "536b0662742c02347bc0e980a01041f333bce120"
+        },
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "companion": null,
+        "engine": "ctranslate2"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-small",
+          "revision": "536b0662742c02347bc0e980a01041f333bce120",
+          "snapshotHash": "536b0662742c02347bc0e980a01041f333bce120"
+        },
+        "companion": null,
+        "engine": "faster-whisper",
+        "model": "small"
+      },
+      "qualityGate": "whisper-family-unlock-only"
+    },
+    {
+      "baselineDisposition": "family-gated-no-baseline",
+      "cases": [],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "whisper",
+      "logicalModelIdentity": "faster-whisper/medium",
+      "mappingRule": "same-artifact；whisper-family-unlock-only，无独立 Python baseline。",
+      "nativeMapping": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-medium",
+          "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f"
+        },
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "companion": null,
+        "engine": "ctranslate2"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "Systran/faster-whisper-medium",
+          "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
+          "snapshotHash": "08e178d48790749d25932bbc082711ddcfdfbc4f"
+        },
+        "companion": null,
+        "engine": "faster-whisper",
+        "model": "medium"
+      },
+      "qualityGate": "whisper-family-unlock-only"
+    },
+    {
+      "baselineDisposition": "family-gated-no-baseline",
+      "cases": [],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "family": "whisper",
+      "logicalModelIdentity": "faster-whisper/large-v3-turbo",
+      "mappingRule": "same-artifact；whisper-family-unlock-only，无独立 Python baseline。",
+      "nativeMapping": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+          "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+        },
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "companion": null,
+        "engine": "ctranslate2"
+      },
+      "pythonIdentity": {
+        "artifact": {
+          "format": "ctranslate2",
+          "repository": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+          "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+          "snapshotHash": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+        },
+        "companion": null,
+        "engine": "faster-whisper",
+        "model": "large-v3-turbo"
+      },
+      "qualityGate": "whisper-family-unlock-only"
+    }
+  ],
+  "qualityComparisonContract": {
+    "independentAbsoluteGates": [
+      "timeline legality: zero invalid/out-of-bounds/negative/reversed/zero-duration segments",
+      "valid UTF-8, text conservation, subtitle and protocol legality",
+      "complete required matrix and identity/evidence attestation",
+      "CPU inference RTF <= 1.0 and accelerated GPU inference RTF <= 0.5",
+      "short cold process wall <= 120s",
+      "peak RSS <= 6 GiB for CTranslate2 and <= 12 GiB for CrispASR",
+      "process cancellation/reap, recovery, path containment, privacy and license contracts"
+    ],
+    "invalidityRules": [
+      "cross-model, family-only, case, profile, artifact, revision or companion substitution is rejected",
+      "missing, invalid, identity-drifted or provenance-ineligible baseline evidence cannot qualify a native row",
+      "no average may hide a per-case or per-metric regression",
+      "a legal Python structured failure is not a waiver for native structural or non-quality gates"
+    ],
+    "key": [
+      "logicalModelIdentity",
+      "caseId",
+      "comparisonProfile"
+    ],
+    "metrics": [
+      {
+        "direction": "lower-or-equal",
+        "id": "cer"
+      },
+      {
+        "direction": "lower-or-equal",
+        "id": "substitutions"
+      },
+      {
+        "direction": "lower-or-equal",
+        "id": "deletions"
+      },
+      {
+        "direction": "lower-or-equal",
+        "id": "insertions"
+      },
+      {
+        "direction": "lower-or-equal",
+        "id": "emptyTextCount"
+      },
+      {
+        "direction": "lower-or-equal",
+        "id": "semanticGapCount"
+      },
+      {
+        "direction": "lower-or-equal",
+        "id": "semanticGapDurationMs"
+      },
+      {
+        "direction": "lower-or-equal",
+        "id": "qwenForcedAlignerMedianStartErrorMs",
+        "requires": "eligible forced-aligner provenance on both rows"
+      },
+      {
+        "direction": "lower-or-equal",
+        "id": "qwenForcedAlignerP95StartErrorMs",
+        "requires": "eligible forced-aligner provenance on both rows"
+      }
+    ],
+    "releaseBoundary": "this comparison can qualify subtitle quality only; release additionally requires every independent absolute gate",
+    "statusOrdering": [
+      "qualified",
+      "stop-revise",
+      "baseline-incomplete",
+      "unscored"
+    ]
+  },
+  "schemaVersion": 1,
+  "whisperFamilyGate": {
+    "anchors": [
+      "faster-whisper/large-v2",
+      "faster-whisper/large-v3"
+    ],
+    "rule": "both anchors must complete all three cases, pass every relative quality metric, and pass all independent absolute gates before family unlock",
+    "unlockedModels": [
+      "faster-whisper/tiny",
+      "faster-whisper/base",
+      "faster-whisper/small",
+      "faster-whisper/medium",
+      "faster-whisper/large-v3-turbo"
+    ]
+  }
+}

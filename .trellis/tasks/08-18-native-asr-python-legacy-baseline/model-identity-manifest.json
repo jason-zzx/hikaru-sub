@@ -1,0 +1,534 @@
+{
+  "kind": "hikaru-asr-model-identity-manifest",
+  "schemaVersion": 1,
+  "task": "08-18-native-asr-python-legacy-baseline",
+  "createdAt": "2026-08-18",
+  "authority": {
+    "summary": "唯一合法的 Python-legacy/native 同模型配对入口。native 候选只能与相同 logicalModelIdentity 的 Python row 比较；family/name-only 匹配、跨尺寸/variant/revision/companion 比较一律拒绝。",
+    "invalidationRules": [
+      "python 或 native artifact 的 repository/revision/hash 变化",
+      "python engine 推理参数、引擎实现或注册表行为变化",
+      "解释器、关键依赖版本或 HF 缓存快照变化",
+      "benchmark corpus manifest（.asr-benchmark/manifest.json）hash 或 case 集合变化"
+    ],
+    "invalidationEffect": "受影响 logicalModelIdentity 的全部 baseline rows 失效，必须按同一 identity 重新采集；不允许沿用旧 row 或跨 identity 借用。"
+  },
+  "corpus": {
+    "corpusId": "hikaru-user-ja-ground-truth-v1",
+    "manifestPath": ".asr-benchmark/manifest.json",
+    "manifestSha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea",
+    "requiredCases": [
+      "short-v1",
+      "medium-v1",
+      "long-v2"
+    ],
+    "note": "comparison identity = (corpusId, manifestSha256, caseId, WAV SHA-256, ASS SHA-256)，与 T01 合同一致。"
+  },
+  "localRawRoot": {
+    "path": ".trellis/tasks/08-18-native-asr-python-legacy-baseline/research/local/",
+    "ignored": true,
+    "privacyRules": [
+      "raw transcript、音频、ASS 正文、模型权重、完整 stderr、私有 cache 内容与密钥只允许写入该 ignored 根目录",
+      "tracked 输出只保留去敏身份、hash、聚合指标、状态与限制",
+      "路径一律以仓库相对形式或 <repo>/ 占位记录，绝对路径不得进入 tracked 输出"
+    ]
+  },
+  "comparisonProfiles": [
+    {
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "description": "当前生产 Python sidecar 的 CUDA legacy 基线 profile（2026-08-18 用户指示由 CPU 改为 GPU 采集）。任何未来其他设备/参数的 legacy profile 必须使用不同 comparisonProfile，且永不与 CUDA rows 合并。本 profile 是 native 字幕质量比较的唯一 Python 参照，适用于 native CPU 与 native CUDA rows 的质量配对；性能/资源指标不做相对比较，仍走既有绝对门槛。冻结前已按 python-legacy-cpu-v1 采集的 large-v2 short/medium/long 三行（research/local/history/python-legacy-cpu-v1/faster-whisper-large-v2-*.json）在本 profile 下 invalid，仅作为 ignored raw 历史保留，不得复用。",
+      "runner": "scripts/asr-benchmark.py（T01 stdlib-only runner/refresh reduction/comparator；每个 raw result 必须在采集时绑定 sourcePath + SHA-256）",
+      "benchmarkRunnerSha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+      "interpreter": {
+        "path": "<repo>/asr-service/.venv/Scripts/python.exe",
+        "pythonVersion": "3.11.15"
+      },
+      "gitRevisionAtFreeze": "c0dae72598e3def5a33b3e344734b22d5796a2f0",
+      "dependencyVersions": {
+        "faster-whisper": "1.2.1",
+        "ctranslate2": "4.8.0",
+        "torch": "2.12.0+cu126",
+        "torchaudio": "2.11.0+cu126",
+        "transformers": "4.57.6",
+        "nemo-toolkit": "2.7.3",
+        "qwen-asr": "0.0.6",
+        "qwen-omni-utils": "0.0.9",
+        "onnxruntime": "1.26.0",
+        "librosa": "0.11.0",
+        "soundfile": "0.14.0",
+        "numpy": "2.4.6",
+        "tokenizers": "0.22.2"
+      },
+      "hfHome": "<repo>/src-tauri/target/debug/deps/models/huggingface",
+      "device": "cuda",
+      "useVad": false,
+      "vadNote": "benchmark run 默认 useVad=false；session VAD 不参与基线。faster-whisper 短路径仍固定使用 faster-whisper 内部 vad_filter=True（1.2.1 默认参数 threshold=0.5, min_speech_duration_ms=0, min_silence_duration_ms=2000, speech_pad_ms=400）。",
+      "engineParameters": {
+        "faster-whisper": {
+          "shortPath": {
+            "computeType": "float16（cuda 解析结果；_resolve_compute_type device=cuda → float16）",
+            "beamSize": 5,
+            "vadFilter": "faster-whisper 内部 VAD（默认参数）",
+            "conditionOnPreviousText": "faster-whisper 1.2.1 默认（true）"
+          },
+          "longMode": {
+            "appliesWhen": "engine=faster-whisper 且 model=large-v2 且 language=ja 且 durationMs>=600000",
+            "computeType": "int8_float16（cuda；_resolve_long_compute_type 非 cpu 返回 int8_float16）",
+            "seed": "ctranslate2.set_random_seed(0)，每会话一次",
+            "vad": "Silero VAD v4.0（silero_vad.onnx, sha256=a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28；threshold=0.45, min_speech_duration_ms=250, min_silence_duration_ms=3000, speech_pad_ms=900）",
+            "decode": "压缩语音流上 beam_size=5, condition_on_previous_text=true, word_timestamps=true, vad_filter=false，restore_speech_timestamps 还原",
+            "note": "该 V4/seed/session/语义分段行为是 legacy baseline 的真实组成部分，但不自动成为 native 算法模板。"
+          }
+        },
+        "kotoba-faster-whisper": {
+          "chunkLengthSeconds": 15,
+          "conditionOnPreviousText": false,
+          "beamSize": 5,
+          "vadFilter": "faster-whisper 内部 VAD（默认参数）",
+          "computeType": "float16（cuda 解析结果；复用 faster-whisper 解析规则）",
+          "readiness": "要求 faster-whisper>=1.1.1 且缓存含 preprocessor_config.json"
+        },
+        "parakeet": {
+          "computeType": "float32（NeMo；device=cuda 时 model.cuda()，dtype 不变）",
+          "chunking": "durationMs>=60000 时固定 45000ms 块 + 2000ms overlap，overlap 去重合并，收尾 TranscriptSegmentRefresh 整体替换",
+          "timestamps": "字级 timestamps 分组；可能含 synthetic fallback（baseline timing 仅作诊断）"
+        },
+        "qwen3-asr": {
+          "computeType": "bfloat16（cuda；dtype=torch.bfloat16, device_map=cuda:0，ForcedAligner 同 dtype/device）",
+          "chunking": "durationMs>=45000 时固定 45000ms 块 + 2000ms overlap（qwen-asr 内部 180s 切块被外层小块取代），overlap 去重合并，收尾 TranscriptSegmentRefresh 整体替换",
+          "language": "Japanese",
+          "returnTimeStamps": true,
+          "timingProvenanceRule": "仅 forced-aligner provenance 的 start median/P95 可作为 baseline timing truth；synthetic/mixed/unknown/engine-native 一律 ineligible"
+        },
+        "reazonspeech-nemo": {
+          "computeType": "float32（NeMo EncDecRNNTBPE；device=cuda 时 model.cuda()，dtype 不变）",
+          "chunking": "durationMs>=60000 时固定 45000ms 块 + 2000ms overlap，overlap 去重合并；use_vad/vad_config 被有意忽略",
+          "audio": "mono 16kHz PCM16，/32768.0，首尾各 0.5s zero padding",
+          "language": "ja（固定）"
+        }
+      },
+      "gpu": {
+        "deviceIndex": 0,
+        "expectedDevice": "NVIDIA GeForce RTX 3070",
+        "expectedMemoryTotalMiB": 8192,
+        "expectedDriver": "596.49",
+        "note": "GPU identity 以每行 runner environment 的 nvidia-smi attestation 为准；torch 2.12.0+cu126 / ctranslate2 4.8.0 CUDA 支持来自 venv pin，设备或驱动变化构成 identity drift。"
+      }
+    }
+  ],
+  "models": [
+    {
+      "logicalModelIdentity": "faster-whisper/large-v2",
+      "family": "whisper",
+      "qualityGate": "whisper-anchor",
+      "python": {
+        "engine": "faster-whisper",
+        "model": "large-v2",
+        "artifact": {
+          "repository": "Systran/faster-whisper-large-v2",
+          "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+          "format": "ctranslate2",
+          "snapshotHash": "f0fe81560cb8b68660e564f55dd99207059c092e"
+        },
+        "companion": {
+          "identity": "silero-vad-v4",
+          "file": "silero_vad.onnx",
+          "sha256": "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28",
+          "role": "large-v2+ja 长音频（>=600000ms）long-mode 的必需 VAD 组件"
+        }
+      },
+      "native": {
+        "engine": "ctranslate2",
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "artifact": {
+          "repository": "Systran/faster-whisper-large-v2",
+          "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+          "format": "ctranslate2"
+        },
+        "companion": null
+      },
+      "mappingRule": "same-artifact：Python 与 native 使用同一 CT2 snapshot（同 repo 同 revision）；Silero V4 仅是 Python long-mode 组件，不构成 native companion。禁止与任何其他 whisper 尺寸/variant 比较。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached"
+    },
+    {
+      "logicalModelIdentity": "faster-whisper/large-v3",
+      "family": "whisper",
+      "qualityGate": "whisper-anchor",
+      "python": {
+        "engine": "faster-whisper",
+        "model": "large-v3",
+        "artifact": {
+          "repository": "Systran/faster-whisper-large-v3",
+          "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+          "format": "ctranslate2",
+          "snapshotHash": "edaa852ec7e145841d8ffdb056a99866b5f0a478"
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "ctranslate2",
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "artifact": {
+          "repository": "Systran/faster-whisper-large-v3",
+          "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+          "format": "ctranslate2"
+        },
+        "companion": null
+      },
+      "mappingRule": "same-artifact：Python 与 native 使用同一 CT2 snapshot（同 repo 同 revision）。禁止与任何其他 whisper 尺寸/variant 比较。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached"
+    },
+    {
+      "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+      "family": "kotoba",
+      "qualityGate": "engine-model",
+      "python": {
+        "engine": "kotoba-faster-whisper",
+        "model": "kotoba-tech/kotoba-whisper-v2.0-faster",
+        "artifact": {
+          "repository": "kotoba-tech/kotoba-whisper-v2.0-faster",
+          "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+          "format": "ctranslate2",
+          "snapshotHash": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc"
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "ctranslate2",
+        "backend": "hikaru-asr-worker CT2 Whisper backend（Kotoba profile）",
+        "artifact": {
+          "repository": "kotoba-tech/kotoba-whisper-v2.0-faster",
+          "revision": "f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+          "format": "ctranslate2"
+        },
+        "companion": null
+      },
+      "mappingRule": "same-artifact：Python 与 native 使用同一 CT2 snapshot（同 repo 同 revision，含 preprocessor_config.json 就绪要求）。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached"
+    },
+    {
+      "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+      "family": "parakeet",
+      "qualityGate": "engine-model",
+      "python": {
+        "engine": "parakeet",
+        "model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+        "artifact": {
+          "repository": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+          "revision": "44edb27eea9317daf89333e75eb830db4b1cc298",
+          "format": "nemo",
+          "snapshotHash": "44edb27eea9317daf89333e75eb830db4b1cc298"
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "crispasr",
+        "backend": "hikaru-asr-worker CrispASR parakeet backend",
+        "artifact": {
+          "repository": "cstr/parakeet-tdt-0.6b-ja-GGUF",
+          "fileName": "parakeet-tdt-0.6b-ja-q8_0.gguf",
+          "format": "gguf",
+          "quantization": "q8_0",
+          "revision": null,
+          "sha256": null,
+          "identityStatus": "pending-t12-native-model-manifest"
+        },
+        "companion": null
+      },
+      "mappingRule": "explicit-cross-format：nvidia/parakeet-tdt_ctc-0.6b-ja（NeMo）↔ cstr/parakeet-tdt-0.6b-ja-GGUF 的 parakeet-tdt-0.6b-ja-q8_0.gguf。native artifact revision/hash 待 T12 manifest 固定后回填；回填前 native 只能记 baseline-incomplete/unscored。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached"
+    },
+    {
+      "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+      "family": "qwen3",
+      "qualityGate": "engine-model",
+      "python": {
+        "engine": "qwen3-asr",
+        "model": "Qwen/Qwen3-ASR-1.7B",
+        "artifact": {
+          "repository": "Qwen/Qwen3-ASR-1.7B",
+          "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
+          "format": "huggingface-qwen-asr",
+          "snapshotHash": "7278e1e70fe206f11671096ffdd38061171dd6e5"
+        },
+        "companion": {
+          "identity": "Qwen/Qwen3-ForcedAligner-0.6B",
+          "repository": "Qwen/Qwen3-ForcedAligner-0.6B",
+          "revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
+          "format": "huggingface",
+          "snapshotHash": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
+          "role": "必需 ForcedAligner；缺失或失败时任务失败，不生成伪造时间戳"
+        }
+      },
+      "native": {
+        "engine": "crispasr",
+        "backend": "hikaru-asr-worker CrispASR qwen3 backend",
+        "artifact": {
+          "repository": "cstr/qwen3-asr-1.7b-GGUF",
+          "fileName": "qwen3-asr-1.7b-q4_k.gguf",
+          "format": "gguf",
+          "quantization": "q4_k",
+          "revision": null,
+          "sha256": null,
+          "identityStatus": "pending-t12-native-model-manifest"
+        },
+        "companion": {
+          "identity": "qwen3-forced-aligner-0.6b-q4_k",
+          "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+          "fileName": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+          "format": "gguf",
+          "quantization": "q4_k",
+          "revision": null,
+          "sha256": null,
+          "identityStatus": "pending-t12-native-model-manifest",
+          "role": "必需 companion；Qwen3 timing 比较只在两侧 ForcedAligner provenance 均 eligible 时进行"
+        }
+      },
+      "mappingRule": "explicit-cross-format：Qwen/Qwen3-ASR-1.7B ↔ cstr/qwen3-asr-1.7b-GGUF 的 qwen3-asr-1.7b-q4_k.gguf；companion Qwen/Qwen3-ForcedAligner-0.6B ↔ cstr/qwen3-forced-aligner-0.6b-GGUF 的 qwen3-forced-aligner-0.6b-q4_k.gguf。两侧 companion identity 单独绑定，不得交叉。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached"
+    },
+    {
+      "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+      "family": "reazonspeech",
+      "qualityGate": "engine-model",
+      "python": {
+        "engine": "reazonspeech-nemo",
+        "model": "reazon-research/reazonspeech-nemo-v2",
+        "artifact": {
+          "repository": "reazon-research/reazonspeech-nemo-v2",
+          "revision": "33693408be76b7cba9fd4a7546a0a8772430211b",
+          "format": "nemo",
+          "snapshotHash": "33693408be76b7cba9fd4a7546a0a8772430211b"
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "crispasr",
+        "backend": "hikaru-asr-worker CrispASR parakeet backend（ReazonSpeech 路由）",
+        "artifact": {
+          "repository": "cstr/reazonspeech-nemo-v2-GGUF",
+          "fileName": "reazonspeech-nemo-v2-q8_0.gguf",
+          "format": "gguf",
+          "quantization": "q8_0",
+          "revision": null,
+          "sha256": null,
+          "identityStatus": "pending-t12-native-model-manifest"
+        },
+        "companion": null
+      },
+      "mappingRule": "explicit-cross-format：reazon-research/reazonspeech-nemo-v2（NeMo）↔ cstr/reazonspeech-nemo-v2-GGUF 的 reazonspeech-nemo-v2-q8_0.gguf。native artifact revision/hash 待 T12 manifest 固定后回填。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached"
+    },
+    {
+      "logicalModelIdentity": "faster-whisper/tiny",
+      "family": "whisper",
+      "qualityGate": "whisper-family-unlock-only",
+      "python": {
+        "engine": "faster-whisper",
+        "model": "tiny",
+        "artifact": {
+          "repository": "Systran/faster-whisper-tiny",
+          "revision": null,
+          "format": "ctranslate2",
+          "snapshotHash": null
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "ctranslate2",
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "artifact": {
+          "repository": "Systran/faster-whisper-tiny",
+          "revision": null,
+          "format": "ctranslate2"
+        },
+        "companion": null
+      },
+      "mappingRule": "same-artifact；不采集独立 Python baseline，发布资格由 whisper family gate（large-v2 + large-v3 双 anchor）解锁，仍须满足既有非质量绝对门槛与 identity/协议/路径/取消/恢复/隐私/许可证证据。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "not-cached-remote-only",
+      "baselineStatus": "family-gated-no-baseline"
+    },
+    {
+      "logicalModelIdentity": "faster-whisper/base",
+      "family": "whisper",
+      "qualityGate": "whisper-family-unlock-only",
+      "python": {
+        "engine": "faster-whisper",
+        "model": "base",
+        "artifact": {
+          "repository": "Systran/faster-whisper-base",
+          "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+          "format": "ctranslate2",
+          "snapshotHash": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "ctranslate2",
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "artifact": {
+          "repository": "Systran/faster-whisper-base",
+          "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+          "format": "ctranslate2"
+        },
+        "companion": null
+      },
+      "mappingRule": "same-artifact；whisper-family-unlock-only，无独立 Python baseline。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached",
+      "baselineStatus": "family-gated-no-baseline"
+    },
+    {
+      "logicalModelIdentity": "faster-whisper/small",
+      "family": "whisper",
+      "qualityGate": "whisper-family-unlock-only",
+      "python": {
+        "engine": "faster-whisper",
+        "model": "small",
+        "artifact": {
+          "repository": "Systran/faster-whisper-small",
+          "revision": "536b0662742c02347bc0e980a01041f333bce120",
+          "format": "ctranslate2",
+          "snapshotHash": "536b0662742c02347bc0e980a01041f333bce120"
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "ctranslate2",
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "artifact": {
+          "repository": "Systran/faster-whisper-small",
+          "revision": "536b0662742c02347bc0e980a01041f333bce120",
+          "format": "ctranslate2"
+        },
+        "companion": null
+      },
+      "mappingRule": "same-artifact；whisper-family-unlock-only，无独立 Python baseline。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached",
+      "baselineStatus": "family-gated-no-baseline"
+    },
+    {
+      "logicalModelIdentity": "faster-whisper/medium",
+      "family": "whisper",
+      "qualityGate": "whisper-family-unlock-only",
+      "python": {
+        "engine": "faster-whisper",
+        "model": "medium",
+        "artifact": {
+          "repository": "Systran/faster-whisper-medium",
+          "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
+          "format": "ctranslate2",
+          "snapshotHash": "08e178d48790749d25932bbc082711ddcfdfbc4f"
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "ctranslate2",
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "artifact": {
+          "repository": "Systran/faster-whisper-medium",
+          "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
+          "format": "ctranslate2"
+        },
+        "companion": null
+      },
+      "mappingRule": "same-artifact；whisper-family-unlock-only，无独立 Python baseline。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached",
+      "baselineStatus": "family-gated-no-baseline"
+    },
+    {
+      "logicalModelIdentity": "faster-whisper/large-v3-turbo",
+      "family": "whisper",
+      "qualityGate": "whisper-family-unlock-only",
+      "python": {
+        "engine": "faster-whisper",
+        "model": "large-v3-turbo",
+        "artifact": {
+          "repository": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+          "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+          "format": "ctranslate2",
+          "snapshotHash": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+        },
+        "companion": null
+      },
+      "native": {
+        "engine": "ctranslate2",
+        "backend": "hikaru-asr-worker CT2 Whisper backend",
+        "artifact": {
+          "repository": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+          "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+          "format": "ctranslate2"
+        },
+        "companion": null
+      },
+      "mappingRule": "same-artifact；whisper-family-unlock-only，无独立 Python baseline。",
+      "requiredCases": [
+        "short-v1",
+        "medium-v1",
+        "long-v2"
+      ],
+      "comparisonProfile": "python-legacy-cuda-v1",
+      "cacheState": "cached",
+      "baselineStatus": "family-gated-no-baseline"
+    }
+  ]
+}

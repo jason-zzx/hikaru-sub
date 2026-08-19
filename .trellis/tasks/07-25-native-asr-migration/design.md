@@ -8,7 +8,7 @@
 
 ## Evidence And Implementation Authority
 
-Algorithm decisions follow this order: validated user `.asr-benchmark` WAV+ASS ground truth; official documentation/stable public APIs/model cards; current well-maintained community recommendations; measured selection against the same ground truth. Current Python code/output is diagnostic and historical reference only, not expected output or a relative quality/performance gate.
+Algorithm decisions follow this order: validated user `.asr-benchmark` WAV+ASS ground truth; official documentation/stable public APIs/model cards; current well-maintained community recommendations; measured selection against the same ground truth. The identity-bound authority at `.trellis/tasks/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json` supplies the only Python subtitle-quality gate: same logical model, same case, `python-legacy-cuda-v1`, per metric. It is never expected output, an annotation source, or a relative performance/resource gate.
 
 This algorithm hierarchy does not weaken product compatibility. React/Tauri commands, `AsrJobSnapshot`, cancellation, recovery, paths, cleanup and security remain mandatory contracts.
 
@@ -69,10 +69,24 @@ The worker is single-request and may exit after each job. Long-lived HTTP servic
 
 ### Python Legacy
 
-- Remain in the source tree during migration as a current-implementation diagnostic and developer-only fallback.
-- Never supply or repair reference text/timestamps, and never be required for native quality comparison.
+- Remain in the source tree during migration as the frozen current-production subtitle-quality baseline and developer-only fallback.
+- Never supply or repair reference text/timestamps; only complete, identity-bound CUDA rows participate in same-model/same-case subtitle-quality comparison.
+- Never supply a relative performance/resource threshold and never weaken timeline legality, protocol, identity, path, cancellation/recovery, privacy, license or other engineering gates.
 - Never be required by the production package after cutover.
 - Remain removable per engine: failure of one CrispASR route does not require reverting completed CTranslate2 work.
+
+### Model-Level Baseline Boundary
+
+```text
+validated WAV+ASS truth
+  -> shared T01 metric recomputation
+  -> Python legacy row (logical model + case + python-legacy-cuda-v1)
+  -> native row with verified mapped artifact/companion identity
+  -> per-field subtitle-quality non-regression
+  + independent structural / performance / resource / protocol / security gates
+```
+
+`large-v2` and `large-v3` are independent Whisper anchors; both complete matrices and all independent gates are required before the other five Whisper models enter release qualification. Kotoba, Parakeet, Qwen3-ASR and ReazonSpeech each use only their own mapped Python rows. A missing, failed-unverifiable, drifted or provenance-ineligible row produces `baseline-incomplete`/`unscored`, never a borrowed family result or waiver.
 
 ## Stable Contracts
 
@@ -239,7 +253,7 @@ Existing specs that state "inference stays in Python" are current-state document
 
 The migration is capability-gated rather than a single irreversible switch:
 
-1. Establish authoritative ground-truth measurements and optional Python diagnostics, then run native PoCs without changing defaults.
+1. Establish authoritative ground-truth measurements and the identity-bound Python legacy CUDA baseline, then run/reinterpret native qualification without changing defaults or historical PoC evidence.
 2. Introduce protocol and Rust host behind development-only native selection.
 3. Productize ordinary CTranslate2 through the T06 CPU root-cause checkpoint, then run T07 development CUDA before T08 regardless of the CPU-ceiling outcome.
 4. Productize Kotoba with GPU-first development iteration when the T07 lane is available.
@@ -258,7 +272,7 @@ Rollback is per engine and per runtime pack. A failed native route can return to
 - Rust tests cover routing, model readiness, download integrity, process lifecycle, paths and cleanup boundaries.
 - GPU qualification runs on an explicit hardware/driver matrix and records actual loaded modules, pack identity, accelerated RTF and CPU fallback; no VRAM gate is invented.
 - Frontend tests cover stable defaults, migrated settings, device availability, visible qualification status for every existing model and removal of Python setup UI.
-- The final model-backed matrix scores short, medium and long Japanese audio directly against T01 ground truth for CER, confirmed speech gaps, timeline, Qwen alignment, performance and resources. Python results are supplemental diagnostics only.
+- The final model-backed matrix recomputes all metrics from T01 ground truth. Subtitle-quality fields are compared per model/case against `python-legacy-cuda-v1`; timeline/UTF-8/text/protocol legality, complete coverage, performance/resources, identity, path, cancellation/recovery, privacy and license remain independent absolute gates.
 
 ## Design Decisions
 

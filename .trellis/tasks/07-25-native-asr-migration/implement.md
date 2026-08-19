@@ -4,6 +4,7 @@
 
 ## Execution Policy
 
+- 后续 native 发布资格必须先消费 `.trellis/tasks/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json`：字幕质量只按同 `logicalModelIdentity × case × python-legacy-cuda-v1` 逐项非回退；结构/证据安全、性能资源、协议、取消恢复、路径、隐私和许可证继续使用既有绝对硬门禁。历史归档 evidence 不改写，仅由父任务和新 handoff 前瞻性 reinterpret。
 - 本父任务保存总需求、总体设计、任务地图和跨任务门禁，通常不执行 `task.py start`。
 - 子任务按阶段及时创建，不一次性把 18 个任务全部置为活跃；创建近期任务时使用 `--parent <parent-dir> --no-start`。
 - 每个子任务在启动前必须完成自己的 `prd.md`、`design.md`、`implement.md` 和上下文清单。
@@ -25,6 +26,7 @@ Gate 2: engine productization + development acceleration
   T06 CPU checkpoint -> T07 development CUDA -> T08
   T06 -> T09 CrispASR core + development GPU -> T10 + T11
   T10 Reazon R1 stop-revise -> T10R Reazon R2
+  model-level Python baseline -> future qualification reinterpretation for T06/T08/T10/T10R/T11
 
 Gate 3: models, CPU/GPU runtime and UI
   T02 + T03 -> T12
@@ -44,7 +46,7 @@ Allowed parallel groups:
 - T08 Kotoba follows T07. T07 is now `development-gpu-ready` with short-v1/locked-120s GPU-to-CPU warmed-median ratios `0.1090/0.1313`, so repeated T08 quality iteration stays on GPU even when CER/gap/timeline gates fail. This does not imply that ordinary native faster-whisper is qualified or enabled.
 - T10 and T11 may overlap after T09 stabilizes the CrispASR core and publishes independent ignored-local `parakeet-family` / `qwen3-family` development-device results. T10R follows T10's Reazon R1 `stop-revise` evidence while T11 may continue independently. Each task consumes only its matching family result; an attested, repeatably faster family GPU seam remains the development device through CER/gap/segmentation/alignment failures. Required CPU regression and final publishable-device gates remain separate.
 - T12 may start from proven model formats and overlap engine productization; T13 waits for the T06 production worker, then may overlap T08～T11.
-- T14 starts after final backend/device inputs and the CPU package contract stabilize; T15 starts after engine pipelines and formal GPU packs are measurable.
+- T14 starts after final backend/device inputs, the CPU package contract and model-level Python baseline mapping stabilize; T15 starts after engine pipelines and formal GPU packs are measurable. Missing native artifact/companion mapping leaves the affected subtitle-quality row `baseline-incomplete`.
 - T07/T09 development GPU artifacts are ignored-local evidence only. Formal GPU pack failure in T14/T15 records `stop-revise` and omits that pack without blocking unrelated qualified CPU routes.
 
 ## Task Map
@@ -219,7 +221,8 @@ Exit criteria:
 - GPU-required branch: the same-binary matrix proves a CPU ceiling, independent review accepts the device decision, and T06 publishes a `gpu-required-pending` handoff to T14/T15. T07 remains the shared post-checkpoint development lane and may already be complete; ordinary faster-whisper stays disabled until T15 qualifies the full CUDA matrix.
 - Migration-handoff branch: when the production worker, selected CPU baseline, reviewed Candidate B stop-revise evidence, Python non-gating comparison, deterministic publishers, host/protocol tests and downstream handoff are complete without proving qualification, T06 may complete as `migration-handoff-stop-revise`; this is not a product qualification or GPU-required decision, and the completed seam hands off first to T07 development CUDA before T08.
 - CPU `stop-revise` is final only after the root-cause matrix; it never makes ordinary faster-whisper optional or qualifies a GPU route.
-- No invalid/overflow timeline segments or confirmed speech gaps `>=1.5s` on any model qualified by the CPU branch.
+- Any future ordinary Whisper quality qualification requires both `large-v2` and `large-v3` short/medium/long-v2 anchors to be independently no worse than their own Python legacy rows; only then may the other five Whisper models use the family unlock. No anchor borrows the other's metrics.
+- Invalid/overflow/negative/reversed timeline, UTF-8/text/protocol legality, complete coverage and existing CPU RTF/cold wall/RSS/identity/process/path/security gates remain absolute for every qualified model.
 - Large-v2 long-audio remains a mandatory regression case: T06 owns it on the CPU branch, while T15 owns it on the GPU-required branch.
 
 Rollback point: retain Python faster-whisper as development default.
@@ -275,7 +278,7 @@ Depends on: T06 and a reviewed T07 result of `development-gpu-ready`, `developme
 Exit criteria:
 
 - Kotoba quality iteration uses the T07 CUDA lane whenever its result is `development-gpu-ready`; CER, confirmed gaps, segmentation or timeline failures stay on GPU. CPU is retained only for required regression/fallback evidence, or when T07 records GPU unavailable/no speedup.
-- Kotoba meets T01 user-reviewed absolute quality/timing/resource gates on its selected candidate device.
+- Kotoba subtitle quality is independently no worse than `kotoba-tech/kotoba-whisper-v2.0-faster` under `python-legacy-cuda-v1` for every required case/metric; timeline/protocol legality and performance/resource/identity/security evidence retain their existing absolute gates.
 - Ordinary faster-whisper readiness is not tightened accidentally.
 - Old valid CT2 caches are reusable and malformed caches fail safely.
 
@@ -324,7 +327,7 @@ Depends on: T09.
 Exit criteria:
 
 - ReazonSpeech and Parakeet each receive an independent, identity-bound `qualified` or `stop-revise` disposition from their reviewed candidate gate. T10 may complete after both frozen full matrices publish truthful independent dispositions, including `stop-revise` for both; a failed engine remains disabled and supplies no accepted downstream algorithm input.
-- Every engine marked `qualified` meets T01 user-reviewed absolute CER/RTF/resource budgets, has no confirmed speech gap `>=1.5s`, and has no invalid/out-of-bounds timeline; a `stop-revise` engine remains disabled and is not promoted downstream.
+- Every engine marked `qualified` is independently no worse than its own model-level Python legacy rows for CER/S-D-I, empty text and semantic gaps; it also passes unchanged absolute RTF/resource, timeline/UTF-8/text/protocol legality, identity, process, path, privacy, cancellation/recovery and license gates. A `stop-revise` engine remains disabled and is not promoted downstream.
 - No Q4 Parakeet repeated-loop default is introduced.
 
 Rollback point: engines switch independently; one failure does not disable the other.
@@ -349,7 +352,7 @@ Exit criteria:
 
 - R2 has a complete identity-valid matrix and independent `qualified | stop-revise` disposition.
 - R2 additionally publishes `better-than-r1 | no-material-improvement` using explicit CER/gap/completion non-regression rules from the child task.
-- `better-than-r1 + stop-revise` remains disabled and supplies no accepted T14/T15 algorithm input; it is only the preferred basis for a later revision.
+- `better-than-r1 + stop-revise` remains disabled and supplies no accepted T14/T15 algorithm input; it is only the preferred basis for a later revision. Any later release qualification compares the new frozen Reazon identity against the same-model Python legacy rows, not against R1 alone.
 - No Parakeet, Qwen, release route, downloader, settings, frontend, installer or runtime-pack work is mixed into T10R.
 
 Rollback point: restore R1/T09's disabled Reazon route and discard only the R2 candidate/evidence; keep T10 history immutable.
@@ -373,9 +376,9 @@ Depends on: T09.
 
 Exit criteria:
 
-- Qwen3 meets T01 user-reviewed absolute CER/RTF/resource budgets.
-- Start-time median <=150 ms and P95 <=500 ms against authoritative ASS timing.
-- Missing companion, alignment failure, leading silence and chunk-boundary cases are tested; timeline remains legal.
+- Qwen3 CER/S-D-I, empty text and semantic gaps are independently no worse than the same-model Python legacy row for every case; RTF/resource and all engineering gates remain absolute.
+- Start-time median/P95 are compared only when both Python and native rows have eligible ForcedAligner provenance; mixed/synthetic/unknown timing yields `unscored`/`baseline-incomplete`, never qualification.
+- Missing companion, alignment failure, leading silence and chunk-boundary cases are tested; timeline remains legal and the ASR/aligner native artifact pair must match the frozen mapping.
 
 Rollback point: disable only Qwen3 native routing.
 
@@ -438,7 +441,7 @@ Deliverables:
 - Reuse protocol v1 resolved device values (`cpu`, `cuda`, `vulkan`); do not introduce a second worker protocol or backend-specific host executable.
 - Add deterministic pack preparation/verification suitable for managed download; end-user machines never compile native dependencies.
 
-Depends on: completed T06 CPU/device decision, T07 CTranslate2 development CUDA result, T09 CrispASR development GPU result, accepted T08/T11 engine inputs, the completed T10R disposition, and the T13 packaging contract. T10R contributes Reazon input only when `qualified`; `better-than-r1 + stop-revise` and other non-qualified results are recorded as omitted and do not block unrelated engines.
+Depends on: completed T06 CPU/device decision, T07 CTranslate2 development CUDA result, T09 CrispASR development GPU result, accepted T08/T11 engine inputs, the completed T10R disposition, the T13 packaging contract, and the model-level Python legacy authority. T10R contributes Reazon input only when `qualified`; `better-than-r1 + stop-revise` and other non-qualified results are recorded as omitted and do not block unrelated engines. Native GGUF/CT2 revisions and companion hashes must complete the baseline mapping before T15 quality scoring.
 
 Exit criteria:
 
@@ -460,7 +463,7 @@ Deliverables:
 - Implement capability probing and resolved routing for the rebuilt candidate packs. Engines with a qualified CPU route may fall back to CPU; ordinary faster-whisper proven GPU-required is unavailable/explained when qualified CUDA is absent.
 - Record T14 `stop-revise`/unbuilt candidates as omitted without attempting to route them.
 - Validate actual loaded modules and device execution rather than trusting a requested device string.
-- Run the applicable complete T01 short-v1 / medium-v1 / long-v2 matrix for every selected engine/model candidate on explicit hardware/driver identities; preserve the same CER/timeline/gap/Qwen gates, require accelerated inference RTF `<=0.5`, and continue later cases after any single quality-gate failure.
+- Run the applicable complete T01 short-v1 / medium-v1 / long-v2 matrix for every selected engine/model candidate on explicit hardware/driver identities; compare subtitle quality per metric against the same-model/same-case `python-legacy-cuda-v1` row, require accelerated inference RTF `<=0.5` and all structural/security gates absolutely, and continue later cases after any single quality-gate failure.
 - If a reviewed device branch activates T15, it owns the complete seven-model ordinary faster-whisper CUDA dispositions: `large-v3` and `large-v2` short/medium/long-v2 remain hard gates; archived long-v1 observations are historical only. The other five models receive measured `qualified`, `stop-revise` or `unsupported-for-native-release` results.
 - Verify pack-load/runtime failure produces one nonfatal notice: engines with a qualified CPU route retry that bundled CPU path without losing job/recovery semantics, while ordinary faster-whisper proven GPU-required becomes unavailable without launching its unqualified CPU route.
 - Publish an independent `qualified`, `stop-revise` or `omitted-no-candidate` decision for CUDA and Vulkan; no non-qualified pack blocks CPU cutover.
@@ -469,7 +472,7 @@ Depends on: completed T06 CPU/device decision, T07, T08, the completed T10R disp
 
 Exit criteria:
 
-- Every publishable pack is rebuilt from final accepted engine sources and meets its quality, timeline, accelerated RTF, fallback, immutable identity and license gates on the declared matrix.
+- Every publishable pack is rebuilt from final accepted engine sources, is no worse than the matching model-level Python quality baseline on every applicable case/metric, and meets timeline/UTF-8/text/protocol legality, accelerated RTF, fallback, immutable identity, path/security/privacy and license gates independently.
 - No VRAM gate is invented; measured VRAM may be reported as diagnostic metadata.
 - CPU results remain unchanged in kind; CPU fallback passes where the engine has a qualified CPU route, and GPU-required route unavailability passes lifecycle/UI contract tests.
 - Unsupported hardware/driver combinations are explicit and never presented as accelerated.
@@ -552,7 +555,7 @@ This task is a release gate, not a place to finish missing engine or GPU impleme
 
 Deliverables:
 
-- Run the complete five-engine short-v1 / medium-v1 / long-v2 authoritative matrix on every selected publishable device; no single quality-gate failure truncates the remaining cases, and publication includes absolute quality/performance/resource results plus optional Python diagnostics.
+- Run the complete five-engine short-v1 / medium-v1 / long-v2 authoritative matrix on every selected publishable device; no single quality-gate failure truncates the remaining cases. Publication includes per-model/per-case Python baseline/native/delta/direction/provenance/disposition for subtitle quality plus independent absolute structural, performance/resource and engineering results.
 - Verify cancel, crash, recovery, qualified CPU fallback or GPU-required unavailability, offline cached-model use, installed and portable behavior.
 - Switch production packaging/default routes only for qualified engines and packs; stop bundling Python sidecar/runtime/venv.
 - Freeze a complete source/dependency/compiler/algorithm-config input lock, rebuild and attest the final immutable CPU runtime from accepted engine identities, and re-verify every publishable GPU artifact matches the exact T15-qualified hash; then verify setup/portable/runtime sizes, third-party licenses and zero bundled model weights while CUDA/Vulkan remain external packs.
@@ -586,7 +589,7 @@ Rollback point: restore the previous production package inputs and per-engine/pa
 
 - [ ] Command/state/type names remain aligned across worker, Rust and TypeScript.
 - [ ] Parent engine-route table matches model manifest and UI metadata.
-- [ ] Every engine has model-backed quality evidence directly against T01 ground truth and legal timestamps; Python parity is not used as a gate.
+- [ ] Every engine has model-backed metrics recomputed against T01 ground truth and legal timestamps; subtitle quality uses only the same-model/same-case `python-legacy-cuda-v1` row, while missing/cross-model rows and Python performance never authorize release.
 - [ ] Qwen3 readiness and execution always include the ForcedAligner.
 - [ ] Portable/installed roots and cleanup boundaries are covered.
 - [ ] Probe performs no recursive storage scan.

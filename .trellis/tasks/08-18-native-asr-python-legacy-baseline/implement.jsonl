@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/asr/quality-guidelines.md", "reason": "Scoped subtitle-quality comparison and unchanged absolute non-quality gates."}
+{"file": ".trellis/tasks/archive/2026-07/07-25-native-asr-benchmark-baseline/research/benchmark-contract.md", "reason": "Existing shared benchmark envelope, comparator, privacy and deterministic report contract."}
+{"file": ".trellis/tasks/07-25-native-asr-migration/prd.md", "reason": "Parent migration gates and downstream task ownership to revise."}
+{"file": ".trellis/tasks/07-25-native-asr-migration/design.md", "reason": "Parent architecture and current Python/native boundary."}
+{"file": ".trellis/tasks/07-25-native-asr-migration/implement.md", "reason": "Parent execution map and existing qualification gates."}

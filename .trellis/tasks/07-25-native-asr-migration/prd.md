@@ -16,7 +16,7 @@
 
 ## Evidence And Implementation Authority
 
-冲突按以下层级解决：用户 `.asr-benchmark` WAV+ASS 真值；官方文档/稳定 API/模型卡；维护良好的社区推荐实践；同一真值上的实测选择；当前 Python 实现诊断参考。Python 不得生成或修补 reference，也不构成相对 CER/RTF gate。
+冲突按以下层级解决：用户 `.asr-benchmark` WAV+ASS 真值；官方文档/稳定 API/模型卡；维护良好的社区推荐实践；同一真值上的实测选择；按具体模型 identity 冻结的 Python legacy 质量基线。`.trellis/tasks/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json` 是后续 native 字幕质量比较的唯一 Python authority：只允许同 `logicalModelIdentity × case × python-legacy-cuda-v1` 的逐项非回退比较。Python 不得生成或修补 reference，也不构成相对性能/资源 gate。
 
 React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同是独立的产品兼容权威，不因算法来源层级变化而降级。
 
@@ -99,12 +99,14 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 
 ### R8 - 质量、发布与回退
 
-- 用户提供的 `.asr-benchmark` WAV+ASS 是唯一质量真值；Python 输出只作为可选诊断/历史参考，不能作为期望输出、相对 CER/RTF gate 或缺失标注替代。
+- 用户提供的 `.asr-benchmark` WAV+ASS 始终是唯一文本、speech-region 和 timeline 真值；Python 输出不能成为期望输出或缺失标注替代。只有本任务冻结、完整且 identity-bound 的 `python-legacy-cuda-v1` rows 可作为同模型同 case 的字幕质量非回退基线。
 - 原生算法按官方文档、稳定 API、模型卡、当前维护良好的社区推荐实践排序选择，再以同一 ground truth 实测；不以复刻 Python 参数、分块、VAD、backfill 或私有 fork 为目标。
-- T01 用户评审后冻结的绝对门槛为：每个 engine/case CER `<=0.35`；纯 CPU inference RTF `<=1.0`；CUDA/Vulkan 等 GPU 加速 inference RTF `<=0.5`；short cold process wall `<=120s`；CTranslate2 RSS `<=6 GiB`；CrispASR RSS `<=12 GiB`；不定义 VRAM gate。所有 CPU/GPU 候选必须直接对 ground truth 评估，不得凭 Python parity 宣称通过。
-- 不得产生 `endMs <= startMs`、负起点或越界片段；直接对 ground truth 评估时，不得存在持续 `>=1.5s`、经参考标注确认含语音的漏段。
-- Qwen3 起始时间误差中位数不高于 150 ms，P95 不高于 500 ms，且时间戳必须来自 ForcedAligner。
-- Python reference 缺失或失败只减少诊断覆盖，不阻塞原生实现直接对 ground truth 的质量判断。
+- 字幕质量按每个 `logicalModelIdentity × case` 逐项比较：native 的 CER、S/D/I、空文本、confirmed semantic speech-gap 数量/时长，以及双方 provenance eligible 时的 Qwen3 ForcedAligner 起始误差 median/P95，均不得劣于对应 Python row。不得用平均值、家族 row、不同模型、缺失 row 或不同 profile 掩盖回退。
+- 纯 CPU inference RTF `<=1.0`、CUDA/Vulkan 等 GPU 加速 inference RTF `<=0.5`、short cold process wall `<=120s`、CTranslate2 RSS `<=6 GiB`、CrispASR RSS `<=12 GiB` 及样本数/设备证据继续使用绝对门槛；不定义 VRAM gate，Python 性能/RSS 不能提供豁免。
+- 不得产生 `endMs <= startMs`、负起点、越界/逆序片段、非法 UTF-8 或 text-conservation/subtitle/protocol violation；完整矩阵、identity/hash、路径、安全、取消/恢复、隐私和许可证合同全部保持独立硬门禁。
+- Qwen3 时间质量只有在 native 与 Python 两侧均为合法 ForcedAligner provenance 时参与相对比较；synthetic、mixed、unknown 或 generic engine-native 时间戳不能授权发布。
+- Python baseline 缺失、失败但不可审计、identity drift 或必要 provenance 缺失时，native row 只能是 `baseline-incomplete`/`unscored`。合法且 identity-bound 的 Python structured failure 仅允许在 native 合法完成时记录相对改善，不能降低结构或非质量门槛。
+- Whisper family gate 要求 `large-v2` 与 `large-v3` 各自完成 short-v1/medium-v1/long-v2、逐项不劣于自己的 Python rows，并通过全部独立硬门禁；两者同时通过后才解锁 `tiny`、`base`、`small`、`medium`、`large-v3-turbo` 的发布资格流程。非 anchor 模型无需独立 Python parity row，但仍须通过所有非质量、identity、模型就绪、协议、路径、取消/恢复、隐私和许可证证据。
 - 发出取消后 2 秒内 worker 退出；异常退出后可读取最后保存的恢复快照。
 - Windows setup 不超过 80 MB，portable ZIP 不超过 90 MB，解压后的 CPU ASR runtime 不超过 250 MB。
 - 迁移期间保留 `python-legacy` 源码开发/诊断路径；发布包不携带 Python runtime 或 venv。
@@ -132,7 +134,7 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 - [ ] installed 与 portable 的 runtime/model/download 路径、probe/measure/cleanup 行为通过测试。
 - [x] T07 在 T08 前完成 CTranslate2 development CUDA seam，T09 在 T10/T11 前完成 CrispASR development GPU seam。T07 已记录 `development-gpu-ready`（short-v1 GPU/CPU `0.1090`，locked 120s `0.1313`）；T09 已分别发布 `parakeet-family` 与 `qwen3-family` 的 `development-gpu-ready` 结论。每个执行族只有 validated GPU unavailable envelope 或任一样本未达到 `20%` 加速时才允许匹配的下游任务开发回退 CPU；无效/不完整 evidence 不发布设备结论，CER、漏段、分段和时间戳失败不参与该决策。T09 外部设备证明不替代 T14/T15 的固定构建身份、哈希、许可证、能力探测和适用的 CPU 回退/不可用说明；只有通过正式 `RTF <=0.5` 与质量门槛的 pack 才进入发布清单。
 - [ ] 运行依赖和转录 UI 不再暴露 Python/venv，旧设置可安全加载并迁移；全部现有模型仍可见，但未通过原生资格的模型有明确状态且不能静默走 Python。
-- [ ] 五引擎质量、长音频覆盖、性能与资源矩阵直接对 T01 用户真值达到用户评审后冻结的绝对门槛；Python 数值只作为可选参考。
+- [ ] 五引擎及 Whisper 双 anchor 的 short-v1/medium-v1/long-v2 矩阵使用同模型同 case `python-legacy-cuda-v1` 字幕质量非回退 gate；结构/证据安全和性能资源矩阵继续满足冻结的绝对门槛，缺失或跨模型 baseline 不得授权发布。
 - [ ] setup、portable 和解压 runtime 体积达到 R8 预算，安装包内模型权重为 0。
 - [ ] `pnpm test`、`pnpm build`、`cargo test --manifest-path src-tauri/Cargo.toml` 和 worker CTest 全部通过。
 - [ ] 第三方许可证、attribution、`THIRD_PARTY_NOTICES.md`、`AGENTS.md` 和相关 Trellis specs 与最终架构一致。
@@ -153,7 +155,7 @@ React/Tauri command、`AsrJobSnapshot`、取消、恢复、路径和安全合同
 
 - 总体 PRD、设计与实施任务地图已获评审；本轮同步新的 ground-truth 权威和 v0.4.1 实现事实。
 - T01 `native-asr-benchmark-baseline`、T02 `native-asr-ctranslate2-poc` 与 T03 `native-asr-crispasr-poc` 均已完成、独立检查、提交并归档；Gate 0 的 runtime/ABI 可行性阶段关闭，算法质量风险移交 T06/T08/T10/T11。
-- T01 ground-truth contract、per-case coverage 与绝对预算已获用户评审并冻结；T02/T03 模型实测直接复用该 manifest identity 和共享指标实现，不依赖 Python reference 成功。
+- T01 ground-truth contract、per-case coverage 与共享指标实现保持权威；历史 T02/T03 disposition 不改写。本任务新增的 model-level `python-legacy-cuda-v1` handoff supersedes 旧 short-only/non-gating Python 报告，仅前瞻性改变后续 native 字幕质量资格判定，非质量绝对门槛与安全合同不变。
 - T02 已证明 CTranslate2 + oneDNN native CPU backend/runtime 可行，但当前最小 fixed-window 算法为 `stop-revise`：large-v3 short CER 略超门槛，large-v3/Kotoba 中长音频均有 confirmed speech gaps。T06 必须修订算法并重测，不能把 runtime 可执行等同于产品质量通过。
 - T03 archived evidence（historical manifest `e4656b82...`）修正了两个 harness interpretation：Reazon GGUF 应通过 public `parakeet` session backend；Qwen 使用 pinned upstream grouping 后 short/leading/boundary timeline legal，但 medium/long grouped source segments fail closed。当前质量权威改为 T03C long-v2 supersession：Parakeet corrected CER `0.4917/0.6123/0.5962`，仍为 `stop-revise`；ReazonSpeech `0.1333/0.2857/0.2944` 且原 T03 gates 全通过，但单巨段与大量 zero-duration native words 仅支持 `proceed-with-named-risks`；Qwen short CER `0.2083` 但 ForcedAligner timing 失败，medium/long-v2 保持 validated unscored blocker，因此仍为 `stop-revise`。没有 CrispASR route 可据此直接切换 production default；当前 handoff 为 `research/t03c-crispasr-long-v2-handoff.md`。
 - GPU 加速不再另建后续父任务：正常编号 T07 在 T06 production-worker/CPU diagnosis checkpoint 后立即提供 development CTranslate2 CUDA execution，优先于 T08 的重复质量迭代且不以 CPU ceiling 为激活条件；T09 同步建立 CrispASR development GPU seam，供 T10/T11 GPU-first 迭代。T14 负责可复现 CUDA/Vulkan runtime packs，T15 负责设备路由、不可用说明/CPU fallback 和 pack 独立资格矩阵。
