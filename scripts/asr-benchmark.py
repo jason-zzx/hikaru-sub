@@ -40,6 +40,9 @@ CANDIDATE_KINDS = ("native-candidate", "python-reference")
 REFERENCE_DERIVATION_TYPE = "ass-dialogue-v1"
 AUTHORIZATION_STATUSES = ("redistributable", "private-use-authorized")
 CHILD_SENTINEL = "HIKARU_ASR_BENCHMARK_RESULT="
+RUNNER_IDENTITY_SCHEMA_VERSION = 1
+RUNNER_IDENTITY_KIND = "python-source"
+RUNNER_SOURCE_PATH = "scripts/asr-benchmark.py"
 REQUIRED_ENGINES = (
     "faster-whisper",
     "kotoba-faster-whisper",
@@ -123,6 +126,22 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def benchmark_runner_identity() -> dict[str, Any]:
+    source = Path(__file__).resolve()
+    try:
+        source_path = source.relative_to(REPO_ROOT).as_posix()
+    except ValueError as exc:
+        raise ContractError("benchmark runner source is outside the repository") from exc
+    if source_path != RUNNER_SOURCE_PATH:
+        raise ContractError("benchmark runner source path identity differs")
+    return {
+        "schemaVersion": RUNNER_IDENTITY_SCHEMA_VERSION,
+        "kind": RUNNER_IDENTITY_KIND,
+        "sourcePath": RUNNER_SOURCE_PATH,
+        "sha256": sha256_file(source),
+    }
 
 
 def normalize_japanese_text(text: str) -> str:
@@ -1352,7 +1371,10 @@ def _engine_parameters(engine_name: str, engine: Any) -> dict[str, Any]:
     device = str(getattr(engine, "device", "unknown"))
     requested_compute = getattr(engine, "compute_type", None)
     if engine_name in {"faster-whisper", "kotoba-faster-whisper"}:
-        if requested_compute and requested_compute not in {"auto", "default"}:
+        loaded_compute = getattr(engine, "_loaded_compute_type", None)
+        if loaded_compute:
+            effective_compute = loaded_compute
+        elif requested_compute and requested_compute not in {"auto", "default"}:
             effective_compute = requested_compute
         elif device == "cpu":
             effective_compute = "int8"
@@ -1360,7 +1382,11 @@ def _engine_parameters(engine_name: str, engine: Any) -> dict[str, Any]:
             effective_compute = "float16"
         else:
             effective_compute = "default"
-        engine_specific: dict[str, Any] = {"beamSize": 5, "vadFilter": True}
+        engine_specific: dict[str, Any] = {
+            "beamSize": 5,
+            "vadFilter": True,
+            "loadedLongMode": getattr(engine, "_loaded_long_mode", None),
+        }
         if engine_name == "kotoba-faster-whisper":
             engine_specific.update({"chunkLengthSeconds": 15, "conditionOnPreviousText": False})
     elif engine_name == "qwen3-asr":
@@ -1527,6 +1553,7 @@ def _child_main() -> int:
         import_started = time.perf_counter()
         from engines.base import TranscriptSegmentRefresh
         from engines.registry import create_engine
+        from engines.whisper_runtime import whisper_inference_session
         import_ms = (time.perf_counter() - import_started) * 1000
         response["registryImportMs"] = round(import_ms, 3)
         response["startupImportMs"] = round((time.perf_counter() - PROCESS_START) * 1000, 3)
@@ -1593,8 +1620,9 @@ def _child_main() -> int:
             for repeat_index in range(repeat_count):
                 stage = "inference"
                 inference_started = time.perf_counter()
-                transcription = engine.transcribe(request["audioPath"], language=request.get("language", "ja"))
-                segments = reduce_segment_events(transcription.segments, TranscriptSegmentRefresh)
+                with whisper_inference_session(request["engine"]):
+                    transcription = engine.transcribe(request["audioPath"], language=request.get("language", "ja"))
+                    segments = reduce_segment_events(transcription.segments, TranscriptSegmentRefresh)
                 inference_ms = (time.perf_counter() - inference_started) * 1000
 
                 stage = "metrics"
@@ -1632,6 +1660,7 @@ def _child_main() -> int:
                     }
                 )
                 response["samples"].append(metrics)
+                response["resolvedParameters"] = _engine_parameters(request["engine"], engine)
                 tracker["observations"].clear()
 
             benchmark_total_ms = (time.perf_counter() - PROCESS_START) * 1000
@@ -1687,8 +1716,10 @@ def _invoke_child(request: dict[str, Any]) -> dict[str, Any]:
             [sys.executable, str(Path(__file__).resolve()), "_engine-child"],
             input=json.dumps(request, ensure_ascii=False),
             text=True,
+            encoding="utf-8",
             capture_output=True,
             cwd=REPO_ROOT,
+            env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
             timeout=None,
         )
     except OSError as exc:
@@ -1876,6 +1907,7 @@ def _require_ignored_raw_output(path: Path) -> None:
 
 def command_run(args: argparse.Namespace) -> int:
     _require_ignored_raw_output(Path(args.output))
+    acquisition_tool = benchmark_runner_identity()
     expected_interpreter = Path(args.expected_interpreter).resolve()
     actual_interpreter = Path(sys.executable).resolve()
     if expected_interpreter != actual_interpreter:
@@ -1907,6 +1939,7 @@ def command_run(args: argparse.Namespace) -> int:
             f"{generated_at}|{validation['manifestSha256']}|{args.engine}|{args.model}|{args.device}".encode("utf-8")
         )[:20],
         "generatedAt": generated_at,
+        "acquisitionTool": acquisition_tool,
         "manifest": {
             "corpusId": manifest["corpusId"],
             "manifestKey": manifest_path.name,
