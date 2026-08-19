@@ -1,0 +1,1788 @@
+{
+  "authority": {
+    "baselineSha256": "c6142c40daf9c45c1d39d3612833c386fc71080866148d9b9719e428787979ef",
+    "benchmarkManifestSha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea",
+    "benchmarkRunnerSha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+    "corpusId": "hikaru-user-ja-ground-truth-v1",
+    "identityManifestSha256": "7b46e0a983b7cc71e302e898d3f90d77b3c9159be2fe538585cd038e31c0a8f0",
+    "legacyPublisherSha256": "e1624bed04782968c5b572992938f725e882f760aea4051b8e87fbf25b2c6393",
+    "nativeEvidenceLockSha256": "1cec6882872a0c73fda569fe9ec4ad3e7e3e536b610e4b7f17f18f82d5102f85",
+    "publisherSha256": "d8b78c18a9c8cc5a8dbfa4f6b16b79e4eb8fcc9bfa983c4e60693f59f0ce72b9"
+  },
+  "candidateInventory": [
+    {
+      "adapterKind": "large-v3-candidate-a",
+      "candidateId": "selected-cpu-beam1-no-history",
+      "device": "cpu",
+      "engine": "faster-whisper",
+      "identitySha256": "d4329c28e037d7e26808843390717dc504b009d4b4ae25240959e37bc7c6c894",
+      "logicalModelIdentity": "faster-whisper/large-v3",
+      "mappingReadiness": "complete",
+      "oldDisposition": "corrected-large-v3-pass",
+      "publicationSha256": [
+        "05beeec3410e7cef720bf73b1afebe0e371bfe81ec359f265575a3090809c3b4",
+        "7e9e6769b7dabbcb71242c7b170be271a65924496024f832f0dfe49ebad8efba",
+        "0be239a83640c65f740f169da6c37a1141d3e92140d829243787671f9f410083",
+        "a470ce38aeb2173b54b31f359771bc6d24836a5688ee605c0091db7681bdf99d",
+        "4a91bc04eb25c2c4fafc65667a05d233b8ef0f698ed6e7f7943d8197ffe0c6d1"
+      ],
+      "rawEvidenceSha256": [
+        "1d559f9a68c4fc1bcd5acc820a0b650d58a30b10654ed31ef245a088bfee8166",
+        "5cd366a7737b503138e629ca6f6d2ca602e32697ebf69e900f3d649e5ad2c3b0",
+        "4ebb28126703b5ebb88184e78b6b4c7b181784e9f0b039bbd6d1fd9f4b84b32c"
+      ]
+    },
+    {
+      "adapterKind": "kotoba-k2",
+      "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+      "device": "cuda",
+      "engine": "kotoba-faster-whisper",
+      "identitySha256": "1072ca83951baa2abc4dacc5e741aa4743cce13ee3c8b7ebf717f4ab02678c02",
+      "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+      "mappingReadiness": "complete",
+      "oldDisposition": "accepted-kotoba-algorithm-input",
+      "publicationSha256": [
+        "5b7fa644eb1d9cbd10412bf0959ea46631332b7bb1266567d203b00cbbfc2415",
+        "d55f363d69cf6ce29892c159e26556dcfecc00e207f7e7c9cd13425078d24c9a",
+        "d9bc43b6a47743c7377e22d6676f5e4d9a119e07dbcb1ae7f0ebe9d6cfb1578a"
+      ],
+      "rawEvidenceSha256": [
+        "f563cceacc31e9e2ca0cd8437c3b39ccd8fa99acd3abd27451c47655cdbe6439",
+        "491623b83f22fcb1304da645940f62318830598abe90e89fbac62ca906f64d8f",
+        "0a494f7e2d07d4abbf0ab49e5fcfab3c4e809f1bb2622fe346a5069495ea1bad"
+      ]
+    },
+    {
+      "adapterKind": "parakeet-p1",
+      "candidateId": "P1-window15s-native-word-v1",
+      "device": "cuda",
+      "engine": "parakeet",
+      "identitySha256": "32ccb5fad2a89761a4de85e19ae5e6a44e1da0432a301b28f062fbc6c147ecbd",
+      "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "oldDisposition": "stop-revise",
+      "publicationSha256": [
+        "ca7512e91b8b69197ff22acbcb5f5b45434c4b5c9b92c1307e479d6a50d246af",
+        "e342111bdc2cac5e0af6bc013a718f324cdc845577d587484020734db54ad9bd",
+        "ef1b0a811fc9544f0b7b1358f663db65690c99e7fadd4d604a5e22d8eefa4d3b"
+      ],
+      "rawEvidenceSha256": [
+        "a8c15925e6fe34408e85f971dc9e573291b24d5ff3058ba1c9d830e03bbe5510",
+        "ce8ef8eec1c351bfcd0dec8877c75bf8bd08b1173b31c69671f816d3e9e74af1",
+        "650eb7cabcee11193eecb0238f4cd84ea12bd8b7cf0e6d4e50172af11d353d78"
+      ]
+    },
+    {
+      "adapterKind": "reazonspeech-r2",
+      "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+      "device": "cuda",
+      "engine": "reazonspeech-nemo",
+      "identitySha256": "6357e6622d68c504131fed0a95e540a061c2560fd6940c4fdfa63d0fa84e544d",
+      "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "oldDisposition": "stop-revise + better-than-r1",
+      "publicationSha256": [
+        "7b88496567285e5ee224300432b054fc7635da23ac817a1e888c66f9c215fbd9",
+        "42039347f43d8b6faa2b9ab2f9acb3a2e021fb0e350eefa67e1bd38dde5bfd3f",
+        "ac860d5a44725158505db3568588dff500d112b69fe601e8d8fe34d798e81ed6"
+      ],
+      "rawEvidenceSha256": [
+        "2da547923efff0012d9923359cfa36c4c40703779e0cbc4df9e50f2b82a39edc",
+        "c744571c68f38e9087f73b361530a1ac9f58335c908c9050e5c5e4d5feafed88",
+        "fe491128605137b18f0e6693f20fda9518ec0cc8ccf1ba73ab41edd91bebc208"
+      ]
+    },
+    {
+      "adapterKind": "qwen-t03c",
+      "candidateId": "t03c-corrected-qwen-poc",
+      "device": "cpu",
+      "engine": "qwen3-asr",
+      "identitySha256": "1f5ebdf5adc78172435b71a72d36576bcca0f96da89f93cd356b9a73cd24c64f",
+      "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "oldDisposition": "stop-revise",
+      "publicationSha256": [
+        "40640099a9790a3d65eee932753b378bc002ced960a6a0265463bd5f443e9051",
+        "a7faa57bc1dc3850177473e74850f73032ad571002ee3f941e17b46344e91f8c",
+        "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f"
+      ],
+      "rawEvidenceSha256": [
+        "2b7fe38eab319f85e232a6219cb6b48efaff730e5e573683d87ac759fa9022f4",
+        "02013002cd133bb3619e18637654a50ec970ba9d7ac5bc7340bed6c677ee0b87",
+        "33d46de94e42d86c7cd9b315c1b143b306cf2cd12abdbf13ed062f5a53fe8943"
+      ]
+    }
+  ],
+  "comparisonProfile": "python-legacy-cuda-v1",
+  "downstreamHandoff": {
+    "historicalArtifactsRewritten": false,
+    "productionRouteChanged": false,
+    "releaseEligibility": "not-decided-by-this-task",
+    "t11Boundary": "Qwen grouping/timeline productization remains pending",
+    "t12Boundary": "formal native model and companion mappings remain pending where marked",
+    "t14T15T18Boundary": "runtime packs, device qualification, and release cutover remain independent"
+  },
+  "expectedSlots": [
+    {
+      "candidateId": "selected-cpu-beam1-no-history",
+      "caseId": "short-v1",
+      "logicalModelIdentity": "faster-whisper/large-v3",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "stop-revise"
+    },
+    {
+      "candidateId": "selected-cpu-beam1-no-history",
+      "caseId": "medium-v1",
+      "logicalModelIdentity": "faster-whisper/large-v3",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "stop-revise"
+    },
+    {
+      "candidateId": "selected-cpu-beam1-no-history",
+      "caseId": "long-v2",
+      "logicalModelIdentity": "faster-whisper/large-v3",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "stop-revise"
+    },
+    {
+      "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+      "caseId": "short-v1",
+      "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "stop-revise"
+    },
+    {
+      "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+      "caseId": "medium-v1",
+      "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "stop-revise"
+    },
+    {
+      "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+      "caseId": "long-v2",
+      "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "stop-revise"
+    },
+    {
+      "candidateId": "P1-window15s-native-word-v1",
+      "caseId": "short-v1",
+      "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "baseline-incomplete"
+    },
+    {
+      "candidateId": "P1-window15s-native-word-v1",
+      "caseId": "medium-v1",
+      "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "baseline-incomplete"
+    },
+    {
+      "candidateId": "P1-window15s-native-word-v1",
+      "caseId": "long-v2",
+      "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+      "observedMetricDisposition": "unscored",
+      "slotStatus": "validated-failed",
+      "subtitleQualityDisposition": "unscored"
+    },
+    {
+      "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+      "caseId": "short-v1",
+      "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "baseline-incomplete"
+    },
+    {
+      "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+      "caseId": "medium-v1",
+      "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "baseline-incomplete"
+    },
+    {
+      "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+      "caseId": "long-v2",
+      "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+      "observedMetricDisposition": "unscored",
+      "slotStatus": "validated-failed",
+      "subtitleQualityDisposition": "unscored"
+    },
+    {
+      "candidateId": "t03c-corrected-qwen-poc",
+      "caseId": "short-v1",
+      "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+      "observedMetricDisposition": "stop-revise",
+      "slotStatus": "completed-comparison",
+      "subtitleQualityDisposition": "baseline-incomplete"
+    },
+    {
+      "candidateId": "t03c-corrected-qwen-poc",
+      "caseId": "medium-v1",
+      "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+      "observedMetricDisposition": "unscored",
+      "slotStatus": "validated-failed",
+      "subtitleQualityDisposition": "unscored"
+    },
+    {
+      "candidateId": "t03c-corrected-qwen-poc",
+      "caseId": "long-v2",
+      "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+      "observedMetricDisposition": "unscored",
+      "slotStatus": "validated-failed",
+      "subtitleQualityDisposition": "unscored"
+    }
+  ],
+  "generatedAt": "2026-08-19T05:41:38Z",
+  "independentAbsoluteGates": [
+    "timeline legality: zero invalid/out-of-bounds/negative/reversed/zero-duration segments",
+    "valid UTF-8, text conservation, subtitle and protocol legality",
+    "complete required matrix and identity/evidence attestation",
+    "CPU inference RTF <= 1.0 and accelerated GPU inference RTF <= 0.5",
+    "short cold process wall <= 120s",
+    "peak RSS <= 6 GiB for CTranslate2 and <= 12 GiB for CrispASR",
+    "process cancellation/reap, recovery, path containment, privacy and license contracts"
+  ],
+  "kind": "hikaru-native-asr-legacy-quality-reevaluation",
+  "limitations": [
+    "Historical archived artifacts remain immutable and no native inference was run.",
+    "Parakeet, ReazonSpeech, and Qwen native artifact/companion mappings remain pending T12; their identity-aware subtitle disposition is baseline-incomplete.",
+    "Validated native failures retain failure provenance and receive no synthetic CER, gap, or timing metrics.",
+    "Large-v3 is only one Whisper anchor; missing large-v2 native qualification keeps the Whisper family blocked.",
+    "Qwen product grouping/timeline policy remains owned by T11; runtime packs, device qualification, and release eligibility remain owned by T14/T15/T18.",
+    "The authoritative corpus still lacks low-volume coverage."
+  ],
+  "models": [
+    {
+      "adapterKind": "large-v3-candidate-a",
+      "candidateId": "selected-cpu-beam1-no-history",
+      "cases": [
+        {
+          "baselineRawResultSha256": "d9dd89836eaf5e98e1d7697f7ed804f832b70e90f3809b94b2dfa3d8c89621fb",
+          "candidateId": "selected-cpu-beam1-no-history",
+          "caseId": "short-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "faster-whisper/large-v3",
+          "metrics": [
+            {
+              "baseline": 0.35833333333333334,
+              "delta": -0.09166666666666667,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "cer",
+              "native": 0.26666666666666666,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 25,
+              "delta": -14,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "substitutions",
+              "native": 11,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 16,
+              "delta": 2,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "deletions",
+              "native": 18,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 2,
+              "delta": 1,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "insertions",
+              "native": 3,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.26666666666666666,
+            "deletions": 18,
+            "emptyTextCount": 0,
+            "insertions": 3,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 11
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "1d559f9a68c4fc1bcd5acc820a0b650d58a30b10654ed31ef245a088bfee8166",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 5
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "stop-revise"
+        },
+        {
+          "baselineRawResultSha256": "98797b2a713b8c2f8c4604d4ed5b4bff5cdcd7f1029150243dea84d2b7b0922f",
+          "candidateId": "selected-cpu-beam1-no-history",
+          "caseId": "medium-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "faster-whisper/large-v3",
+          "metrics": [
+            {
+              "baseline": 0.10021978021978022,
+              "delta": 0.013186813186813195,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "cer",
+              "native": 0.11340659340659341,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 72,
+              "delta": 6,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "substitutions",
+              "native": 78,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 92,
+              "delta": 57,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "deletions",
+              "native": 149,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 64,
+              "delta": -33,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "insertions",
+              "native": 31,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.11340659340659341,
+            "deletions": 149,
+            "emptyTextCount": 0,
+            "insertions": 31,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 78
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "5cd366a7737b503138e629ca6f6d2ca602e32697ebf69e900f3d649e5ad2c3b0",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 181
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "stop-revise"
+        },
+        {
+          "baselineRawResultSha256": "29d36d654a3870542b913f8c638e57741585ab1254b2d6c65658ecc1ab34fe3b",
+          "candidateId": "selected-cpu-beam1-no-history",
+          "caseId": "long-v2",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "faster-whisper/large-v3",
+          "metrics": [
+            {
+              "baseline": 0.17953339341143487,
+              "delta": -0.028637228396915987,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "cer",
+              "native": 0.15089616501451888,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 958,
+              "delta": -327,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "substitutions",
+              "native": 631,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 1686,
+              "delta": 220,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "deletions",
+              "native": 1906,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 942,
+              "delta": -465,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "insertions",
+              "native": 477,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.15089616501451888,
+            "deletions": 1906,
+            "emptyTextCount": 0,
+            "insertions": 477,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 631
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "4ebb28126703b5ebb88184e78b6b4c7b181784e9f0b039bbd6d1fd9f4b84b32c",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 1156
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "stop-revise"
+        }
+      ],
+      "independentGateDisposition": "pass",
+      "logicalModelIdentity": "faster-whisper/large-v3",
+      "mappingReadiness": "complete",
+      "nativeEvidenceDisposition": "complete",
+      "observedMetricDisposition": "stop-revise",
+      "oldDisposition": "corrected-large-v3-pass",
+      "releaseEligibility": "not-decided-by-this-task",
+      "subtitleQualityDisposition": "stop-revise",
+      "whisperFamilyDisposition": "blocked-pending-large-v2-anchor"
+    },
+    {
+      "adapterKind": "kotoba-k2",
+      "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+      "cases": [
+        {
+          "baselineRawResultSha256": "739343348cfecbb1940ffeafd9894ac47176a6d216a63eb23354b82eddb72b2b",
+          "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+          "caseId": "short-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+          "metrics": [
+            {
+              "baseline": 0.325,
+              "delta": 0.024999999999999967,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "cer",
+              "native": 0.35,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 16,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "substitutions",
+              "native": 16,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 22,
+              "delta": -1,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "deletions",
+              "native": 21,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 1,
+              "delta": 4,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "insertions",
+              "native": 5,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.35,
+            "deletions": 21,
+            "emptyTextCount": 0,
+            "insertions": 5,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 16
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "f563cceacc31e9e2ca0cd8437c3b39ccd8fa99acd3abd27451c47655cdbe6439",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 10
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "stop-revise"
+        },
+        {
+          "baselineRawResultSha256": "ca682492ef35c5a7e1e5dcaa85f29dc7e9a9b3202b35485c130c96bdf58df90b",
+          "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+          "caseId": "medium-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+          "metrics": [
+            {
+              "baseline": 0.22153846153846155,
+              "delta": 0.05802197802197803,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "cer",
+              "native": 0.2795604395604396,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 176,
+              "delta": 34,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "substitutions",
+              "native": 210,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 259,
+              "delta": -107,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "deletions",
+              "native": 152,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 69,
+              "delta": 205,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "insertions",
+              "native": 274,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 1,
+              "delta": -1,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 1590,
+              "delta": -1590,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.2795604395604396,
+            "deletions": 152,
+            "emptyTextCount": 0,
+            "insertions": 274,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 210
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "491623b83f22fcb1304da645940f62318830598abe90e89fbac62ca906f64d8f",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 2,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 211
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "stop-revise"
+        },
+        {
+          "baselineRawResultSha256": "9785e696de568525ed56d6d1ba3d4fe7478bacf39faaa1871df0add89249b39d",
+          "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+          "caseId": "long-v2",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+          "metrics": [
+            {
+              "baseline": 0.23445479122859716,
+              "delta": 0.060328426955041564,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "cer",
+              "native": 0.29478321818363873,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 1087,
+              "delta": 176,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "substitutions",
+              "native": 1263,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 3156,
+              "delta": -1002,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "deletions",
+              "native": 2154,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 440,
+              "delta": 2031,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "insertions",
+              "native": 2471,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 13,
+              "delta": -13,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 32270,
+              "delta": -32270,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.29478321818363873,
+            "deletions": 2154,
+            "emptyTextCount": 0,
+            "insertions": 2471,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 1263
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "0a494f7e2d07d4abbf0ab49e5fcfab3c4e809f1bb2622fe346a5069495ea1bad",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 1342
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "stop-revise"
+        }
+      ],
+      "independentGateDisposition": "pass",
+      "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+      "mappingReadiness": "complete",
+      "nativeEvidenceDisposition": "complete",
+      "observedMetricDisposition": "stop-revise",
+      "oldDisposition": "accepted-kotoba-algorithm-input",
+      "releaseEligibility": "not-decided-by-this-task",
+      "subtitleQualityDisposition": "stop-revise",
+      "whisperFamilyDisposition": "not-applicable"
+    },
+    {
+      "adapterKind": "parakeet-p1",
+      "candidateId": "P1-window15s-native-word-v1",
+      "cases": [
+        {
+          "baselineRawResultSha256": "a86c8220d0493a5eea3142a1755492f5c7784f216ae6ca0087d48225f9611358",
+          "candidateId": "P1-window15s-native-word-v1",
+          "caseId": "short-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+          "metrics": [
+            {
+              "baseline": 0.7583333333333333,
+              "delta": -0.5916666666666667,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "cer",
+              "native": 0.16666666666666666,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 1,
+              "delta": 4,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "substitutions",
+              "native": 5,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 90,
+              "delta": -78,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "deletions",
+              "native": 12,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 3,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "insertions",
+              "native": 3,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 5,
+              "delta": -5,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 10620,
+              "delta": -10620,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.16666666666666666,
+            "deletions": 12,
+            "emptyTextCount": 0,
+            "insertions": 3,
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 5
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "a8c15925e6fe34408e85f971dc9e573291b24d5ff3058ba1c9d830e03bbe5510",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 2
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "baseline-incomplete"
+        },
+        {
+          "baselineRawResultSha256": "3495554b3b3ad1c4d9d5d5111588acd6e0d9f24a56fa98e2a225b89570d754d5",
+          "candidateId": "P1-window15s-native-word-v1",
+          "caseId": "medium-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+          "metrics": [
+            {
+              "baseline": 0.28175824175824177,
+              "delta": 0.11076923076923079,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "cer",
+              "native": 0.39252747252747255,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 254,
+              "delta": -69,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "substitutions",
+              "native": 185,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 189,
+              "delta": 477,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "deletions",
+              "native": 666,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 198,
+              "delta": -156,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "insertions",
+              "native": 42,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 12,
+              "delta": 5,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "semanticGapCount",
+              "native": 17,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 31120,
+              "delta": 21160,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "semanticGapDurationMs",
+              "native": 52280,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.39252747252747255,
+            "deletions": 666,
+            "emptyTextCount": 0,
+            "insertions": 42,
+            "semanticGapCount": 17,
+            "semanticGapDurationMs": 52280,
+            "substitutions": 185
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "ce8ef8eec1c351bfcd0dec8877c75bf8bd08b1173b31c69671f816d3e9e74af1",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 1,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 34
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "baseline-incomplete"
+        },
+        {
+          "baselineRawResultSha256": "477a8c49f384e16d2fef0ff9b05bc3281e2f33e9072aed68dd1261d3a573591a",
+          "candidateId": "P1-window15s-native-word-v1",
+          "caseId": "long-v2",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "validated-failed",
+          "failure": {
+            "errorCode": "parakeet_family_text_conservation",
+            "failureClass": "candidate-caused-structured-failure"
+          },
+          "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+          "metrics": [],
+          "observedMetricDisposition": "unscored",
+          "rawEvidenceSha256": "650eb7cabcee11193eecb0238f4cd84ea12bd8b7cf0e6d4e50172af11d353d78",
+          "slotStatus": "validated-failed",
+          "subtitleQualityDisposition": "unscored"
+        }
+      ],
+      "independentGateDisposition": "stop-revise",
+      "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "nativeEvidenceDisposition": "validated-failure",
+      "observedMetricDisposition": "stop-revise",
+      "oldDisposition": "stop-revise",
+      "releaseEligibility": "not-decided-by-this-task",
+      "subtitleQualityDisposition": "baseline-incomplete",
+      "whisperFamilyDisposition": "not-applicable"
+    },
+    {
+      "adapterKind": "reazonspeech-r2",
+      "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+      "cases": [
+        {
+          "baselineRawResultSha256": "6ece024aa9defbc4a1890a2551efa80e5ea81655014df105eea126ccddbe8bf0",
+          "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+          "caseId": "short-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+          "metrics": [
+            {
+              "baseline": 0.10833333333333334,
+              "delta": 0.15833333333333333,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "cer",
+              "native": 0.26666666666666666,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 2,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "substitutions",
+              "native": 2,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 11,
+              "delta": 19,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "deletions",
+              "native": 30,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "insertions",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 1,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "semanticGapCount",
+              "native": 1,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 2080,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "semanticGapDurationMs",
+              "native": 2080,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.26666666666666666,
+            "deletions": 30,
+            "emptyTextCount": 0,
+            "insertions": 0,
+            "semanticGapCount": 1,
+            "semanticGapDurationMs": 2080,
+            "substitutions": 2
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "2da547923efff0012d9923359cfa36c4c40703779e0cbc4df9e50f2b82a39edc",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 3
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "baseline-incomplete"
+        },
+        {
+          "baselineRawResultSha256": "886f4a253f6e8e35c7efaddf2aa7e60b2335d80b205dbe5d5c3decc4e7537528",
+          "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+          "caseId": "medium-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+          "metrics": [
+            {
+              "baseline": 0.5010989010989011,
+              "delta": -0.20571428571428568,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "cer",
+              "native": 0.2953846153846154,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 121,
+              "delta": 65,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "substitutions",
+              "native": 186,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 967,
+              "delta": -546,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "deletions",
+              "native": 421,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 52,
+              "delta": 13,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "insertions",
+              "native": 65,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 46,
+              "delta": -27,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 19,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 137230,
+              "delta": -92950,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 44280,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.2953846153846154,
+            "deletions": 421,
+            "emptyTextCount": 0,
+            "insertions": 65,
+            "semanticGapCount": 19,
+            "semanticGapDurationMs": 44280,
+            "substitutions": 186
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "c744571c68f38e9087f73b361530a1ac9f58335c908c9050e5c5e4d5feafed88",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 1,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 53
+            },
+            "timestampProvenance": "engine-native"
+          },
+          "subtitleQualityDisposition": "baseline-incomplete"
+        },
+        {
+          "baselineRawResultSha256": "9cedf428d4978b1e70828b2088b9b4276fda4a525ccf0b957f2706c0569f1afc",
+          "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+          "caseId": "long-v2",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "validated-failed",
+          "failure": {
+            "attemptedThroughMs": 768570,
+            "attemptedWindowCount": 62,
+            "completedWindowCount": 61,
+            "errorCode": "crispasr_result_invalid",
+            "failureClass": "candidate-caused-structured-failure",
+            "resultFailure": {
+              "fingerprintSha256": "35b1f992ca3619d7e985ee3e9bb33f01280bed48829766bafbe01ee1892dc93e",
+              "localEndMs": 2160,
+              "localStartMs": 2160,
+              "resultTraceSha256": "f3179c7ab489bfcc211b4779fa15fb481354850dd08cbf2286b64c00f13c45bb",
+              "segmentIndex": 0,
+              "subtype": "zero_duration_top_level_result",
+              "windowEndMs": 768570,
+              "windowStartMs": 763590,
+              "zeroBasedWindowIndex": 61
+            }
+          },
+          "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+          "metrics": [],
+          "observedMetricDisposition": "unscored",
+          "rawEvidenceSha256": "fe491128605137b18f0e6693f20fda9518ec0cc8ccf1ba73ab41edd91bebc208",
+          "slotStatus": "validated-failed",
+          "subtitleQualityDisposition": "unscored"
+        }
+      ],
+      "independentGateDisposition": "stop-revise",
+      "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "nativeEvidenceDisposition": "validated-failure",
+      "observedMetricDisposition": "stop-revise",
+      "oldDisposition": "stop-revise + better-than-r1",
+      "releaseEligibility": "not-decided-by-this-task",
+      "subtitleQualityDisposition": "baseline-incomplete",
+      "whisperFamilyDisposition": "not-applicable"
+    },
+    {
+      "adapterKind": "qwen-t03c",
+      "candidateId": "t03c-corrected-qwen-poc",
+      "cases": [
+        {
+          "baselineRawResultSha256": "abe89eada6df0fa5b2f50b7f4be833ab368d767acad459e5cd6827483fff349b",
+          "candidateId": "t03c-corrected-qwen-poc",
+          "caseId": "short-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "completed",
+          "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+          "metrics": [
+            {
+              "baseline": 0.25,
+              "delta": -0.04166666666666666,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "cer",
+              "native": 0.20833333333333334,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 14,
+              "delta": -3,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "substitutions",
+              "native": 11,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 16,
+              "delta": -5,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "deletions",
+              "native": 11,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 3,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "insertions",
+              "native": 3,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "emptyTextCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapCount",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 0,
+              "delta": 0,
+              "direction": "lower-or-equal",
+              "disposition": "qualified",
+              "metric": "semanticGapDurationMs",
+              "native": 0,
+              "provenance": {
+                "baseline": "python-legacy-cuda-v1",
+                "native": "shared-t01-recomputed-historical-native"
+              }
+            },
+            {
+              "baseline": 140.0,
+              "delta": 7560.0,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "qwenForcedAlignerMedianStartErrorMs",
+              "native": 7700.0,
+              "provenance": {
+                "baseline": "forced-aligner",
+                "native": "forced-aligner"
+              }
+            },
+            {
+              "baseline": 2060.0,
+              "delta": 15908.999999999996,
+              "direction": "lower-or-equal",
+              "disposition": "stop-revise",
+              "metric": "qwenForcedAlignerP95StartErrorMs",
+              "native": 17968.999999999996,
+              "provenance": {
+                "baseline": "forced-aligner",
+                "native": "forced-aligner"
+              }
+            }
+          ],
+          "nativeQuality": {
+            "cer": 0.20833333333333334,
+            "deletions": 11,
+            "emptyTextCount": 0,
+            "insertions": 3,
+            "qwenForcedAlignerTiming": {
+              "eligible": true,
+              "medianStartErrorMs": 7700.0,
+              "p95StartErrorMs": 17968.999999999996,
+              "provenance": "forced-aligner",
+              "unavailableReason": null
+            },
+            "semanticGapCount": 0,
+            "semanticGapDurationMs": 0,
+            "substitutions": 11
+          },
+          "observedMetricDisposition": "stop-revise",
+          "rawEvidenceSha256": "2b7fe38eab319f85e232a6219cb6b48efaff730e5e573683d87ac759fa9022f4",
+          "slotStatus": "completed-comparison",
+          "structuralDiagnostics": {
+            "excludedNonSemanticVocalizationGapCount": 0,
+            "timeline": {
+              "afterAudioEndCount": 0,
+              "emptyTextCount": 0,
+              "negativeStartCount": 0,
+              "nonMonotonicCount": 0,
+              "nonPositiveDurationCount": 0,
+              "segmentCount": 1
+            },
+            "timestampProvenance": "forced-aligner"
+          },
+          "subtitleQualityDisposition": "baseline-incomplete"
+        },
+        {
+          "baselineRawResultSha256": "b0223fae466edb3cabeaf79e6a4ec0903850eb2fbf07bb23347e098278898d3a",
+          "candidateId": "t03c-corrected-qwen-poc",
+          "caseId": "medium-v1",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "validated-failed",
+          "failure": {
+            "acceptedTimedSegmentCount": 0,
+            "errorCode": "segment-legality-failed",
+            "failureClass": "candidate-caused-structured-failure"
+          },
+          "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+          "metrics": [],
+          "observedMetricDisposition": "unscored",
+          "rawEvidenceSha256": "02013002cd133bb3619e18637654a50ec970ba9d7ac5bc7340bed6c677ee0b87",
+          "slotStatus": "validated-failed",
+          "subtitleQualityDisposition": "unscored"
+        },
+        {
+          "baselineRawResultSha256": "2171fb8f7757ad4642a2b88052c76658735621251231c9a5293cc0f4d21f790e",
+          "candidateId": "t03c-corrected-qwen-poc",
+          "caseId": "long-v2",
+          "comparisonProfile": "python-legacy-cuda-v1",
+          "expectedStatus": "validated-failed",
+          "failure": {
+            "acceptedTimedSegmentCount": 0,
+            "errorCode": "segment-legality-failed",
+            "failureClass": "candidate-caused-structured-failure"
+          },
+          "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+          "metrics": [],
+          "observedMetricDisposition": "unscored",
+          "rawEvidenceSha256": "33d46de94e42d86c7cd9b315c1b143b306cf2cd12abdbf13ed062f5a53fe8943",
+          "slotStatus": "validated-failed",
+          "subtitleQualityDisposition": "unscored"
+        }
+      ],
+      "independentGateDisposition": "stop-revise",
+      "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "nativeEvidenceDisposition": "validated-failure",
+      "observedMetricDisposition": "stop-revise",
+      "oldDisposition": "stop-revise",
+      "releaseEligibility": "not-decided-by-this-task",
+      "subtitleQualityDisposition": "baseline-incomplete",
+      "whisperFamilyDisposition": "not-applicable"
+    }
+  ],
+  "qualityComparisonContract": {
+    "direction": "lower-or-equal",
+    "key": [
+      "logicalModelIdentity",
+      "caseId",
+      "comparisonProfile"
+    ],
+    "metrics": [
+      "cer",
+      "substitutions",
+      "deletions",
+      "insertions",
+      "emptyTextCount",
+      "semanticGapCount",
+      "semanticGapDurationMs",
+      "qwenForcedAlignerMedianStartErrorMs",
+      "qwenForcedAlignerP95StartErrorMs"
+    ],
+    "reduction": "each completed historical native row is recomputed from private WAV+ASS truth through scripts/asr-benchmark.py; no case/model average"
+  },
+  "schemaVersion": 1
+}

@@ -5,6 +5,7 @@
 ## Execution Policy
 
 - 后续 native 发布资格必须先消费 `.trellis/tasks/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json`：字幕质量只按同 `logicalModelIdentity × case × python-legacy-cuda-v1` 逐项非回退；结构/证据安全、性能资源、协议、取消恢复、路径、隐私和许可证继续使用既有绝对硬门禁。历史归档 evidence 不改写，仅由父任务和新 handoff 前瞻性 reinterpret。
+- 最新历史 evidence 重评 authority 为 `.trellis/tasks/08-19-native-asr-legacy-quality-reevaluation/research/evidence/native-asr-legacy-quality-reevaluation.json`：large-v3 Candidate A 与 Kotoba K2 在逐指标 legacy-relative gate 下均为 `stop-revise`；Parakeet P1、ReazonSpeech R2 与 Qwen T03C 的 observed metrics 也为 `stop-revise`，且因 T12 mapping pending，identity-aware subtitle disposition 保持 `baseline-incomplete`。large-v2、T11、T12、T14/T15/T18 边界和全部 production routes 不变。
 - 本父任务保存总需求、总体设计、任务地图和跨任务门禁，通常不执行 `task.py start`。
 - 子任务按阶段及时创建，不一次性把 18 个任务全部置为活跃；创建近期任务时使用 `--parent <parent-dir> --no-start`。
 - 每个子任务在启动前必须完成自己的 `prd.md`、`design.md`、`implement.md` 和上下文清单。
@@ -26,7 +27,7 @@ Gate 2: engine productization + development acceleration
   T06 CPU checkpoint -> T07 development CUDA -> T08
   T06 -> T09 CrispASR core + development GPU -> T10 + T11
   T10 Reazon R1 stop-revise -> T10R Reazon R2
-  model-level Python baseline -> future qualification reinterpretation for T06/T08/T10/T10R/T11
+  model-level Python baseline -> T08-19 frozen-evidence reinterpretation -> T06/T08/T10/T10R/T11 forward status
 
 Gate 3: models, CPU/GPU runtime and UI
   T02 + T03 -> T12

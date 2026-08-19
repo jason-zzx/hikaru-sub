@@ -1,0 +1,510 @@
+{
+  "schemaVersion": 1,
+  "kind": "hikaru-native-legacy-quality-evidence-lock",
+  "task": "08-19-native-asr-legacy-quality-reevaluation",
+  "comparisonProfile": "python-legacy-cuda-v1",
+  "noRerunDecision": "2026-08-19 user-confirmed scope: strictly re-evaluate existing frozen evidence; no native inference rerun, no candidate/algorithm/device/runtime change",
+  "authorities": {
+    "baseline": {
+      "path": ".trellis/tasks/archive/2026-08/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json",
+      "sha256": "c6142c40daf9c45c1d39d3612833c386fc71080866148d9b9719e428787979ef"
+    },
+    "identityManifest": {
+      "path": ".trellis/tasks/archive/2026-08/08-18-native-asr-python-legacy-baseline/model-identity-manifest.json",
+      "sha256": "7b46e0a983b7cc71e302e898d3f90d77b3c9159be2fe538585cd038e31c0a8f0"
+    },
+    "benchmarkManifest": {
+      "path": ".asr-benchmark/manifest.json",
+      "sha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea"
+    },
+    "benchmarkRunner": {
+      "path": "scripts/asr-benchmark.py",
+      "sha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c"
+    },
+    "legacyPublisher": {
+      "path": "scripts/asr-legacy-baseline.py",
+      "sha256": "e1624bed04782968c5b572992938f725e882f760aea4051b8e87fbf25b2c6393"
+    }
+  },
+  "candidates": [
+    {
+      "logicalModelIdentity": "faster-whisper/large-v3",
+      "candidateId": "selected-cpu-beam1-no-history",
+      "adapterKind": "large-v3-candidate-a",
+      "sourceTasks": ["T06 08-02-native-asr-ctranslate2-whisper", "T08 08-05-native-asr-kotoba-compatibility corrected CT2 authority"],
+      "oldDisposition": "corrected-large-v3-pass",
+      "independentGateDisposition": "pass",
+      "mappingReadiness": "complete",
+      "ignoredRoot": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local",
+      "identity": {
+        "engine": "faster-whisper",
+        "device": "cpu",
+        "model": "Systran/faster-whisper-large-v3@edaa852ec7e145841d8ffdb056a99866b5f0a478",
+        "rawKind": "hikaru-ct2-whisper-selected-cpu-raw",
+        "timestampProvenance": "engine-native",
+        "candidateLockSha256": "0be239a83640c65f740f169da6c37a1141d3e92140d829243787671f9f410083"
+      },
+      "publications": [
+        {
+          "role": "publication",
+          "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/evidence/selected-cpu-short-medium.json",
+          "sha256": "05beeec3410e7cef720bf73b1afebe0e371bfe81ec359f265575a3090809c3b4"
+        },
+        {
+          "role": "publication",
+          "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/evidence/selected-cpu-long.json",
+          "sha256": "7e9e6769b7dabbcb71242c7b170be271a65924496024f832f0dfe49ebad8efba"
+        },
+        {
+          "role": "candidate-lock",
+          "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/selected-cpu-candidate-lock.md",
+          "sha256": "0be239a83640c65f740f169da6c37a1141d3e92140d829243787671f9f410083"
+        },
+        {
+          "role": "correction-authority",
+          "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/evidence/corrected-ct2-reassessment.json",
+          "sha256": "a470ce38aeb2173b54b31f359771bc6d24836a5688ee605c0091db7681bdf99d"
+        },
+        {
+          "role": "correction-lock",
+          "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/corrected-ct2-reassessment-lock.md",
+          "sha256": "4a91bc04eb25c2c4fafc65667a05d233b8ef0f698ed6e7f7943d8197ffe0c6d1"
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "sourceCaseId": "short-v1",
+          "expectedStatus": "completed",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/raw/selected-cpu-large-v3-short.json",
+              "sha256": "1d559f9a68c4fc1bcd5acc820a0b650d58a30b10654ed31ef245a088bfee8166"
+            },
+            {
+              "role": "adapted",
+              "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/results/selected-cpu-large-v3-short.json",
+              "sha256": "f4fe1515275b6b8f638569334406b3a10577755d21218e8ba3cb585f2d49d3e1"
+            }
+          ]
+        },
+        {
+          "caseId": "medium-v1",
+          "sourceCaseId": "medium-v1",
+          "expectedStatus": "completed",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/raw/selected-cpu-large-v3-medium.json",
+              "sha256": "5cd366a7737b503138e629ca6f6d2ca602e32697ebf69e900f3d649e5ad2c3b0"
+            },
+            {
+              "role": "adapted",
+              "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/results/selected-cpu-large-v3-medium.json",
+              "sha256": "522baead4de92542f566de4b1d372836ac2d2bb95d8ab7544b8762d43c9a504a"
+            }
+          ]
+        },
+        {
+          "caseId": "long-v2",
+          "sourceCaseId": "long-v1",
+          "expectedStatus": "completed",
+          "correctionAuthority": {
+            "rowCandidateId": "t06-selected-a",
+            "rowCaseId": "long-v2",
+            "rowSourceCaseId": "long-v1",
+            "rowIgnoredRawSha256": "4ebb28126703b5ebb88184e78b6b4c7b181784e9f0b039bbd6d1fd9f4b84b32c",
+            "rowAllApplicableGatesPass": true
+          },
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/raw/selected-cpu-large-v3-long.json",
+              "sha256": "4ebb28126703b5ebb88184e78b6b4c7b181784e9f0b039bbd6d1fd9f4b84b32c"
+            },
+            {
+              "role": "adapted",
+              "path": ".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/results/selected-cpu-large-v3-long.json",
+              "sha256": "d9f3233281b4b585a2e57befdae6790541e1e1b400563ca1b3b54939283a396e"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "logicalModelIdentity": "kotoba-faster-whisper/kotoba-whisper-v2.0-faster",
+      "candidateId": "kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1",
+      "adapterKind": "kotoba-k2",
+      "sourceTasks": ["T08 08-05-native-asr-kotoba-compatibility"],
+      "oldDisposition": "accepted-kotoba-algorithm-input",
+      "independentGateDisposition": "pass",
+      "mappingReadiness": "complete",
+      "ignoredRoot": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/local",
+      "identity": {
+        "engine": "kotoba-faster-whisper",
+        "device": "cuda",
+        "model": "kotoba-tech/kotoba-whisper-v2.0-faster@f44edd35eaeb2274e85ac7b31fb2c6f59ff1c4bc",
+        "rawKind": "hikaru-ct2-kotoba-k2-raw",
+        "adaptedKind": "hikaru-ct2-kotoba-k2-adapted",
+        "timestampProvenance": "engine-native",
+        "inputLockSha256": "d55f363d69cf6ce29892c159e26556dcfecc00e207f7e7c9cd13425078d24c9a"
+      },
+      "publications": [
+        {
+          "role": "publication",
+          "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/evidence/kotoba-k2-candidate.json",
+          "sha256": "5b7fa644eb1d9cbd10412bf0959ea46631332b7bb1266567d203b00cbbfc2415"
+        },
+        {
+          "role": "input-lock",
+          "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-lock.md",
+          "sha256": "d55f363d69cf6ce29892c159e26556dcfecc00e207f7e7c9cd13425078d24c9a"
+        },
+        {
+          "role": "correction-lock",
+          "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-correction-lock.md",
+          "sha256": "d9bc43b6a47743c7377e22d6676f5e4d9a119e07dbcb1ae7f0ebe9d6cfb1578a"
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "sourceCaseId": "short-v1",
+          "expectedStatus": "completed",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/local/k2/raw/short-v1.json",
+              "sha256": "f563cceacc31e9e2ca0cd8437c3b39ccd8fa99acd3abd27451c47655cdbe6439"
+            },
+            {
+              "role": "adapted",
+              "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/local/k2/adapted/short-v1.json",
+              "sha256": "4d4ce52a58f0aae877adcd160a235e5efbbe731950d23c38d47e4303a0842a7d"
+            }
+          ]
+        },
+        {
+          "caseId": "medium-v1",
+          "sourceCaseId": "medium-v1",
+          "expectedStatus": "completed",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/local/k2/raw/medium-v1.json",
+              "sha256": "491623b83f22fcb1304da645940f62318830598abe90e89fbac62ca906f64d8f"
+            },
+            {
+              "role": "adapted",
+              "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/local/k2/adapted/medium-v1.json",
+              "sha256": "4ed20610eb2595c174f02804bc86196bea5218c5a0173030c075ce3469974981"
+            }
+          ]
+        },
+        {
+          "caseId": "long-v2",
+          "sourceCaseId": "long-v2",
+          "expectedStatus": "completed",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/local/k2/raw/long-v2.json",
+              "sha256": "0a494f7e2d07d4abbf0ab49e5fcfab3c4e809f1bb2622fe346a5069495ea1bad"
+            },
+            {
+              "role": "adapted",
+              "path": ".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/local/k2/adapted/long-v2.json",
+              "sha256": "43dfb487a1c31974be1504b6551248417b09d9327b59d50caa52e826203ce5b8"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "logicalModelIdentity": "parakeet/parakeet-tdt_ctc-0.6b-ja",
+      "candidateId": "P1-window15s-native-word-v1",
+      "adapterKind": "parakeet-p1",
+      "sourceTasks": ["T10 08-13-native-asr-parakeet-reazon"],
+      "oldDisposition": "stop-revise",
+      "independentGateDisposition": "stop-revise",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "ignoredRoot": ".trellis/tasks/archive/2026-08/08-13-native-asr-parakeet-reazon/08-13-native-asr-parakeet-reazon/research/local",
+      "identity": {
+        "schema": "hikaru-t10-parakeet-family-attempt-v1",
+        "engine": "parakeet",
+        "device": "cuda",
+        "model": {"sha256": "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17", "sizeBytes": 673554880},
+        "workerSha256": "57e8d02c17c5a7a268b6a0c391beecbd0356bbcd03c3f361540606223efdba5d",
+        "runnerSha256": "845dc2e5f93f73a851789b0643d2e4e29aa6e29ea0835e037cfad047c58660c6",
+        "librarySha256": "824b5d89fd38eac5f04a5fd65927bb11a0060ab8a001cc57766bf6c914ec334e",
+        "inputLockSha256": "e342111bdc2cac5e0af6bc013a718f324cdc845577d587484020734db54ad9bd",
+        "timestampProvenance": "engine-native"
+      },
+      "publications": [
+        {
+          "role": "publication",
+          "path": ".trellis/tasks/archive/2026-08/08-13-native-asr-parakeet-reazon/08-13-native-asr-parakeet-reazon/research/evidence/t10-parakeet-reazon.json",
+          "sha256": "ca7512e91b8b69197ff22acbcb5f5b45434c4b5c9b92c1307e479d6a50d246af"
+        },
+        {
+          "role": "input-lock",
+          "path": ".trellis/tasks/archive/2026-08/08-13-native-asr-parakeet-reazon/08-13-native-asr-parakeet-reazon/research/t10-input-lock.md",
+          "sha256": "e342111bdc2cac5e0af6bc013a718f324cdc845577d587484020734db54ad9bd"
+        },
+        {
+          "role": "raw-index",
+          "path": ".trellis/tasks/archive/2026-08/08-13-native-asr-parakeet-reazon/08-13-native-asr-parakeet-reazon/research/t10-raw-index.json",
+          "sha256": "ef1b0a811fc9544f0b7b1358f663db65690c99e7fadd4d604a5e22d8eefa4d3b"
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "sourceCaseId": "short-v1",
+          "expectedStatus": "completed",
+          "runKind": "cold",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-13-native-asr-parakeet-reazon/08-13-native-asr-parakeet-reazon/research/local/raw/parakeet/short-v1/cold-0.json",
+              "sha256": "a8c15925e6fe34408e85f971dc9e573291b24d5ff3058ba1c9d830e03bbe5510"
+            }
+          ]
+        },
+        {
+          "caseId": "medium-v1",
+          "sourceCaseId": "medium-v1",
+          "expectedStatus": "completed",
+          "runKind": "measured",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-13-native-asr-parakeet-reazon/08-13-native-asr-parakeet-reazon/research/local/raw/parakeet/medium-v1/measured-0.json",
+              "sha256": "ce8ef8eec1c351bfcd0dec8877c75bf8bd08b1173b31c69671f816d3e9e74af1"
+            }
+          ]
+        },
+        {
+          "caseId": "long-v2",
+          "sourceCaseId": "long-v2",
+          "expectedStatus": "validated-failed",
+          "runKind": "measured",
+          "failure": {
+            "errorCode": "parakeet_family_text_conservation",
+            "failureClass": "candidate-caused-structured-failure"
+          },
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-13-native-asr-parakeet-reazon/08-13-native-asr-parakeet-reazon/research/local/raw/parakeet/long-v2/measured-0.json",
+              "sha256": "650eb7cabcee11193eecb0238f4cd84ea12bd8b7cf0e6d4e50172af11d353d78"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "logicalModelIdentity": "reazonspeech-nemo/reazonspeech-nemo-v2",
+      "candidateId": "R2-vad12-pad30-overlap-top-level-v1",
+      "adapterKind": "reazonspeech-r2",
+      "sourceTasks": ["T10R 08-14-native-asr-reazonspeech-r2"],
+      "oldDisposition": "stop-revise + better-than-r1",
+      "independentGateDisposition": "stop-revise",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "ignoredRoot": ".trellis/tasks/archive/2026-08/08-14-native-asr-reazonspeech-r2/research/local",
+      "identity": {
+        "schema": "hikaru-reazonspeech-r2-worker-attempt-v1",
+        "engine": "reazonspeech-nemo",
+        "device": "cuda",
+        "model": {"sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2", "sizeBytes": 667147072},
+        "workerSha256": "e86c199e8a01cfead31d36f34d576fe89be52e0fd6f3d29163383ee94023c274",
+        "runnerSha256": "c3f6439d2cc708f4ab48713249056eab7f30e392e8a6ca60b52a69292416a5b7",
+        "inputLockSha256": "42039347f43d8b6faa2b9ab2f9acb3a2e021fb0e350eefa67e1bd38dde5bfd3f",
+        "timestampProvenance": "engine-native"
+      },
+      "publications": [
+        {
+          "role": "publication",
+          "path": ".trellis/tasks/archive/2026-08/08-14-native-asr-reazonspeech-r2/research/evidence/reazonspeech-r2.json",
+          "sha256": "7b88496567285e5ee224300432b054fc7635da23ac817a1e888c66f9c215fbd9"
+        },
+        {
+          "role": "input-lock",
+          "path": ".trellis/tasks/archive/2026-08/08-14-native-asr-reazonspeech-r2/research/r2-input-lock.md",
+          "sha256": "42039347f43d8b6faa2b9ab2f9acb3a2e021fb0e350eefa67e1bd38dde5bfd3f"
+        },
+        {
+          "role": "raw-index",
+          "path": ".trellis/tasks/archive/2026-08/08-14-native-asr-reazonspeech-r2/research/r2-raw-index.json",
+          "sha256": "ac860d5a44725158505db3568588dff500d112b69fe601e8d8fe34d798e81ed6"
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "sourceCaseId": "short-v1",
+          "expectedStatus": "completed",
+          "runKind": "cold",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-14-native-asr-reazonspeech-r2/research/local/formal/raw/short-v1/cold-0.json",
+              "sha256": "2da547923efff0012d9923359cfa36c4c40703779e0cbc4df9e50f2b82a39edc"
+            }
+          ]
+        },
+        {
+          "caseId": "medium-v1",
+          "sourceCaseId": "medium-v1",
+          "expectedStatus": "completed",
+          "runKind": "measured",
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-14-native-asr-reazonspeech-r2/research/local/formal/raw/medium-v1/measured-0.json",
+              "sha256": "c744571c68f38e9087f73b361530a1ac9f58335c908c9050e5c5e4d5feafed88"
+            }
+          ]
+        },
+        {
+          "caseId": "long-v2",
+          "sourceCaseId": "long-v2",
+          "expectedStatus": "validated-failed",
+          "runKind": "measured",
+          "failure": {
+            "errorCode": "crispasr_result_invalid",
+            "failureClass": "candidate-caused-structured-failure",
+            "error": {
+              "code": "crispasr_result_invalid",
+              "message": "CrispASR final result is invalid: segment=0 startMs=2160 endMs=2160 durationMs=4980",
+              "ready": true,
+              "stage": "transcribe",
+              "taxonomy": "candidate-caused-structured-failure"
+            },
+            "resultFailure": {
+              "subtype": "zero_duration_top_level_result",
+              "fingerprintSha256": "35b1f992ca3619d7e985ee3e9bb33f01280bed48829766bafbe01ee1892dc93e",
+              "resultTraceSha256": "f3179c7ab489bfcc211b4779fa15fb481354850dd08cbf2286b64c00f13c45bb",
+              "segmentIndex": 0,
+              "localStartMs": 2160,
+              "localEndMs": 2160,
+              "windowStartMs": 763590,
+              "windowEndMs": 768570,
+              "zeroBasedWindowIndex": 61
+            },
+            "attemptedWindowCount": 62,
+            "completedWindowCount": 61,
+            "attemptedThroughMs": 768570
+          },
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/08-14-native-asr-reazonspeech-r2/research/local/formal/raw/long-v2/measured-0.json",
+              "sha256": "fe491128605137b18f0e6693f20fda9518ec0cc8ccf1ba73ab41edd91bebc208"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "logicalModelIdentity": "qwen3-asr/qwen3-asr-1.7b",
+      "candidateId": "t03c-corrected-qwen-poc",
+      "adapterKind": "qwen-t03c",
+      "sourceTasks": ["T03 07-25-native-asr-crispasr-poc", "T03C 08-06-crispasr-long-v2-correction"],
+      "oldDisposition": "stop-revise",
+      "independentGateDisposition": "stop-revise",
+      "mappingReadiness": "pending-t12-native-model-manifest",
+      "ignoredRoot": ".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/local",
+      "identity": {
+        "rawKind": "hikaru-crispasr-poc-raw",
+        "engine": "qwen3-asr",
+        "device": "cpu",
+        "timestampProvenance": "forced-aligner",
+        "inputLockSha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f"
+      },
+      "publications": [
+        {
+          "role": "correction-authority",
+          "path": ".trellis/tasks/archive/2026-08/08-06-crispasr-long-v2-correction/research/evidence/crispasr-long-v2-correction.json",
+          "sha256": "40640099a9790a3d65eee932753b378bc002ced960a6a0265463bd5f443e9051"
+        },
+        {
+          "role": "correction-lock",
+          "path": ".trellis/tasks/archive/2026-08/08-06-crispasr-long-v2-correction/research/crispasr-long-v2-correction-lock.md",
+          "sha256": "a7faa57bc1dc3850177473e74850f73032ad571002ee3f941e17b46344e91f8c"
+        },
+        {
+          "role": "input-lock",
+          "path": ".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/crispasr-input-lock.json",
+          "sha256": "f72aa6d2c7117abff16862bef8f9e18c45c9fcb9dc98249c2cf6e0872703279f"
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "short-v1",
+          "sourceCaseId": "short-v1",
+          "expectedStatus": "completed",
+          "correctionRow": {"rowId": "qwen3-short-v1", "status": "measured"},
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/local/runs/qwen3-short.json",
+              "sha256": "2b7fe38eab319f85e232a6219cb6b48efaff730e5e573683d87ac759fa9022f4"
+            }
+          ]
+        },
+        {
+          "caseId": "medium-v1",
+          "sourceCaseId": "medium-v1",
+          "expectedStatus": "validated-failed",
+          "failure": {
+            "errorCode": "segment-legality-failed",
+            "failureClass": "candidate-caused-structured-failure",
+            "acceptedTimedSegmentCount": 0
+          },
+          "correctionRow": {"rowId": "qwen3-medium-v1", "status": "upstream-blocker"},
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/local/runs/qwen3-medium.json",
+              "sha256": "02013002cd133bb3619e18637654a50ec970ba9d7ac5bc7340bed6c677ee0b87"
+            }
+          ]
+        },
+        {
+          "caseId": "long-v2",
+          "sourceCaseId": "long-v1",
+          "expectedStatus": "validated-failed",
+          "failure": {
+            "errorCode": "segment-legality-failed",
+            "failureClass": "candidate-caused-structured-failure",
+            "acceptedTimedSegmentCount": 0
+          },
+          "correctionRow": {"rowId": "qwen3-long-v2", "status": "upstream-blocker"},
+          "sources": [
+            {
+              "role": "raw",
+              "path": ".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/local/runs/qwen3-long.json",
+              "sha256": "33d46de94e42d86c7cd9b315c1b143b306cf2cd12abdbf13ed062f5a53fe8943"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "excludedScopes": [
+    {"subject": "faster-whisper/large-v2", "reason": "no previous complete old-gate native candidate; Whisper anchor baseline exists but no frozen native candidate to reassess"},
+    {"subject": "faster-whisper/tiny", "reason": "family-gated; no old complete model conclusion"},
+    {"subject": "faster-whisper/base", "reason": "family-gated; no old complete model conclusion"},
+    {"subject": "faster-whisper/small", "reason": "family-gated; no old complete model conclusion"},
+    {"subject": "faster-whisper/medium", "reason": "family-gated; no old complete model conclusion"},
+    {"subject": "faster-whisper/large-v3-turbo", "reason": "family-gated; no old complete model conclusion"},
+    {"subject": "t02-large-v3-fixed", "reason": "superseded by T06 selected Candidate A"},
+    {"subject": "t02-kotoba-fixed", "reason": "superseded by T08 Kotoba K2"},
+    {"subject": "t06-candidate-b", "reason": "reviewed stop-revise diagnostic; superseded by selected Candidate A"},
+    {"subject": "t08-kotoba-k1", "reason": "superseded by Kotoba K2"},
+    {"subject": "R1-window15s-top-level-v1", "reason": "superseded by ReazonSpeech R2"},
+    {"subject": "t09-development-gpu-speed-rows", "reason": "device-selection evidence only, not subtitle-quality candidates"}
+  ]
+}

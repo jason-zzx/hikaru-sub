@@ -1,0 +1,4 @@
+{"file":".trellis/spec/asr/index.md","reason":"ASR layer entry point and validation expectations for Python evidence tooling."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Authoritative same-model python-legacy quality comparison, identity, full-matrix, privacy, and failure contracts."}
+{"file":".trellis/tasks/08-19-native-asr-legacy-quality-reevaluation/research/evidence-inventory.md","reason":"Scoped candidate inventory, archived evidence locations, exclusions, and no-rerun/pending-T12 constraints."}
+{"file":".trellis/tasks/archive/2026-08/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.md","reason":"Human-readable frozen Python baseline rows and comparison limitations that the reassessment must consume."}
