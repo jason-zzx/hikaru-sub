@@ -885,3 +885,36 @@ Established the authoritative model-identity Python legacy baseline for the nati
 ### Next Steps
 
 - Parent 07-25-native-asr-migration: plan T12 (native model manifest + downloader) to freeze GGUF artifact identities currently `pending-t12` in the baseline mapping; T13 may overlap per the allowed parallel groups.
+
+
+## Session 26: Re-evaluate native ASR quality against Python legacy baseline
+
+**Date**: 2026-08-19
+**Task**: Re-evaluate native ASR quality against Python legacy baseline
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Published an identity-bound historical evidence reassessment for large-v3 Candidate A, Kotoba K2, Parakeet P1, ReazonSpeech R2, and Qwen T03C without rerunning inference. Added the frozen evidence lock, shared-T01 publisher, deterministic sanitized JSON/Markdown handoff, mutation tests, and ASR quality-spec guardrails. All candidates remain stop-revise under observed legacy-relative metrics; Parakeet, ReazonSpeech, and Qwen also remain baseline-incomplete pending T12 mappings.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `42d7904` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
