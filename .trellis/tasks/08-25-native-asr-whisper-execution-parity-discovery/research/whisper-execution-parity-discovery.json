@@ -1,0 +1,39 @@
+{
+  "disposition": "invalid-evidence",
+  "evidence": {
+    "crossoversStarted": false,
+    "harnessFailureCount": 2,
+    "harnessFailureRecordSha256": "98fb16e6e9c02112596e443fb558ccf44f6ad88eee522a4f2ed8e6d46beb3465",
+    "invalidatedRawArtifactCount": 4,
+    "invalidatedRawArtifactSetSha256": "d846abdc05ada61ac2a5bfcd8e037356a237230929c13a584178f7803a426cfa",
+    "processRemaining": false,
+    "scoringEligible": false
+  },
+  "findings": [
+    "the initial model-backed anchor command exceeded the outer 30000 ms executor while its child process remained",
+    "the reviewed correction overlapped that still-running child, consuming the second harness failure",
+    "all acquired A/D rows are invalidated and B/C never started"
+  ],
+  "kind": "hikaru-whisper-execution-parity-discovery",
+  "limitations": [
+    "short-only execution-parity discovery",
+    "fresh Python output is reproducibility evidence only",
+    "no candidate acquisition or qualification evidence",
+    "production/default remains Python legacy"
+  ],
+  "modelContract": {
+    "contractCount": 2,
+    "dtype": "float32-le",
+    "nMels": 128,
+    "setSha256": "5e4631ab31243d42ddb9e610e05e1e76a5f92fc19a0c7d6e0ffe873225d1c397",
+    "shape": [
+      128,
+      3000
+    ]
+  },
+  "promotionEligible": false,
+  "qualificationEligible": false,
+  "rows": [],
+  "schemaVersion": 1,
+  "status": "completed"
+}

@@ -1,6 +1,6 @@
 # 原生 ASR 迁移实施总计划
 
-> 状态：父任务保持 `planning`；Gate 0/1 已关闭。归档 legacy-relative 重评是当前前瞻性质量 authority：large-v3 Candidate A、Kotoba K2、Parakeet P1、ReazonSpeech R2 与 Qwen T03C 的 observed disposition 均为 `stop-revise`，其中后三者在 T12 mapping 冻结前 identity-aware 为 `baseline-incomplete`。T06R 也已以 truthful `stop-revise / non-qualified` handoff 收口，当前没有 subtitle-quality qualified native candidate；native routes 仍未切换，ORT/VAD 不进入 T13，Release/default 保持 Python legacy。ordinary Faster-Whisper 下一步先运行 T06D bounded execution-parity discovery，再决定是否另建一个质量候选任务。
+> 状态：父任务保持 `planning`；Gate 0/1 已关闭。归档 legacy-relative 重评是当前前瞻性质量 authority：large-v3 Candidate A、Kotoba K2、Parakeet P1、ReazonSpeech R2 与 Qwen T03C 的 observed disposition 均为 `stop-revise`，其中后三者在 T12 mapping 冻结前 identity-aware 为 `baseline-incomplete`。T06R 已以 truthful `stop-revise / non-qualified` handoff 收口；T06D 又以 `invalid-evidence` 关闭，两次 harness failure 使 A/D rows 全部失效且 B/C 未启动，因此没有 causal attribution，也没有被授权的后续 ordinary Faster-Whisper candidate。当前没有 subtitle-quality qualified native candidate；native routes 仍未切换，ORT/VAD 不进入 T13，Release/default 保持 Python legacy。
 
 ## Execution Policy
 
@@ -23,8 +23,8 @@ Gate 1: native task foundation
   T02 + T03 -> T04 -> T05
 
 Gate 2: archived engine evidence + quality recovery
-  T05 -> T06 -> T07; archived T06/T07 + legacy reassessment -> archived non-qualified T06R -> T06D discovery
-  T06D causal attribution -> separately planned ordinary Faster-Whisper quality candidate
+  T05 -> T06 -> T07; archived T06/T07 + legacy reassessment -> archived non-qualified T06R -> closed invalid-evidence T06D
+  future ordinary Faster-Whisper work requires a separate roadmap decision; T06D authorizes no candidate
   T07 -> archived T08; archived T08 + legacy reassessment -> T08R
   T06 -> T09 -> archived T10/T10R
   T09 -> T11 development; T12 frozen Qwen + ForcedAligner mapping -> T11 final publication
@@ -45,12 +45,12 @@ Allowed parallel groups:
 
 - T02 and T03 after T01.
 - T06 after T05. T07 starts after T06 exposes the production-worker seam and completes the CPU root-cause checkpoint; it does not depend on proving a CPU ceiling and does not wait for a GPU-required decision.
-- T06R started from archived T06/T07 plus the Python baseline and legacy-relative reassessment, then closed non-qualified after three valid `no-candidate-selected` scopes and one invalid 80-mel/128-mel parity investigation. T06D now owns one bounded, promotion-ineligible, exact-model-contract execution-parity discovery. Only a successful causal attribution may justify a separately planned ordinary Faster-Whisper quality candidate. T07's `development-gpu-ready` result accelerates iteration but is not T15 pack qualification.
+- T06R started from archived T06/T07 plus the Python baseline and legacy-relative reassessment, then closed non-qualified after three valid `no-candidate-selected` scopes and one invalid 80-mel/128-mel parity investigation. T06D then proved the exact large-v3 `128 × 3000` model contract but closed `invalid-evidence`: the reviewed correction overlapped the first timed-out child process, consuming the second harness failure, invalidating all A/D rows and preventing B/C. It authorizes no candidate; any future ordinary Faster-Whisper investment requires a separate roadmap decision rather than another implicit lock repair. T07's `development-gpu-ready` result accelerates iteration but is not T15 pack qualification.
 - T08R starts from archived T07/T08 safety evidence plus the same baseline/reassessment. K3 inherits bounded stride, ownership and exact-dedup contracts without changing K2 history or using reference-based repair.
 - T12 may start immediately from proven model formats and the archived identity manifest. It freezes CT2, GGUF, license/file-role and Qwen companion identities without changing any quality disposition.
 - T11 may develop from T09 while T12 runs, but final evidence cannot publish until the exact T12-frozen Qwen + ForcedAligner pair is consumed.
 - T13 waits only for the T04/T06 worker seam and may run provisionally in parallel; T18 owns the final worker/runtime rebuild and attestation.
-- T14/T15 wait for T12/T13 and at least one accepted final engine lane. The mandatory ordinary Faster-Whisper lane has no accepted input after T06R; it must come from a separately planned post-T06D quality candidate. Parakeet P1 and ReazonSpeech R2 are omitted-current-candidate by default; no P2/R3 is implied.
+- T14/T15 wait for T12/T13 and at least one accepted final engine lane. The mandatory ordinary Faster-Whisper lane has no accepted input after T06R/T06D; T06D produced no causal candidate, so a future lane requires a separate reviewed roadmap decision and task. Parakeet P1 and ReazonSpeech R2 are omitted-current-candidate by default; no P2/R3 is implied.
 - T16 then T17 remain staged on T12/T13/T15 and stable qualification metadata. T07/T09 development GPU artifacts never substitute for formal pack evidence.
 
 ## Task Map
@@ -301,6 +301,14 @@ Exit criteria:
 - No formal candidate lock, six-row matrix, production route change or CPU inheritance is created.
 - A second harness/identity failure closes the discovery rather than creating another lock-version chain.
 
+Verified T06D result:
+
+- Published `invalid-evidence` with exact loaded large-v3 `128 × 3000` contracts in both runtime roots.
+- The initial outer executor timed out while its child remained; the reviewed correction overlapped that process, consuming the second harness failure.
+- All four acquired A/D raw artifacts are invalidated, B/C never started, and no feature/runtime/parser attribution exists.
+- The correction budget is permanently exhausted; terminal state is closed and rejects further model commands.
+- `qualificationEligible=false`, `promotionEligible=false`, `scoringEligible=false`; ordinary native Faster-Whisper remains disabled and Python legacy remains production/default.
+
 Rollback point: remove only T06D task-local discovery code/artifacts; preserve all archived T06/T07/T06R evidence.
 
 #### T08 - Productize Kotoba And Legacy CT2 Cache Compatibility
@@ -509,7 +517,7 @@ Deliverables:
 - Reuse protocol v1 resolved device values (`cpu`, `cuda`, `vulkan`); do not introduce a second worker protocol or backend-specific host executable.
 - Add deterministic pack preparation/verification suitable for managed download; end-user machines never compile native dependencies.
 
-Depends on: completed T12 and T13, plus at least one accepted final algorithm input from an ordinary Faster-Whisper post-T06D candidate, T08R or T11. T07/T09 development GPU evidence may inform builds but is not qualification. Parakeet P1 and ReazonSpeech R2 are `omitted-current-candidate` unless a later separately reviewed candidate qualifies; no P2/R3 is implied.
+Depends on: completed T12 and T13, plus at least one accepted final algorithm input from a future separately reviewed ordinary Faster-Whisper candidate, T08R or T11. T06D supplies no accepted input. T07/T09 development GPU evidence may inform builds but is not qualification. Parakeet P1 and ReazonSpeech R2 are `omitted-current-candidate` unless a later separately reviewed candidate qualifies; no P2/R3 is implied.
 
 Exit criteria:
 
@@ -536,7 +544,7 @@ Deliverables:
 - Verify pack-load/runtime failure produces one nonfatal notice and preserves job/recovery semantics. CPU routing may use only an exact `inherited-from-gpu` model disposition; no runtime path may claim CPU measurements or silently substitute Python.
 - Publish an independent `qualified`, `stop-revise` or `omitted-no-candidate` decision for CUDA and Vulkan. Any qualified selected GPU identity may authorize exact CPU `inherited-from-gpu` metadata; a failed GPU identity cannot authorize CPU and does not block another independently qualified GPU identity.
 
-Depends on: T12, T13, T14 candidate-built packs, and the exact accepted ordinary Faster-Whisper post-T06D / T08R / T11 lane identities included by T14. Omitted or non-qualified lanes are recorded without routing attempts. Ordinary Faster-Whisper remains mandatory for release even if another optional lane qualifies first.
+Depends on: T12, T13, T14 candidate-built packs, and the exact accepted future ordinary Faster-Whisper / T08R / T11 lane identities included by T14. T06D contributes no accepted lane. Omitted or non-qualified lanes are recorded without routing attempts. Ordinary Faster-Whisper remains mandatory for release even if another optional lane qualifies first.
 
 Exit criteria:
 
@@ -667,7 +675,7 @@ Rollback point: restore the previous production package inputs and per-engine/pa
 - [ ] CPU package and optional GPU packs contain runtime only, no model weights; GPU packs are not bundled in the main installer.
 - [ ] GPU routing proves actual loaded acceleration and omits failed packs without blocking unrelated accepted lanes; CPU route metadata inherits only exact qualified GPU model identities and never claims independent CPU measurements.
 - [ ] Every current model remains visible in T17 with qualification-driven availability; no unsupported model silently falls back to Python.
-- [x] T06R closed non-qualified without rewriting T06 evidence; [ ] T06D must finish bounded model-valid discovery before any new ordinary Faster-Whisper quality task. T08R uses a new identity without rewriting T08 evidence; T11 final evidence binds T12's exact Qwen/ForcedAligner pair.
+- [x] T06R closed non-qualified without rewriting T06 evidence; [x] T06D closed `invalid-evidence` without causal attribution or a new candidate. Any future ordinary Faster-Whisper quality task now requires a separate roadmap decision. T08R uses a new identity without rewriting T08 evidence; T11 final evidence binds T12's exact Qwen/ForcedAligner pair.
 - [ ] T13 artifacts remain provisional; T14/T15 contain only accepted selected lanes; T18 owns the final rebuild/attestation.
 - [ ] Ordinary Faster-Whisper is mandatory, while Parakeet P1/ReazonSpeech R2 and any other failed optional lane have explicit visible/unavailable dispositions.
 - [ ] Python legacy remains production/default until T18 and development-only during the agreed post-cutover rollback window.
@@ -686,8 +694,8 @@ Stage 0 child-task creation:
 - [x] User approved T06 hard gates for `large-v3` and `large-v2` long audio; ordinary faster-whisper remains mandatory and all models remain visible in T17 even when native qualification fails.
 - [x] User approved the legacy-relative roadmap reprioritization: no latest native candidate is currently subtitle-quality qualified; ordinary Faster-Whisper remains mandatory; optional failed models remain visible/unavailable; production/default remains Python legacy.
 - [x] User approved `native-gpu-authoritative-v1`: all future native ASR model qualification uses GPU-only matrices; matching CPU routes inherit the exact GPU disposition as `inherited-from-gpu`, no CPU model results are acquired, and no GPU values are copied into CPU fields.
-- [x] T06R, T12, T11, T08R and T13 were created as the next planning batch; T06R has now closed non-qualified and T06D is the only immediate ordinary Faster-Whisper follow-up. T14～T18 remain map entries created incrementally after their gates; Parakeet P2 and ReazonSpeech R3 are deferred pending a separate user-reviewed investment decision.
-- [x] T11 final publication requires T12's exact Qwen + ForcedAligner mapping; T13 is provisional-only; T14/T15 consume only accepted post-T06D ordinary Faster-Whisper, T08R or T11 lanes; T18 owns final immutable runtime rebuild/attestation.
+- [x] T06R closed non-qualified and T06D closed `invalid-evidence`; there is no immediate authorized ordinary Faster-Whisper candidate follow-up. T14～T18 remain map entries created incrementally after their gates; Parakeet P2 and ReazonSpeech R3 are deferred pending a separate user-reviewed investment decision.
+- [x] T11 final publication requires T12's exact Qwen + ForcedAligner mapping; T13 is provisional-only; T14/T15 consume only accepted future ordinary Faster-Whisper, T08R or T11 lanes, and T06D contributes none; T18 owns final immutable runtime rebuild/attestation.
 - [x] T07 completed the ignored-local CTranslate2 CUDA lane and independently froze `development-gpu-ready`; archived T08 uses that development seam, while T14/T15 remain the only pack/release qualification owners.
 - [x] T04-T06 were created as the next planning batch and linked to this parent.
 - [x] T04 completed protocol/limits/fake-worker implementation, independent check, commit and archive.
