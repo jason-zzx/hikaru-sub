@@ -951,3 +951,36 @@ Reconciled the native ASR parent roadmap with the python-legacy-cuda-v1 reassess
 ### Next Steps
 
 - None - task complete
+
+
+## Session 28: Close native Whisper quality revision
+
+**Date**: 2026-08-25
+**Task**: Close native Whisper quality revision
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Closed and archived the non-qualified native Faster-Whisper quality revision, preserved deterministic diagnostic evidence, updated ASR qualification guidance and parent roadmap, cleaned task-local artifacts, and created the bounded execution-parity discovery planning task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3a9c9e6` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
