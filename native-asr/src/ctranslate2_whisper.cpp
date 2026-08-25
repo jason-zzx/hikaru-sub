@@ -2174,26 +2174,25 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe_precomputed_mel_for_te
     std::int64_t audio_duration_ms,
     const CancellationCallback& is_cancelled) {
   check_cancelled(is_cancelled);
-  const CandidateAConfig expected = upstream_generation_fallback_config();
-  if (impl_->mel_bins != 80
-      || impl_->config.beam_size != expected.beam_size
+  if (impl_->mel_bins != 128
+      || impl_->config.beam_size != 5
       || !impl_->config.condition_on_previous_text
       || !impl_->config.timestamp_driven_seek
-      || !impl_->config.upstream_generation_fallback
+      || impl_->config.upstream_generation_fallback
       || impl_->config.temperature != 0.0f
       || impl_->config.max_source_frames != max_model_frames
       || impl_->config.max_applied_seek_frames != 0) {
     throw BackendError(
         "config_identity_mismatch",
-        "Short parity bisect requires the exact ordinary fallback identity");
+        "Execution parity requires the exact large-v3 short first-attempt identity");
   }
   if (source_sample_count != 385637
       || audio_duration_ms != 24102
       || source_frame_count(source_sample_count) != 2411
-      || mel.size() != static_cast<std::size_t>(80 * max_model_frames)) {
+      || mel.size() != static_cast<std::size_t>(impl_->mel_bins * max_model_frames)) {
     throw BackendError(
         "feature_invalid_input",
-        "Short parity bisect input shape or source identity drifted");
+        "Execution parity input shape or source identity drifted");
   }
 
   const Clock::time_point inference_started = Clock::now();
@@ -2226,6 +2225,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe_precomputed_mel_for_te
   options.return_scores = true;
   options.return_no_speech_prob = true;
   options.max_initial_timestamp_index = impl_->config.max_initial_timestamp_index;
+  options.sampling_temperature = 0.0f;
 
   ctranslate2::models::WhisperGenerationResult generated;
   try {
@@ -2236,82 +2236,39 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe_precomputed_mel_for_te
     trace.prompt_token_count = prompt.size();
     trace.prefix_forward_token_count = prompt.empty() ? 0 : prompt.size() - 1;
     const Clock::time_point generate_started = Clock::now();
-    std::vector<ctranslate2::models::WhisperGenerationResult> generated_attempts;
-    const GenerationFallbackResult fallback = run_upstream_generation_fallback(
-        impl_->config,
-        [&](const FallbackAttemptOptions& attempt) {
-          ctranslate2::models::WhisperOptions attempt_options = options;
-          attempt_options.beam_size = attempt.beam_size;
-          attempt_options.patience = attempt.patience;
-          attempt_options.num_hypotheses = attempt.num_hypotheses;
-          if (attempt.sampling_topk) {
-            attempt_options.sampling_topk = *attempt.sampling_topk;
-          }
-          if (attempt.sampling_temperature) {
-            attempt_options.sampling_temperature =
-                static_cast<float>(*attempt.sampling_temperature);
-          }
-          auto futures = impl_->model->generate(features, {prompt}, attempt_options);
-          if (futures.empty()) {
-            throw BackendError(
-                "invalid_generation",
-                "Short parity bisect generation returned no future");
-          }
-          ctranslate2::models::WhisperGenerationResult value = futures.front().get();
-          if (value.sequences_ids.empty()
-              || value.sequences_ids.front().empty()
-              || value.scores.empty()) {
-            throw BackendError(
-                "invalid_generation",
-                "Short parity bisect generation returned no sequence or score");
-          }
-          FallbackGenerated summary;
-          summary.token_ids = value.sequences_ids.front();
-          summary.score = value.scores.front();
-          summary.no_speech_probability = value.no_speech_prob;
-          std::vector<std::uint32_t> ids;
-          ids.reserve(summary.token_ids.size());
-          std::transform(
-              summary.token_ids.begin(),
-              summary.token_ids.end(),
-              std::back_inserter(ids),
-              [](std::size_t id) { return static_cast<std::uint32_t>(id); });
-          summary.decoded_text = impl_->tokenizer.decode(ids);
-          generated_attempts.push_back(std::move(value));
-          check_cancelled(is_cancelled);
-          return summary;
-        });
-    generated = std::move(generated_attempts.at(fallback.selected_attempt_index));
-    trace.generation_fallback_enabled = true;
-    trace.selected_fallback_attempt_index = fallback.selected_attempt_index;
-    trace.generation_call_count = fallback.attempts.size();
-    trace.fallback_call_count = fallback.attempts.size() - 1;
-    trace.selected_temperature = fallback.selected_temperature;
-    trace.fallback_attempts = fallback.attempts;
-    trace.average_log_probability =
-        fallback.attempts[fallback.selected_attempt_index].average_log_probability;
-    trace.compression_ratio =
-        fallback.attempts[fallback.selected_attempt_index].compression_ratio;
+    auto futures = impl_->model->generate(features, {prompt}, options);
+    if (futures.empty()) {
+      throw BackendError(
+          "invalid_generation",
+          "Execution parity generation returned no future");
+    }
+    generated = futures.front().get();
     trace.generate_ms = elapsed_ms(generate_started);
     result.generate_ms = trace.generate_ms;
+    trace.generation_call_count = 1;
+    trace.fallback_call_count = 0;
+    trace.selected_temperature = 0.0;
     check_cancelled(is_cancelled);
   } catch (const BackendError&) {
     throw;
   } catch (const std::exception&) {
     throw BackendError(
         "model_runtime_failed",
-        "Short parity bisect CTranslate2 generation failed");
+        "Execution parity CTranslate2 generation failed");
   }
 
-  if (generated.sequences_ids.empty()) {
+  if (generated.sequences_ids.empty() || generated.scores.empty()) {
     throw BackendError(
         "invalid_generation",
-        "Short parity bisect CTranslate2 returned no sequence");
+        "Execution parity CTranslate2 returned no sequence or score");
   }
   trace.token_ids = generated.sequences_ids.front();
   trace.generated_token_count = trace.token_ids.size();
   trace.sha256 = sha256_text(token_trace(trace.token_ids));
   trace.no_speech_probability = generated.no_speech_prob;
+  trace.average_log_probability = average_log_probability(
+      generated,
+      impl_->config.length_penalty);
   const bool skip_no_speech =
       static_cast<double>(trace.no_speech_probability) > upstream_no_speech_threshold
       && trace.average_log_probability <= impl_->config.log_prob_threshold;
@@ -2345,7 +2302,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe_precomputed_mel_for_te
               && segment.segment.start_ms < result.segments.back().segment.start_ms)) {
         throw BackendError(
             "invalid_generation",
-            "Short parity bisect generated segment timeline is invalid");
+            "Execution parity generated segment timeline is invalid");
       }
       result.segments.push_back(std::move(segment));
     }

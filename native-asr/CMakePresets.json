@@ -54,11 +54,12 @@
       }
     },
     {
-      "name": "windows-x64-ct2-cuda-whisper-parity-bisect",
-      "displayName": "Windows x64 CTranslate2 CUDA Whisper Short Parity Bisect",
-      "inherits": "windows-x64-ct2-cuda-whisper-quality",
-      "binaryDir": "${sourceDir}/../.trellis/tasks/08-20-native-asr-whisper-quality-revision/research/local/build/windows-x64-ct2-cuda-short-parity",
+      "name": "windows-x64-ct2-cuda-whisper-parity-discovery",
+      "displayName": "Windows x64 CTranslate2 CUDA Whisper Execution Parity Discovery",
+      "inherits": "windows-x64-ct2-cuda-development",
+      "binaryDir": "${sourceDir}/../.trellis/tasks/08-25-native-asr-whisper-execution-parity-discovery/research/local/b/t06d",
       "cacheVariables": {
+        "HIKARU_ASR_CT2_PREBUILT_ROOT": "${sourceDir}/../.trellis/tasks/archive/2026-08/08-04-native-asr-ctranslate2-cuda-development/research/local/build/windows-x64-ct2-cuda",
         "HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT": "ON"
       }
     }
@@ -81,8 +82,8 @@
       "configurePreset": "windows-x64-ct2-cuda-whisper-quality"
     },
     {
-      "name": "windows-x64-ct2-cuda-whisper-parity-bisect",
-      "configurePreset": "windows-x64-ct2-cuda-whisper-parity-bisect"
+      "name": "windows-x64-ct2-cuda-whisper-parity-discovery",
+      "configurePreset": "windows-x64-ct2-cuda-whisper-parity-discovery"
     }
   ],
   "testPresets": [
@@ -127,8 +128,8 @@
       }
     },
     {
-      "name": "windows-x64-ct2-cuda-whisper-parity-bisect",
-      "configurePreset": "windows-x64-ct2-cuda-whisper-parity-bisect",
+      "name": "windows-x64-ct2-cuda-whisper-parity-discovery",
+      "configurePreset": "windows-x64-ct2-cuda-whisper-parity-discovery",
       "output": {
         "outputOnFailure": true
       },

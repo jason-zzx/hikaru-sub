@@ -101,7 +101,7 @@ option(
   OFF)
 option(
   HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT
-  "Enable the task-local short Mel/runtime parity bisect probe"
+  "Enable the task-local Whisper execution-parity discovery probe"
   OFF)
 set(HIKARU_ASR_ZLIB_ARCHIVE "" CACHE FILEPATH "Exact task-local zlib 1.3.1 archive")
 set(HIKARU_ASR_ZLIB_SOURCE_DIR "" CACHE PATH "Exact task-local zlib 1.3.1 source")
@@ -114,9 +114,8 @@ if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY AND NOT HIKARU_ASR_BUILD_CT2_WORKER
 endif()
 if(HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT
     AND (NOT HIKARU_ASR_BUILD_CT2_WORKER
-         OR NOT HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT
-         OR NOT HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY))
-  message(FATAL_ERROR "Whisper parity bisect requires the task-local CUDA fallback build")
+         OR NOT HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT))
+  message(FATAL_ERROR "Whisper execution-parity discovery requires the task-local CUDA build")
 endif()
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
   message(FATAL_ERROR "T09 CrispASR development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
@@ -506,12 +505,16 @@ file(TO_CMAKE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-20-native-asr-whisper-quality-revision/research/local"
   T06R_LOCAL_ROOT)
 file(TO_CMAKE_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-25-native-asr-whisper-execution-parity-discovery/research/local"
+  T06D_LOCAL_ROOT)
+file(TO_CMAKE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/local"
   T08_LOCAL_ROOT)
 target_compile_definitions(hikaru-asr-ctranslate2-tests PRIVATE
   "T06_LOCAL_ROOT=\"${T06_LOCAL_ROOT_REAL}\""
   "T07_LOCAL_ROOT=\"${T07_LOCAL_ROOT}\""
   "T06R_LOCAL_ROOT=\"${T06R_LOCAL_ROOT}\""
+  "T06D_LOCAL_ROOT=\"${T06D_LOCAL_ROOT}\""
   "T08_LOCAL_ROOT=\"${T08_LOCAL_ROOT}\"")
 
 endif()
@@ -614,9 +617,9 @@ if(BUILD_TESTING)
       set_tests_properties(ctranslate2-whisper-fallback-parity PROPERTIES TIMEOUT 30)
     endif()
     if(HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT)
-      add_test(NAME ctranslate2-whisper-short-parity
-        COMMAND hikaru-asr-ctranslate2-tests --short-parity-self-check)
-      set_tests_properties(ctranslate2-whisper-short-parity PROPERTIES TIMEOUT 30)
+      add_test(NAME ctranslate2-whisper-execution-parity
+        COMMAND hikaru-asr-ctranslate2-tests --execution-parity-self-check)
+      set_tests_properties(ctranslate2-whisper-execution-parity PROPERTIES TIMEOUT 30)
     endif()
   endif()
 endif()
