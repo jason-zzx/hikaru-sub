@@ -39,6 +39,28 @@
       "cacheVariables": {
         "HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT": "ON"
       }
+    },
+    {
+      "name": "windows-x64-ct2-cuda-whisper-quality",
+      "displayName": "Windows x64 CTranslate2 CUDA Whisper Quality",
+      "inherits": "windows-x64-ct2-release",
+      "binaryDir": "${sourceDir}/../.trellis/tasks/08-20-native-asr-whisper-quality-revision/research/local/build/windows-x64-ct2-cuda",
+      "cacheVariables": {
+        "HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT": "ON",
+        "HIKARU_ASR_CT2_PREBUILT_ROOT": "${sourceDir}/../.trellis/tasks/archive/2026-08/08-04-native-asr-ctranslate2-cuda-development/research/local/build/windows-x64-ct2-cuda",
+        "HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY": "ON",
+        "HIKARU_ASR_ZLIB_ARCHIVE": "${sourceDir}/../.trellis/tasks/08-20-native-asr-whisper-quality-revision/research/local/deps/zlib-1.3.1.tar.gz",
+        "HIKARU_ASR_ZLIB_SOURCE_DIR": "${sourceDir}/../.trellis/tasks/08-20-native-asr-whisper-quality-revision/research/local/deps/zlib-1.3.1"
+      }
+    },
+    {
+      "name": "windows-x64-ct2-cuda-whisper-parity-bisect",
+      "displayName": "Windows x64 CTranslate2 CUDA Whisper Short Parity Bisect",
+      "inherits": "windows-x64-ct2-cuda-whisper-quality",
+      "binaryDir": "${sourceDir}/../.trellis/tasks/08-20-native-asr-whisper-quality-revision/research/local/build/windows-x64-ct2-cuda-short-parity",
+      "cacheVariables": {
+        "HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -53,6 +75,14 @@
     {
       "name": "windows-x64-ct2-cuda-development",
       "configurePreset": "windows-x64-ct2-cuda-development"
+    },
+    {
+      "name": "windows-x64-ct2-cuda-whisper-quality",
+      "configurePreset": "windows-x64-ct2-cuda-whisper-quality"
+    },
+    {
+      "name": "windows-x64-ct2-cuda-whisper-parity-bisect",
+      "configurePreset": "windows-x64-ct2-cuda-whisper-parity-bisect"
     }
   ],
   "testPresets": [
@@ -79,6 +109,26 @@
     {
       "name": "windows-x64-ct2-cuda-development",
       "configurePreset": "windows-x64-ct2-cuda-development",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-x64-ct2-cuda-whisper-quality",
+      "configurePreset": "windows-x64-ct2-cuda-whisper-quality",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-x64-ct2-cuda-whisper-parity-bisect",
+      "configurePreset": "windows-x64-ct2-cuda-whisper-parity-bisect",
       "output": {
         "outputOnFailure": true
       },

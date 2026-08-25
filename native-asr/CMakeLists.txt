@@ -94,9 +94,29 @@ option(
 set(HIKARU_ASR_CRISPASR_RUNTIME_FILE "" CACHE FILEPATH "Locked CrispASR development runtime")
 set(HIKARU_ASR_CRISPASR_RUNTIME_SIZE "" CACHE STRING "Locked CrispASR development runtime size")
 set(HIKARU_ASR_CRISPASR_RUNTIME_SHA256 "" CACHE STRING "Locked CrispASR development runtime SHA-256")
+set(HIKARU_ASR_CT2_PREBUILT_ROOT "" CACHE PATH "Optional locked prebuilt CTranslate2 development root")
+option(
+  HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY
+  "Enable the task-local faster-whisper 1.2.1 fallback parity candidate"
+  OFF)
+option(
+  HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT
+  "Enable the task-local short Mel/runtime parity bisect probe"
+  OFF)
+set(HIKARU_ASR_ZLIB_ARCHIVE "" CACHE FILEPATH "Exact task-local zlib 1.3.1 archive")
+set(HIKARU_ASR_ZLIB_SOURCE_DIR "" CACHE PATH "Exact task-local zlib 1.3.1 source")
 
 if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
   message(FATAL_ERROR "T07 CUDA development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
+endif()
+if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
+  message(FATAL_ERROR "Whisper fallback parity requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
+endif()
+if(HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT
+    AND (NOT HIKARU_ASR_BUILD_CT2_WORKER
+         OR NOT HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT
+         OR NOT HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY))
+  message(FATAL_ERROR "Whisper parity bisect requires the task-local CUDA fallback build")
 endif()
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
   message(FATAL_ERROR "T09 CrispASR development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
@@ -264,6 +284,40 @@ require_pinned_file("${ORT_ROOT}/lib/onnxruntime_providers_shared.dll" 21856 599
 require_pinned_file("${ORT_ROOT}/LICENSE" 1094 c250d6278f0b47a6439fb7592b08b58a55eb9f535aa49a1db63211c3f982b674 "ONNX Runtime license")
 require_pinned_file("${ORT_ROOT}/ThirdPartyNotices.txt" 331175 fb0af774b4d7cffc5b9d046f2aaeade2f37df2f80abf8033c95dfffcc77a8866 "ONNX Runtime notices")
 require_pinned_file("${VAD_MODEL_SOURCE}" 1245151 4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2 "faster-whisper Silero V6 model")
+if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
+  if(NOT HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT
+      OR NOT HIKARU_ASR_ZLIB_ARCHIVE
+      OR NOT HIKARU_ASR_ZLIB_SOURCE_DIR)
+    message(FATAL_ERROR "Fallback parity is task-local CUDA-only and requires exact zlib inputs")
+  endif()
+  enable_language(C)
+  require_pinned_file(
+    "${HIKARU_ASR_ZLIB_ARCHIVE}"
+    1512791
+    9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+    "official zlib 1.3.1 archive")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/LICENSE" 1002 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243 "zlib 1.3.1 license")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/zlib.h" 96829 8a5579af72ea4f427ff00a4150f0ccb3fc5c1e4379f726e101133b1ab9fc600c "zlib 1.3.1 header")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/zconf.h" 16500 f5134250a67d57459234b63858f0d9d3ef8dcc48e9e1028d3f4fdcf6eae677ae "zlib 1.3.1 config header")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/adler32.c" 4964 9cd1443a24ff2a3053961695bd432035c58347386a420d3388232376ebabe211 "zlib 1.3.1 adler32")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/compress.c" 2613 86f802c16a965e7a28737e3730b4e576c5ba40981753967e3e30916f4dc1b4b1 "zlib 1.3.1 compress")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/crc32.c" 31605 8fd16f0a7714d51c89c2eb37eb98ec15e8a4dc57ba343e7b7398b19144039fda "zlib 1.3.1 crc32")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/deflate.c" 81731 3b956337350f94c34987750f785587ef33d9c89ceaebb7c2afb189c956360cbe "zlib 1.3.1 deflate")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/trees.c" 40937 f63c68c16c05fcd196050529d1a0e7657960e4136b9987d90a6ac3e58a964b0f "zlib 1.3.1 trees")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/zutil.c" 7179 8ced40d8c88588811edd2bdb35b7439983d5e1f8e9e32b8a3b244731f3c317b7 "zlib 1.3.1 zutil")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/zutil.h" 6677 dddb2dc7a1dc339ecf2c8e089b366f08bb731c0839c7110240d17ce731bb4fea "zlib 1.3.1 zutil header")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/deflate.h" 14041 48baf016326d8d5e3e32ac8153cc7e22f854b8e6834830b167b998a7fb1e7989 "zlib 1.3.1 deflate header")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/trees.h" 8472 bb0a9d3ca88ee00c81adb7c636e73b97085f6ef1b52d6d58edbe2b6dc3adeb4d "zlib 1.3.1 trees header")
+  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/crc32.h" 591749 9a2223575183ac2ee8a247f20bf3ac066e8bd0140369556bdbdffc777435749e "zlib 1.3.1 crc32 table")
+  add_library(hikaru-asr-zlib-static STATIC
+    "${HIKARU_ASR_ZLIB_SOURCE_DIR}/adler32.c"
+    "${HIKARU_ASR_ZLIB_SOURCE_DIR}/compress.c"
+    "${HIKARU_ASR_ZLIB_SOURCE_DIR}/crc32.c"
+    "${HIKARU_ASR_ZLIB_SOURCE_DIR}/deflate.c"
+    "${HIKARU_ASR_ZLIB_SOURCE_DIR}/trees.c"
+    "${HIKARU_ASR_ZLIB_SOURCE_DIR}/zutil.c")
+  target_include_directories(hikaru-asr-zlib-static PUBLIC "${HIKARU_ASR_ZLIB_SOURCE_DIR}")
+endif()
 file(READ "${ORT_ROOT}/VERSION_NUMBER" ORT_VERSION_NUMBER)
 file(READ "${ORT_ROOT}/GIT_COMMIT_ID" ORT_GIT_COMMIT_ID)
 file(STRINGS "${ORT_ROOT}/include/onnxruntime_c_api.h" ORT_API_LINE REGEX "^#define ORT_API_VERSION 28$")
@@ -323,7 +377,27 @@ set(BUILD_CLI OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
 set(OPENMP_RUNTIME COMP CACHE STRING "" FORCE)
-add_subdirectory("${CT2_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/ctranslate2" EXCLUDE_FROM_ALL)
+if(HIKARU_ASR_CT2_PREBUILT_ROOT)
+  set(CT2_PREBUILT_DLL "${HIKARU_ASR_CT2_PREBUILT_ROOT}/bin/ctranslate2.dll")
+  set(CT2_PREBUILT_IMPLIB "${HIKARU_ASR_CT2_PREBUILT_ROOT}/ctranslate2/ctranslate2.lib")
+  require_pinned_file(
+    "${CT2_PREBUILT_DLL}"
+    36974592
+    e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2
+    "T07 prebuilt CTranslate2 CUDA DLL")
+  require_pinned_file(
+    "${CT2_PREBUILT_IMPLIB}"
+    49653378
+    06075ad38a230ae3c1b2411a8733d441b8231b0bc79f49f33e05617f21ffe54e
+    "T07 prebuilt CTranslate2 CUDA import library")
+  add_library(ctranslate2 SHARED IMPORTED GLOBAL)
+  set_target_properties(ctranslate2 PROPERTIES
+    IMPORTED_LOCATION "${CT2_PREBUILT_DLL}"
+    IMPORTED_IMPLIB "${CT2_PREBUILT_IMPLIB}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CT2_SOURCE_DIR}/include")
+else()
+  add_subdirectory("${CT2_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/ctranslate2" EXCLUDE_FROM_ALL)
+endif()
 
 find_program(CARGO_EXECUTABLE cargo REQUIRED)
 set(TOKENIZER_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/tokenizer-ffi/Cargo.toml")
@@ -347,6 +421,14 @@ if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT)
   target_compile_definitions(hikaru-asr-ctranslate2 PUBLIC HIKARU_ASR_CT2_WITH_CUDA=1)
   target_include_directories(hikaru-asr-ctranslate2 PRIVATE "${CUDA_TOOLKIT_ROOT_NORMALIZED}/include")
 endif()
+if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
+  target_compile_definitions(hikaru-asr-ctranslate2 PUBLIC HIKARU_ASR_WHISPER_FALLBACK_PARITY=1)
+  target_include_directories(hikaru-asr-ctranslate2 PRIVATE
+    "${HIKARU_ASR_ZLIB_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/zlib")
+endif()
+if(HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT)
+  target_compile_definitions(hikaru-asr-ctranslate2 PUBLIC HIKARU_ASR_WHISPER_PARITY_BISECT=1)
+endif()
 target_include_directories(hikaru-asr-ctranslate2
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
   PRIVATE "${POCKETFFT_SOURCE_DIR}" "${ORT_ROOT}/include")
@@ -360,6 +442,9 @@ target_link_libraries(hikaru-asr-ctranslate2
     "${TOKENIZER_IMPLIB}"
     "${ORT_ROOT}/lib/onnxruntime.lib"
     bcrypt)
+if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
+  target_link_libraries(hikaru-asr-ctranslate2 PRIVATE hikaru-asr-zlib-static)
+endif()
 
 add_executable(hikaru-asr-worker src/main.cpp)
 target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-ctranslate2)
@@ -418,11 +503,15 @@ file(TO_CMAKE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-04-native-asr-ctranslate2-cuda-development/research/local"
   T07_LOCAL_ROOT)
 file(TO_CMAKE_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-20-native-asr-whisper-quality-revision/research/local"
+  T06R_LOCAL_ROOT)
+file(TO_CMAKE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/08-05-native-asr-kotoba-compatibility/research/local"
   T08_LOCAL_ROOT)
 target_compile_definitions(hikaru-asr-ctranslate2-tests PRIVATE
   "T06_LOCAL_ROOT=\"${T06_LOCAL_ROOT_REAL}\""
   "T07_LOCAL_ROOT=\"${T07_LOCAL_ROOT}\""
+  "T06R_LOCAL_ROOT=\"${T06R_LOCAL_ROOT}\""
   "T08_LOCAL_ROOT=\"${T08_LOCAL_ROOT}\"")
 
 endif()
@@ -519,5 +608,15 @@ if(BUILD_TESTING)
       set_tests_properties(crispasr-release-route-disabled PROPERTIES TIMEOUT 30)
     endif()
     set_tests_properties(ctranslate2-whisper-core PROPERTIES TIMEOUT 30)
+    if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
+      add_test(NAME ctranslate2-whisper-fallback-parity
+        COMMAND hikaru-asr-ctranslate2-tests --fallback-self-check)
+      set_tests_properties(ctranslate2-whisper-fallback-parity PROPERTIES TIMEOUT 30)
+    endif()
+    if(HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT)
+      add_test(NAME ctranslate2-whisper-short-parity
+        COMMAND hikaru-asr-ctranslate2-tests --short-parity-self-check)
+      set_tests_properties(ctranslate2-whisper-short-parity PROPERTIES TIMEOUT 30)
+    endif()
   endif()
 endif()

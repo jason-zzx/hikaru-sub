@@ -5,7 +5,11 @@
 > 首期平台：Windows x64
 > 目标运行时：CTranslate2 + CrispASR，安装包内置 CPU runtime，ASR 模型按需下载
 >
-> **规划与协议更新（2026-08-02）：** 本文保留技术架构、调研依据和历史提案；任务编号、Gate、GPU 开发顺序和发布阻塞规则以同目录最新 `prd.md`、`design.md`、`implement.md` 为准。开发 CTranslate2 CUDA 已提前为 T07；正式 CUDA/Vulkan packs 与资格分别为 T14/T15，失败 pack 不阻塞无关 CPU 路线。本文第 6 节的旧 `modelPaths`/`computeType`/`ready` JSON 示例仅为历史草案，最终 wire contract 以 T04 `prd.md`、`design.md` 和其产出的 `native-asr/docs/protocol-v1.md` 为准；后文原“阶段 6/后续 GPU”顺序也不再作为执行任务地图。
+> **规划与协议更新（2026-08-02）：** 本文保留技术架构、调研依据和历史提案；任务编号、Gate、GPU 开发顺序和发布阻塞规则以同目录最新 `prd.md`、`design.md`、`implement.md` 为准。开发 CTranslate2 CUDA 已提前为 T07；正式 CUDA/Vulkan packs 与资格分别为 T14/T15。本文第 6 节的旧 `modelPaths`/`computeType`/`ready` JSON 示例仅为历史草案，最终 wire contract 以 T04 `prd.md`、`design.md` 和其产出的 `native-asr/docs/protocol-v1.md` 为准；后文原“阶段 6/后续 GPU”顺序也不再作为执行任务地图。
+>
+> **资格规则更新（2026-08-20）：** 后续所有 native ASR model-backed qualification 统一使用 `native-gpu-authoritative-v1` GPU profile。匹配同模型、同算法 identity 的 CPU route 以 `qualificationSource=inherited-from-gpu` 继承 GPU disposition，不再采集 CPU CER/S/D/I/RTF/RSS；本文后续 CPU quality/performance 矩阵、CPU ceiling、GPU-required 和 CPU fallback 文字仅为历史提案，不再是当前资格标准。CPU 编译、协议、打包、路径和非模型 smoke 仍需独立验证。
+>
+> **ordinary Whisper 状态更新（2026-08-25）：** T06R 已以 `stop-revise / non-qualified` handoff 关闭，未产生正式 candidate 或双 anchor 六行矩阵。其后续 T06D 只做一次 bounded、promotion-ineligible execution-parity discovery：先从 exact loaded model 学习动态合同（large-v3 为 128 Mel），再复现 Python/native anchors；只有 model-valid causal attribution 才允许另建质量候选任务。Discovery、candidate acquisition 与 qualification 必须分离。
 
 ## 1. 结论摘要
 

@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "kind": "hikaru-native-whisper-gpu-fallback-corrected-lock-preflight",
+  "status": "ready-for-renewed-acquisition-decision",
+  "qualificationEligible": false,
+  "comparisonProfile": "native-gpu-authoritative-v1",
+  "candidateId": "upstream-generation-fallback-parity-v1",
+  "modelLoaded": false,
+  "acquisitionRows": [],
+  "correctedLock": {
+    "path": "research/gpu-fallback-diagnostic-lock-v2.md",
+    "sizeBytes": 16141,
+    "sha256": "823630f08ab15ed7dadf4f80f0e5a320c89e3e2171cd55b8ac86cc6463235b82"
+  },
+  "supersededIdentity": {
+    "lockSha256": "5fcfe845451f418a1e21fe8711ba9f367fdc2e13f8c2e02dd598683dde4e073a",
+    "invalidPreflightJsonSha256": "29b8767342bb9f1ac57c630285c1481b58877c57b92c775e38f9dfb9d4b6a212",
+    "invalidPreflightMarkdownSha256": "27054915dc39d7e2e58535e0a62dfb6fbaf55aac47caf5bd0f66017f539b2f6f",
+    "disposition": "invalid-preflight-no-publication"
+  },
+  "loadedModuleInventory": [
+    {
+      "name": "hikaru-asr-ctranslate2-tests.exe",
+      "sizeBytes": 978944,
+      "sha256": "1f72c282f342abc84d69f2e663d021d06b6957a44cdef83d25c44f53e5ec0e39",
+      "rootRole": "task-local-runtime-bin"
+    },
+    {
+      "name": "ctranslate2.dll",
+      "sizeBytes": 36974592,
+      "sha256": "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2",
+      "rootRole": "task-local-runtime-bin"
+    },
+    {
+      "name": "hikaru_asr_tokenizer.dll",
+      "sizeBytes": 2137088,
+      "sha256": "d0ac979b132073ba76220f47e5b77538bf03ec1dcaea01fb5d9d928762939cad",
+      "rootRole": "task-local-runtime-bin"
+    },
+    {
+      "name": "onnxruntime.dll",
+      "sizeBytes": 15809848,
+      "sha256": "18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257",
+      "rootRole": "task-local-runtime-bin"
+    },
+    {
+      "name": "vcomp140.dll",
+      "sizeBytes": 213064,
+      "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7",
+      "rootRole": "windows-system32"
+    },
+    {
+      "name": "nvcuda.dll",
+      "sizeBytes": 4466920,
+      "sha256": "ec9942ff94bcf2a6714531932720d0d36bd1f362df768af9ae21f2388c08ef7c",
+      "rootRole": "windows-system32"
+    },
+    {
+      "name": "cublas64_12.dll",
+      "sizeBytes": 113716224,
+      "sha256": "9513540e4ec4c51ee9e7304138c2cc255c29a8c181f9e80c38efa25738becd99",
+      "rootRole": "cuda-toolkit-12.8-bin"
+    },
+    {
+      "name": "cublasLt64_12.dll",
+      "sizeBytes": 674667520,
+      "sha256": "b199d1ff892a81b7fd3d57ba1781549609b41500b36008fef326038393ad46c7",
+      "rootRole": "cuda-toolkit-12.8-bin"
+    }
+  ],
+  "reattestation": {
+    "checkedFileCount": 51,
+    "identityDrift": false,
+    "rebuilt": false,
+    "sourceChanged": false,
+    "publisherChanged": false,
+    "gpu": "NVIDIA GeForce RTX 3070",
+    "driverVersion": "596.49",
+    "computeCapability": "8.6",
+    "cudaToolkitVersion": "12.8.93",
+    "restrictedPathRootIdentitySha256": "8866553cc6616ec76f152177b69c5161e0aa5dec0c13519eb65b654afa3c66f6"
+  },
+  "validation": {
+    "publisherTests": "14 passed",
+    "moduleInventoryCheckedAgainstCurrentFiles": true,
+    "supersededLockPreserved": true,
+    "privacyScan": "passed",
+    "ignoredLocalRoot": "passed",
+    "taskValidation": "passed"
+  },
+  "modelEvidence": {
+    "exists": false,
+    "reason": "The prior authorized acquisition stopped before model load because its superseded lock omitted direct loaded-module hashes; the corrected lock was prepared and validated without running either cell."
+  },
+  "nextGate": "Independent review of the corrected lock, then fresh explicit model-backed acquisition approval for both closed cells."
+}

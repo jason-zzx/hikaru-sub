@@ -1,4 +1,5 @@
 #include "ctranslate2_whisper.hpp"
+#include "wav_audio.hpp"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -55,6 +56,32 @@ std::string required_arg(
     throw std::runtime_error("missing argument: " + name);
   }
   return *std::next(iterator);
+}
+
+void validate_closed_mode_args(
+    const std::vector<std::string>& args,
+    const std::string& mode,
+    const std::vector<std::string>& value_args) {
+  std::vector<std::string> seen;
+  bool found_mode = false;
+  for (std::size_t index = 0; index < args.size(); ++index) {
+    const std::string& arg = args[index];
+    if (arg == mode) {
+      check(!found_mode, "duplicate mode argument: " + mode);
+      found_mode = true;
+      continue;
+    }
+    check(std::find(value_args.begin(), value_args.end(), arg) != value_args.end(),
+          "unknown closed-mode argument: " + arg);
+    check(std::find(seen.begin(), seen.end(), arg) == seen.end(),
+          "duplicate closed-mode argument: " + arg);
+    check(index + 1 < args.size() && args[index + 1].rfind("--", 0) != 0,
+          "missing closed-mode argument value: " + arg);
+    seen.push_back(arg);
+    ++index;
+  }
+  check(found_mode, "closed mode argument is missing: " + mode);
+  check(seen.size() == value_args.size(), "closed mode argument inventory is incomplete");
 }
 
 int integer_arg(
@@ -115,6 +142,112 @@ std::vector<std::pair<std::string, CandidateAConfig>> diagnostic_matrix_configs(
   return {{"A", a}, {"B", b}, {"C", c}, {"D", d}};
 }
 
+struct WhisperQualityDiagnosticCell {
+  std::string id;
+  std::string case_id;
+  CandidateAConfig config;
+};
+
+std::vector<WhisperQualityDiagnosticCell> whisper_quality_diagnostic_cells() {
+  std::vector<WhisperQualityDiagnosticCell> cells;
+  for (std::size_t beam_size : {std::size_t{1}, std::size_t{5}}) {
+    CandidateAConfig short_config = short_decode_config(beam_size);
+    cells.push_back({
+        "short-b" + std::to_string(beam_size) + "-off",
+        "short-v1",
+        short_config});
+    for (bool history : {false, true}) {
+      CandidateAConfig medium_config = short_config;
+      medium_config.condition_on_previous_text = history;
+      cells.push_back({
+          "medium-b" + std::to_string(beam_size) + (history ? "-on" : "-off"),
+          "medium-v1",
+          medium_config});
+    }
+  }
+  return cells;
+}
+
+WhisperQualityDiagnosticCell whisper_quality_diagnostic_cell(const std::string& id) {
+  const auto cells = whisper_quality_diagnostic_cells();
+  const auto found = std::find_if(cells.begin(), cells.end(), [&](const auto& cell) {
+    return cell.id == id;
+  });
+  check(found != cells.end(), "T06R diagnostic cell is not allowed");
+  return *found;
+}
+
+std::vector<WhisperQualityDiagnosticCell> whisper_quality_vad_diagnostic_cells() {
+  CandidateAConfig short_config = short_decode_config(5);
+  CandidateAConfig medium_config = short_config;
+  medium_config.condition_on_previous_text = true;
+  return {
+      {"short-b5-vad", "short-v1", short_config},
+      {"medium-b5-on-vad", "medium-v1", medium_config}};
+}
+
+WhisperQualityDiagnosticCell whisper_quality_vad_diagnostic_cell(const std::string& id) {
+  const auto cells = whisper_quality_vad_diagnostic_cells();
+  const auto found = std::find_if(cells.begin(), cells.end(), [&](const auto& cell) {
+    return cell.id == id;
+  });
+  check(found != cells.end(), "T06R VAD diagnostic cell is not allowed");
+  return *found;
+}
+
+std::vector<WhisperQualityDiagnosticCell> whisper_quality_fallback_diagnostic_cells() {
+  const CandidateAConfig config = upstream_generation_fallback_config();
+  return {
+      {"short-b5-on-vad-fallback", "short-v1", config},
+      {"medium-b5-on-vad-fallback", "medium-v1", config}};
+}
+
+WhisperQualityDiagnosticCell whisper_quality_fallback_diagnostic_cell(
+    const std::string& id) {
+  const auto cells = whisper_quality_fallback_diagnostic_cells();
+  const auto found = std::find_if(cells.begin(), cells.end(), [&](const auto& cell) {
+    return cell.id == id;
+  });
+  check(found != cells.end(), "T06R fallback diagnostic cell is not allowed");
+  return *found;
+}
+
+#ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
+struct WhisperShortParityCell {
+  std::string id;
+  std::string mel_role;
+  std::string mel_sha256;
+  std::string runtime_role;
+  std::string runtime_sha256;
+};
+
+std::vector<WhisperShortParityCell> whisper_short_parity_cells() {
+  constexpr const char* python_mel =
+      "51209b71c3450718055dfad8a3d5923283dd95d702d606b0bdf56aac53218aa9";
+  constexpr const char* native_mel =
+      "c2fc425ae691a4b1f9acd92580061ad97df82e01165747d761653f87634b9e08";
+  constexpr const char* python_runtime =
+      "60e536c0801432cde4a105aeebbca35fbf228aa3e901807b2310b02676c2f140";
+  constexpr const char* native_runtime =
+      "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2";
+  return {
+      {"python-runtime-python-mel", "python", python_mel, "python-wheel", python_runtime},
+      {"python-runtime-native-mel", "native", native_mel, "python-wheel", python_runtime},
+      {"native-runtime-python-mel", "python", python_mel, "native-no-cudnn", native_runtime},
+      {"native-runtime-native-mel", "native", native_mel, "native-no-cudnn", native_runtime},
+  };
+}
+
+WhisperShortParityCell whisper_short_parity_cell(const std::string& id) {
+  const auto cells = whisper_short_parity_cells();
+  const auto found = std::find_if(cells.begin(), cells.end(), [&](const auto& cell) {
+    return cell.id == id;
+  });
+  check(found != cells.end(), "T06R short parity cell is not allowed");
+  return *found;
+}
+#endif
+
 std::string digest_hex(const unsigned char* digest, std::size_t size) {
   std::ostringstream output;
   for (std::size_t index = 0; index < size; ++index) {
@@ -122,6 +255,14 @@ std::string digest_hex(const unsigned char* digest, std::size_t size) {
            << static_cast<int>(digest[index]);
   }
   return output.str();
+}
+
+std::string read_text_file(const fs::path& path) {
+  std::ifstream input(path, std::ios::binary);
+  check(static_cast<bool>(input), "cannot read required text file");
+  return std::string(
+      std::istreambuf_iterator<char>(input),
+      std::istreambuf_iterator<char>());
 }
 
 std::string sha256_file(const fs::path& path) {
@@ -176,6 +317,51 @@ std::string sha256_file(const fs::path& path) {
   BCryptCloseAlgorithmProvider(algorithm, 0);
   return digest_hex(digest.data(), digest.size());
 }
+
+#ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
+bool is_t06r_task_local_output(const fs::path& path);
+
+std::vector<float> read_short_parity_mel(
+    const fs::path& path,
+    const std::string& expected_sha256) {
+  check(is_t06r_task_local_output(path),
+        "T06R short parity Mel must stay under research/local");
+  check(fs::is_regular_file(path)
+            && fs::file_size(path)
+                == static_cast<std::uintmax_t>(80 * max_model_frames * sizeof(float)),
+        "T06R short parity Mel shape drifted");
+  check(sha256_file(path) == expected_sha256,
+        "T06R short parity Mel identity drifted");
+  std::ifstream input(path, std::ios::binary);
+  check(static_cast<bool>(input), "T06R short parity Mel could not be read");
+  std::vector<float> mel(static_cast<std::size_t>(80 * max_model_frames));
+  const std::streamsize expected_bytes =
+      static_cast<std::streamsize>(mel.size() * sizeof(float));
+  input.read(reinterpret_cast<char*>(mel.data()), expected_bytes);
+  check(input.gcount() == expected_bytes,
+        "T06R short parity Mel read was truncated");
+  return mel;
+}
+
+void write_short_parity_mel(
+    const fs::path& path,
+    const std::vector<float>& mel) {
+  check(is_t06r_task_local_output(path),
+        "T06R short parity Mel output must stay under research/local");
+  check(mel.size() == static_cast<std::size_t>(80 * max_model_frames),
+        "T06R short parity Mel output shape drifted");
+  fs::create_directories(path.parent_path());
+  const fs::path temporary = path.string() + ".tmp";
+  std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+  output.write(
+      reinterpret_cast<const char*>(mel.data()),
+      static_cast<std::streamsize>(mel.size() * sizeof(float)));
+  check(static_cast<bool>(output), "T06R short parity Mel write failed");
+  output.close();
+  fs::remove(path);
+  fs::rename(temporary, path);
+}
+#endif
 
 std::string sha256_text(const std::string& text) {
   BCRYPT_ALG_HANDLE algorithm = nullptr;
@@ -482,6 +668,15 @@ bool is_t07_task_local_output(const fs::path& path) {
   return is_path_within(fs::path(T07_LOCAL_ROOT), path);
 }
 
+bool is_t06r_task_local_output(const fs::path& path) {
+  return is_path_within(fs::path(T06R_LOCAL_ROOT), path);
+}
+
+bool is_t06r_tracked_research_file(const fs::path& path) {
+  return is_path_within(fs::path(T06R_LOCAL_ROOT).parent_path(), path)
+      && !is_t06r_task_local_output(path);
+}
+
 bool is_t08_task_local_output(const fs::path& path) {
   return is_path_within(fs::path(T08_LOCAL_ROOT), path);
 }
@@ -629,6 +824,35 @@ Json cuda_development_loaded_modules(const Json& path_policy) {
   return result;
 }
 
+Json attested_cuda_gpu(
+    const Json& modules,
+    const BackendExecutionAttestation& attestation) {
+  check(attestation.config.device == ExecutionDevice::Cuda
+            && attestation.config.compute_type == ExecutionComputeType::Float16
+            && attestation.config.device_index == 0,
+        "CUDA execution mapping drift");
+  const auto driver_module = std::find_if(modules.begin(), modules.end(), [](const Json& module) {
+    return lowercase(module.at("name").get<std::string>()) == "nvcuda.dll";
+  });
+  check(driver_module != modules.end(), "CUDA driver module attestation is missing");
+  check(attestation.device_name == "NVIDIA GeForce RTX 3070", "GPU name drift");
+  check(attestation.compute_capability_major == 8
+            && attestation.compute_capability_minor == 6,
+        "GPU compute capability drift");
+  check(attestation.cuda_driver_api_version == 13020, "CUDA driver API version drift");
+  check(driver_module->at("version") == "32.0.15.9649", "NVIDIA driver module drift");
+  return Json{
+      {"deviceIndex", 0},
+      {"name", attestation.device_name},
+      {"driverVersion", "596.49"},
+      {"driverModuleVersion", driver_module->at("version")},
+      {"cudaDriverApiVersion", attestation.cuda_driver_api_version},
+      {"computeCapability", std::to_string(attestation.compute_capability_major) + "."
+           + std::to_string(attestation.compute_capability_minor)},
+      {"visibleDeviceCount", attestation.visible_device_count},
+      {"float16Supported", attestation.compute_type_supported}};
+}
+
 std::vector<unsigned char> wav_pcm_data(const fs::path& path) {
   std::ifstream input(path, std::ios::binary);
   check(static_cast<bool>(input), "WAV prefix authority is missing");
@@ -715,6 +939,251 @@ void expect_timestamp_error(
   }
 }
 
+FallbackGenerated fake_generation(
+    std::string text,
+    float average_log_probability,
+    float no_speech_probability = 0.0f) {
+  FallbackGenerated value;
+  value.token_ids = {1, 2};
+  value.score = average_log_probability * 1.5f;
+  value.no_speech_probability = no_speech_probability;
+  value.decoded_text = std::move(text);
+  return value;
+}
+
+GenerationFallbackResult fake_fallback(
+    const std::vector<FallbackGenerated>& attempts,
+    std::vector<FallbackAttemptOptions>* observed = nullptr) {
+  std::size_t index = 0;
+  return run_upstream_generation_fallback(
+      upstream_generation_fallback_config(),
+      [&](const FallbackAttemptOptions& options) {
+        check(index < attempts.size(), "fake fallback exhausted its attempts");
+        if (observed) {
+          observed->push_back(options);
+        }
+        return attempts[index++];
+      });
+}
+
+void run_fallback_self_check() {
+  check(upstream_zlib_version() == "1.3.1", "fallback zlib identity drift");
+  check(std::abs(upstream_compression_ratio("hello")
+                 - upstream_compression_ratio("\xe3\x80\x80hello\xc2\xa0")) < 1e-12,
+        "fallback Python Unicode strip parity drift");
+  check(upstream_compression_ratio(std::string(1000, 'a'))
+            > upstream_compression_ratio_threshold,
+        "fallback compression trigger fixture drift");
+
+  const GenerationFallbackResult no_retry = fake_fallback({fake_generation("hello", 0.0f)});
+  check(no_retry.attempts.size() == 1
+            && no_retry.selected_attempt_index == 0
+            && no_retry.selected_temperature == 0.0,
+        "fallback no-retry selection drift");
+
+  std::vector<FallbackAttemptOptions> options;
+  const GenerationFallbackResult compression_retry = fake_fallback(
+      {fake_generation(std::string(1000, 'a'), 0.0f), fake_generation("hello", 0.0f)},
+      &options);
+  check(compression_retry.attempts.size() == 2
+            && compression_retry.attempts[0].compression_triggered
+            && compression_retry.selected_attempt_index == 1
+            && options[0].beam_size == 5
+            && !options[0].sampling
+            && options[0].num_hypotheses == 1
+            && !options[0].sampling_topk
+            && !options[0].sampling_temperature
+            && options[1].beam_size == 1
+            && options[1].sampling
+            && options[1].num_hypotheses == 5
+            && options[1].sampling_topk
+            && *options[1].sampling_topk == 0
+            && options[1].sampling_temperature
+            && *options[1].sampling_temperature == 0.2,
+        "fallback compression retry/options drift");
+
+  const GenerationFallbackResult log_retry = fake_fallback(
+      {fake_generation("hello", -1.1f), fake_generation("hello", 0.0f)});
+  check(log_retry.attempts.size() == 2
+            && log_retry.attempts[0].log_probability_triggered
+            && log_retry.selected_attempt_index == 1,
+        "fallback log-probability retry drift");
+
+  const GenerationFallbackResult silence = fake_fallback(
+      {fake_generation("hello", -1.1f, 0.7f)});
+  check(silence.attempts.size() == 1
+            && silence.attempts[0].silence_override
+            && silence.selected_attempt_index == 0,
+        "fallback silence override drift");
+  const GenerationFallbackResult compression_silence = fake_fallback(
+      {fake_generation(std::string(1000, 'a'), -1.1f, 0.7f)});
+  check(compression_silence.attempts.size() == 1
+            && compression_silence.attempts[0].compression_triggered
+            && compression_silence.attempts[0].silence_override,
+        "fallback silence did not override compression retry");
+  const GenerationFallbackResult ct2_no_speech_boundary = fake_fallback(
+      {fake_generation("hello", -1.1f, 0.6f)});
+  check(ct2_no_speech_boundary.attempts.size() == 1
+            && ct2_no_speech_boundary.attempts[0].silence_override,
+        "fallback CT2-float no-speech boundary drift");
+  const GenerationFallbackResult below_no_speech_boundary = fake_fallback({
+      fake_generation("hello", -1.1f, std::nextafter(0.6f, 0.0f)),
+      fake_generation("hello", 0.0f)});
+  check(below_no_speech_boundary.attempts.size() == 2
+            && !below_no_speech_boundary.attempts[0].silence_override,
+        "fallback strict no-speech threshold drift");
+  const GenerationFallbackResult log_probability_boundary = fake_fallback(
+      {fake_generation("hello", -1.0f, 0.7f)});
+  check(log_probability_boundary.attempts.size() == 1
+            && !log_probability_boundary.attempts[0].log_probability_triggered
+            && !log_probability_boundary.attempts[0].silence_override,
+        "fallback log-probability strict threshold drift");
+  FallbackGenerated float_boundary = fake_generation("hello", 0.0f);
+  float_boundary.token_ids = {1, 2, 3};
+  float_boundary.score = -1.3333333730697632f;
+  const GenerationFallbackResult float_boundary_retry = fake_fallback(
+      {float_boundary, fake_generation("hello", 0.0f)});
+  check(float_boundary_retry.attempts.size() == 2
+            && float_boundary_retry.attempts[0].average_log_probability < -1.0
+            && float_boundary_retry.attempts[0].log_probability_triggered,
+        "fallback double-precision log-probability boundary drift");
+
+  const GenerationFallbackResult first_passing = fake_fallback({
+      fake_generation(std::string(1000, 'a'), 0.0f),
+      fake_generation("hello", -1.1f),
+      fake_generation("hello", 0.0f)});
+  check(first_passing.attempts.size() == 3
+            && first_passing.selected_attempt_index == 2
+            && first_passing.selected_temperature == 0.4
+            && !(first_passing.selected_temperature > 0.5),
+        "fallback first-passing/prompt-retain drift");
+
+  const GenerationFallbackResult prompt_reset = fake_fallback({
+      fake_generation(std::string(1000, 'a'), 0.0f),
+      fake_generation(std::string(1000, 'a'), 0.0f),
+      fake_generation(std::string(1000, 'a'), 0.0f),
+      fake_generation("hello", 0.0f)});
+  check(prompt_reset.selected_temperature == 0.6
+            && prompt_reset.selected_temperature > 0.5,
+        "fallback selected-temperature prompt reset drift");
+
+  const GenerationFallbackResult all_failed = fake_fallback({
+      fake_generation("hello", -1.5f),
+      fake_generation("hello", -1.4f),
+      fake_generation("hello", -1.3f),
+      fake_generation("hello", -1.2f),
+      fake_generation("hello", -1.1f),
+      fake_generation("hello", -1.25f)});
+  check(all_failed.attempts.size() == upstream_fallback_temperatures.size()
+            && all_failed.selected_attempt_index == 4
+            && all_failed.selected_temperature == 1.0
+            && all_failed.selected_temperature > 0.5,
+        "fallback all-failed selection/max-attempt drift");
+  const GenerationFallbackResult all_failed_tie = fake_fallback({
+      fake_generation("hello", -1.5f),
+      fake_generation("hello", -1.4f),
+      fake_generation("hello", -1.1f),
+      fake_generation("hello", -1.2f),
+      fake_generation("hello", -1.1f),
+      fake_generation("hello", -1.25f)});
+  check(all_failed_tie.selected_attempt_index == 2
+            && all_failed_tie.selected_temperature == 1.0,
+        "fallback all-failed tie did not select the first maximum");
+  const GenerationFallbackResult below_compression_preference = fake_fallback({
+      fake_generation(std::string(1000, 'a'), 0.0f),
+      fake_generation("hello", -1.5f),
+      fake_generation(std::string(1000, 'a'), -0.1f),
+      fake_generation(std::string(1000, 'a'), -0.1f),
+      fake_generation(std::string(1000, 'a'), -0.1f),
+      fake_generation(std::string(1000, 'a'), -0.1f)});
+  check(below_compression_preference.selected_attempt_index == 1
+            && below_compression_preference.selected_temperature == 1.0,
+        "fallback below-compression-threshold preference drift");
+  check(std::all_of(
+            all_failed.attempts.begin(),
+            all_failed.attempts.end(),
+            [](const FallbackAttemptTrace& attempt) {
+              return attempt.aggregate_sha256.size() == 64;
+            }),
+        "fallback sanitized attempt identity drift");
+
+  CandidateAConfig open_config = upstream_generation_fallback_config();
+  open_config.beam_size = 1;
+  try {
+    static_cast<void>(run_upstream_generation_fallback(
+        open_config,
+        [](const FallbackAttemptOptions&) { return fake_generation("hello", 0.0f); }));
+    throw std::runtime_error("fallback open config unexpectedly passed");
+  } catch (const BackendError& error) {
+    check(error.code() == "config_identity_mismatch",
+          "fallback open-config error drift");
+  }
+  try {
+    static_cast<void>(run_upstream_generation_fallback(
+        upstream_generation_fallback_config(),
+        [](const FallbackAttemptOptions&) { return FallbackGenerated{}; }));
+    throw std::runtime_error("fallback empty generation unexpectedly passed");
+  } catch (const BackendError& error) {
+    check(error.code() == "invalid_generation",
+          "fallback empty-generation error drift");
+  }
+}
+
+Json fallback_attempt_json(const FallbackAttemptTrace& attempt);
+
+void run_fallback_oracle(const std::vector<std::string>& args) {
+  validate_closed_mode_args(
+      args,
+      "--run-whisper-fallback-oracle",
+      {"--input", "--output"});
+  const fs::path input_path = fs::u8path(required_arg(args, "--input"));
+  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
+  check(is_t06r_task_local_output(input_path)
+            && is_t06r_task_local_output(output_path),
+        "fallback oracle files must stay under research/local");
+  const Json input = Json::parse(read_text_file(input_path));
+  check(input.is_object() && input.size() == 1 && input.contains("attempts")
+            && input["attempts"].is_array()
+            && input["attempts"].size() == upstream_fallback_temperatures.size(),
+        "fallback oracle input schema drift");
+  std::size_t index = 0;
+  const GenerationFallbackResult result = run_upstream_generation_fallback(
+      upstream_generation_fallback_config(),
+      [&](const FallbackAttemptOptions&) {
+        const Json& attempt = input["attempts"].at(index++);
+        check(attempt.is_object()
+                  && attempt.size() == 4
+                  && attempt.contains("tokenIds")
+                  && attempt.contains("score")
+                  && attempt.contains("noSpeechProbability")
+                  && attempt.contains("text"),
+              "fallback oracle attempt schema drift");
+        return FallbackGenerated{
+            attempt.at("tokenIds").get<std::vector<std::size_t>>(),
+            attempt.at("score").get<float>(),
+            attempt.at("noSpeechProbability").get<float>(),
+            attempt.at("text").get<std::string>()};
+      });
+  Json attempts = Json::array();
+  for (const FallbackAttemptTrace& attempt : result.attempts) {
+    attempts.push_back(fallback_attempt_json(attempt));
+  }
+  const Json output{
+      {"schemaVersion", 1},
+      {"kind", "hikaru-whisper-fallback-oracle-result"},
+      {"zlibVersion", upstream_zlib_version()},
+      {"attemptCount", result.attempts.size()},
+      {"selectedAttemptIndex", result.selected_attempt_index},
+      {"selectedTemperature", result.selected_temperature},
+      {"promptReset", result.selected_temperature > 0.5f},
+      {"attempts", std::move(attempts)}};
+  fs::create_directories(output_path.parent_path());
+  const fs::path temporary = output_path.string() + ".tmp";
+  std::ofstream(temporary, std::ios::binary) << std::setw(2) << output << '\n';
+  fs::remove(output_path);
+  fs::rename(temporary, output_path);
+}
+
 void run_core_tests() {
   const BackendExecutionConfig cpu_execution = cpu_execution_config();
   check(cpu_execution.device == ExecutionDevice::Cpu
@@ -733,6 +1202,14 @@ void run_core_tests() {
   check(production_defaults.beam_size == 1, "production beam default drift");
   check(production_defaults.max_source_frames == max_model_frames,
         "production source-window default drift");
+  check(!production_defaults.upstream_generation_fallback,
+        "production defaults unexpectedly enabled generation fallback");
+  const CandidateAConfig fallback_candidate = upstream_generation_fallback_config();
+  check(fallback_candidate.beam_size == 5
+            && fallback_candidate.condition_on_previous_text
+            && fallback_candidate.timestamp_driven_seek
+            && fallback_candidate.upstream_generation_fallback,
+        "fallback candidate config drift");
 
   const CandidateAConfig kotoba = kotoba_config();
   check(kotoba.beam_size == 5, "Kotoba beam drift");
@@ -865,6 +1342,129 @@ void run_core_tests() {
           && beam_1.timestamp_driven_seek
           && beam_5.timestamp_driven_seek,
       "short beam-only probe config drift");
+
+  const auto quality_cells = whisper_quality_diagnostic_cells();
+  check(quality_cells.size() == 6, "T06R diagnostic matrix size drift");
+  check(quality_cells[0].id == "short-b1-off"
+            && quality_cells[0].case_id == "short-v1"
+            && quality_cells[0].config.beam_size == 1
+            && !quality_cells[0].config.condition_on_previous_text,
+        "T06R short beam-1 cell drift");
+  check(quality_cells[1].id == "medium-b1-off"
+            && quality_cells[1].case_id == "medium-v1"
+            && !quality_cells[1].config.condition_on_previous_text,
+        "T06R medium beam-1/history-off cell drift");
+  check(quality_cells[2].id == "medium-b1-on"
+            && quality_cells[2].config.condition_on_previous_text,
+        "T06R medium beam-1/history-on cell drift");
+  check(quality_cells[3].id == "short-b5-off"
+            && quality_cells[3].config.beam_size == 5,
+        "T06R short beam-5 cell drift");
+  check(quality_cells[4].id == "medium-b5-off"
+            && !quality_cells[4].config.condition_on_previous_text,
+        "T06R medium beam-5/history-off cell drift");
+  check(quality_cells[5].id == "medium-b5-on"
+            && quality_cells[5].config.condition_on_previous_text,
+        "T06R medium beam-5/history-on cell drift");
+  check(std::all_of(quality_cells.begin(), quality_cells.end(), [](const auto& cell) {
+          return cell.config.timestamp_driven_seek;
+        }),
+        "T06R diagnostic seek policy drift");
+
+  const auto vad_quality_cells = whisper_quality_vad_diagnostic_cells();
+  check(vad_quality_cells.size() == 2,
+        "T06R VAD diagnostic matrix size drift");
+  check(vad_quality_cells[0].id == "short-b5-vad"
+            && vad_quality_cells[0].case_id == "short-v1"
+            && vad_quality_cells[0].config.beam_size == 5
+            && !vad_quality_cells[0].config.condition_on_previous_text
+            && vad_quality_cells[0].config.timestamp_driven_seek,
+        "T06R short VAD diagnostic cell drift");
+  check(vad_quality_cells[1].id == "medium-b5-on-vad"
+            && vad_quality_cells[1].case_id == "medium-v1"
+            && vad_quality_cells[1].config.beam_size == 5
+            && vad_quality_cells[1].config.condition_on_previous_text
+            && vad_quality_cells[1].config.timestamp_driven_seek,
+        "T06R medium VAD diagnostic cell drift");
+  const std::vector<std::string> closed_vad_value_args{
+      "--cell", "--model", "--audio", "--output", "--input-lock",
+      "--production-worker", "--model-id", "--model-revision",
+      "--model-bin-sha256", "--repeats", "--vad-model"};
+  validate_closed_mode_args(
+      {"--run-whisper-quality-vad-diagnostic",
+       "--cell", "short-b5-vad",
+       "--model", "model",
+       "--audio", "audio",
+       "--output", "output",
+       "--input-lock", "lock",
+       "--production-worker", "worker",
+       "--model-id", "model-id",
+       "--model-revision", "revision",
+       "--model-bin-sha256", "hash",
+       "--repeats", "1",
+       "--vad-model", "vad"},
+      "--run-whisper-quality-vad-diagnostic",
+      closed_vad_value_args);
+  for (const std::vector<std::string>& invalid : {
+           std::vector<std::string>{"--run-whisper-quality-vad-diagnostic", "--prompt", "x"},
+           std::vector<std::string>{"--run-whisper-quality-vad-diagnostic", "--cell", "x", "--cell", "y"}}) {
+    try {
+      validate_closed_mode_args(
+          invalid,
+          "--run-whisper-quality-vad-diagnostic",
+          closed_vad_value_args);
+      throw std::runtime_error("T06R closed VAD CLI mutation unexpectedly passed");
+    } catch (const std::runtime_error& error) {
+      check(std::string(error.what()) != "T06R closed VAD CLI mutation unexpectedly passed",
+            "T06R closed VAD CLI rejection drift");
+    }
+  }
+  const auto fallback_cells = whisper_quality_fallback_diagnostic_cells();
+  check(fallback_cells.size() == 2
+            && fallback_cells[0].id == "short-b5-on-vad-fallback"
+            && fallback_cells[0].case_id == "short-v1"
+            && fallback_cells[1].id == "medium-b5-on-vad-fallback"
+            && fallback_cells[1].case_id == "medium-v1"
+            && std::all_of(
+                fallback_cells.begin(),
+                fallback_cells.end(),
+                [](const WhisperQualityDiagnosticCell& cell) {
+                  return cell.config.beam_size == 5
+                      && cell.config.condition_on_previous_text
+                      && cell.config.timestamp_driven_seek
+                      && cell.config.upstream_generation_fallback;
+                }),
+        "T06R fallback diagnostic cells drift");
+  validate_closed_mode_args(
+      {"--run-whisper-quality-fallback-diagnostic",
+       "--cell", "short-b5-on-vad-fallback",
+       "--model", "model",
+       "--audio", "audio",
+       "--output", "output",
+       "--input-lock", "lock",
+       "--production-worker", "worker",
+       "--model-id", "model-id",
+       "--model-revision", "revision",
+       "--model-bin-sha256", "hash",
+       "--repeats", "1",
+       "--vad-model", "vad"},
+      "--run-whisper-quality-fallback-diagnostic",
+      closed_vad_value_args);
+  for (const std::vector<std::string>& invalid : {
+           std::vector<std::string>{"--run-whisper-quality-fallback-diagnostic", "--temperature", "0.2"},
+           std::vector<std::string>{"--run-whisper-quality-fallback-diagnostic", "--cell", "x", "--cell", "y"}}) {
+    try {
+      validate_closed_mode_args(
+          invalid,
+          "--run-whisper-quality-fallback-diagnostic",
+          closed_vad_value_args);
+      throw std::runtime_error("T06R closed fallback CLI mutation unexpectedly passed");
+    } catch (const std::runtime_error& error) {
+      check(std::string(error.what())
+                != "T06R closed fallback CLI mutation unexpectedly passed",
+            "T06R closed fallback CLI rejection drift");
+    }
+  }
 
   check(vad_window_samples == 512, "Candidate B VAD window drift");
   check(vad_context_samples == 64, "Candidate B VAD context drift");
@@ -1204,6 +1804,31 @@ Json k2_disposition_json(const K2SegmentDisposition& disposition) {
            : Json(disposition.duplicate_target_sha256)}};
 }
 
+Json fallback_attempt_json(const FallbackAttemptTrace& attempt) {
+  return Json{
+      {"temperature", attempt.options.temperature},
+      {"decodeMode", attempt.options.sampling ? "sampling" : "beam"},
+      {"beamSize", attempt.options.beam_size},
+      {"patience", attempt.options.sampling ? Json(nullptr) : Json(attempt.options.patience)},
+      {"numHypotheses", attempt.options.num_hypotheses},
+      {"samplingTopK", attempt.options.sampling_topk
+          ? Json(*attempt.options.sampling_topk)
+          : Json(nullptr)},
+      {"samplingTemperature", attempt.options.sampling_temperature
+          ? Json(*attempt.options.sampling_temperature)
+          : Json(nullptr)},
+      {"tokenIds", attempt.token_ids},
+      {"score", attempt.score},
+      {"averageLogProbability", attempt.average_log_probability},
+      {"noSpeechProbability", attempt.no_speech_probability},
+      {"decodedText", attempt.decoded_text},
+      {"compressionRatio", attempt.compression_ratio},
+      {"compressionTriggered", attempt.compression_triggered},
+      {"logProbabilityTriggered", attempt.log_probability_triggered},
+      {"silenceOverride", attempt.silence_override},
+      {"aggregateSha256", attempt.aggregate_sha256}};
+}
+
 Json trace_json(const WindowTrace& trace) {
   Json value{
       {"windowOffsetMs", trace.window_offset_ms},
@@ -1231,6 +1856,18 @@ Json trace_json(const WindowTrace& trace) {
       {"parseError", trace.parse_error.empty() ? Json(nullptr) : Json(trace.parse_error)},
       {"sha256", trace.sha256},
       {"tokenIds", trace.token_ids}};
+  if (trace.generation_fallback_enabled) {
+    Json attempts = Json::array();
+    for (const FallbackAttemptTrace& attempt : trace.fallback_attempts) {
+      attempts.push_back(fallback_attempt_json(attempt));
+    }
+    value.update(Json{
+        {"generationFallbackEnabled", true},
+        {"selectedAttemptIndex", trace.selected_fallback_attempt_index},
+        {"selectedTemperature", trace.selected_temperature},
+        {"compressionRatio", trace.compression_ratio},
+        {"fallbackAttempts", std::move(attempts)}});
+  }
   if (trace.k2_candidate) {
     Json dispositions = Json::array();
     for (const K2SegmentDisposition& disposition : trace.segment_dispositions) {
@@ -1268,7 +1905,7 @@ Json config_json(const CandidateAConfig& config) {
   const auto exact = [](float value) {
     return std::round(static_cast<double>(value) * 1000.0) / 1000.0;
   };
-  return Json{
+  Json value{
       {"beamSize", config.beam_size},
       {"patience", exact(config.patience)},
       {"lengthPenalty", exact(config.length_penalty)},
@@ -1285,6 +1922,16 @@ Json config_json(const CandidateAConfig& config) {
       {"modelWindowDurationMs", model_window_duration_ms},
       {"timestampResolutionMs", timestamp_resolution_ms},
       {"vad", false}};
+  if (config.upstream_generation_fallback) {
+    value.update(Json{
+        {"generationFallback", "faster-whisper-v1.2.1-exact"},
+        {"fallbackTemperatures", upstream_fallback_temperatures},
+        {"compressionRatioThreshold", upstream_compression_ratio_threshold},
+        {"samplingBestOf", upstream_sampling_best_of},
+        {"samplingTopK", upstream_sampling_topk},
+        {"zlibVersion", upstream_zlib_version()}});
+  }
+  return value;
 }
 
 Json kotoba_config_json(const CandidateAConfig& config) {
@@ -1973,29 +2620,9 @@ void run_cuda_development_evidence(const std::vector<std::string>& args) {
           return lowercase(module.at("name").get<std::string>()).rfind("cudnn", 0) == 0;
         }),
         "T07 no-cuDNN identity loaded an unexpected cuDNN module");
-  Json gpu = nullptr;
-  if (requested_device == "cuda") {
-    const auto driver_module = std::find_if(modules.begin(), modules.end(), [](const Json& module) {
-      return lowercase(module.at("name").get<std::string>()) == "nvcuda.dll";
-    });
-    check(driver_module != modules.end(), "T07 CUDA driver module attestation is missing");
-    check(attestation.device_name == "NVIDIA GeForce RTX 3070", "T07 GPU name drift");
-    check(attestation.compute_capability_major == 8
-              && attestation.compute_capability_minor == 6,
-          "T07 compute capability drift");
-    check(attestation.cuda_driver_api_version == 13020, "T07 CUDA driver API version drift");
-    check(driver_module->at("version") == "32.0.15.9649", "T07 NVIDIA driver module drift");
-    gpu = Json{
-        {"deviceIndex", 0},
-        {"name", attestation.device_name},
-        {"driverVersion", "596.49"},
-        {"driverModuleVersion", driver_module->at("version")},
-        {"cudaDriverApiVersion", attestation.cuda_driver_api_version},
-        {"computeCapability", std::to_string(attestation.compute_capability_major) + "."
-             + std::to_string(attestation.compute_capability_minor)},
-        {"visibleDeviceCount", attestation.visible_device_count},
-        {"float16Supported", attestation.compute_type_supported}};
-  }
+  const Json gpu = requested_device == "cuda"
+      ? attested_cuda_gpu(modules, attestation)
+      : Json(nullptr);
 
   const Json raw{
       {"schemaVersion", 1},
@@ -2048,6 +2675,927 @@ void run_cuda_development_evidence(const std::vector<std::string>& args) {
       {"device", requested_device},
       {"moduleDiscovery", discovery},
       {"sampleCount", repeats}}.dump() << '\n';
+}
+
+#ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
+Json short_parity_runtime_files(
+    const fs::path& executable,
+    const std::string& role) {
+  std::vector<std::string> expected{
+      "ctranslate2.dll",
+      "hikaru-asr-ctranslate2-tests.exe",
+      "hikaru-asr-worker.exe",
+      "hikaru_asr_tokenizer.dll",
+      "onnxruntime.dll",
+      "onnxruntime_providers_shared.dll",
+      "silero_vad_v6.onnx"};
+  if (role == "python-wheel") {
+    expected.push_back("cudnn64_9.dll");
+    expected.push_back("libiomp5md.dll");
+  }
+  std::sort(expected.begin(), expected.end());
+
+  Json files = Json::array();
+  std::vector<std::string> actual;
+  for (const fs::directory_entry& entry : fs::directory_iterator(executable.parent_path())) {
+    check(entry.is_regular_file(),
+          "T06R short parity runtime root contains a non-file entry");
+    const std::string name = entry.path().filename().u8string();
+    actual.push_back(name);
+    Json identity = file_identity(entry.path());
+    identity["name"] = name;
+    files.push_back(std::move(identity));
+  }
+  std::sort(actual.begin(), actual.end());
+  check(actual == expected, "T06R short parity runtime file set drifted");
+  std::sort(files.begin(), files.end(), [](const Json& left, const Json& right) {
+    return lowercase(left.at("name").get<std::string>())
+        < lowercase(right.at("name").get<std::string>());
+  });
+  return files;
+}
+
+Json short_parity_lock_identity(const std::string& lock_text) {
+  constexpr const char* begin_marker = "<!-- SHORT-PARITY-IDENTITY:BEGIN -->";
+  constexpr const char* end_marker = "<!-- SHORT-PARITY-IDENTITY:END -->";
+  const std::size_t begin = lock_text.find(begin_marker);
+  const std::size_t end = lock_text.find(end_marker);
+  check(begin != std::string::npos && end != std::string::npos && begin < end,
+        "T06R short parity lock identity block is missing");
+  const std::size_t json_begin = begin + std::char_traits<char>::length(begin_marker);
+  Json identity = Json::parse(
+      lock_text.substr(json_begin, end - json_begin), nullptr, false);
+  check(identity.is_object()
+            && identity.value("candidateId", "")
+                == "short-input-runtime-parity-bisect-v1",
+        "T06R short parity lock identity is invalid");
+  return identity;
+}
+
+void require_short_parity_identity(
+    const fs::path& path,
+    const Json& expected,
+    const std::string& label) {
+  check(fs::is_regular_file(path)
+            && expected.is_object()
+            && expected.value("sizeBytes", std::uintmax_t{0}) == fs::file_size(path)
+            && expected.value("sha256", "") == sha256_file(path),
+        "T06R short parity " + label + " identity drifted");
+}
+
+void require_short_parity_named_files(
+    const Json& actual,
+    const Json& expected,
+    const std::string& label) {
+  check(actual.is_array() && expected.is_array() && actual.size() == expected.size(),
+        "T06R short parity " + label + " cardinality drifted");
+  for (const Json& expected_file : expected) {
+    const std::string name = expected_file.value("name", "");
+    const auto found = std::find_if(actual.begin(), actual.end(), [&](const Json& file) {
+      return lowercase(file.value("name", "")) == lowercase(name);
+    });
+    check(found != actual.end()
+              && found->value("sizeBytes", std::uintmax_t{0})
+                  == expected_file.value("sizeBytes", std::uintmax_t{0})
+              && found->value("sha256", "") == expected_file.value("sha256", ""),
+          "T06R short parity " + label + " identity drifted: " + name);
+  }
+}
+
+void require_short_parity_module_files(
+    const Json& path_policy,
+    const Json& expected_modules) {
+  std::map<std::string, fs::path> roots;
+  for (const Json& root : path_policy.at("resolvedRoots")) {
+    roots.emplace(
+        root.at("role").get<std::string>(),
+        fs::u8path(root.at("canonicalPath").get<std::string>()));
+  }
+  check(expected_modules.is_array(),
+        "T06R short parity expected module set is missing");
+  for (const Json& module : expected_modules) {
+    const std::string role = module.value("rootRole", "");
+    const std::string name = module.value("name", "");
+    const auto root = roots.find(role);
+    check(root != roots.end(),
+          "T06R short parity module root role drifted: " + name);
+    require_short_parity_identity(
+        root->second / fs::u8path(name), module, "module " + name);
+  }
+}
+
+Json short_parity_vad_model_identity(
+    const fs::path& path,
+    const fs::path& executable) {
+  const fs::path expected = executable.parent_path() / "silero_vad_v6.onnx";
+  check(is_t06r_task_local_output(path)
+            && fs::is_regular_file(path)
+            && fs::weakly_canonical(path) == fs::weakly_canonical(expected),
+        "T06R short parity VAD model must be the isolated runtime asset");
+  check(fs::file_size(path) == 1245151
+            && sha256_file(path)
+                == "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+        "T06R short parity exact Silero V6 asset identity drifted");
+  Json identity = file_identity(path);
+  identity["name"] = "silero_vad_v6.onnx";
+  identity["rootRole"] = "task-local-runtime-bin";
+  return identity;
+}
+
+void run_short_parity_self_check(const std::vector<std::string>& args) {
+  validate_closed_mode_args(args, "--short-parity-self-check", {});
+  const auto cells = whisper_short_parity_cells();
+  check(cells.size() == 4, "T06R short parity cell count drifted");
+  check(cells[0].id == "python-runtime-python-mel"
+            && cells[1].id == "python-runtime-native-mel"
+            && cells[2].id == "native-runtime-python-mel"
+            && cells[3].id == "native-runtime-native-mel",
+        "T06R short parity cell order drifted");
+  for (const auto& cell : cells) {
+    check((cell.mel_role == "python" || cell.mel_role == "native")
+              && (cell.runtime_role == "python-wheel"
+                  || cell.runtime_role == "native-no-cudnn")
+              && cell.mel_sha256.size() == 64
+              && cell.runtime_sha256.size() == 64,
+          "T06R short parity cell identity drifted");
+  }
+  const CandidateAConfig config = upstream_generation_fallback_config();
+  check(config.beam_size == 5
+            && config.condition_on_previous_text
+            && config.timestamp_driven_seek
+            && config.upstream_generation_fallback,
+        "T06R short parity fallback config drifted");
+  const std::vector<std::string> value_args{
+      "--cell", "--model", "--mel", "--output", "--input-lock",
+      "--production-worker", "--model-id", "--model-revision",
+      "--model-bin-sha256", "--repeats", "--vad-model"};
+  const std::vector<std::string> valid_args{
+      "--run-whisper-short-parity",
+      "--cell", "python-runtime-python-mel",
+      "--model", "model",
+      "--mel", "mel",
+      "--output", "output",
+      "--input-lock", "lock",
+      "--production-worker", "worker",
+      "--model-id", "model-id",
+      "--model-revision", "revision",
+      "--model-bin-sha256", "hash",
+      "--repeats", "2",
+      "--vad-model", "vad"};
+  validate_closed_mode_args(
+      valid_args, "--run-whisper-short-parity", value_args);
+  for (std::vector<std::string> invalid : {
+           std::vector<std::string>(valid_args.begin(), valid_args.end() - 2),
+           std::vector<std::string>{"--run-whisper-short-parity", "--vad", "true"}}) {
+    try {
+      validate_closed_mode_args(
+          invalid, "--run-whisper-short-parity", value_args);
+      throw std::runtime_error("T06R short parity closed CLI mutation unexpectedly passed");
+    } catch (const std::runtime_error& error) {
+      check(std::string(error.what())
+                != "T06R short parity closed CLI mutation unexpectedly passed",
+            "T06R short parity closed CLI rejection drift");
+    }
+  }
+  static_cast<void>(short_parity_vad_model_identity(
+      current_executable().parent_path() / "silero_vad_v6.onnx",
+      current_executable()));
+  std::cout << "ctranslate2 whisper short parity tests passed\n";
+}
+
+void run_short_parity_runtime_smoke(const std::vector<std::string>& args) {
+  validate_closed_mode_args(
+      args,
+      "--short-parity-runtime-smoke",
+      {"--runtime-role", "--output"});
+  const std::string role = required_arg(args, "--runtime-role");
+  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
+  check(role == "python-wheel" || role == "native-no-cudnn",
+        "T06R short parity runtime role is not allowed");
+  check(is_t06r_task_local_output(output_path),
+        "T06R short parity smoke output must stay under research/local");
+  const fs::path executable = current_executable();
+  const fs::path ct2_dll = executable.parent_path() / "ctranslate2.dll";
+  const std::string expected_ct2 = role == "python-wheel"
+      ? "60e536c0801432cde4a105aeebbca35fbf228aa3e901807b2310b02676c2f140"
+      : "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2";
+  check(sha256_file(ct2_dll) == expected_ct2,
+        "T06R short parity smoke CT2 runtime drifted");
+  const Json path_policy = cuda_development_path_policy();
+  const Json runtime_files = short_parity_runtime_files(executable, role);
+  Json modules = cuda_development_loaded_modules(path_policy);
+  const auto has_module = [&](const std::string& name) {
+    return std::any_of(modules.begin(), modules.end(), [&](const Json& module) {
+      return lowercase(module.at("name").get<std::string>()) == lowercase(name);
+    });
+  };
+  check(has_module(executable.filename().u8string())
+            && has_module("ctranslate2.dll")
+            && has_module("hikaru_asr_tokenizer.dll")
+            && has_module("onnxruntime.dll"),
+        "T06R short parity smoke required module is missing");
+  if (role == "python-wheel") {
+    check(!has_module("vcomp140.dll"),
+          "T06R Python-wheel smoke loaded the native OpenMP runtime");
+  } else {
+    check(!has_module("cudnn64_9.dll") && !has_module("libiomp5md.dll")
+              && has_module("vcomp140.dll"),
+          "T06R native smoke module family drifted");
+  }
+  const Json raw{
+      {"schemaVersion", 1},
+      {"kind", "hikaru-ct2-whisper-short-parity-runtime-smoke"},
+      {"status", "completed"},
+      {"qualificationEligible", false},
+      {"modelLoaded", false},
+      {"runtimeRole", role},
+      {"measurementExecutable", file_identity(executable)},
+      {"ctranslate2", file_identity(ct2_dll)},
+      {"runtimeFiles", runtime_files},
+      {"pathPolicy", path_policy},
+      {"loadedModules", std::move(modules)}};
+  fs::create_directories(output_path.parent_path());
+  const fs::path temporary = output_path.string() + ".tmp";
+  std::ofstream(temporary, std::ios::binary) << std::setw(2) << raw << '\n';
+  fs::remove(output_path);
+  fs::rename(temporary, output_path);
+  std::cout << Json{{"status", "completed"}, {"runtimeRole", role}}.dump() << '\n';
+}
+
+void export_short_parity_native_mel(const std::vector<std::string>& args) {
+  validate_closed_mode_args(
+      args,
+      "--export-whisper-short-parity-native-mel",
+      {"--audio", "--output"});
+  const fs::path audio_path = fs::u8path(required_arg(args, "--audio"));
+  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
+  check(fs::is_regular_file(audio_path)
+            && sha256_file(audio_path)
+                == "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"
+            && verified_wav_duration_ms(audio_path) == 24102,
+        "T06R short parity WAV identity drifted");
+  const wav::Audio audio = wav::read_pcm16_mono_16khz(audio_path);
+  check(audio.samples.size() == 385637,
+        "T06R short parity sample count drifted");
+  const std::vector<float> mel = official_log_mel_for_test(
+      audio.samples,
+      80,
+      0,
+      static_cast<int>(source_frame_count(audio.samples.size())));
+  write_short_parity_mel(output_path, mel);
+  const std::string hash = sha256_file(output_path);
+  check(hash == "c2fc425ae691a4b1f9acd92580061ad97df82e01165747d761653f87634b9e08",
+        "T06R native short Mel identity drifted");
+  std::cout << Json{
+      {"status", "completed"},
+      {"producer", "native"},
+      {"shape", Json::array({80, max_model_frames})},
+      {"dtype", "float32-le"},
+      {"sha256", hash}}.dump() << '\n';
+}
+
+struct ShortParityPreflight {
+  Json model_files;
+  Json path_policy;
+  Json runtime_files;
+  Json vad_model;
+};
+
+ShortParityPreflight validate_short_parity_preflight(
+    const WhisperShortParityCell& cell,
+    const fs::path& model_path,
+    const fs::path& mel_path,
+    const fs::path& vad_model_path,
+    const fs::path& input_lock,
+    const fs::path& production_worker,
+    const std::string& model_id,
+    const std::string& model_revision,
+    const std::string& model_hash) {
+  check(is_t06r_tracked_research_file(input_lock)
+            && fs::is_regular_file(input_lock),
+        "T06R short parity lock must be a tracked research file");
+  const fs::path executable = current_executable();
+  check(fs::is_regular_file(production_worker)
+            && fs::equivalent(
+                fs::weakly_canonical(production_worker).parent_path(),
+                fs::weakly_canonical(executable).parent_path())
+            && production_worker.filename() == "hikaru-asr-worker.exe",
+        "T06R short parity production worker must use the isolated runtime root");
+  static_cast<void>(read_short_parity_mel(mel_path, cell.mel_sha256));
+
+  ShortParityPreflight preflight;
+  preflight.vad_model = short_parity_vad_model_identity(vad_model_path, executable);
+  preflight.model_files = model_file_identities(model_path);
+  const auto model_bin = std::find_if(
+      preflight.model_files.begin(), preflight.model_files.end(), [](const Json& file) {
+        return file.at("name") == "model.bin";
+      });
+  check(model_id == "Systran/faster-whisper-large-v3"
+            && model_revision == "edaa852ec7e145841d8ffdb056a99866b5f0a478"
+            && model_hash
+                == "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1"
+            && model_bin != preflight.model_files.end()
+            && model_bin->at("sha256") == model_hash,
+        "T06R short parity model identity drifted");
+
+  const fs::path ct2_dll = executable.parent_path() / "ctranslate2.dll";
+  check(fs::is_regular_file(ct2_dll)
+            && sha256_file(ct2_dll) == cell.runtime_sha256,
+        "T06R short parity process-start CT2 runtime drifted");
+  preflight.path_policy = cuda_development_path_policy();
+  preflight.runtime_files = short_parity_runtime_files(executable, cell.runtime_role);
+  const std::string lock_text = read_text_file(input_lock);
+  const Json lock_identity = short_parity_lock_identity(lock_text);
+  check(lock_identity.at("cells").is_array()
+            && std::find(
+                lock_identity.at("cells").begin(),
+                lock_identity.at("cells").end(),
+                cell.id) != lock_identity.at("cells").end(),
+        "T06R short parity cell is absent from the lock");
+  check(lock_identity.at("audio").value("waveformSha256", "")
+            == "2cbf22e7635a41cf751401525e4358c19f2d452ae99c0ced78f65b6e9327e1c2",
+        "T06R short parity waveform identity drifted");
+  check(lock_identity.value("supersedesLockSha256", "")
+            == "62ef486a9f54d62d3f78504fc293a1917e59746d85cf09a73422edc2c384e42f"
+            && lock_identity.at("invalidV3").value("ignoredRecordSha256", "")
+                == "808dd23c1f69e395bd759aad183e04e6b32e8c354a54f151b64c001e22882132"
+            && lock_identity.at("invalidV3").value("trackedReportSha256", "")
+                == "1571773487cfe39fbf33daa149e030b29c257b3dca2760c0056604a46f79509d",
+        "T06R short parity v4 supersession identity drifted");
+  check(lock_identity.at("vadModel") == preflight.vad_model,
+        "T06R short parity VAD model lock identity drifted");
+  require_short_parity_named_files(
+      preflight.model_files,
+      lock_identity.at("model").at("files"),
+      "model file set");
+  const Json& expected_runtime =
+      lock_identity.at("runtimes").at(cell.runtime_role);
+  check(expected_runtime.value("pathRootIdentitySha256", "")
+            == preflight.path_policy.at("rootIdentitySha256").get<std::string>(),
+        "T06R short parity PATH root identity drifted");
+  require_short_parity_named_files(
+      preflight.runtime_files,
+      expected_runtime.at("runtimeFiles"),
+      "runtime file set");
+  require_short_parity_identity(
+      executable,
+      expected_runtime.at("measurementExecutable"),
+      "measurement executable");
+  require_short_parity_identity(
+      production_worker,
+      expected_runtime.at("productionWorker"),
+      "production worker");
+  require_short_parity_identity(
+      ct2_dll,
+      expected_runtime.at("ctranslate2"),
+      "CTranslate2 runtime");
+  require_short_parity_module_files(
+      preflight.path_policy, expected_runtime.at("loadedModules"));
+  check(lock_text.find("does not authorize acquisition") != std::string::npos,
+        "T06R short parity lock lacks the acquisition stop boundary");
+  return preflight;
+}
+
+void run_short_parity_preflight(const std::vector<std::string>& args) {
+  validate_closed_mode_args(
+      args,
+      "--short-parity-preflight",
+      {"--cell", "--model", "--mel", "--vad-model", "--input-lock",
+       "--production-worker", "--model-id", "--model-revision",
+       "--model-bin-sha256"});
+  const WhisperShortParityCell cell = whisper_short_parity_cell(
+      required_arg(args, "--cell"));
+  const ShortParityPreflight preflight = validate_short_parity_preflight(
+      cell,
+      fs::u8path(required_arg(args, "--model")),
+      fs::u8path(required_arg(args, "--mel")),
+      fs::u8path(required_arg(args, "--vad-model")),
+      fs::u8path(required_arg(args, "--input-lock")),
+      fs::u8path(required_arg(args, "--production-worker")),
+      required_arg(args, "--model-id"),
+      required_arg(args, "--model-revision"),
+      required_arg(args, "--model-bin-sha256"));
+  std::cout << Json{
+      {"status", "completed"},
+      {"cellId", cell.id},
+      {"vadModel", preflight.vad_model},
+      {"vadModelLoaded", false},
+      {"asrModelLoaded", false},
+      {"modelLoaded", false}}.dump() << '\n';
+}
+
+void run_short_parity_evidence(const std::vector<std::string>& args) {
+  validate_closed_mode_args(
+      args,
+      "--run-whisper-short-parity",
+      {"--cell", "--model", "--mel", "--vad-model", "--output",
+       "--input-lock", "--production-worker", "--model-id",
+       "--model-revision", "--model-bin-sha256", "--repeats"});
+  const WhisperShortParityCell cell = whisper_short_parity_cell(
+      required_arg(args, "--cell"));
+  const fs::path model_path = fs::u8path(required_arg(args, "--model"));
+  const fs::path mel_path = fs::u8path(required_arg(args, "--mel"));
+  const fs::path vad_model_path = fs::u8path(required_arg(args, "--vad-model"));
+  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
+  const fs::path input_lock = fs::u8path(required_arg(args, "--input-lock"));
+  const fs::path production_worker = fs::u8path(required_arg(args, "--production-worker"));
+  const std::string model_id = required_arg(args, "--model-id");
+  const std::string model_revision = required_arg(args, "--model-revision");
+  const std::string model_hash = required_arg(args, "--model-bin-sha256");
+  const int repeats = integer_arg(args, "--repeats", 2);
+
+  check(repeats == 2, "T06R short parity requires exactly two repeats");
+  check(is_t06r_task_local_output(output_path),
+        "T06R short parity raw output must stay under research/local");
+  const ShortParityPreflight preflight = validate_short_parity_preflight(
+      cell,
+      model_path,
+      mel_path,
+      vad_model_path,
+      input_lock,
+      production_worker,
+      model_id,
+      model_revision,
+      model_hash);
+  std::vector<float> mel = read_short_parity_mel(mel_path, cell.mel_sha256);
+  const fs::path executable = current_executable();
+  const fs::path ct2_dll = executable.parent_path() / "ctranslate2.dll";
+  const Json& model_files = preflight.model_files;
+  const Json& path_policy = preflight.path_policy;
+  const Json& runtime_files = preflight.runtime_files;
+
+  const Clock::time_point load_started = Clock::now();
+  CTranslate2WhisperBackend backend(
+      model_path,
+      upstream_generation_fallback_config(),
+      vad_model_path,
+      cuda_execution_config());
+  const double load_ms = elapsed_ms(load_started);
+  const BackendExecutionAttestation attestation = backend.execution_attestation();
+  check(attestation.config.device == ExecutionDevice::Cuda
+            && attestation.config.compute_type == ExecutionComputeType::Float16
+            && attestation.config.device_index == 0,
+        "T06R short parity CUDA mapping drifted");
+
+  Json samples = Json::array();
+  bool failed = false;
+  for (int repeat = 0; repeat < repeats; ++repeat) {
+    const Clock::time_point started = Clock::now();
+    const TranscriptionResult result = backend.transcribe_precomputed_mel_for_test(
+        mel,
+        385637,
+        24102);
+    const double sample_wall_ms = elapsed_ms(started);
+    Json segments = Json::array();
+    for (const SegmentEvidence& segment : result.segments) {
+      segments.push_back(segment_json(segment));
+    }
+    Json traces = Json::array();
+    std::size_t generation_calls = 0;
+    for (const WindowTrace& trace : result.traces) {
+      traces.push_back(trace_json(trace));
+      generation_calls += trace.generation_call_count;
+    }
+    check(result.traces.size() == 1 && generation_calls > 0,
+          "T06R short parity row lacks the single-window generation trace");
+    samples.push_back(Json{
+        {"status", result.failure_code.empty() ? "completed" : "failed"},
+        {"runKind", "short-parity"},
+        {"repeatIndex", repeat + 1},
+        {"segments", std::move(segments)},
+        {"tokenTraces", std::move(traces)},
+        {"generationCallCount", generation_calls},
+        {"failure", result.failure_code.empty()
+             ? Json(nullptr)
+             : Json{{"code", result.failure_code}}},
+        {"timings", Json{
+             {"loadMs", repeat == 0 ? Json(load_ms) : Json(nullptr)},
+             {"sampleWallMs", sample_wall_ms},
+             {"modelGenerateMs", result.generate_ms},
+             {"inferenceMs", result.inference_ms}}}});
+    if (!result.failure_code.empty()) {
+      failed = true;
+      break;
+    }
+  }
+
+  Json modules = cuda_development_loaded_modules(path_policy);
+  const auto has_module = [&](const std::string& name) {
+    return std::any_of(modules.begin(), modules.end(), [&](const Json& module) {
+      return lowercase(module.at("name").get<std::string>()) == lowercase(name);
+    });
+  };
+  if (cell.runtime_role == "python-wheel") {
+    check(has_module("cudnn64_9.dll") && has_module("libiomp5md.dll"),
+          "T06R Python-wheel runtime did not load cuDNN/OpenMP identity");
+  } else {
+    check(!has_module("cudnn64_9.dll") && !has_module("libiomp5md.dll")
+              && has_module("vcomp140.dll"),
+          "T06R native runtime module family drifted");
+  }
+  const Json gpu = attested_cuda_gpu(modules, attestation);
+  Json parity_config = config_json(upstream_generation_fallback_config());
+  parity_config["vad"] = false;
+  parity_config["language"] = "ja";
+  parity_config["sampleRate"] = sample_rate;
+
+  const Json raw{
+      {"schemaVersion", 1},
+      {"kind", "hikaru-ct2-whisper-short-parity-raw"},
+      {"status", failed ? "failed" : "completed"},
+      {"qualificationEligible", false},
+      {"promotionEligible", false},
+      {"candidateId", "short-input-runtime-parity-bisect-v1"},
+      {"cellId", cell.id},
+      {"caseId", "short-v1"},
+      {"mel", Json{
+           {"producer", cell.mel_role},
+           {"shape", Json::array({80, max_model_frames})},
+           {"dtype", "float32-le"},
+           {"sizeBytes", 80 * max_model_frames * sizeof(float)},
+           {"sha256", cell.mel_sha256}}},
+      {"audio", Json{
+           {"wavSha256", "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"},
+           {"waveformSha256", "2cbf22e7635a41cf751401525e4358c19f2d452ae99c0ced78f65b6e9327e1c2"},
+           {"sampleCount", 385637},
+           {"durationMs", 24102},
+           {"vadExpectedInterval", Json::array({0, 385637})}}},
+      {"model", Json{
+           {"id", model_id},
+           {"revision", model_revision},
+           {"files", model_files}}},
+      {"config", std::move(parity_config)},
+      {"decodeIdentity", Json{
+           {"promptTokenIds", Json::array({50258, 50266, 50360})},
+           {"promptSha256", "908b1562c473b2889d6ac86c6e011ec4c681f6e78c971f0d8e73424057a42ba0"},
+           {"suppressedTokenCount", 88},
+           {"suppressedTokenIdsSha256", "f726fbe0a6dca45caa2028ac3584464684710a51040e1d1da176271c22184a6c"},
+           {"beginSuppressedTokenIds", Json::array({220, 50257})},
+           {"beginSuppressedTokenIdsSha256", "5361010e57b1f08ec8360f097ea3063cf72e41f048203f694631e36bdd569a98"},
+           {"parser", "native-timestamp-parser-v1"},
+           {"fallback", "faster-whisper-1.2.1-exact"}}},
+      {"anchors", Json{
+           {"pythonParserTextSha256", "4ae70515a50f3e7368655a021c94e5db7edaa05372a02d14c93bf77dc1837de0"},
+           {"nativeParserTextSha256", "d5eb90a205337e242dbcfd2752f2173adbff50a5178219365b9c10894b82479c"}}},
+      {"inputLockSha256", sha256_file(input_lock)},
+      {"runtime", Json{
+           {"role", cell.runtime_role},
+           {"measurementExecutable", file_identity(executable)},
+           {"productionWorker", file_identity(production_worker)},
+           {"ctranslate2", file_identity(ct2_dll)},
+           {"runtimeFiles", runtime_files},
+           {"vadModel", preflight.vad_model},
+           {"requestedDevice", "cuda"},
+           {"resolvedDevice", "cuda"},
+           {"computeType", "float16"},
+           {"deviceIndex", 0},
+           {"ctranslate2Version", "4.8.0"},
+           {"gpu", gpu},
+           {"pathPolicy", path_policy},
+           {"loadedModules", std::move(modules)}}},
+      {"samples", std::move(samples)},
+      {"resources", Json{
+           {"peakProcessRssBytes", peak_working_set()},
+           {"method", "GetProcessMemoryInfo.PeakWorkingSetSize"}}}};
+
+  fs::create_directories(output_path.parent_path());
+  const fs::path temporary = output_path.string() + ".tmp";
+  std::ofstream(temporary, std::ios::binary) << std::setw(2) << raw << '\n';
+  fs::remove(output_path);
+  fs::rename(temporary, output_path);
+  std::cout << Json{
+      {"status", failed ? "failed" : "completed"},
+      {"cellId", cell.id},
+      {"sampleCount", raw["samples"].size()}}.dump() << '\n';
+}
+#endif
+
+void run_whisper_quality_evidence(
+    const std::vector<std::string>& args,
+    bool diagnostic,
+    bool vad_diagnostic = false,
+    bool fallback_diagnostic = false) {
+  const bool selection_diagnostic = diagnostic || vad_diagnostic || fallback_diagnostic;
+  const bool exact_vad = vad_diagnostic || fallback_diagnostic;
+  check(static_cast<int>(diagnostic) + static_cast<int>(vad_diagnostic)
+            + static_cast<int>(fallback_diagnostic) <= 1,
+        "T06R diagnostic modes are mutually exclusive");
+  if (exact_vad) {
+    validate_closed_mode_args(
+        args,
+        fallback_diagnostic
+            ? "--run-whisper-quality-fallback-diagnostic"
+            : "--run-whisper-quality-vad-diagnostic",
+        {"--cell", "--model", "--audio", "--output", "--input-lock",
+         "--production-worker", "--model-id", "--model-revision",
+         "--model-bin-sha256", "--repeats", "--vad-model"});
+  }
+  const fs::path model_path = fs::u8path(required_arg(args, "--model"));
+  const fs::path audio_path = fs::u8path(required_arg(args, "--audio"));
+  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
+  const fs::path input_lock = fs::u8path(required_arg(args, "--input-lock"));
+  const fs::path production_worker = fs::u8path(required_arg(args, "--production-worker"));
+  const std::string model_id = required_arg(args, "--model-id");
+  const std::string model_revision = required_arg(args, "--model-revision");
+  const std::string expected_model_hash = required_arg(args, "--model-bin-sha256");
+
+  check(is_t06r_task_local_output(output_path),
+        "T06R raw output must stay under research/local");
+  check(fs::is_regular_file(input_lock), "T06R input lock is missing");
+  check(!exact_vad || is_t06r_tracked_research_file(input_lock),
+        "T06R exact-VAD diagnostic lock must be a tracked research file");
+  check(fs::is_regular_file(production_worker), "T06R production worker is missing");
+
+  const bool large_v3 = model_id == "Systran/faster-whisper-large-v3"
+      && model_revision == "edaa852ec7e145841d8ffdb056a99866b5f0a478"
+      && expected_model_hash == "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1";
+  const bool large_v2 = model_id == "Systran/faster-whisper-large-v2"
+      && model_revision == "f0fe81560cb8b68660e564f55dd99207059c092e"
+      && expected_model_hash == "bf2a9746382e1aa7ffff6b3a0d137ed9edbd9670c3b87e5d35f5e85e70d0333a";
+  check(large_v3 || (!selection_diagnostic && large_v2),
+        "T06R model identity is not an allowed anchor");
+  check(sha256_file(model_path / "model.bin") == expected_model_hash,
+        "T06R model.bin identity drift");
+
+  CandidateAConfig config;
+  std::string case_id;
+  std::string candidate_id;
+  if (selection_diagnostic) {
+    const std::string cell_id = required_arg(args, "--cell");
+    const WhisperQualityDiagnosticCell cell = fallback_diagnostic
+        ? whisper_quality_fallback_diagnostic_cell(cell_id)
+        : (vad_diagnostic
+            ? whisper_quality_vad_diagnostic_cell(cell_id)
+            : whisper_quality_diagnostic_cell(cell_id));
+    config = cell.config;
+    case_id = cell.case_id;
+    candidate_id = cell.id;
+  } else {
+    case_id = required_arg(args, "--case-id");
+    candidate_id = "ordinary-whisper-b" + std::to_string(config.beam_size)
+        + (config.condition_on_previous_text ? "-history" : "-no-history");
+  }
+
+  const std::map<std::string, std::pair<std::int64_t, std::string>> expected_cases{
+      {"short-v1", {24102, "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"}},
+      {"medium-v1", {498872, "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458"}},
+      {"long-v2", {4144235, "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e"}},
+  };
+  const auto expected_case = expected_cases.find(case_id);
+  check(expected_case != expected_cases.end(), "T06R case identity is not allowed");
+  if (selection_diagnostic) {
+    check(case_id != "long-v2", "T06R diagnostics do not allow long-v2");
+  }
+  check(verified_wav_duration_ms(audio_path) == expected_case->second.first
+            && sha256_file(audio_path) == expected_case->second.second,
+        "T06R authoritative audio identity drift");
+
+  const int expected_repeats = selection_diagnostic ? 1 : (case_id == "short-v1" ? 4 : 1);
+  const int repeats = integer_arg(args, "--repeats", expected_repeats);
+  check(repeats == expected_repeats, "T06R sample count drift");
+
+  std::optional<fs::path> vad_model_path;
+  if (exact_vad) {
+    const fs::path path = fs::u8path(required_arg(args, "--vad-model"));
+    check(is_t06r_task_local_output(path) && fs::is_regular_file(path),
+          "T06R VAD asset must stay under research/local");
+    check(fs::file_size(path) == 1245151
+              && sha256_file(path)
+                  == "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "T06R exact Silero V6 asset identity drift");
+    vad_model_path = path;
+  }
+
+  const Json path_policy = cuda_development_path_policy();
+  const fs::path executable = current_executable();
+  if (exact_vad) {
+    const std::string lock_text = read_text_file(input_lock);
+    const auto require_locked_hash = [&](const std::string& hash, const std::string& label) {
+      check(lock_text.find(hash) != std::string::npos,
+            "T06R VAD diagnostic lock does not freeze " + label);
+    };
+    require_locked_hash(expected_case->second.second, "audio");
+    require_locked_hash(sha256_file(executable), "measurement executable");
+    require_locked_hash(sha256_file(production_worker), "production worker");
+    require_locked_hash(path_policy.at("rootIdentitySha256").get<std::string>(),
+                        "restricted PATH root identity");
+    for (const Json& file : model_file_identities(model_path)) {
+      require_locked_hash(file.at("sha256").get<std::string>(),
+                          "model file " + file.at("name").get<std::string>());
+    }
+    for (const Json& file : runtime_file_identities(executable, true)) {
+      require_locked_hash(file.at("sha256").get<std::string>(),
+                          "runtime file " + file.at("name").get<std::string>());
+    }
+    require_locked_hash(sha256_file(*vad_model_path), "exact Silero V6 model");
+    if (fallback_diagnostic) {
+      require_locked_hash(
+          "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+          "exact zlib 1.3.1 archive");
+      require_locked_hash(
+          "5d5ffb00018561d3d529b2c72e1d9f5fff055bea725f3cccc7c6c67f5cc8ffe4",
+          "faster-whisper 1.2.1 source oracle");
+      check(lock_text.find("upstream-generation-fallback-parity-v1") != std::string::npos
+                && lock_text.find("short-b5-on-vad-fallback") != std::string::npos
+                && lock_text.find("medium-b5-on-vad-fallback") != std::string::npos
+                && lock_text.find("does not authorize acquisition") != std::string::npos,
+            "T06R fallback diagnostic lock scope is incomplete");
+    }
+  }
+  const Clock::time_point load_started = Clock::now();
+  CTranslate2WhisperBackend backend(
+      model_path,
+      config,
+      vad_model_path,
+      cuda_execution_config());
+  const double load_ms = elapsed_ms(load_started);
+  const BackendExecutionAttestation attestation = backend.execution_attestation();
+  check(attestation.config.device == ExecutionDevice::Cuda
+            && attestation.config.compute_type == ExecutionComputeType::Float16
+            && attestation.config.device_index == 0,
+        "T06R CUDA execution mapping drift");
+
+  Json samples = Json::array();
+  bool failed = false;
+  for (int repeat = 0; repeat < repeats; ++repeat) {
+    std::vector<std::int64_t> progress;
+    const Clock::time_point sample_started = Clock::now();
+    const TranscriptionResult result = backend.transcribe(
+        audio_path,
+        exact_vad
+            ? ProgressCallback([&](std::int64_t processed_ms) {
+                progress.push_back(processed_ms);
+              })
+            : ProgressCallback{});
+    const double sample_wall_ms = elapsed_ms(sample_started);
+    check(result.duration_ms == expected_case->second.first,
+          "T06R measured duration drift");
+    if (exact_vad) {
+      check(result.vad_enabled, "T06R exact-VAD diagnostic did not enable VAD");
+      check(std::is_sorted(progress.begin(), progress.end()),
+            "T06R VAD diagnostic source progress regressed");
+      if (result.failure_code.empty()) {
+        check(!progress.empty() && progress.back() == result.duration_ms,
+              "T06R VAD diagnostic progress did not reach WAV end");
+      }
+    }
+
+    Json segments = Json::array();
+    for (const SegmentEvidence& segment : result.segments) {
+      segments.push_back(segment_json(segment));
+    }
+    Json traces = Json::array();
+    std::size_t generation_calls = 0;
+    for (const WindowTrace& trace : result.traces) {
+      traces.push_back(trace_json(trace));
+      generation_calls += trace.generation_call_count;
+    }
+    check(!result.traces.empty(), "T06R sample has no complete trace");
+    if (result.failure_code.empty()) {
+      check(generation_calls > 0, "T06R completed sample has no generation call");
+    }
+
+    Json vad_intervals = Json::array();
+    if (exact_vad) {
+      for (const VadSpeechInterval& interval : result.vad_intervals) {
+        vad_intervals.push_back(vad_interval_json(interval));
+      }
+      check(result.original_sample_count > 0
+                && result.compressed_sample_count > 0
+                && result.compressed_sample_count <= result.original_sample_count
+                && !result.vad_intervals.empty(),
+            "T06R VAD diagnostic compression provenance is incomplete");
+    }
+
+    Json timings{
+        {"loadMs", repeat == 0 ? Json(load_ms) : Json(nullptr)},
+        {"sampleWallMs", sample_wall_ms},
+        {"featureMs", result.feature_ms},
+        {"modelGenerateMs", result.generate_ms},
+        {"inferenceMs", result.inference_ms},
+        {"inferenceRtf", result.inference_ms / result.duration_ms}};
+    if (exact_vad) {
+      timings["vadMs"] = result.vad_ms;
+    }
+    if (repeat == 0) {
+      const double process_wall_ms = elapsed_ms(process_started);
+      timings["processWallMs"] = process_wall_ms;
+      timings["processWallRtf"] = process_wall_ms / result.duration_ms;
+    }
+
+    const bool sample_failed = !result.failure_code.empty();
+    Json sample{
+        {"status", sample_failed ? "failed" : "completed"},
+        {"runKind", fallback_diagnostic
+             ? "fallback-diagnostic"
+             : (vad_diagnostic
+                 ? "vad-diagnostic"
+                 : (diagnostic ? "diagnostic" : (repeat == 0 ? "cold" : "warm")))},
+        {"repeatIndex", repeat + 1},
+        {"segments", std::move(segments)},
+        {"tokenTraces", std::move(traces)},
+        {"generationCompleted", !sample_failed},
+        {"generationCallCount", generation_calls},
+        {"failure", sample_failed ? Json{{"code", result.failure_code}} : Json(nullptr)},
+        {"timings", std::move(timings)}};
+    if (exact_vad) {
+      sample["progressMs"] = std::move(progress);
+      sample["vad"] = Json{
+          {"inferenceMs", result.vad_ms},
+          {"originalSampleCount", result.original_sample_count},
+          {"compressedSampleCount", result.compressed_sample_count},
+          {"rowCount", result.vad_row_count},
+          {"batchCount", result.vad_batch_count},
+          {"intervals", std::move(vad_intervals)}};
+    }
+    samples.push_back(std::move(sample));
+    if (sample_failed) {
+      failed = true;
+      break;
+    }
+  }
+
+  Json modules = cuda_development_loaded_modules(path_policy);
+  check(std::none_of(modules.begin(), modules.end(), [](const Json& module) {
+          return lowercase(module.at("name").get<std::string>()).rfind("cudnn", 0) == 0;
+        }),
+        "T06R no-cuDNN identity loaded an unexpected cuDNN module");
+  if (exact_vad) {
+    const Json& ort = loaded_module_named(modules, "onnxruntime.dll");
+    check(ort.at("rootRole") == "task-local-runtime-bin",
+          "T06R VAD diagnostic ORT escaped the task-local runtime root");
+  }
+  const Json gpu = attested_cuda_gpu(modules, attestation);
+  Json config_identity = exact_vad
+      ? candidate_b_config_json(config)
+      : config_json(config);
+  if (exact_vad) {
+    config_identity["vadAlgorithm"] = "faster-whisper-v1.2.1-silero-v6-exact";
+  }
+
+  const Json raw{
+      {"schemaVersion", 1},
+      {"kind", fallback_diagnostic
+           ? "hikaru-ct2-whisper-gpu-quality-fallback-diagnostic-raw"
+           : (vad_diagnostic
+               ? "hikaru-ct2-whisper-gpu-quality-vad-diagnostic-raw"
+               : (diagnostic
+                   ? "hikaru-ct2-whisper-gpu-quality-diagnostic-raw"
+                   : "hikaru-ct2-whisper-gpu-quality-candidate-raw"))},
+      {"status", failed ? "failed" : "completed"},
+      {"qualificationEligible", !selection_diagnostic},
+      {"comparisonProfile", "native-gpu-authoritative-v1"},
+      {"candidateId", candidate_id},
+      {"diagnosticCell", selection_diagnostic ? Json(candidate_id) : Json(nullptr)},
+      {"caseId", case_id},
+      {"engine", "faster-whisper"},
+      {"model", Json{
+           {"id", model_id},
+           {"revision", model_revision},
+           {"files", model_file_identities(model_path)}}},
+      {"audio", Json{
+           {"sha256", expected_case->second.second},
+           {"durationMs", expected_case->second.first}}},
+      {"algorithm", fallback_diagnostic
+           ? "upstream-generation-fallback-parity-v1"
+           : (vad_diagnostic
+               ? "ordinary-whisper-timestamp-driven-silero-v6"
+               : "ordinary-whisper-timestamp-driven")},
+      {"config", std::move(config_identity)},
+      {"inputLockSha256", sha256_file(input_lock)},
+      {"runtime", Json{
+           {"measurementExecutable", file_identity(executable)},
+           {"productionWorker", file_identity(production_worker)},
+           {"requiredDlls", runtime_file_identities(executable, true)},
+           {"requestedDevice", "cuda"},
+           {"resolvedDevice", "cuda"},
+           {"computeType", "float16"},
+           {"deviceIndex", 0},
+           {"ctranslate2Version", "4.8.0"},
+           {"onnxRuntimeVersion", exact_vad ? Json("1.28.0") : Json(nullptr)},
+           {"vadModel", exact_vad ? file_identity(*vad_model_path) : Json(nullptr)},
+           {"cudaBuildEnabled", true},
+           {"cudaDynamicLoading", true},
+           {"withCudnn", false},
+           {"gpu", gpu},
+           {"cpu", cpu_identity()},
+           {"pathPolicy", path_policy},
+           {"loadedModules", std::move(modules)}}},
+      {"samples", std::move(samples)},
+      {"resources", Json{
+           {"peakProcessRssBytes", peak_working_set()},
+           {"method", "GetProcessMemoryInfo.PeakWorkingSetSize"}}}};
+
+  fs::create_directories(output_path.parent_path());
+  const fs::path temporary = output_path.string() + ".tmp";
+  std::ofstream(temporary, std::ios::binary) << std::setw(2) << raw << '\n';
+  fs::remove(output_path);
+  fs::rename(temporary, output_path);
+  std::cout << Json{
+      {"status", failed ? "failed" : "completed"},
+      {"caseId", case_id},
+      {"candidateId", candidate_id},
+      {"sampleCount", raw["samples"].size()}}.dump() << '\n';
 }
 
 void run_kotoba_evidence(const std::vector<std::string>& args, bool k2) {
@@ -2319,6 +3867,23 @@ int main(int argc, char** argv) {
     const std::vector<std::string> args(argv + 1, argv + argc);
     if (std::find(args.begin(), args.end(), "--candidate-b-identity-check") != args.end()) {
       run_candidate_b_identity_check();
+#ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
+    } else if (std::find(args.begin(), args.end(), "--short-parity-self-check") != args.end()) {
+      run_short_parity_self_check(args);
+    } else if (std::find(args.begin(), args.end(), "--short-parity-runtime-smoke") != args.end()) {
+      run_short_parity_runtime_smoke(args);
+    } else if (std::find(args.begin(), args.end(), "--short-parity-preflight") != args.end()) {
+      run_short_parity_preflight(args);
+    } else if (std::find(args.begin(), args.end(), "--export-whisper-short-parity-native-mel") != args.end()) {
+      export_short_parity_native_mel(args);
+    } else if (std::find(args.begin(), args.end(), "--run-whisper-short-parity") != args.end()) {
+      run_short_parity_evidence(args);
+#endif
+    } else if (std::find(args.begin(), args.end(), "--fallback-self-check") != args.end()) {
+      run_fallback_self_check();
+      std::cout << "ctranslate2 whisper fallback tests passed\n";
+    } else if (std::find(args.begin(), args.end(), "--run-whisper-fallback-oracle") != args.end()) {
+      run_fallback_oracle(args);
     } else if (args.empty() || std::find(args.begin(), args.end(), "--self-check") != args.end()) {
       run_core_tests();
       std::cout << "ctranslate2 whisper tests passed\n";
@@ -2330,6 +3895,14 @@ int main(int argc, char** argv) {
       run_evidence(args, true, true);
     } else if (std::find(args.begin(), args.end(), "--run-cuda-development-evidence") != args.end()) {
       run_cuda_development_evidence(args);
+    } else if (std::find(args.begin(), args.end(), "--run-whisper-quality-fallback-diagnostic") != args.end()) {
+      run_whisper_quality_evidence(args, false, false, true);
+    } else if (std::find(args.begin(), args.end(), "--run-whisper-quality-vad-diagnostic") != args.end()) {
+      run_whisper_quality_evidence(args, false, true);
+    } else if (std::find(args.begin(), args.end(), "--run-whisper-quality-diagnostic") != args.end()) {
+      run_whisper_quality_evidence(args, true);
+    } else if (std::find(args.begin(), args.end(), "--run-whisper-quality-evidence") != args.end()) {
+      run_whisper_quality_evidence(args, false);
     } else if (std::find(args.begin(), args.end(), "--run-kotoba-k2-evidence") != args.end()) {
       run_kotoba_evidence(args, true);
     } else if (std::find(args.begin(), args.end(), "--run-kotoba-evidence") != args.end()) {
