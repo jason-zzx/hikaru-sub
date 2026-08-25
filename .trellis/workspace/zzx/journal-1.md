@@ -984,3 +984,37 @@ Closed and archived the non-qualified native Faster-Whisper quality revision, pr
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: Close native Whisper execution parity discovery
+
+**Date**: 2026-08-25
+**Task**: Close native Whisper execution parity discovery
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented and validated the bounded T06D execution-parity harness. Exact large-v3 128x3000 contracts were confirmed, but overlapping model processes exhausted the correction budget and invalidated A/D evidence; published invalid-evidence, kept Python legacy default, updated ASR evidence rules and parent roadmap, and archived the task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dff1b52` | (see git log) |
+| `309bd2e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
