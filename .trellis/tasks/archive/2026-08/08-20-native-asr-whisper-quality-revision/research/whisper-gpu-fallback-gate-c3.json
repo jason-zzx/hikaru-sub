@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "kind": "hikaru-native-whisper-gpu-fallback-gate-c3",
+  "status": "clean-to-request-renewed-acquisition",
+  "qualificationEligible": false,
+  "comparisonProfile": "native-gpu-authoritative-v1",
+  "candidateId": "upstream-generation-fallback-parity-v1",
+  "modelLoaded": false,
+  "acquisitionRows": [],
+  "currentLock": {
+    "path": "research/gpu-fallback-diagnostic-lock-v3.md",
+    "sizeBytes": 17179,
+    "sha256": "b95bdcc1e2a33ab30c2064fef70d466cd92842fedaaaed07350a1c111bcdcf29"
+  },
+  "supersededIdentities": [
+    {
+      "path": "research/gpu-fallback-diagnostic-lock.md",
+      "sha256": "5fcfe845451f418a1e21fe8711ba9f367fdc2e13f8c2e02dd598683dde4e073a",
+      "disposition": "invalid-preflight-no-publication"
+    },
+    {
+      "path": "research/gpu-fallback-diagnostic-lock-v2.md",
+      "sha256": "823630f08ab15ed7dadf4f80f0e5a320c89e3e2171cd55b8ac86cc6463235b82",
+      "disposition": "gate-c3-blocked-module-set-not-exact"
+    }
+  ],
+  "boundPredecessorEvidence": {
+    "invalidPreflightJsonSha256": "29b8767342bb9f1ac57c630285c1481b58877c57b92c775e38f9dfb9d4b6a212",
+    "invalidPreflightMarkdownSha256": "27054915dc39d7e2e58535e0a62dfb6fbaf55aac47caf5bd0f66017f539b2f6f",
+    "v2PreflightJsonSha256": "5fa4f06f4caea4cb38e7bbbc36b5024b2ab5400efefdb513cd579ab2df282ac4",
+    "v2PreflightMarkdownSha256": "0509d242a5fb9b12988d8fb1510b4ebb53e207f1066b6bf7dd0b2b039d7dd1bb"
+  },
+  "reviewRepair": {
+    "finding": "The v2 lock declared an exact loaded-module set, but the fallback publisher validated only a required subset.",
+    "publisherSha256": "ece07ee742992e4315fed0635c7c56feaa1fb6e5142e912173739f647901f30c",
+    "publisherTestSha256": "ef9e72fcdb45b8fc2f015c65906762142ece4802465bfa56820aa3708f721d8c",
+    "exactLoadedModuleCount": 8,
+    "rejectedMutations": [
+      "missing-module",
+      "additional-module",
+      "module-size-or-hash-drift",
+      "module-version-drift",
+      "module-root-role-drift"
+    ]
+  },
+  "validation": {
+    "publisherTests": "15 passed",
+    "currentFileReattestation": "51 matched, 0 drift",
+    "exactModuleInventory": "passed",
+    "supersededLocksPreserved": true,
+    "privacyScan": "passed",
+    "ignoredLocalRoot": "passed",
+    "taskValidation": "passed",
+    "diffCheck": "passed",
+    "noStagedFiles": true
+  },
+  "modelEvidence": {
+    "exists": false,
+    "reason": "No ASR model was loaded under any fallback lock and neither diagnostic cell has run."
+  },
+  "nextGate": "Fresh explicit model-backed acquisition approval for short-b5-on-vad-fallback and medium-b5-on-vad-fallback under the exact v3 lock identity."
+}

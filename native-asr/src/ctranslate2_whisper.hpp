@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -26,6 +27,12 @@ inline constexpr float vad_threshold = 0.5f;
 inline constexpr double vad_negative_threshold = 0.35;
 inline constexpr std::int64_t vad_min_silence_ms = 2000;
 inline constexpr std::int64_t vad_speech_pad_ms = 400;
+inline constexpr std::array<double, 6> upstream_fallback_temperatures{
+    0.0, 0.2, 0.4, 0.6, 0.8, 1.0};
+inline constexpr double upstream_compression_ratio_threshold = 2.4;
+inline constexpr double upstream_no_speech_threshold = 0.6;
+inline constexpr std::size_t upstream_sampling_best_of = 5;
+inline constexpr std::size_t upstream_sampling_topk = 0;
 
 enum class ExecutionDevice {
   Cpu,
@@ -69,6 +76,7 @@ struct CandidateAConfig {
   bool timestamp_driven_seek = true;
   float prompt_reset_on_temperature = 0.5f;
   float temperature = 0.0f;
+  bool upstream_generation_fallback = false;
   std::size_t max_initial_timestamp_index = 50;
   int max_source_frames = max_model_frames;
   // Zero keeps the K1/ordinary seek behavior; K2 sets the Kotoba-only cap.
@@ -77,7 +85,53 @@ struct CandidateAConfig {
 
 CandidateAConfig kotoba_config();
 CandidateAConfig kotoba_k2_config();
+CandidateAConfig upstream_generation_fallback_config();
 bool kotoba_mel_shape_supported(std::size_t mel_bins);
+
+struct FallbackAttemptOptions {
+  double temperature = 0;
+  std::size_t beam_size = 1;
+  float patience = 1;
+  std::size_t num_hypotheses = 1;
+  std::optional<std::size_t> sampling_topk;
+  std::optional<double> sampling_temperature;
+  bool sampling = false;
+};
+
+struct FallbackGenerated {
+  std::vector<std::size_t> token_ids;
+  float score = 0;
+  float no_speech_probability = 0;
+  std::string decoded_text;
+};
+
+struct FallbackAttemptTrace {
+  FallbackAttemptOptions options;
+  std::vector<std::size_t> token_ids;
+  float score = 0;
+  double average_log_probability = 0;
+  float no_speech_probability = 0;
+  std::string decoded_text;
+  double compression_ratio = 0;
+  bool compression_triggered = false;
+  bool log_probability_triggered = false;
+  bool silence_override = false;
+  std::string aggregate_sha256;
+};
+
+struct GenerationFallbackResult {
+  std::size_t selected_attempt_index = 0;
+  double selected_temperature = 0;
+  std::vector<FallbackAttemptTrace> attempts;
+};
+
+using FallbackGenerator = std::function<FallbackGenerated(const FallbackAttemptOptions&)>;
+
+double upstream_compression_ratio(const std::string& text);
+std::string upstream_zlib_version();
+GenerationFallbackResult run_upstream_generation_fallback(
+    const CandidateAConfig& config,
+    const FallbackGenerator& generate);
 
 struct TokenIds {
   std::size_t eot = 0;
@@ -177,8 +231,13 @@ struct WindowTrace {
   double generate_ms = 0;
   std::size_t generation_call_count = 0;
   std::size_t fallback_call_count = 0;
+  bool generation_fallback_enabled = false;
+  std::size_t selected_fallback_attempt_index = 0;
+  double selected_temperature = 0;
+  double compression_ratio = 0;
+  std::vector<FallbackAttemptTrace> fallback_attempts;
   float no_speech_probability = 0;
-  float average_log_probability = 0;
+  double average_log_probability = 0;
   bool skipped_as_no_speech = false;
   std::string parse_status;
   std::string parse_error;
@@ -300,6 +359,14 @@ class CTranslate2WhisperBackend {
       const ProgressCallback& on_progress = {},
       const SegmentCallback& on_segment = {},
       const CancellationCallback& is_cancelled = {});
+
+#ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
+  TranscriptionResult transcribe_precomputed_mel_for_test(
+      std::vector<float> mel,
+      std::size_t source_sample_count,
+      std::int64_t audio_duration_ms,
+      const CancellationCallback& is_cancelled = {});
+#endif
 
   int mel_bins() const;
   std::size_t resolved_intra_threads() const;

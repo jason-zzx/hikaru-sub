@@ -20,6 +20,9 @@
 #include <nlohmann/json.hpp>
 #include <onnxruntime_cxx_api.h>
 #include <pocketfft_hdronly.h>
+#ifdef HIKARU_ASR_WHISPER_FALLBACK_PARITY
+#include <zlib.h>
+#endif
 
 #include <algorithm>
 #include <array>
@@ -844,6 +847,84 @@ float average_log_probability(
   return static_cast<float>(cumulative / (length + 1.0));
 }
 
+std::uint32_t utf8_code_point(
+    const std::string& text,
+    std::size_t index,
+    std::size_t& next) {
+  const auto byte = [&](std::size_t offset) {
+    if (offset >= text.size()) {
+      throw BackendError("tokenizer_decode_failed", "Decoded text is invalid UTF-8");
+    }
+    return static_cast<unsigned char>(text[offset]);
+  };
+  const unsigned char first = byte(index);
+  std::size_t length = 1;
+  std::uint32_t value = first;
+  if ((first & 0x80) == 0) {
+    length = 1;
+  } else if ((first & 0xe0) == 0xc0) {
+    length = 2;
+    value = first & 0x1f;
+  } else if ((first & 0xf0) == 0xe0) {
+    length = 3;
+    value = first & 0x0f;
+  } else if ((first & 0xf8) == 0xf0) {
+    length = 4;
+    value = first & 0x07;
+  } else {
+    throw BackendError("tokenizer_decode_failed", "Decoded text is invalid UTF-8");
+  }
+  for (std::size_t offset = 1; offset < length; ++offset) {
+    const unsigned char continuation = byte(index + offset);
+    if ((continuation & 0xc0) != 0x80) {
+      throw BackendError("tokenizer_decode_failed", "Decoded text is invalid UTF-8");
+    }
+    value = (value << 6) | (continuation & 0x3f);
+  }
+  if ((length == 2 && value < 0x80)
+      || (length == 3 && value < 0x800)
+      || (length == 4 && value < 0x10000)
+      || value > 0x10ffff
+      || (value >= 0xd800 && value <= 0xdfff)) {
+    throw BackendError("tokenizer_decode_failed", "Decoded text is invalid UTF-8");
+  }
+  next = index + length;
+  return value;
+}
+
+bool python_whitespace(std::uint32_t value) {
+  return (value >= 0x09 && value <= 0x0d)
+      || (value >= 0x1c && value <= 0x20)
+      || value == 0x85
+      || value == 0xa0
+      || value == 0x1680
+      || (value >= 0x2000 && value <= 0x200a)
+      || value == 0x2028
+      || value == 0x2029
+      || value == 0x202f
+      || value == 0x205f
+      || value == 0x3000;
+}
+
+std::string python_strip_utf8(const std::string& text) {
+  std::size_t first_non_whitespace = text.size();
+  std::size_t end_non_whitespace = 0;
+  for (std::size_t index = 0; index < text.size();) {
+    std::size_t next = index;
+    const std::uint32_t value = utf8_code_point(text, index, next);
+    if (!python_whitespace(value)) {
+      if (first_non_whitespace == text.size()) {
+        first_non_whitespace = index;
+      }
+      end_non_whitespace = next;
+    }
+    index = next;
+  }
+  return first_non_whitespace == text.size()
+      ? std::string()
+      : text.substr(first_non_whitespace, end_non_whitespace - first_non_whitespace);
+}
+
 #ifdef HIKARU_ASR_CT2_WITH_CUDA
 class CudaDriverModule {
  public:
@@ -983,6 +1064,175 @@ CandidateAConfig kotoba_k2_config() {
   CandidateAConfig config = kotoba_config();
   config.max_applied_seek_frames = 1000;
   return config;
+}
+
+CandidateAConfig upstream_generation_fallback_config() {
+  CandidateAConfig config;
+  config.beam_size = 5;
+  config.condition_on_previous_text = true;
+  config.upstream_generation_fallback = true;
+  return config;
+}
+
+double upstream_compression_ratio(const std::string& text) {
+#ifndef HIKARU_ASR_WHISPER_FALLBACK_PARITY
+  static_cast<void>(text);
+  throw BackendError(
+      "fallback_not_built",
+      "This worker was built without exact zlib fallback parity support");
+#else
+  if (std::string(zlibVersion()) != "1.3.1") {
+    throw BackendError("fallback_identity_mismatch", "Exact zlib 1.3.1 is required");
+  }
+  const std::string stripped = python_strip_utf8(text);
+  uLongf compressed_size = compressBound(static_cast<uLong>(stripped.size()));
+  std::vector<Bytef> compressed(compressed_size);
+  const Bytef* source = stripped.empty()
+      ? reinterpret_cast<const Bytef*>("")
+      : reinterpret_cast<const Bytef*>(stripped.data());
+  if (compress2(
+          compressed.data(),
+          &compressed_size,
+          source,
+          static_cast<uLong>(stripped.size()),
+          Z_DEFAULT_COMPRESSION) != Z_OK
+      || compressed_size == 0) {
+    throw BackendError("fallback_compression_failed", "zlib compression failed");
+  }
+  return static_cast<double>(stripped.size())
+      / static_cast<double>(compressed_size);
+#endif
+}
+
+std::string upstream_zlib_version() {
+#ifdef HIKARU_ASR_WHISPER_FALLBACK_PARITY
+  return zlibVersion();
+#else
+  return {};
+#endif
+}
+
+GenerationFallbackResult run_upstream_generation_fallback(
+    const CandidateAConfig& config,
+    const FallbackGenerator& generate) {
+  const CandidateAConfig expected = upstream_generation_fallback_config();
+  if (!generate
+      || !config.upstream_generation_fallback
+      || config.beam_size != expected.beam_size
+      || config.max_length != expected.max_length
+      || config.patience != expected.patience
+      || config.length_penalty != expected.length_penalty
+      || config.repetition_penalty != expected.repetition_penalty
+      || config.no_repeat_ngram_size != expected.no_repeat_ngram_size
+      || config.no_speech_threshold != expected.no_speech_threshold
+      || config.log_prob_threshold != expected.log_prob_threshold
+      || !config.condition_on_previous_text
+      || !config.timestamp_driven_seek
+      || config.prompt_reset_on_temperature != expected.prompt_reset_on_temperature
+      || config.temperature != 0.0f
+      || config.max_initial_timestamp_index != expected.max_initial_timestamp_index
+      || config.max_source_frames != max_model_frames
+      || config.max_applied_seek_frames != 0) {
+    throw BackendError("config_identity_mismatch", "Fallback candidate config is not closed");
+  }
+
+  GenerationFallbackResult result;
+  std::vector<std::size_t> below_compression_threshold;
+  for (double temperature : upstream_fallback_temperatures) {
+    FallbackAttemptOptions options;
+    options.temperature = temperature;
+    options.sampling = temperature > 0;
+    options.beam_size = options.sampling ? 1 : config.beam_size;
+    options.patience = config.patience;
+    options.num_hypotheses = options.sampling ? upstream_sampling_best_of : 1;
+    options.sampling_topk = options.sampling
+        ? std::optional<std::size_t>(upstream_sampling_topk)
+        : std::nullopt;
+    options.sampling_temperature = options.sampling
+        ? std::optional<double>(temperature)
+        : std::nullopt;
+
+    const FallbackGenerated generated = generate(options);
+    if (generated.token_ids.empty()) {
+      throw BackendError("invalid_generation", "Generated sequence is empty");
+    }
+    const double length = static_cast<double>(generated.token_ids.size());
+    FallbackAttemptTrace trace;
+    trace.options = options;
+    trace.token_ids = generated.token_ids;
+    trace.score = generated.score;
+    trace.average_log_probability =
+        generated.score * std::pow(length, config.length_penalty) / (length + 1.0);
+    trace.no_speech_probability = generated.no_speech_probability;
+    trace.decoded_text = generated.decoded_text;
+    trace.compression_ratio = upstream_compression_ratio(generated.decoded_text);
+    trace.compression_triggered =
+        trace.compression_ratio > upstream_compression_ratio_threshold;
+    trace.log_probability_triggered =
+        trace.average_log_probability < config.log_prob_threshold;
+    trace.silence_override =
+        static_cast<double>(generated.no_speech_probability) > upstream_no_speech_threshold
+        && trace.log_probability_triggered;
+    if (!trace.compression_triggered) {
+      below_compression_threshold.push_back(result.attempts.size());
+    }
+    std::ostringstream identity;
+    identity << std::setprecision(17)
+             << temperature << '\n'
+             << options.beam_size << '\n'
+             << options.patience << '\n'
+             << options.num_hypotheses << '\n'
+             << (options.sampling_topk
+                     ? std::to_string(*options.sampling_topk)
+                     : std::string("default")) << '\n';
+    if (options.sampling_temperature) {
+      identity << *options.sampling_temperature;
+    } else {
+      identity << "default";
+    }
+    identity << '\n'
+             << options.sampling << '\n'
+             << trace.average_log_probability << '\n'
+             << trace.compression_ratio << '\n'
+             << generated.no_speech_probability << '\n'
+             << trace.compression_triggered << '\n'
+             << trace.log_probability_triggered << '\n'
+             << trace.silence_override << '\n'
+             << sha256_text(token_trace(generated.token_ids)) << '\n'
+             << sha256_text(generated.decoded_text);
+    trace.aggregate_sha256 = sha256_text(identity.str());
+    result.attempts.push_back(std::move(trace));
+
+    const FallbackAttemptTrace& current = result.attempts.back();
+    const bool needs_fallback =
+        (current.compression_triggered || current.log_probability_triggered)
+        && !current.silence_override;
+    if (!needs_fallback) {
+      result.selected_attempt_index = result.attempts.size() - 1;
+      result.selected_temperature = temperature;
+      return result;
+    }
+  }
+
+  const std::vector<std::size_t> all_indices = [&]() {
+    std::vector<std::size_t> values(result.attempts.size());
+    std::iota(values.begin(), values.end(), 0);
+    return values;
+  }();
+  const std::vector<std::size_t>& eligible = below_compression_threshold.empty()
+      ? all_indices
+      : below_compression_threshold;
+  result.selected_attempt_index = *std::max_element(
+      eligible.begin(),
+      eligible.end(),
+      [&](std::size_t left, std::size_t right) {
+        return result.attempts[left].average_log_probability
+            < result.attempts[right].average_log_probability;
+      });
+  // faster-whisper 1.2.1 reports the final ladder temperature on all-failed
+  // selection, even when an earlier result has the highest log probability.
+  result.selected_temperature = upstream_fallback_temperatures.back();
+  return result;
 }
 
 bool kotoba_mel_shape_supported(std::size_t mel_bins) {
@@ -1373,6 +1623,24 @@ class CTranslate2WhisperBackend::Impl {
             && this->config.max_applied_seek_frames > this->config.max_source_frames)) {
       throw BackendError("config_identity_mismatch", "Source window frame limit is invalid");
     }
+    if (this->config.upstream_generation_fallback) {
+#ifndef HIKARU_ASR_WHISPER_FALLBACK_PARITY
+      throw BackendError("fallback_not_built", "Exact fallback parity support is disabled");
+#else
+      const CandidateAConfig expected = upstream_generation_fallback_config();
+      if (!this->vad_model_path
+          || this->config.beam_size != expected.beam_size
+          || !this->config.condition_on_previous_text
+          || !this->config.timestamp_driven_seek
+          || this->config.temperature != 0.0f
+          || this->config.max_applied_seek_frames != 0
+          || upstream_zlib_version() != "1.3.1") {
+        throw BackendError(
+            "config_identity_mismatch",
+            "Fallback parity requires beam5/history-on/exact-VAD identity");
+      }
+#endif
+    }
     tokens.eot = tokenizer.token_to_id("<|endoftext|>");
     tokens.sot = tokenizer.token_to_id("<|startoftranscript|>");
     tokens.japanese = tokenizer.token_to_id("<|ja|>");
@@ -1568,7 +1836,9 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     options.return_scores = true;
     options.return_no_speech_prob = true;
     options.max_initial_timestamp_index = impl_->config.max_initial_timestamp_index;
-    options.sampling_temperature = impl_->config.temperature;
+    if (!impl_->config.upstream_generation_fallback) {
+      options.sampling_temperature = impl_->config.temperature;
+    }
 
     ctranslate2::models::WhisperGenerationResult generated;
     try {
@@ -1578,10 +1848,70 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
           impl_->config);
       trace.prompt_token_count = prompt.size();
       trace.prefix_forward_token_count = prompt.empty() ? 0 : prompt.size() - 1;
-      trace.generation_call_count = 1;
       const Clock::time_point generate_started = Clock::now();
-      auto futures = impl_->model->generate(features, {prompt}, options);
-      generated = futures.front().get();
+      if (impl_->config.upstream_generation_fallback) {
+        std::vector<ctranslate2::models::WhisperGenerationResult> generated_attempts;
+        const GenerationFallbackResult fallback = run_upstream_generation_fallback(
+            impl_->config,
+            [&](const FallbackAttemptOptions& attempt) {
+              ctranslate2::models::WhisperOptions attempt_options = options;
+              attempt_options.beam_size = attempt.beam_size;
+              attempt_options.patience = attempt.patience;
+              attempt_options.num_hypotheses = attempt.num_hypotheses;
+              if (attempt.sampling_topk) {
+                attempt_options.sampling_topk = *attempt.sampling_topk;
+              }
+              if (attempt.sampling_temperature) {
+                attempt_options.sampling_temperature =
+                    static_cast<float>(*attempt.sampling_temperature);
+              }
+              auto futures = impl_->model->generate(features, {prompt}, attempt_options);
+              if (futures.empty()) {
+                throw BackendError(
+                    "invalid_generation",
+                    "CTranslate2 fallback attempt returned no future");
+              }
+              ctranslate2::models::WhisperGenerationResult value = futures.front().get();
+              if (value.sequences_ids.empty()
+                  || value.sequences_ids.front().empty()
+                  || value.scores.empty()) {
+                throw BackendError(
+                    "invalid_generation",
+                    "CTranslate2 fallback attempt returned no sequence or score");
+              }
+              FallbackGenerated summary;
+              summary.token_ids = value.sequences_ids.front();
+              summary.score = value.scores.front();
+              summary.no_speech_probability = value.no_speech_prob;
+              std::vector<std::uint32_t> ids;
+              ids.reserve(summary.token_ids.size());
+              std::transform(
+                  summary.token_ids.begin(),
+                  summary.token_ids.end(),
+                  std::back_inserter(ids),
+                  [](std::size_t id) { return static_cast<std::uint32_t>(id); });
+              summary.decoded_text = impl_->tokenizer.decode(ids);
+              generated_attempts.push_back(std::move(value));
+              check_cancelled(is_cancelled);
+              return summary;
+            });
+        generated = std::move(generated_attempts.at(fallback.selected_attempt_index));
+        trace.generation_fallback_enabled = true;
+        trace.selected_fallback_attempt_index = fallback.selected_attempt_index;
+        trace.generation_call_count = fallback.attempts.size();
+        trace.fallback_call_count = fallback.attempts.size() - 1;
+        trace.selected_temperature = fallback.selected_temperature;
+        trace.fallback_attempts = fallback.attempts;
+        trace.average_log_probability =
+            fallback.attempts[fallback.selected_attempt_index].average_log_probability;
+        trace.compression_ratio =
+            fallback.attempts[fallback.selected_attempt_index].compression_ratio;
+      } else {
+        trace.generation_call_count = 1;
+        auto futures = impl_->model->generate(features, {prompt}, options);
+        generated = futures.front().get();
+        trace.selected_temperature = impl_->config.temperature;
+      }
       trace.generate_ms = elapsed_ms(generate_started);
       result.generate_ms += trace.generate_ms;
       check_cancelled(is_cancelled);
@@ -1598,12 +1928,17 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     trace.generated_token_count = trace.token_ids.size();
     trace.sha256 = sha256_text(token_trace(trace.token_ids));
     trace.no_speech_probability = generated.no_speech_prob;
-    trace.average_log_probability = average_log_probability(
-        generated,
-        impl_->config.length_penalty);
+    if (!trace.generation_fallback_enabled) {
+      trace.average_log_probability = average_log_probability(
+          generated,
+          impl_->config.length_penalty);
+    }
 
+    const double no_speech_threshold = impl_->config.upstream_generation_fallback
+        ? upstream_no_speech_threshold
+        : static_cast<double>(impl_->config.no_speech_threshold);
     const bool skip_no_speech =
-        trace.no_speech_probability > impl_->config.no_speech_threshold
+        static_cast<double>(trace.no_speech_probability) > no_speech_threshold
         && trace.average_log_probability <= impl_->config.log_prob_threshold;
     if (skip_no_speech) {
       trace.skipped_as_no_speech = true;
@@ -1714,7 +2049,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
           parsed.history_tokens.begin(),
           parsed.history_tokens.end());
       if (!impl_->config.condition_on_previous_text
-          || impl_->config.temperature > impl_->config.prompt_reset_on_temperature) {
+          || trace.selected_temperature > impl_->config.prompt_reset_on_temperature) {
         history.clear();
       }
       trace.history_token_count_after = history.size();
@@ -1831,5 +2166,219 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
   result.inference_ms = elapsed_ms(inference_started);
   return result;
 }
+
+#ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
+TranscriptionResult CTranslate2WhisperBackend::transcribe_precomputed_mel_for_test(
+    std::vector<float> mel,
+    std::size_t source_sample_count,
+    std::int64_t audio_duration_ms,
+    const CancellationCallback& is_cancelled) {
+  check_cancelled(is_cancelled);
+  const CandidateAConfig expected = upstream_generation_fallback_config();
+  if (impl_->mel_bins != 80
+      || impl_->config.beam_size != expected.beam_size
+      || !impl_->config.condition_on_previous_text
+      || !impl_->config.timestamp_driven_seek
+      || !impl_->config.upstream_generation_fallback
+      || impl_->config.temperature != 0.0f
+      || impl_->config.max_source_frames != max_model_frames
+      || impl_->config.max_applied_seek_frames != 0) {
+    throw BackendError(
+        "config_identity_mismatch",
+        "Short parity bisect requires the exact ordinary fallback identity");
+  }
+  if (source_sample_count != 385637
+      || audio_duration_ms != 24102
+      || source_frame_count(source_sample_count) != 2411
+      || mel.size() != static_cast<std::size_t>(80 * max_model_frames)) {
+    throw BackendError(
+        "feature_invalid_input",
+        "Short parity bisect input shape or source identity drifted");
+  }
+
+  const Clock::time_point inference_started = Clock::now();
+  TranscriptionResult result;
+  result.duration_ms = audio_duration_ms;
+  result.original_sample_count = source_sample_count;
+  result.compressed_sample_count = source_sample_count;
+
+  WindowTrace trace;
+  trace.window_offset_ms = 0;
+  trace.source_window_duration_ms = audio_duration_ms;
+  trace.seek_frames_before = 0;
+  trace.source_progress_before_ms = 0;
+  trace.window_index = 0;
+  trace.ownership_start_ms = 0;
+  trace.ownership_end_ms = audio_duration_ms;
+  trace.final_window = true;
+
+  ctranslate2::StorageView features(
+      {1, impl_->mel_bins, max_model_frames},
+      std::move(mel));
+  ctranslate2::models::WhisperOptions options;
+  options.beam_size = impl_->config.beam_size;
+  options.patience = impl_->config.patience;
+  options.length_penalty = impl_->config.length_penalty;
+  options.repetition_penalty = impl_->config.repetition_penalty;
+  options.no_repeat_ngram_size = impl_->config.no_repeat_ngram_size;
+  options.max_length = impl_->config.max_length;
+  options.num_hypotheses = 1;
+  options.return_scores = true;
+  options.return_no_speech_prob = true;
+  options.max_initial_timestamp_index = impl_->config.max_initial_timestamp_index;
+
+  ctranslate2::models::WhisperGenerationResult generated;
+  try {
+    const std::vector<std::size_t> prompt = make_prompt(
+        impl_->tokens,
+        {},
+        impl_->config);
+    trace.prompt_token_count = prompt.size();
+    trace.prefix_forward_token_count = prompt.empty() ? 0 : prompt.size() - 1;
+    const Clock::time_point generate_started = Clock::now();
+    std::vector<ctranslate2::models::WhisperGenerationResult> generated_attempts;
+    const GenerationFallbackResult fallback = run_upstream_generation_fallback(
+        impl_->config,
+        [&](const FallbackAttemptOptions& attempt) {
+          ctranslate2::models::WhisperOptions attempt_options = options;
+          attempt_options.beam_size = attempt.beam_size;
+          attempt_options.patience = attempt.patience;
+          attempt_options.num_hypotheses = attempt.num_hypotheses;
+          if (attempt.sampling_topk) {
+            attempt_options.sampling_topk = *attempt.sampling_topk;
+          }
+          if (attempt.sampling_temperature) {
+            attempt_options.sampling_temperature =
+                static_cast<float>(*attempt.sampling_temperature);
+          }
+          auto futures = impl_->model->generate(features, {prompt}, attempt_options);
+          if (futures.empty()) {
+            throw BackendError(
+                "invalid_generation",
+                "Short parity bisect generation returned no future");
+          }
+          ctranslate2::models::WhisperGenerationResult value = futures.front().get();
+          if (value.sequences_ids.empty()
+              || value.sequences_ids.front().empty()
+              || value.scores.empty()) {
+            throw BackendError(
+                "invalid_generation",
+                "Short parity bisect generation returned no sequence or score");
+          }
+          FallbackGenerated summary;
+          summary.token_ids = value.sequences_ids.front();
+          summary.score = value.scores.front();
+          summary.no_speech_probability = value.no_speech_prob;
+          std::vector<std::uint32_t> ids;
+          ids.reserve(summary.token_ids.size());
+          std::transform(
+              summary.token_ids.begin(),
+              summary.token_ids.end(),
+              std::back_inserter(ids),
+              [](std::size_t id) { return static_cast<std::uint32_t>(id); });
+          summary.decoded_text = impl_->tokenizer.decode(ids);
+          generated_attempts.push_back(std::move(value));
+          check_cancelled(is_cancelled);
+          return summary;
+        });
+    generated = std::move(generated_attempts.at(fallback.selected_attempt_index));
+    trace.generation_fallback_enabled = true;
+    trace.selected_fallback_attempt_index = fallback.selected_attempt_index;
+    trace.generation_call_count = fallback.attempts.size();
+    trace.fallback_call_count = fallback.attempts.size() - 1;
+    trace.selected_temperature = fallback.selected_temperature;
+    trace.fallback_attempts = fallback.attempts;
+    trace.average_log_probability =
+        fallback.attempts[fallback.selected_attempt_index].average_log_probability;
+    trace.compression_ratio =
+        fallback.attempts[fallback.selected_attempt_index].compression_ratio;
+    trace.generate_ms = elapsed_ms(generate_started);
+    result.generate_ms = trace.generate_ms;
+    check_cancelled(is_cancelled);
+  } catch (const BackendError&) {
+    throw;
+  } catch (const std::exception&) {
+    throw BackendError(
+        "model_runtime_failed",
+        "Short parity bisect CTranslate2 generation failed");
+  }
+
+  if (generated.sequences_ids.empty()) {
+    throw BackendError(
+        "invalid_generation",
+        "Short parity bisect CTranslate2 returned no sequence");
+  }
+  trace.token_ids = generated.sequences_ids.front();
+  trace.generated_token_count = trace.token_ids.size();
+  trace.sha256 = sha256_text(token_trace(trace.token_ids));
+  trace.no_speech_probability = generated.no_speech_prob;
+  const bool skip_no_speech =
+      static_cast<double>(trace.no_speech_probability) > upstream_no_speech_threshold
+      && trace.average_log_probability <= impl_->config.log_prob_threshold;
+  if (skip_no_speech) {
+    trace.skipped_as_no_speech = true;
+    trace.parse_status = "no-speech";
+    trace.seek_frames_after = source_frame_count(source_sample_count);
+    trace.source_progress_after_ms = audio_duration_ms;
+    result.traces.push_back(std::move(trace));
+    result.inference_ms = elapsed_ms(inference_started);
+    return result;
+  }
+
+  try {
+    TimestampParseResult parsed = parse_timestamp_tokens(
+        trace.token_ids,
+        impl_->tokens,
+        [&](const std::vector<std::uint32_t>& ids) {
+          return impl_->tokenizer.decode(ids);
+        },
+        0,
+        audio_duration_ms,
+        audio_duration_ms);
+    for (SegmentEvidence& segment : parsed.segments) {
+      segment.trace_sha256 = trace.sha256;
+      if (!has_text(segment.segment.text)
+          || segment.segment.start_ms < 0
+          || segment.segment.end_ms <= segment.segment.start_ms
+          || segment.segment.end_ms > audio_duration_ms
+          || (!result.segments.empty()
+              && segment.segment.start_ms < result.segments.back().segment.start_ms)) {
+        throw BackendError(
+            "invalid_generation",
+            "Short parity bisect generated segment timeline is invalid");
+      }
+      result.segments.push_back(std::move(segment));
+    }
+    trace.parsed_seek_advance_frames = parsed.seek_advance_frames;
+    trace.proposed_advance_frames = parsed.seek_advance_frames;
+    trace.applied_seek_advance_frames = parsed.seek_advance_frames;
+    trace.seek_frames_after = source_frame_count(source_sample_count);
+    trace.single_timestamp_ending = parsed.single_timestamp_ending;
+    trace.used_decoded_seek = parsed.used_decoded_seek;
+    trace.parse_status = parsed.used_decoded_seek
+        ? "decoded-seek"
+        : "source-window-end";
+    trace.parsed_segment_count = result.segments.size();
+    trace.emitted_segment_count = result.segments.size();
+    trace.history_token_count_after = 0;
+    trace.source_progress_after_ms = audio_duration_ms;
+    trace.last_emitted_start_after_ms = result.segments.empty()
+        ? -1
+        : result.segments.back().segment.start_ms;
+  } catch (const BackendError& error) {
+    trace.parse_status = "failed";
+    trace.parse_error = error.code();
+    trace.seek_frames_after = 0;
+    trace.source_progress_after_ms = 0;
+    result.failure_code = error.code();
+  }
+
+  result.traces.push_back(std::move(trace));
+  remove_exact_duplicate_segments(result.segments);
+  check_cancelled(is_cancelled);
+  result.inference_ms = elapsed_ms(inference_started);
+  return result;
+}
+#endif
 
 }  // namespace hikaru_asr::whisper

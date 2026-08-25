@@ -10,12 +10,13 @@
 - 阻塞条件来自归档 T03C 和 legacy-relative reassessment：raw character ranges 不是 accepted cues，medium/long 无合法 accepted timing，observed result 为 `stop-revise`。
 - T12 `native-asr-model-manager` 可与本任务并行，但 final publication 必须消费其冻结的精确 Qwen ASR + ForcedAligner mapping。
 - 字幕质量只比较匹配的 identity-bound `python-legacy-cuda-v1` row，并遵循 `.trellis/spec/asr/quality-guidelines.md`。
+- 后续资格遵循 `native-gpu-authoritative-v1`：Qwen 只运行 GPU model-backed matrix，匹配 CPU route 以 `inherited-from-gpu` 继承且不产生 CPU 测量。
 
 ## Requirements
 
 1. 保留 raw ForcedAligner ranges 作为 provenance，按精确 pinned upstream token/range/source-segment semantics 分组；session getter 或 generic engine-native timing 不可成为 accepted timing。
 2. 最终 cue 必须合法、非负、非逆序、正时长、audio-bounded、text-conserving；zero-duration final group fail closed，不得 synthetic expand、clip 或平均分配时间。
-3. 同一冻结 candidate 完成 short-v1、medium-v1、long-v2；单 case 质量失败不得截断矩阵。
+3. 同一冻结 GPU candidate 完成 short-v1、medium-v1、long-v2；单 case 质量失败不得截断矩阵。
 4. 缺 companion、aligner 失败、leading silence、chunk boundary、tail overrun 和 malformed result 必须产生稳定失败且零 accepted partial output。
 5. 只有 T12-frozen ASR/aligner pair 可进入最终 evidence；mapping 变化后受影响 rows 必须重新获取。
 6. T09 GPU evidence 只决定开发加速，不构成正式 pack、设备或质量资格。
@@ -23,9 +24,10 @@
 ## Acceptance Criteria
 
 - [ ] T12 前可完成的 grouping/policy tests 独立通过；final evidence 明确绑定 T12 冻结的 ASR/ForcedAligner revisions、sizes 和 hashes。
-- [ ] short-v1/medium-v1/long-v2 均有 identity-valid completed 或完整 structured-failure row，并由完整矩阵发布一个 disposition。
+- [ ] short-v1/medium-v1/long-v2 均有 identity-valid GPU completed 或完整 structured-failure row，并由完整矩阵发布一个 disposition。
 - [ ] 所有 accepted timing 均可追溯到 legal ForcedAligner grouping；synthetic/mixed/session-native/unknown timing 数量为 0。
-- [ ] 每个 case 的 CER、S/D/I、空文本、semantic gaps 及双方 provenance eligible 时的 start median/P95 均不劣于匹配 Python row，并通过全部绝对硬门禁，才可发布 accepted algorithm handoff。
+- [ ] 每个 GPU case 的 CER、S/D/I、空文本、semantic gaps 及双方 provenance eligible 时的 start median/P95 均不劣于匹配 Python row，并通过全部绝对 GPU 硬门禁，才可发布 accepted algorithm handoff。
+- [ ] 匹配 CPU route 只记录 `qualificationSource=inherited-from-gpu`，不采集或填充 CPU CER/S/D/I/RTF/RSS。
 - [ ] 任一门禁失败时 Qwen 保持 visible/unavailable，且没有 failed-row promotion、伪时间轴或 silent Python fallback。
 
 ## Forbidden Premature Claims

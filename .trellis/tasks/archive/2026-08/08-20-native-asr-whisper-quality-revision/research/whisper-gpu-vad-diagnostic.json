@@ -1,0 +1,196 @@
+{
+  "authority": {
+    "benchmarkManifestSha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea",
+    "benchmarkRunnerSha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+    "inputLockSha256": "ee8a7e6bfd062f84359eaa3d86eb54ed843bb4d036613043ed2bc2f8f282b8c3",
+    "modelIdentitySha256": "964457273f6b15a13c95e8a8c5e95bc968f3e32a5ec5e7ab07c68622d403c95b",
+    "publisherSha256": "ce195b68bb0f501aa7f37e51ec816c75f15ec6d163ec16b2e3a505a2e4dfe7ae",
+    "pythonLegacyBaselineSha256": "c6142c40daf9c45c1d39d3612833c386fc71080866148d9b9719e428787979ef",
+    "runtimeIdentitySha256": "981f0dde3b7bb4448fbf45220498153df14846044880732ecf0550ce55662998"
+  },
+  "comparisonProfile": "native-gpu-authoritative-v1",
+  "kind": "hikaru-native-whisper-gpu-quality-vad-diagnostic",
+  "limitations": [
+    "Selection-only large-v3 short/medium exact-VAD evidence; no formal qualification claim.",
+    "No CPU model-backed measurements were acquired.",
+    "Diagnostic rows cannot be promoted; a selected algorithm requires a new lock, rebuild, and formal rerun."
+  ],
+  "qualificationEligible": false,
+  "rows": [
+    {
+      "beamSize": 5,
+      "caseId": "short-v1",
+      "cellId": "short-b5-vad",
+      "comparisons": {
+        "cer": {
+          "baseline": 0.35833333333333334,
+          "delta": -0.025000000000000022,
+          "disposition": "qualified",
+          "native": 0.3333333333333333
+        },
+        "deletions": {
+          "baseline": 16,
+          "delta": -1,
+          "disposition": "qualified",
+          "native": 15
+        },
+        "emptyTextCount": {
+          "baseline": 0,
+          "delta": 0,
+          "disposition": "qualified",
+          "native": 0
+        },
+        "insertions": {
+          "baseline": 2,
+          "delta": 4,
+          "disposition": "stop-revise",
+          "native": 6
+        },
+        "semanticGapCount": {
+          "baseline": 0,
+          "delta": 0,
+          "disposition": "qualified",
+          "native": 0
+        },
+        "semanticGapDurationMs": {
+          "baseline": 0,
+          "delta": 0,
+          "disposition": "qualified",
+          "native": 0
+        },
+        "substitutions": {
+          "baseline": 25,
+          "delta": -6,
+          "disposition": "qualified",
+          "native": 19
+        }
+      },
+      "conditionOnPreviousText": false,
+      "disposition": "stop-revise",
+      "engineering": {
+        "gpuInferenceRtf": 0.12190638121317734,
+        "gpuInferenceRtfPass": true,
+        "peakProcessRssBytes": 3231682560,
+        "peakProcessRssPass": true,
+        "processWallMs": 17142.877,
+        "shortProcessWallPass": true,
+        "timelinePass": true
+      },
+      "quality": {
+        "cer": 0.3333333333333333,
+        "deletions": 15,
+        "emptyTextCount": 0,
+        "insertions": 6,
+        "semanticGapCount": 0,
+        "semanticGapDurationMs": 0,
+        "substitutions": 19
+      },
+      "rawEvidenceSha256": "542e8ff1c5fab0e2ceb45a805efc45b95fdb151678f332e2e6cc150120706016",
+      "structural": {
+        "afterAudioEndCount": 0,
+        "negativeStartCount": 0,
+        "nonMonotonicCount": 0,
+        "nonPositiveDurationCount": 0,
+        "segmentCount": 5
+      },
+      "vad": {
+        "batchCount": 1,
+        "compressedSampleCount": 385637,
+        "intervalCount": 1,
+        "originalSampleCount": 385637,
+        "rowCount": 754
+      },
+      "vadEnabled": true
+    },
+    {
+      "beamSize": 5,
+      "caseId": "medium-v1",
+      "cellId": "medium-b5-on-vad",
+      "comparisons": {
+        "cer": {
+          "baseline": 0.10021978021978022,
+          "delta": 0.026373626373626377,
+          "disposition": "stop-revise",
+          "native": 0.1265934065934066
+        },
+        "deletions": {
+          "baseline": 92,
+          "delta": 20,
+          "disposition": "stop-revise",
+          "native": 112
+        },
+        "emptyTextCount": {
+          "baseline": 0,
+          "delta": 0,
+          "disposition": "qualified",
+          "native": 0
+        },
+        "insertions": {
+          "baseline": 64,
+          "delta": 28,
+          "disposition": "stop-revise",
+          "native": 92
+        },
+        "semanticGapCount": {
+          "baseline": 0,
+          "delta": 0,
+          "disposition": "qualified",
+          "native": 0
+        },
+        "semanticGapDurationMs": {
+          "baseline": 0,
+          "delta": 0,
+          "disposition": "qualified",
+          "native": 0
+        },
+        "substitutions": {
+          "baseline": 72,
+          "delta": 12,
+          "disposition": "stop-revise",
+          "native": 84
+        }
+      },
+      "conditionOnPreviousText": true,
+      "disposition": "stop-revise",
+      "engineering": {
+        "gpuInferenceRtf": 0.11859974642794144,
+        "gpuInferenceRtfPass": true,
+        "peakProcessRssBytes": 3231666176,
+        "peakProcessRssPass": true,
+        "processWallMs": 73534.7599,
+        "shortProcessWallPass": true,
+        "timelinePass": true
+      },
+      "quality": {
+        "cer": 0.1265934065934066,
+        "deletions": 112,
+        "emptyTextCount": 0,
+        "insertions": 92,
+        "semanticGapCount": 0,
+        "semanticGapDurationMs": 0,
+        "substitutions": 84
+      },
+      "rawEvidenceSha256": "a04edd7491da5d6d90dbef59dbd47986adb0934121a27f378d71ec9d13cc3478",
+      "structural": {
+        "afterAudioEndCount": 0,
+        "negativeStartCount": 0,
+        "nonMonotonicCount": 0,
+        "nonPositiveDurationCount": 0,
+        "segmentCount": 179
+      },
+      "vad": {
+        "batchCount": 2,
+        "compressedSampleCount": 7593600,
+        "intervalCount": 10,
+        "originalSampleCount": 7981952,
+        "rowCount": 15590
+      },
+      "vadEnabled": true
+    }
+  ],
+  "schemaVersion": 1,
+  "selection": {
+    "eligible": [],
+    "status": "no-candidate-selected"
+  }
+}

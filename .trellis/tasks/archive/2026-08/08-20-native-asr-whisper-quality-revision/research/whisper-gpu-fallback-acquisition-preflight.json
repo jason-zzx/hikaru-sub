@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "kind": "hikaru-native-whisper-gpu-fallback-acquisition-preflight",
+  "status": "invalid-evidence",
+  "qualificationEligible": false,
+  "comparisonProfile": "native-gpu-authoritative-v1",
+  "candidateId": "upstream-generation-fallback-parity-v1",
+  "modelLoaded": false,
+  "acquisitionRows": [],
+  "authority": {
+    "inputLockSha256": "5fcfe845451f418a1e21fe8711ba9f367fdc2e13f8c2e02dd598683dde4e073a",
+    "publisherSha256": "0b4164af9997c137450fdb02c0698d3424f54c1b4a4f1450b6fb6da104385c2c",
+    "benchmarkManifestSha256": "3c05c0eb705c29060123090e27e62a56e84177ef7e83a58485e3cbd90707d9ea",
+    "benchmarkRunnerSha256": "2e0dbee811f28e18dd1d5d29bb9ed50ab5ed028004adf1820665a128a813c45c",
+    "pythonLegacyBaselineSha256": "c6142c40daf9c45c1d39d3612833c386fc71080866148d9b9719e428787979ef",
+    "restrictedPathRootIdentitySha256": "8866553cc6616ec76f152177b69c5161e0aa5dec0c13519eb65b654afa3c66f6"
+  },
+  "dependencyIdentity": {
+    "fasterWhisperVersion": "1.2.1",
+    "fasterWhisperTranscribeSha256": "5d5ffb00018561d3d529b2c72e1d9f5fff055bea725f3cccc7c6c67f5cc8ffe4",
+    "pythonZlibCompileVersion": "1.3.1",
+    "pythonZlibRuntimeVersion": "1.3.1",
+    "zlibArchiveSha256": "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+    "modelIdentityManifestSha256": "7b46e0a983b7cc71e302e898d3f90d77b3c9159be2fe538585cd038e31c0a8f0",
+    "secondDiagnosticLockSha256": "ee8a7e6bfd062f84359eaa3d86eb54ed843bb4d036613043ed2bc2f8f282b8c3",
+    "secondDiagnosticPublicationSha256": "890453f440418d4c418e7916fcbe52b8ea9db2c85f48ef79b7d1b30bc372ecbc",
+    "msvcCompilerVersion": "19.50.35722",
+    "cmakeVersion": "4.1.1-msvc1",
+    "ninjaVersion": "1.12.1"
+  },
+  "sourceIdentity": {
+    "native-asr/CMakeLists.txt": "6e12c13af84e7a34f8b65094dc52d00933243e4495a533abd248834e0696f1db",
+    "native-asr/CMakePresets.json": "0a8fb41103b89dd1ca985d47061b7b2f224e0537234034fb215aa38bb0d838b6",
+    "native-asr/src/ctranslate2_whisper.hpp": "ba163402b1ac6efa43be58d10382e507012c662a6d3221e77f30f38bb3773dec",
+    "native-asr/src/ctranslate2_whisper.cpp": "1bb123dc28e1499ec89ec9ccc92e7306e14051585c88a2ed0d0378caf78bc617",
+    "native-asr/src/main.cpp": "c0440ec5ae31dc6be836b2d40b8941a5f17dab6206bfea8100b734e674832e42",
+    "native-asr/tests/ctranslate2_whisper_tests.cpp": "d8c171c345d0196cc01d4bd4b36140bf58f63ed94656f1ee346e1554a4bfe679",
+    "research/publish_whisper_gpu_quality.py": "0b4164af9997c137450fdb02c0698d3424f54c1b4a4f1450b6fb6da104385c2c",
+    "research/test_publish_whisper_gpu_quality.py": "5a610a71c80c60c7967245d85721484815c6d6f8a583eea13228da373472f537",
+    "research/test_whisper_fallback_oracle.py": "318b919dfa695fc80109fbb10c0574716aa2b9983b5404d1c77b33fb3146a894"
+  },
+  "runtimeIdentity": {
+    "hikaru-asr-worker.exe": {
+      "sizeBytes": 548352,
+      "sha256": "b73301c475b65b729732479a6a3750f50a5082249e5f6605ae1ecac18e1635c1"
+    },
+    "hikaru-asr-ctranslate2-tests.exe": {
+      "sizeBytes": 978944,
+      "sha256": "1f72c282f342abc84d69f2e663d021d06b6957a44cdef83d25c44f53e5ec0e39"
+    },
+    "ctranslate2.dll": {
+      "sizeBytes": 36974592,
+      "sha256": "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2"
+    },
+    "hikaru_asr_tokenizer.dll": {
+      "sizeBytes": 2137088,
+      "sha256": "d0ac979b132073ba76220f47e5b77538bf03ec1dcaea01fb5d9d928762939cad"
+    },
+    "onnxruntime.dll": {
+      "sizeBytes": 15809848,
+      "sha256": "18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257"
+    },
+    "onnxruntime_providers_shared.dll": {
+      "sizeBytes": 21856,
+      "sha256": "599629fa643707defe9156140ae5edd73531f221aa97b7585b1c9bb0a93586f8"
+    }
+  },
+  "modelIdentity": {
+    "id": "Systran/faster-whisper-large-v3",
+    "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "files": {
+      "config.json": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+      "model.bin": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+      "preprocessor_config.json": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+      "tokenizer.json": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+      "vocabulary.json": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
+    }
+  },
+  "inputIdentity": {
+    "shortWavSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+    "shortAssSha256": "60cd8c81b759e514e74af548f5a7478c0c409943932d35356504dae9f7fd844b",
+    "mediumWavSha256": "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
+    "mediumAssSha256": "d8849bcdb3f2c65a96fa2721d29ddcc919ac6532af20cba1d20fc7b82602404e",
+    "sileroVadV6Sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2"
+  },
+  "gpuIdentity": {
+    "deviceIndex": 0,
+    "name": "NVIDIA GeForce RTX 3070",
+    "driverVersion": "596.49",
+    "computeCapability": "8.6",
+    "cudaToolkitVersion": "12.8.93"
+  },
+  "modulePreflight": [
+    {
+      "name": "vcomp140.dll",
+      "sizeBytes": 213064,
+      "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7",
+      "directlyFrozenInInputLock": false
+    },
+    {
+      "name": "nvcuda.dll",
+      "sizeBytes": 4466920,
+      "sha256": "ec9942ff94bcf2a6714531932720d0d36bd1f362df768af9ae21f2388c08ef7c",
+      "directlyFrozenInInputLock": false
+    },
+    {
+      "name": "cublas64_12.dll",
+      "sizeBytes": 113716224,
+      "sha256": "9513540e4ec4c51ee9e7304138c2cc255c29a8c181f9e80c38efa25738becd99",
+      "directlyFrozenInInputLock": false
+    },
+    {
+      "name": "cublasLt64_12.dll",
+      "sizeBytes": 674667520,
+      "sha256": "b199d1ff892a81b7fd3d57ba1781549609b41500b36008fef326038393ad46c7",
+      "directlyFrozenInInputLock": false
+    }
+  ],
+  "blocker": {
+    "code": "fallback_lock_loaded_module_inventory_incomplete",
+    "summary": "The frozen publisher requires every loaded-module SHA-256 to appear directly in the fallback input lock, but the frozen lock omits the expected driver, CUDA BLAS, and OpenMP module hashes.",
+    "publisherFailure": "loaded module is not frozen",
+    "invalidEvidencePolicy": "stop-before-model-load"
+  },
+  "publicationDisposition": "invalid-preflight-no-publication",
+  "nextGate": "Return to planning, freeze a new reviewed lock that directly binds the complete loaded-module inventory, rebuild or re-attest as required, and obtain fresh explicit acquisition approval before running both cells.",
+  "limitations": [
+    "No model was loaded and neither authorized diagnostic cell was executed.",
+    "No CER, substitutions, deletions, insertions, gap, RTF, RSS, fallback-trigger, or selected-temperature row metrics exist.",
+    "The frozen lock was not edited or refreshed."
+  ]
+}

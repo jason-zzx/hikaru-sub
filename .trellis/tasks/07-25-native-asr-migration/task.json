@@ -38,7 +38,8 @@
     "08-20-native-asr-model-manager",
     "08-20-native-asr-qwen3-aligner",
     "08-20-native-asr-kotoba-quality-revision",
-    "08-20-native-asr-cpu-runtime-package"
+    "08-20-native-asr-cpu-runtime-package",
+    "08-25-native-asr-whisper-execution-parity-discovery"
   ],
   "parent": null,
   "relatedFiles": [],
