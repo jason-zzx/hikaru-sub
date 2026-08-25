@@ -2,40 +2,56 @@
 
 ## Goal
 
-Run one bounded, promotion-ineligible execution-parity discovery for ordinary Faster-Whisper so a later task can decide whether one causal native quality candidate is justified. The discovery must use the exact loaded model feature contract and must not repeat the lock-repair chain from the archived quality-revision task.
+Run one bounded, promotion-ineligible execution-parity discovery for ordinary Faster-Whisper. The result should determine whether one later causal short/medium quality candidate is justified, without repeating the archived lock-repair chain or beginning qualification.
 
-## Authority
+## Background
 
-- Ground truth and Python comparison authority remain the existing `.asr-benchmark` corpus and `python-legacy-cuda-v1` rows.
-- Historical ordinary Whisper quality evidence comes from archived T06 plus the archived `08-20-native-asr-whisper-quality-revision` non-qualified handoff.
-- The exact large-v3 model exposes `128` Mel bins. The prior `80 × 3000` parity tensors are invalid for model-backed large-v3 attribution and may be retained only as historical source-only evidence.
-- `.trellis/spec/asr/quality-guidelines.md` owns discovery/acquisition/qualification separation and exact model-derived feature-shape rules.
+- User-provided `.asr-benchmark` WAV+ASS data remains the only subtitle truth.
+- The identity-bound `python-legacy-cuda-v1` rows remain the Python quality authority; fresh Python output is reproducibility evidence only.
+- Archived T06R closed `stop-revise / non-qualified` after beam/history, exact Silero V6 and exact upstream-fallback diagnostics selected no candidate.
+- T06R's later parity probe was invalid: it froze `80 × 3000` Mel tensors before constructing the exact large-v3 model, which exposes `128` Mel bins.
+- `.trellis/spec/asr/quality-guidelines.md` requires discovery, candidate acquisition and qualification to remain separate.
 
 ## Requirements
 
-1. Planning must define separate unscored discovery, candidate acquisition and qualification stages. Discovery artifacts are always `qualificationEligible=false` and cannot be promoted.
-2. Before freezing any candidate/acquisition lock, one ignored-local model-backed discovery must construct the exact large-v3 model and record the actual feature shape and lazy-loaded runtime/module contract needed by the intended probe.
-3. Feature producers must derive `n_mels` from the exact loaded model identity. Large-v3 probes must use exact `128 × 3000` tensors; resizing, padding channels, substituting the prior 80-mel tensor or inferring shape from a model-independent default is forbidden.
-4. Reproduce the two anchor lanes first: Python-wheel runtime with its matching Python feature producer, and native runtime with its matching native feature producer. If either anchor cannot reproduce its frozen aggregate under a valid harness, stop as `baseline-runtime-unresolved` or `native-harness-unresolved` before crossover cells.
-5. Only after both anchors reproduce may the task run the optional cross-feature/runtime cells needed to distinguish feature divergence, runtime divergence, parser divergence or feature-runtime interaction.
-6. Python/native parser replay may compare exact acquired token sequences, but fresh Python output is reproducibility evidence only and never replaces the archived quality authority or user ASS truth.
-7. The discovery may perform at most one reviewed harness correction after the first model-backed discovery failure. A second harness/identity failure ends the task truthfully rather than creating another lock version.
-8. A successful attribution may propose at most one later short/medium quality candidate. This task does not implement or acquire that candidate, run the formal large-v3/large-v2 six-row matrix, change production/default routing or create CPU inheritance metadata.
-9. Raw audio, Mel tensors, tokens, text, module paths, models and binaries remain under the exact ignored task-local root. Tracked output contains only identities, aggregate hashes, bounded findings and limitations.
-10. Production worker/protocol/default routes remain unchanged. Python legacy stays the production/default route.
+1. Discovery artifacts must set `qualificationEligible=false` and `promotionEligible=false`; no discovery row may be promoted or adapted into candidate or qualification evidence.
+2. The discovery must construct the exact large-v3 model before accepting a feature tensor and record the model-reported Mel shape plus the runtime/module contract needed by the intended probe.
+3. Every feature producer must consume the exact model-derived `n_mels`. Large-v3 must use exact `128 × 3000` float32 tensors; resizing, channel padding, the historical 80-mel tensors and model-independent defaults are forbidden.
+4. Run the two anchor lanes first:
+   - Python-wheel CTranslate2 runtime with the matching faster-whisper/NumPy feature producer.
+   - Native no-cuDNN CTranslate2 runtime with the matching native/pocketfft feature producer.
+5. The Python-runtime anchor must reproduce the archived Python short aggregate; otherwise stop as `baseline-runtime-unresolved`. The native anchor must reproduce the reviewed native short aggregate; otherwise stop as `native-harness-unresolved`.
+6. Only after both anchors reproduce may the task run the two crossover lanes needed to distinguish feature divergence, runtime divergence, parser divergence, feature/runtime interaction or no divergence.
+7. Exact acquired token sequences may be replayed through both parsers. Fresh Python parsing/output never replaces the archived quality authority or user ASS truth.
+8. After the first model-backed harness or identity failure, at most one reviewed harness correction is allowed. A second such failure closes the task as `invalid-evidence`; no lock-version chain is allowed.
+9. A successful attribution may propose at most one separately planned short/medium quality candidate. This task does not implement or acquire that candidate.
+10. Audio, model paths, Mel tensors, tokens, text, module paths, runtimes, binaries and raw traces stay below the exact ignored task-local root. Tracked output contains only identities, aggregate hashes/counts, bounded findings and limitations.
+11. Production worker protocol, Tauri/React contracts, model manager, packaging and default routing remain unchanged. Python legacy stays production/default.
 
 ## Acceptance Criteria
 
-- [ ] `design.md` defines the minimal model-backed discovery command, actual loaded-contract capture, A/D-first stop gates, optional crossover rule, privacy boundary and single-correction budget.
-- [ ] `implement.md` defines exact validation commands and explicit stops before any quality candidate or qualification lock.
-- [ ] Planning binds the archived non-qualified handoff and the current ASR quality spec without modifying historical locks or artifacts.
-- [ ] No model-backed discovery runs before this task is separately reviewed and activated.
-- [ ] The eventual task result is one of: bounded causal attribution, `baseline-runtime-unresolved`, `native-harness-unresolved`, `feature-runtime-interaction`, `no-divergence` or `invalid-evidence`; it never claims qualification.
-- [ ] Any proposed follow-up is one causal short/medium quality candidate at most, requiring its own planning, review and explicit acquisition authorization.
+- [x] `design.md` defines the minimal model-backed discovery command, exact loaded-contract capture, anchor-first stop gates, optional crossover rule, privacy boundary and one-correction budget.
+- [x] `implement.md` defines ordered implementation and validation commands with explicit stops before candidate acquisition or qualification.
+- [x] Context manifests bind the ASR quality specification, archived T06R handoff and invalid 80-mel acquisition outcome.
+- [x] No model-backed discovery ran before this task was reviewed and activated.
+- [ ] Both anchors use exact model-derived `128 × 3000` inputs and clean isolated processes. The model contracts did report exact `128 × 3000`, but the reviewed correction overlapped the first timed-out child process, so all four A/D raw rows were invalidated.
+- [x] The task publishes exactly one bounded result: `invalid-evidence`.
+- [x] The result never claims qualification, changes production/default routing or creates CPU inheritance metadata.
+- [x] No follow-up quality candidate was created; the failed discovery provides no causal basis for one.
 
-## Out Of Scope
+## Final Result
 
-- Formal subtitle-quality qualification or pack/device attestation.
-- large-v2/large-v3 six-row acquisition.
-- Production/default route, protocol, frontend, downloader, model manager, installer or packaging changes.
-- Reference-derived repair, arbitrary beam/VAD/temperature searches or combining multiple speculative fixes.
+- Disposition: `invalid-evidence`.
+- Harness failures: `2`; the single reviewed correction budget is permanently exhausted.
+- Invalidated evidence: `A × 2` and `D × 2`; B/C never started.
+- Exact loaded model contract: large-v3 `128 × 3000` float32 Mel in both runtime roots.
+- Eligibility: `qualificationEligible=false`, `promotionEligible=false`, `scoringEligible=false`.
+- Product impact: none; ordinary native Faster-Whisper remains disabled and Python legacy remains production/default.
+- Authority: `research/whisper-execution-parity-discovery.json` and matching Markdown publication.
+
+## Out of Scope
+
+- Formal large-v3/large-v2 six-row acquisition or qualification.
+- Production worker/protocol/frontend/downloader/model-manager/installer/package changes.
+- Reference-derived repair, arbitrary beam/VAD/temperature searches or combining speculative fixes.
+- Rewriting archived T06/T06R locks, evidence or handoffs.

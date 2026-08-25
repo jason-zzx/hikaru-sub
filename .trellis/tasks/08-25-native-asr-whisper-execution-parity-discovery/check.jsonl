@@ -1,1 +1,4 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check exact Mel-shape authority, discovery non-promotion, identity validation, privacy and validation requirements."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-whisper-quality-revision/research/whisper-quality-non-qualified-handoff.md","reason":"Verify T06D does not overclaim qualification or alter the archived non-qualified disposition."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-whisper-quality-revision/research/whisper-short-parity-v5-acquisition-preflight.md","reason":"Verify the implementation rejects the historical 80-mel failure mode before encode/generate."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-whisper-quality-revision/research/next-candidate-causal-audit.md","reason":"Check anchor-first gates, four-cell attribution and parser/runtime/feature decision semantics."}

@@ -3,7 +3,7 @@
   "name": "native-asr-whisper-execution-parity-discovery",
   "title": "Discover native Whisper execution parity",
   "description": "Run one bounded planning-first, promotion-ineligible execution-parity discovery for ordinary Faster-Whisper using exact model-derived feature contracts before any new quality candidate or qualification lock.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
