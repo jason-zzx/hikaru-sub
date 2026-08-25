@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 28
+- **Total Sessions**: 29
 - **Last Active**: 2026-08-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~986 | Active |
+| `journal-1.md` | ~1020 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 29 | 2026-08-25 | Close native Whisper execution parity discovery | `dff1b52`, `309bd2e` | `dev-crisp-asr` |
 | 28 | 2026-08-25 | Close native Whisper quality revision | `3a9c9e6` | `dev-crisp-asr` |
 | 27 | 2026-08-20 | Reprioritize native ASR migration roadmap | `c14d934` | `dev-crisp-asr` |
 | 26 | 2026-08-19 | Re-evaluate native ASR quality against Python legacy baseline | `42d7904` | `dev-crisp-asr` |
