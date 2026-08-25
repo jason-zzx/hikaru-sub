@@ -213,38 +213,41 @@ WhisperQualityDiagnosticCell whisper_quality_fallback_diagnostic_cell(
 }
 
 #ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
-struct WhisperShortParityCell {
+struct WhisperExecutionParityCell {
   std::string id;
   std::string mel_role;
-  std::string mel_sha256;
   std::string runtime_role;
   std::string runtime_sha256;
 };
 
-std::vector<WhisperShortParityCell> whisper_short_parity_cells() {
-  constexpr const char* python_mel =
-      "51209b71c3450718055dfad8a3d5923283dd95d702d606b0bdf56aac53218aa9";
-  constexpr const char* native_mel =
-      "c2fc425ae691a4b1f9acd92580061ad97df82e01165747d761653f87634b9e08";
+std::vector<WhisperExecutionParityCell> whisper_execution_parity_cells() {
   constexpr const char* python_runtime =
       "60e536c0801432cde4a105aeebbca35fbf228aa3e901807b2310b02676c2f140";
   constexpr const char* native_runtime =
       "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2";
   return {
-      {"python-runtime-python-mel", "python", python_mel, "python-wheel", python_runtime},
-      {"python-runtime-native-mel", "native", native_mel, "python-wheel", python_runtime},
-      {"native-runtime-python-mel", "python", python_mel, "native-no-cudnn", native_runtime},
-      {"native-runtime-native-mel", "native", native_mel, "native-no-cudnn", native_runtime},
+      {"python-runtime-python-mel", "python", "python-wheel", python_runtime},
+      {"python-runtime-native-mel", "native", "python-wheel", python_runtime},
+      {"native-runtime-python-mel", "python", "native-no-cudnn", native_runtime},
+      {"native-runtime-native-mel", "native", "native-no-cudnn", native_runtime},
   };
 }
 
-WhisperShortParityCell whisper_short_parity_cell(const std::string& id) {
-  const auto cells = whisper_short_parity_cells();
+WhisperExecutionParityCell whisper_execution_parity_cell(const std::string& id) {
+  const auto cells = whisper_execution_parity_cells();
   const auto found = std::find_if(cells.begin(), cells.end(), [&](const auto& cell) {
     return cell.id == id;
   });
-  check(found != cells.end(), "T06R short parity cell is not allowed");
+  check(found != cells.end(), "T06D execution-parity cell is not allowed");
   return *found;
+}
+
+CandidateAConfig execution_parity_config() {
+  CandidateAConfig config;
+  config.beam_size = 5;
+  config.condition_on_previous_text = true;
+  config.timestamp_driven_seek = true;
+  return config;
 }
 #endif
 
@@ -319,44 +322,49 @@ std::string sha256_file(const fs::path& path) {
 }
 
 #ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
-bool is_t06r_task_local_output(const fs::path& path);
+bool is_t06d_task_local_output(const fs::path& path);
 
-std::vector<float> read_short_parity_mel(
+std::vector<float> read_execution_parity_mel(
     const fs::path& path,
+    int mel_bins,
     const std::string& expected_sha256) {
-  check(is_t06r_task_local_output(path),
-        "T06R short parity Mel must stay under research/local");
-  check(fs::is_regular_file(path)
-            && fs::file_size(path)
-                == static_cast<std::uintmax_t>(80 * max_model_frames * sizeof(float)),
-        "T06R short parity Mel shape drifted");
+  check(is_t06d_task_local_output(path),
+        "T06D Mel must stay under research/local");
+  check(mel_bins == 128,
+        "T06D large-v3 contract must expose 128 Mel bins");
+  const std::uintmax_t expected_size =
+      static_cast<std::uintmax_t>(mel_bins * max_model_frames * sizeof(float));
+  check(fs::is_regular_file(path) && fs::file_size(path) == expected_size,
+        "T06D Mel shape drifted");
   check(sha256_file(path) == expected_sha256,
-        "T06R short parity Mel identity drifted");
+        "T06D Mel identity drifted");
   std::ifstream input(path, std::ios::binary);
-  check(static_cast<bool>(input), "T06R short parity Mel could not be read");
-  std::vector<float> mel(static_cast<std::size_t>(80 * max_model_frames));
+  check(static_cast<bool>(input), "T06D Mel could not be read");
+  std::vector<float> mel(static_cast<std::size_t>(mel_bins * max_model_frames));
   const std::streamsize expected_bytes =
       static_cast<std::streamsize>(mel.size() * sizeof(float));
   input.read(reinterpret_cast<char*>(mel.data()), expected_bytes);
   check(input.gcount() == expected_bytes,
-        "T06R short parity Mel read was truncated");
+        "T06D Mel read was truncated");
   return mel;
 }
 
-void write_short_parity_mel(
+void write_execution_parity_mel(
     const fs::path& path,
-    const std::vector<float>& mel) {
-  check(is_t06r_task_local_output(path),
-        "T06R short parity Mel output must stay under research/local");
-  check(mel.size() == static_cast<std::size_t>(80 * max_model_frames),
-        "T06R short parity Mel output shape drifted");
+    const std::vector<float>& mel,
+    int mel_bins) {
+  check(is_t06d_task_local_output(path),
+        "T06D Mel output must stay under research/local");
+  check(mel_bins == 128
+            && mel.size() == static_cast<std::size_t>(mel_bins * max_model_frames),
+        "T06D Mel output shape drifted");
   fs::create_directories(path.parent_path());
   const fs::path temporary = path.string() + ".tmp";
   std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
   output.write(
       reinterpret_cast<const char*>(mel.data()),
       static_cast<std::streamsize>(mel.size() * sizeof(float)));
-  check(static_cast<bool>(output), "T06R short parity Mel write failed");
+  check(static_cast<bool>(output), "T06D Mel write failed");
   output.close();
   fs::remove(path);
   fs::rename(temporary, path);
@@ -670,6 +678,10 @@ bool is_t07_task_local_output(const fs::path& path) {
 
 bool is_t06r_task_local_output(const fs::path& path) {
   return is_path_within(fs::path(T06R_LOCAL_ROOT), path);
+}
+
+bool is_t06d_task_local_output(const fs::path& path) {
+  return is_path_within(fs::path(T06D_LOCAL_ROOT), path);
 }
 
 bool is_t06r_tracked_research_file(const fs::path& path) {
@@ -2678,596 +2690,7 @@ void run_cuda_development_evidence(const std::vector<std::string>& args) {
 }
 
 #ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
-Json short_parity_runtime_files(
-    const fs::path& executable,
-    const std::string& role) {
-  std::vector<std::string> expected{
-      "ctranslate2.dll",
-      "hikaru-asr-ctranslate2-tests.exe",
-      "hikaru-asr-worker.exe",
-      "hikaru_asr_tokenizer.dll",
-      "onnxruntime.dll",
-      "onnxruntime_providers_shared.dll",
-      "silero_vad_v6.onnx"};
-  if (role == "python-wheel") {
-    expected.push_back("cudnn64_9.dll");
-    expected.push_back("libiomp5md.dll");
-  }
-  std::sort(expected.begin(), expected.end());
-
-  Json files = Json::array();
-  std::vector<std::string> actual;
-  for (const fs::directory_entry& entry : fs::directory_iterator(executable.parent_path())) {
-    check(entry.is_regular_file(),
-          "T06R short parity runtime root contains a non-file entry");
-    const std::string name = entry.path().filename().u8string();
-    actual.push_back(name);
-    Json identity = file_identity(entry.path());
-    identity["name"] = name;
-    files.push_back(std::move(identity));
-  }
-  std::sort(actual.begin(), actual.end());
-  check(actual == expected, "T06R short parity runtime file set drifted");
-  std::sort(files.begin(), files.end(), [](const Json& left, const Json& right) {
-    return lowercase(left.at("name").get<std::string>())
-        < lowercase(right.at("name").get<std::string>());
-  });
-  return files;
-}
-
-Json short_parity_lock_identity(const std::string& lock_text) {
-  constexpr const char* begin_marker = "<!-- SHORT-PARITY-IDENTITY:BEGIN -->";
-  constexpr const char* end_marker = "<!-- SHORT-PARITY-IDENTITY:END -->";
-  const std::size_t begin = lock_text.find(begin_marker);
-  const std::size_t end = lock_text.find(end_marker);
-  check(begin != std::string::npos && end != std::string::npos && begin < end,
-        "T06R short parity lock identity block is missing");
-  const std::size_t json_begin = begin + std::char_traits<char>::length(begin_marker);
-  Json identity = Json::parse(
-      lock_text.substr(json_begin, end - json_begin), nullptr, false);
-  check(identity.is_object()
-            && identity.value("candidateId", "")
-                == "short-input-runtime-parity-bisect-v1",
-        "T06R short parity lock identity is invalid");
-  return identity;
-}
-
-void require_short_parity_identity(
-    const fs::path& path,
-    const Json& expected,
-    const std::string& label) {
-  check(fs::is_regular_file(path)
-            && expected.is_object()
-            && expected.value("sizeBytes", std::uintmax_t{0}) == fs::file_size(path)
-            && expected.value("sha256", "") == sha256_file(path),
-        "T06R short parity " + label + " identity drifted");
-}
-
-void require_short_parity_named_files(
-    const Json& actual,
-    const Json& expected,
-    const std::string& label) {
-  check(actual.is_array() && expected.is_array() && actual.size() == expected.size(),
-        "T06R short parity " + label + " cardinality drifted");
-  for (const Json& expected_file : expected) {
-    const std::string name = expected_file.value("name", "");
-    const auto found = std::find_if(actual.begin(), actual.end(), [&](const Json& file) {
-      return lowercase(file.value("name", "")) == lowercase(name);
-    });
-    check(found != actual.end()
-              && found->value("sizeBytes", std::uintmax_t{0})
-                  == expected_file.value("sizeBytes", std::uintmax_t{0})
-              && found->value("sha256", "") == expected_file.value("sha256", ""),
-          "T06R short parity " + label + " identity drifted: " + name);
-  }
-}
-
-void require_short_parity_module_files(
-    const Json& path_policy,
-    const Json& expected_modules) {
-  std::map<std::string, fs::path> roots;
-  for (const Json& root : path_policy.at("resolvedRoots")) {
-    roots.emplace(
-        root.at("role").get<std::string>(),
-        fs::u8path(root.at("canonicalPath").get<std::string>()));
-  }
-  check(expected_modules.is_array(),
-        "T06R short parity expected module set is missing");
-  for (const Json& module : expected_modules) {
-    const std::string role = module.value("rootRole", "");
-    const std::string name = module.value("name", "");
-    const auto root = roots.find(role);
-    check(root != roots.end(),
-          "T06R short parity module root role drifted: " + name);
-    require_short_parity_identity(
-        root->second / fs::u8path(name), module, "module " + name);
-  }
-}
-
-Json short_parity_vad_model_identity(
-    const fs::path& path,
-    const fs::path& executable) {
-  const fs::path expected = executable.parent_path() / "silero_vad_v6.onnx";
-  check(is_t06r_task_local_output(path)
-            && fs::is_regular_file(path)
-            && fs::weakly_canonical(path) == fs::weakly_canonical(expected),
-        "T06R short parity VAD model must be the isolated runtime asset");
-  check(fs::file_size(path) == 1245151
-            && sha256_file(path)
-                == "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
-        "T06R short parity exact Silero V6 asset identity drifted");
-  Json identity = file_identity(path);
-  identity["name"] = "silero_vad_v6.onnx";
-  identity["rootRole"] = "task-local-runtime-bin";
-  return identity;
-}
-
-void run_short_parity_self_check(const std::vector<std::string>& args) {
-  validate_closed_mode_args(args, "--short-parity-self-check", {});
-  const auto cells = whisper_short_parity_cells();
-  check(cells.size() == 4, "T06R short parity cell count drifted");
-  check(cells[0].id == "python-runtime-python-mel"
-            && cells[1].id == "python-runtime-native-mel"
-            && cells[2].id == "native-runtime-python-mel"
-            && cells[3].id == "native-runtime-native-mel",
-        "T06R short parity cell order drifted");
-  for (const auto& cell : cells) {
-    check((cell.mel_role == "python" || cell.mel_role == "native")
-              && (cell.runtime_role == "python-wheel"
-                  || cell.runtime_role == "native-no-cudnn")
-              && cell.mel_sha256.size() == 64
-              && cell.runtime_sha256.size() == 64,
-          "T06R short parity cell identity drifted");
-  }
-  const CandidateAConfig config = upstream_generation_fallback_config();
-  check(config.beam_size == 5
-            && config.condition_on_previous_text
-            && config.timestamp_driven_seek
-            && config.upstream_generation_fallback,
-        "T06R short parity fallback config drifted");
-  const std::vector<std::string> value_args{
-      "--cell", "--model", "--mel", "--output", "--input-lock",
-      "--production-worker", "--model-id", "--model-revision",
-      "--model-bin-sha256", "--repeats", "--vad-model"};
-  const std::vector<std::string> valid_args{
-      "--run-whisper-short-parity",
-      "--cell", "python-runtime-python-mel",
-      "--model", "model",
-      "--mel", "mel",
-      "--output", "output",
-      "--input-lock", "lock",
-      "--production-worker", "worker",
-      "--model-id", "model-id",
-      "--model-revision", "revision",
-      "--model-bin-sha256", "hash",
-      "--repeats", "2",
-      "--vad-model", "vad"};
-  validate_closed_mode_args(
-      valid_args, "--run-whisper-short-parity", value_args);
-  for (std::vector<std::string> invalid : {
-           std::vector<std::string>(valid_args.begin(), valid_args.end() - 2),
-           std::vector<std::string>{"--run-whisper-short-parity", "--vad", "true"}}) {
-    try {
-      validate_closed_mode_args(
-          invalid, "--run-whisper-short-parity", value_args);
-      throw std::runtime_error("T06R short parity closed CLI mutation unexpectedly passed");
-    } catch (const std::runtime_error& error) {
-      check(std::string(error.what())
-                != "T06R short parity closed CLI mutation unexpectedly passed",
-            "T06R short parity closed CLI rejection drift");
-    }
-  }
-  static_cast<void>(short_parity_vad_model_identity(
-      current_executable().parent_path() / "silero_vad_v6.onnx",
-      current_executable()));
-  std::cout << "ctranslate2 whisper short parity tests passed\n";
-}
-
-void run_short_parity_runtime_smoke(const std::vector<std::string>& args) {
-  validate_closed_mode_args(
-      args,
-      "--short-parity-runtime-smoke",
-      {"--runtime-role", "--output"});
-  const std::string role = required_arg(args, "--runtime-role");
-  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
-  check(role == "python-wheel" || role == "native-no-cudnn",
-        "T06R short parity runtime role is not allowed");
-  check(is_t06r_task_local_output(output_path),
-        "T06R short parity smoke output must stay under research/local");
-  const fs::path executable = current_executable();
-  const fs::path ct2_dll = executable.parent_path() / "ctranslate2.dll";
-  const std::string expected_ct2 = role == "python-wheel"
-      ? "60e536c0801432cde4a105aeebbca35fbf228aa3e901807b2310b02676c2f140"
-      : "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2";
-  check(sha256_file(ct2_dll) == expected_ct2,
-        "T06R short parity smoke CT2 runtime drifted");
-  const Json path_policy = cuda_development_path_policy();
-  const Json runtime_files = short_parity_runtime_files(executable, role);
-  Json modules = cuda_development_loaded_modules(path_policy);
-  const auto has_module = [&](const std::string& name) {
-    return std::any_of(modules.begin(), modules.end(), [&](const Json& module) {
-      return lowercase(module.at("name").get<std::string>()) == lowercase(name);
-    });
-  };
-  check(has_module(executable.filename().u8string())
-            && has_module("ctranslate2.dll")
-            && has_module("hikaru_asr_tokenizer.dll")
-            && has_module("onnxruntime.dll"),
-        "T06R short parity smoke required module is missing");
-  if (role == "python-wheel") {
-    check(!has_module("vcomp140.dll"),
-          "T06R Python-wheel smoke loaded the native OpenMP runtime");
-  } else {
-    check(!has_module("cudnn64_9.dll") && !has_module("libiomp5md.dll")
-              && has_module("vcomp140.dll"),
-          "T06R native smoke module family drifted");
-  }
-  const Json raw{
-      {"schemaVersion", 1},
-      {"kind", "hikaru-ct2-whisper-short-parity-runtime-smoke"},
-      {"status", "completed"},
-      {"qualificationEligible", false},
-      {"modelLoaded", false},
-      {"runtimeRole", role},
-      {"measurementExecutable", file_identity(executable)},
-      {"ctranslate2", file_identity(ct2_dll)},
-      {"runtimeFiles", runtime_files},
-      {"pathPolicy", path_policy},
-      {"loadedModules", std::move(modules)}};
-  fs::create_directories(output_path.parent_path());
-  const fs::path temporary = output_path.string() + ".tmp";
-  std::ofstream(temporary, std::ios::binary) << std::setw(2) << raw << '\n';
-  fs::remove(output_path);
-  fs::rename(temporary, output_path);
-  std::cout << Json{{"status", "completed"}, {"runtimeRole", role}}.dump() << '\n';
-}
-
-void export_short_parity_native_mel(const std::vector<std::string>& args) {
-  validate_closed_mode_args(
-      args,
-      "--export-whisper-short-parity-native-mel",
-      {"--audio", "--output"});
-  const fs::path audio_path = fs::u8path(required_arg(args, "--audio"));
-  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
-  check(fs::is_regular_file(audio_path)
-            && sha256_file(audio_path)
-                == "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"
-            && verified_wav_duration_ms(audio_path) == 24102,
-        "T06R short parity WAV identity drifted");
-  const wav::Audio audio = wav::read_pcm16_mono_16khz(audio_path);
-  check(audio.samples.size() == 385637,
-        "T06R short parity sample count drifted");
-  const std::vector<float> mel = official_log_mel_for_test(
-      audio.samples,
-      80,
-      0,
-      static_cast<int>(source_frame_count(audio.samples.size())));
-  write_short_parity_mel(output_path, mel);
-  const std::string hash = sha256_file(output_path);
-  check(hash == "c2fc425ae691a4b1f9acd92580061ad97df82e01165747d761653f87634b9e08",
-        "T06R native short Mel identity drifted");
-  std::cout << Json{
-      {"status", "completed"},
-      {"producer", "native"},
-      {"shape", Json::array({80, max_model_frames})},
-      {"dtype", "float32-le"},
-      {"sha256", hash}}.dump() << '\n';
-}
-
-struct ShortParityPreflight {
-  Json model_files;
-  Json path_policy;
-  Json runtime_files;
-  Json vad_model;
-};
-
-ShortParityPreflight validate_short_parity_preflight(
-    const WhisperShortParityCell& cell,
-    const fs::path& model_path,
-    const fs::path& mel_path,
-    const fs::path& vad_model_path,
-    const fs::path& input_lock,
-    const fs::path& production_worker,
-    const std::string& model_id,
-    const std::string& model_revision,
-    const std::string& model_hash) {
-  check(is_t06r_tracked_research_file(input_lock)
-            && fs::is_regular_file(input_lock),
-        "T06R short parity lock must be a tracked research file");
-  const fs::path executable = current_executable();
-  check(fs::is_regular_file(production_worker)
-            && fs::equivalent(
-                fs::weakly_canonical(production_worker).parent_path(),
-                fs::weakly_canonical(executable).parent_path())
-            && production_worker.filename() == "hikaru-asr-worker.exe",
-        "T06R short parity production worker must use the isolated runtime root");
-  static_cast<void>(read_short_parity_mel(mel_path, cell.mel_sha256));
-
-  ShortParityPreflight preflight;
-  preflight.vad_model = short_parity_vad_model_identity(vad_model_path, executable);
-  preflight.model_files = model_file_identities(model_path);
-  const auto model_bin = std::find_if(
-      preflight.model_files.begin(), preflight.model_files.end(), [](const Json& file) {
-        return file.at("name") == "model.bin";
-      });
-  check(model_id == "Systran/faster-whisper-large-v3"
-            && model_revision == "edaa852ec7e145841d8ffdb056a99866b5f0a478"
-            && model_hash
-                == "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1"
-            && model_bin != preflight.model_files.end()
-            && model_bin->at("sha256") == model_hash,
-        "T06R short parity model identity drifted");
-
-  const fs::path ct2_dll = executable.parent_path() / "ctranslate2.dll";
-  check(fs::is_regular_file(ct2_dll)
-            && sha256_file(ct2_dll) == cell.runtime_sha256,
-        "T06R short parity process-start CT2 runtime drifted");
-  preflight.path_policy = cuda_development_path_policy();
-  preflight.runtime_files = short_parity_runtime_files(executable, cell.runtime_role);
-  const std::string lock_text = read_text_file(input_lock);
-  const Json lock_identity = short_parity_lock_identity(lock_text);
-  check(lock_identity.at("cells").is_array()
-            && std::find(
-                lock_identity.at("cells").begin(),
-                lock_identity.at("cells").end(),
-                cell.id) != lock_identity.at("cells").end(),
-        "T06R short parity cell is absent from the lock");
-  check(lock_identity.at("audio").value("waveformSha256", "")
-            == "2cbf22e7635a41cf751401525e4358c19f2d452ae99c0ced78f65b6e9327e1c2",
-        "T06R short parity waveform identity drifted");
-  check(lock_identity.value("supersedesLockSha256", "")
-            == "62ef486a9f54d62d3f78504fc293a1917e59746d85cf09a73422edc2c384e42f"
-            && lock_identity.at("invalidV3").value("ignoredRecordSha256", "")
-                == "808dd23c1f69e395bd759aad183e04e6b32e8c354a54f151b64c001e22882132"
-            && lock_identity.at("invalidV3").value("trackedReportSha256", "")
-                == "1571773487cfe39fbf33daa149e030b29c257b3dca2760c0056604a46f79509d",
-        "T06R short parity v4 supersession identity drifted");
-  check(lock_identity.at("vadModel") == preflight.vad_model,
-        "T06R short parity VAD model lock identity drifted");
-  require_short_parity_named_files(
-      preflight.model_files,
-      lock_identity.at("model").at("files"),
-      "model file set");
-  const Json& expected_runtime =
-      lock_identity.at("runtimes").at(cell.runtime_role);
-  check(expected_runtime.value("pathRootIdentitySha256", "")
-            == preflight.path_policy.at("rootIdentitySha256").get<std::string>(),
-        "T06R short parity PATH root identity drifted");
-  require_short_parity_named_files(
-      preflight.runtime_files,
-      expected_runtime.at("runtimeFiles"),
-      "runtime file set");
-  require_short_parity_identity(
-      executable,
-      expected_runtime.at("measurementExecutable"),
-      "measurement executable");
-  require_short_parity_identity(
-      production_worker,
-      expected_runtime.at("productionWorker"),
-      "production worker");
-  require_short_parity_identity(
-      ct2_dll,
-      expected_runtime.at("ctranslate2"),
-      "CTranslate2 runtime");
-  require_short_parity_module_files(
-      preflight.path_policy, expected_runtime.at("loadedModules"));
-  check(lock_text.find("does not authorize acquisition") != std::string::npos,
-        "T06R short parity lock lacks the acquisition stop boundary");
-  return preflight;
-}
-
-void run_short_parity_preflight(const std::vector<std::string>& args) {
-  validate_closed_mode_args(
-      args,
-      "--short-parity-preflight",
-      {"--cell", "--model", "--mel", "--vad-model", "--input-lock",
-       "--production-worker", "--model-id", "--model-revision",
-       "--model-bin-sha256"});
-  const WhisperShortParityCell cell = whisper_short_parity_cell(
-      required_arg(args, "--cell"));
-  const ShortParityPreflight preflight = validate_short_parity_preflight(
-      cell,
-      fs::u8path(required_arg(args, "--model")),
-      fs::u8path(required_arg(args, "--mel")),
-      fs::u8path(required_arg(args, "--vad-model")),
-      fs::u8path(required_arg(args, "--input-lock")),
-      fs::u8path(required_arg(args, "--production-worker")),
-      required_arg(args, "--model-id"),
-      required_arg(args, "--model-revision"),
-      required_arg(args, "--model-bin-sha256"));
-  std::cout << Json{
-      {"status", "completed"},
-      {"cellId", cell.id},
-      {"vadModel", preflight.vad_model},
-      {"vadModelLoaded", false},
-      {"asrModelLoaded", false},
-      {"modelLoaded", false}}.dump() << '\n';
-}
-
-void run_short_parity_evidence(const std::vector<std::string>& args) {
-  validate_closed_mode_args(
-      args,
-      "--run-whisper-short-parity",
-      {"--cell", "--model", "--mel", "--vad-model", "--output",
-       "--input-lock", "--production-worker", "--model-id",
-       "--model-revision", "--model-bin-sha256", "--repeats"});
-  const WhisperShortParityCell cell = whisper_short_parity_cell(
-      required_arg(args, "--cell"));
-  const fs::path model_path = fs::u8path(required_arg(args, "--model"));
-  const fs::path mel_path = fs::u8path(required_arg(args, "--mel"));
-  const fs::path vad_model_path = fs::u8path(required_arg(args, "--vad-model"));
-  const fs::path output_path = fs::u8path(required_arg(args, "--output"));
-  const fs::path input_lock = fs::u8path(required_arg(args, "--input-lock"));
-  const fs::path production_worker = fs::u8path(required_arg(args, "--production-worker"));
-  const std::string model_id = required_arg(args, "--model-id");
-  const std::string model_revision = required_arg(args, "--model-revision");
-  const std::string model_hash = required_arg(args, "--model-bin-sha256");
-  const int repeats = integer_arg(args, "--repeats", 2);
-
-  check(repeats == 2, "T06R short parity requires exactly two repeats");
-  check(is_t06r_task_local_output(output_path),
-        "T06R short parity raw output must stay under research/local");
-  const ShortParityPreflight preflight = validate_short_parity_preflight(
-      cell,
-      model_path,
-      mel_path,
-      vad_model_path,
-      input_lock,
-      production_worker,
-      model_id,
-      model_revision,
-      model_hash);
-  std::vector<float> mel = read_short_parity_mel(mel_path, cell.mel_sha256);
-  const fs::path executable = current_executable();
-  const fs::path ct2_dll = executable.parent_path() / "ctranslate2.dll";
-  const Json& model_files = preflight.model_files;
-  const Json& path_policy = preflight.path_policy;
-  const Json& runtime_files = preflight.runtime_files;
-
-  const Clock::time_point load_started = Clock::now();
-  CTranslate2WhisperBackend backend(
-      model_path,
-      upstream_generation_fallback_config(),
-      vad_model_path,
-      cuda_execution_config());
-  const double load_ms = elapsed_ms(load_started);
-  const BackendExecutionAttestation attestation = backend.execution_attestation();
-  check(attestation.config.device == ExecutionDevice::Cuda
-            && attestation.config.compute_type == ExecutionComputeType::Float16
-            && attestation.config.device_index == 0,
-        "T06R short parity CUDA mapping drifted");
-
-  Json samples = Json::array();
-  bool failed = false;
-  for (int repeat = 0; repeat < repeats; ++repeat) {
-    const Clock::time_point started = Clock::now();
-    const TranscriptionResult result = backend.transcribe_precomputed_mel_for_test(
-        mel,
-        385637,
-        24102);
-    const double sample_wall_ms = elapsed_ms(started);
-    Json segments = Json::array();
-    for (const SegmentEvidence& segment : result.segments) {
-      segments.push_back(segment_json(segment));
-    }
-    Json traces = Json::array();
-    std::size_t generation_calls = 0;
-    for (const WindowTrace& trace : result.traces) {
-      traces.push_back(trace_json(trace));
-      generation_calls += trace.generation_call_count;
-    }
-    check(result.traces.size() == 1 && generation_calls > 0,
-          "T06R short parity row lacks the single-window generation trace");
-    samples.push_back(Json{
-        {"status", result.failure_code.empty() ? "completed" : "failed"},
-        {"runKind", "short-parity"},
-        {"repeatIndex", repeat + 1},
-        {"segments", std::move(segments)},
-        {"tokenTraces", std::move(traces)},
-        {"generationCallCount", generation_calls},
-        {"failure", result.failure_code.empty()
-             ? Json(nullptr)
-             : Json{{"code", result.failure_code}}},
-        {"timings", Json{
-             {"loadMs", repeat == 0 ? Json(load_ms) : Json(nullptr)},
-             {"sampleWallMs", sample_wall_ms},
-             {"modelGenerateMs", result.generate_ms},
-             {"inferenceMs", result.inference_ms}}}});
-    if (!result.failure_code.empty()) {
-      failed = true;
-      break;
-    }
-  }
-
-  Json modules = cuda_development_loaded_modules(path_policy);
-  const auto has_module = [&](const std::string& name) {
-    return std::any_of(modules.begin(), modules.end(), [&](const Json& module) {
-      return lowercase(module.at("name").get<std::string>()) == lowercase(name);
-    });
-  };
-  if (cell.runtime_role == "python-wheel") {
-    check(has_module("cudnn64_9.dll") && has_module("libiomp5md.dll"),
-          "T06R Python-wheel runtime did not load cuDNN/OpenMP identity");
-  } else {
-    check(!has_module("cudnn64_9.dll") && !has_module("libiomp5md.dll")
-              && has_module("vcomp140.dll"),
-          "T06R native runtime module family drifted");
-  }
-  const Json gpu = attested_cuda_gpu(modules, attestation);
-  Json parity_config = config_json(upstream_generation_fallback_config());
-  parity_config["vad"] = false;
-  parity_config["language"] = "ja";
-  parity_config["sampleRate"] = sample_rate;
-
-  const Json raw{
-      {"schemaVersion", 1},
-      {"kind", "hikaru-ct2-whisper-short-parity-raw"},
-      {"status", failed ? "failed" : "completed"},
-      {"qualificationEligible", false},
-      {"promotionEligible", false},
-      {"candidateId", "short-input-runtime-parity-bisect-v1"},
-      {"cellId", cell.id},
-      {"caseId", "short-v1"},
-      {"mel", Json{
-           {"producer", cell.mel_role},
-           {"shape", Json::array({80, max_model_frames})},
-           {"dtype", "float32-le"},
-           {"sizeBytes", 80 * max_model_frames * sizeof(float)},
-           {"sha256", cell.mel_sha256}}},
-      {"audio", Json{
-           {"wavSha256", "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"},
-           {"waveformSha256", "2cbf22e7635a41cf751401525e4358c19f2d452ae99c0ced78f65b6e9327e1c2"},
-           {"sampleCount", 385637},
-           {"durationMs", 24102},
-           {"vadExpectedInterval", Json::array({0, 385637})}}},
-      {"model", Json{
-           {"id", model_id},
-           {"revision", model_revision},
-           {"files", model_files}}},
-      {"config", std::move(parity_config)},
-      {"decodeIdentity", Json{
-           {"promptTokenIds", Json::array({50258, 50266, 50360})},
-           {"promptSha256", "908b1562c473b2889d6ac86c6e011ec4c681f6e78c971f0d8e73424057a42ba0"},
-           {"suppressedTokenCount", 88},
-           {"suppressedTokenIdsSha256", "f726fbe0a6dca45caa2028ac3584464684710a51040e1d1da176271c22184a6c"},
-           {"beginSuppressedTokenIds", Json::array({220, 50257})},
-           {"beginSuppressedTokenIdsSha256", "5361010e57b1f08ec8360f097ea3063cf72e41f048203f694631e36bdd569a98"},
-           {"parser", "native-timestamp-parser-v1"},
-           {"fallback", "faster-whisper-1.2.1-exact"}}},
-      {"anchors", Json{
-           {"pythonParserTextSha256", "4ae70515a50f3e7368655a021c94e5db7edaa05372a02d14c93bf77dc1837de0"},
-           {"nativeParserTextSha256", "d5eb90a205337e242dbcfd2752f2173adbff50a5178219365b9c10894b82479c"}}},
-      {"inputLockSha256", sha256_file(input_lock)},
-      {"runtime", Json{
-           {"role", cell.runtime_role},
-           {"measurementExecutable", file_identity(executable)},
-           {"productionWorker", file_identity(production_worker)},
-           {"ctranslate2", file_identity(ct2_dll)},
-           {"runtimeFiles", runtime_files},
-           {"vadModel", preflight.vad_model},
-           {"requestedDevice", "cuda"},
-           {"resolvedDevice", "cuda"},
-           {"computeType", "float16"},
-           {"deviceIndex", 0},
-           {"ctranslate2Version", "4.8.0"},
-           {"gpu", gpu},
-           {"pathPolicy", path_policy},
-           {"loadedModules", std::move(modules)}}},
-      {"samples", std::move(samples)},
-      {"resources", Json{
-           {"peakProcessRssBytes", peak_working_set()},
-           {"method", "GetProcessMemoryInfo.PeakWorkingSetSize"}}}};
-
-  fs::create_directories(output_path.parent_path());
-  const fs::path temporary = output_path.string() + ".tmp";
-  std::ofstream(temporary, std::ios::binary) << std::setw(2) << raw << '\n';
-  fs::remove(output_path);
-  fs::rename(temporary, output_path);
-  std::cout << Json{
-      {"status", failed ? "failed" : "completed"},
-      {"cellId", cell.id},
-      {"sampleCount", raw["samples"].size()}}.dump() << '\n';
-}
+#include "whisper_execution_parity_discovery.inc"
 #endif
 
 void run_whisper_quality_evidence(
@@ -3868,16 +3291,14 @@ int main(int argc, char** argv) {
     if (std::find(args.begin(), args.end(), "--candidate-b-identity-check") != args.end()) {
       run_candidate_b_identity_check();
 #ifdef HIKARU_ASR_WHISPER_PARITY_BISECT
-    } else if (std::find(args.begin(), args.end(), "--short-parity-self-check") != args.end()) {
-      run_short_parity_self_check(args);
-    } else if (std::find(args.begin(), args.end(), "--short-parity-runtime-smoke") != args.end()) {
-      run_short_parity_runtime_smoke(args);
-    } else if (std::find(args.begin(), args.end(), "--short-parity-preflight") != args.end()) {
-      run_short_parity_preflight(args);
-    } else if (std::find(args.begin(), args.end(), "--export-whisper-short-parity-native-mel") != args.end()) {
-      export_short_parity_native_mel(args);
-    } else if (std::find(args.begin(), args.end(), "--run-whisper-short-parity") != args.end()) {
-      run_short_parity_evidence(args);
+    } else if (std::find(args.begin(), args.end(), "--execution-parity-self-check") != args.end()) {
+      run_execution_parity_self_check(args);
+    } else if (std::find(args.begin(), args.end(), "--execution-parity-contract") != args.end()) {
+      run_execution_parity_contract(args);
+    } else if (std::find(args.begin(), args.end(), "--execution-parity-native-mel") != args.end()) {
+      export_execution_parity_native_mel(args);
+    } else if (std::find(args.begin(), args.end(), "--run-whisper-execution-parity") != args.end()) {
+      run_execution_parity_evidence(args);
 #endif
     } else if (std::find(args.begin(), args.end(), "--fallback-self-check") != args.end()) {
       run_fallback_self_check();

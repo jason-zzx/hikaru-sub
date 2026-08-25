@@ -52,3 +52,4 @@ docs/superpowers/
 /.trellis/tasks/**/08-18-native-asr-python-legacy-baseline/research/local/
 /.trellis/tasks/**/08-19-native-asr-legacy-quality-reevaluation/research/local/
 /.trellis/tasks/**/08-20-native-asr-whisper-quality-revision/research/local/
+/.trellis/tasks/**/08-25-native-asr-whisper-execution-parity-discovery/research/local/
