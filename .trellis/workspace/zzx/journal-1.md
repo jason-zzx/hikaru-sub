@@ -1018,3 +1018,36 @@ Implemented and validated the bounded T06D execution-parity harness. Exact large
 ### Next Steps
 
 - None - task complete
+
+
+## Session 30: Reprioritize Native ASR for release-first MVP
+
+**Date**: 2026-08-26
+**Task**: Reprioritize Native ASR for release-first MVP
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Reworked the Native ASR roadmap around a Windows x64 CPU-only faster-whisper large-v3 MVP, promoted model management and final CPU packaging to P1, deferred optional engines and GPU work, and added the remaining Faster-Whisper models as the first P1 post-MVP expansion.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1e32ba3` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

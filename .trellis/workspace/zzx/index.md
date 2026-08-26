@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 29
-- **Last Active**: 2026-08-25
+- **Total Sessions**: 30
+- **Last Active**: 2026-08-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1020 | Active |
+| `journal-1.md` | ~1053 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 30 | 2026-08-26 | Reprioritize Native ASR for release-first MVP | `1e32ba3` | `dev-crisp-asr` |
 | 29 | 2026-08-25 | Close native Whisper execution parity discovery | `dff1b52`, `309bd2e` | `dev-crisp-asr` |
 | 28 | 2026-08-25 | Close native Whisper quality revision | `3a9c9e6` | `dev-crisp-asr` |
 | 27 | 2026-08-20 | Reprioritize native ASR migration roadmap | `c14d934` | `dev-crisp-asr` |
