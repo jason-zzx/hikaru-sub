@@ -1547,6 +1547,7 @@ void run_core_tests() {
   check(candidate_b_restore_time_ms_for_test(timestamp_map, 2000, true) == 4000,
         "Candidate B source-progress restoration drift");
 
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
   const fs::path candidate_b_model = fs::path(T06_LOCAL_ROOT)
       / "candidate-b/model/silero_vad_v6.onnx";
   std::vector<float> zero_frame(vad_window_samples, 0.0f);
@@ -1634,6 +1635,7 @@ void run_core_tests() {
   }
   validate_candidate_b_loaded_modules(loaded_runtime_modules());
   fs::remove_all(candidate_b_negative_root);
+#endif
 
   check(source_frame_count(120 * sample_rate) == 12000, "exact source frame count drift");
   check(source_frame_count(1) == 1, "single-sample frame count drift");

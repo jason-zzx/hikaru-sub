@@ -91,10 +91,34 @@ option(
   HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
   "Enable the ignored-local T09 CrispASR development backend"
   OFF)
+option(
+  HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
+  "Enable the rejected task-local ONNX Runtime/Silero VAD Candidate B"
+  OFF)
+option(
+  HIKARU_ASR_REPRODUCIBLE_BUILD
+  "Enable deterministic compiler/linker flags for the final CPU runtime"
+  OFF)
+option(
+  HIKARU_ASR_MVP_CPU_RUNTIME
+  "Restrict the final CPU worker to ordinary faster-whisper only"
+  OFF)
 set(HIKARU_ASR_CRISPASR_RUNTIME_FILE "" CACHE FILEPATH "Locked CrispASR development runtime")
 set(HIKARU_ASR_CRISPASR_RUNTIME_SIZE "" CACHE STRING "Locked CrispASR development runtime size")
 set(HIKARU_ASR_CRISPASR_RUNTIME_SHA256 "" CACHE STRING "Locked CrispASR development runtime SHA-256")
-set(HIKARU_ASR_CT2_PREBUILT_ROOT "" CACHE PATH "Optional locked prebuilt CTranslate2 development root")
+set(HIKARU_ASR_CT2_SOURCE_DIR "" CACHE PATH "Pinned CTranslate2 4.8.0 source")
+set(HIKARU_ASR_CT2_SOURCE_REVISION "" CACHE STRING "Pinned CTranslate2 source revision")
+set(HIKARU_ASR_POCKETFFT_SOURCE_DIR "" CACHE PATH "Pinned pocketfft source")
+set(HIKARU_ASR_DNNL_ROOT "" CACHE PATH "Pinned oneDNN 3.1.1 static install")
+set(HIKARU_ASR_DNNL_LIBRARY_SIZE "" CACHE STRING "Optional pinned oneDNN static library size")
+set(HIKARU_ASR_DNNL_LIBRARY_SHA256 "" CACHE STRING "Optional pinned oneDNN static library SHA-256")
+set(HIKARU_ASR_CANDIDATE_B_ROOT "" CACHE PATH "Locked Candidate B input root")
+set(HIKARU_ASR_REPRODUCIBLE_PATH_ROOT "" CACHE PATH "Optional path-remap root for reproducible builds")
+set(HIKARU_ASR_CT2_PREBUILT_ROOT "" CACHE PATH "Optional locked prebuilt CTranslate2 root")
+set(HIKARU_ASR_CT2_PREBUILT_DLL_SIZE "" CACHE STRING "Pinned prebuilt CTranslate2 DLL size")
+set(HIKARU_ASR_CT2_PREBUILT_DLL_SHA256 "" CACHE STRING "Pinned prebuilt CTranslate2 DLL SHA-256")
+set(HIKARU_ASR_CT2_PREBUILT_IMPLIB_SIZE "" CACHE STRING "Pinned prebuilt CTranslate2 import library size")
+set(HIKARU_ASR_CT2_PREBUILT_IMPLIB_SHA256 "" CACHE STRING "Pinned prebuilt CTranslate2 import library SHA-256")
 option(
   HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY
   "Enable the task-local faster-whisper 1.2.1 fallback parity candidate"
@@ -109,8 +133,13 @@ set(HIKARU_ASR_ZLIB_SOURCE_DIR "" CACHE PATH "Exact task-local zlib 1.3.1 source
 if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
   message(FATAL_ERROR "T07 CUDA development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
 endif()
-if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
-  message(FATAL_ERROR "Whisper fallback parity requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
+if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
+  message(FATAL_ERROR "Candidate B development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
+endif()
+if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY
+    AND (NOT HIKARU_ASR_BUILD_CT2_WORKER
+         OR NOT HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT))
+  message(FATAL_ERROR "Whisper fallback parity requires the Candidate B development runtime")
 endif()
 if(HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT
     AND (NOT HIKARU_ASR_BUILD_CT2_WORKER
@@ -119,6 +148,25 @@ if(HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT
 endif()
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
   message(FATAL_ERROR "T09 CrispASR development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
+endif()
+if(HIKARU_ASR_MVP_CPU_RUNTIME
+    AND (HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT
+         OR HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
+         OR HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
+         OR HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY
+         OR HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT))
+  message(FATAL_ERROR "The final MVP CPU runtime cannot enable development capabilities")
+endif()
+
+if(MSVC AND HIKARU_ASR_REPRODUCIBLE_BUILD)
+  add_compile_options(
+    /Brepro
+    /experimental:deterministic
+    "/pathmap:${CMAKE_CURRENT_SOURCE_DIR}=native-asr")
+  if(HIKARU_ASR_REPRODUCIBLE_PATH_ROOT)
+    add_compile_options("/pathmap:${HIKARU_ASR_REPRODUCIBLE_PATH_ROOT}=source")
+  endif()
+  add_link_options(/Brepro)
 endif()
 
 add_library(hikaru-asr-wav-audio STATIC src/wav_audio.cpp)
@@ -181,6 +229,19 @@ add_executable(hikaru-asr-crispasr-tests tests/crispasr_backend_tests.cpp)
 target_link_libraries(hikaru-asr-crispasr-tests PRIVATE hikaru-asr-crispasr-test-adapter)
 add_executable(hikaru-asr-parakeet-family-policy-tests tests/parakeet_family_policy_tests.cpp)
 target_link_libraries(hikaru-asr-parakeet-family-policy-tests PRIVATE hikaru-asr-parakeet-family-policy)
+if(HIKARU_ASR_MVP_CPU_RUNTIME)
+  set_target_properties(
+    hikaru-asr-fake-worker
+    hikaru-asr-crispasr
+    hikaru-asr-parakeet-family-policy
+    hikaru-asr-crispasr-test-adapter
+    hikaru-asr-fake-crispasr-abi
+    hikaru-asr-fake-crispasr-cuda-marker
+    hikaru-asr-fake-crispasr-abi-broken
+    hikaru-asr-crispasr-tests
+    hikaru-asr-parakeet-family-policy-tests
+    PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   add_executable(hikaru-asr-crispasr-development-runner tests/crispasr_development_runner.cpp)
   target_include_directories(hikaru-asr-crispasr-development-runner SYSTEM PRIVATE
@@ -219,24 +280,47 @@ if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
   message(FATAL_ERROR "The production CTranslate2 worker currently supports Windows x64 only")
 endif()
 
-file(REAL_PATH
-  "${CMAKE_CURRENT_SOURCE_DIR}/../.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local"
-  T06_LOCAL_ROOT_REAL)
-set(CT2_SOURCE_DIR "${T06_LOCAL_ROOT_REAL}/src/CTranslate2" CACHE PATH "Pinned CTranslate2 4.8.0 source")
-set(POCKETFFT_SOURCE_DIR "${T06_LOCAL_ROOT_REAL}/src/pocketfft" CACHE PATH "Pinned pocketfft source")
-set(DNNL_ROOT "${T06_LOCAL_ROOT_REAL}/installed/onednn-3.1.1" CACHE PATH "Pinned oneDNN 3.1.1 install")
-set(CANDIDATE_B_ROOT "${T06_LOCAL_ROOT_REAL}/candidate-b" CACHE PATH "Locked Candidate B input root")
-set(ORT_ROOT "${CANDIDATE_B_ROOT}/extracted/onnxruntime-win-x64-1.28.0" CACHE PATH "Official ONNX Runtime 1.28.0 Windows x64 SDK")
-set(ORT_ARCHIVE "${CANDIDATE_B_ROOT}/downloads/onnxruntime-win-x64-1.28.0.zip")
-set(VAD_MODEL_SOURCE "${CANDIDATE_B_ROOT}/model/silero_vad_v6.onnx")
+foreach(required_variable IN ITEMS
+    HIKARU_ASR_CT2_SOURCE_DIR
+    HIKARU_ASR_CT2_SOURCE_REVISION
+    HIKARU_ASR_POCKETFFT_SOURCE_DIR)
+  if("${${required_variable}}" STREQUAL "")
+    message(FATAL_ERROR "${required_variable} is required for a CTranslate2 worker build")
+  endif()
+endforeach()
+if(NOT HIKARU_ASR_CT2_SOURCE_REVISION STREQUAL "54a546cec4262f9770d4674a0bfb4ac3c4f05698")
+  message(FATAL_ERROR "CTranslate2 source revision drifted from the pinned 4.8.0 commit")
+endif()
+file(REAL_PATH "${HIKARU_ASR_CT2_SOURCE_DIR}" CT2_SOURCE_DIR)
+file(REAL_PATH "${HIKARU_ASR_POCKETFFT_SOURCE_DIR}" POCKETFFT_SOURCE_DIR)
+if(NOT HIKARU_ASR_CT2_PREBUILT_ROOT)
+  if(NOT HIKARU_ASR_DNNL_ROOT)
+    message(FATAL_ERROR "HIKARU_ASR_DNNL_ROOT is required when building CTranslate2 from source")
+  endif()
+  file(REAL_PATH "${HIKARU_ASR_DNNL_ROOT}" DNNL_ROOT)
+endif()
 if(NOT EXISTS "${CT2_SOURCE_DIR}/include/ctranslate2/models/whisper.h")
-  message(FATAL_ERROR "Missing pinned CTranslate2 source below T06 research/local")
+  message(FATAL_ERROR "Missing pinned CTranslate2 source")
 endif()
 if(NOT EXISTS "${POCKETFFT_SOURCE_DIR}/pocketfft_hdronly.h")
-  message(FATAL_ERROR "Missing pinned pocketfft source below T06 research/local")
+  message(FATAL_ERROR "Missing pinned pocketfft source")
 endif()
-if(NOT EXISTS "${DNNL_ROOT}/include/dnnl.h" OR NOT EXISTS "${DNNL_ROOT}/lib/dnnl.lib")
-  message(FATAL_ERROR "Missing pinned oneDNN install below T06 research/local")
+if(NOT HIKARU_ASR_CT2_PREBUILT_ROOT
+    AND (NOT EXISTS "${DNNL_ROOT}/include/dnnl.h"
+         OR NOT EXISTS "${DNNL_ROOT}/lib/dnnl.lib"))
+  message(FATAL_ERROR "Missing pinned oneDNN static install")
+endif()
+if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT)
+  if(NOT HIKARU_ASR_CANDIDATE_B_ROOT)
+    message(FATAL_ERROR "Candidate B development requires HIKARU_ASR_CANDIDATE_B_ROOT")
+  endif()
+  file(REAL_PATH "${HIKARU_ASR_CANDIDATE_B_ROOT}" CANDIDATE_B_ROOT)
+  set(ORT_ROOT "${CANDIDATE_B_ROOT}/extracted/onnxruntime-win-x64-1.28.0")
+  set(ORT_ARCHIVE "${CANDIDATE_B_ROOT}/downloads/onnxruntime-win-x64-1.28.0.zip")
+  set(VAD_MODEL_SOURCE "${CANDIDATE_B_ROOT}/model/silero_vad_v6.onnx")
+  get_filename_component(T06_LOCAL_ROOT_REAL "${CANDIDATE_B_ROOT}" DIRECTORY)
+else()
+  set(T06_LOCAL_ROOT_REAL "")
 endif()
 
 function(require_pinned_file path expected_size expected_sha256 label)
@@ -256,18 +340,26 @@ require_pinned_file(
   120735
   3e9a05318d8e3b1446bda1c4617e6a103cdd23599ae0a776a92a6e8800e92fdc
   "pocketfft header")
-require_pinned_file(
-  "${DNNL_ROOT}/include/dnnl.h"
-  826
-  23e40186069086c288f70b397485a20b59a8fedce33194ea70e107d91fddaae4
-  "oneDNN header")
-require_pinned_file(
-  "${DNNL_ROOT}/lib/dnnl.lib"
-  385595736
-  9104b04662d354793e593bb1b162740e7047c9ce3aa8c2b532049504d678c005
-  "oneDNN static library")
+if(NOT HIKARU_ASR_CT2_PREBUILT_ROOT)
+  require_pinned_file(
+    "${DNNL_ROOT}/include/dnnl.h"
+    826
+    23e40186069086c288f70b397485a20b59a8fedce33194ea70e107d91fddaae4
+    "oneDNN header")
+  if(HIKARU_ASR_DNNL_LIBRARY_SIZE OR HIKARU_ASR_DNNL_LIBRARY_SHA256)
+    if(NOT HIKARU_ASR_DNNL_LIBRARY_SIZE OR NOT HIKARU_ASR_DNNL_LIBRARY_SHA256)
+      message(FATAL_ERROR "Both oneDNN static library size and SHA-256 are required together")
+    endif()
+    require_pinned_file(
+      "${DNNL_ROOT}/lib/dnnl.lib"
+      "${HIKARU_ASR_DNNL_LIBRARY_SIZE}"
+      "${HIKARU_ASR_DNNL_LIBRARY_SHA256}"
+      "oneDNN static library")
+  endif()
+endif()
 
-require_pinned_file("${ORT_ARCHIVE}" 78796801 abef733dacbe2f571547a7150b479b5cb9cc0df22f96c24983a42cadb1b4f8bc "official ONNX Runtime archive")
+if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT)
+  require_pinned_file("${ORT_ARCHIVE}" 78796801 abef733dacbe2f571547a7150b479b5cb9cc0df22f96c24983a42cadb1b4f8bc "official ONNX Runtime archive")
 require_pinned_file("${ORT_ROOT}/VERSION_NUMBER" 8 b056072036db8b4f37fbdb84a6c45992ceea413fd481b7a0489288c0708f2fae "ONNX Runtime version identity")
 require_pinned_file("${ORT_ROOT}/GIT_COMMIT_ID" 43 c7b502512e05a29cca9fb4e220d5d847e67075173fdce3a125166fc60bfe4491 "ONNX Runtime commit identity")
 require_pinned_file("${ORT_ROOT}/include/cpu_provider_factory.h" 416 e2f658eeace78d79a8df82f233dcdeea135db498a77766156054bfc0d1d06c21 "ONNX Runtime CPU provider header")
@@ -282,7 +374,8 @@ require_pinned_file("${ORT_ROOT}/lib/onnxruntime.dll" 15809848 18370c375f07357fa
 require_pinned_file("${ORT_ROOT}/lib/onnxruntime_providers_shared.dll" 21856 599629fa643707defe9156140ae5edd73531f221aa97b7585b1c9bb0a93586f8 "ONNX Runtime providers shared DLL")
 require_pinned_file("${ORT_ROOT}/LICENSE" 1094 c250d6278f0b47a6439fb7592b08b58a55eb9f535aa49a1db63211c3f982b674 "ONNX Runtime license")
 require_pinned_file("${ORT_ROOT}/ThirdPartyNotices.txt" 331175 fb0af774b4d7cffc5b9d046f2aaeade2f37df2f80abf8033c95dfffcc77a8866 "ONNX Runtime notices")
-require_pinned_file("${VAD_MODEL_SOURCE}" 1245151 4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2 "faster-whisper Silero V6 model")
+  require_pinned_file("${VAD_MODEL_SOURCE}" 1245151 4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2 "faster-whisper Silero V6 model")
+endif()
 if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
   if(NOT HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT
       OR NOT HIKARU_ASR_ZLIB_ARCHIVE
@@ -317,41 +410,47 @@ if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
     "${HIKARU_ASR_ZLIB_SOURCE_DIR}/zutil.c")
   target_include_directories(hikaru-asr-zlib-static PUBLIC "${HIKARU_ASR_ZLIB_SOURCE_DIR}")
 endif()
-file(READ "${ORT_ROOT}/VERSION_NUMBER" ORT_VERSION_NUMBER)
-file(READ "${ORT_ROOT}/GIT_COMMIT_ID" ORT_GIT_COMMIT_ID)
-file(STRINGS "${ORT_ROOT}/include/onnxruntime_c_api.h" ORT_API_LINE REGEX "^#define ORT_API_VERSION 28$")
-string(STRIP "${ORT_VERSION_NUMBER}" ORT_VERSION_NUMBER)
-string(STRIP "${ORT_GIT_COMMIT_ID}" ORT_GIT_COMMIT_ID)
-if(NOT ORT_VERSION_NUMBER STREQUAL "1.28.0"
-    OR NOT ORT_GIT_COMMIT_ID STREQUAL "da9b5e364c465de65c49d91e696cd6485270757f"
-    OR NOT ORT_API_LINE STREQUAL "#define ORT_API_VERSION 28")
-  message(FATAL_ERROR "ONNX Runtime source/API identity drifted from Candidate B lock")
+if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT)
+  file(READ "${ORT_ROOT}/VERSION_NUMBER" ORT_VERSION_NUMBER)
+  file(READ "${ORT_ROOT}/GIT_COMMIT_ID" ORT_GIT_COMMIT_ID)
+  file(STRINGS "${ORT_ROOT}/include/onnxruntime_c_api.h" ORT_API_LINE REGEX "^#define ORT_API_VERSION 28$")
+  string(STRIP "${ORT_VERSION_NUMBER}" ORT_VERSION_NUMBER)
+  string(STRIP "${ORT_GIT_COMMIT_ID}" ORT_GIT_COMMIT_ID)
+  if(NOT ORT_VERSION_NUMBER STREQUAL "1.28.0"
+      OR NOT ORT_GIT_COMMIT_ID STREQUAL "da9b5e364c465de65c49d91e696cd6485270757f"
+      OR NOT ORT_API_LINE STREQUAL "#define ORT_API_VERSION 28")
+    message(FATAL_ERROR "ONNX Runtime source/API identity drifted from Candidate B lock")
+  endif()
 endif()
 
-find_package(Git REQUIRED)
-execute_process(
-  COMMAND "${GIT_EXECUTABLE}" -C "${CT2_SOURCE_DIR}" rev-parse HEAD
-  RESULT_VARIABLE CT2_GIT_RESULT
-  OUTPUT_VARIABLE CT2_GIT_COMMIT
-  ERROR_QUIET
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(
-  COMMAND "${GIT_EXECUTABLE}" -C "${CT2_SOURCE_DIR}" status --porcelain --untracked-files=no
-  RESULT_VARIABLE CT2_STATUS_RESULT
-  OUTPUT_VARIABLE CT2_GIT_STATUS
-  ERROR_QUIET
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT CT2_GIT_RESULT EQUAL 0
-    OR NOT CT2_STATUS_RESULT EQUAL 0
-    OR NOT CT2_GIT_COMMIT STREQUAL "54a546cec4262f9770d4674a0bfb4ac3c4f05698"
-    OR NOT CT2_GIT_STATUS STREQUAL "")
-  message(FATAL_ERROR "CTranslate2 source is not the clean pinned 4.8.0 commit")
+if(EXISTS "${CT2_SOURCE_DIR}/.git")
+  find_package(Git REQUIRED)
+  execute_process(
+    COMMAND "${GIT_EXECUTABLE}" -C "${CT2_SOURCE_DIR}" rev-parse HEAD
+    RESULT_VARIABLE CT2_GIT_RESULT
+    OUTPUT_VARIABLE CT2_GIT_COMMIT
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+    COMMAND "${GIT_EXECUTABLE}" -C "${CT2_SOURCE_DIR}" status --porcelain --untracked-files=no
+    RESULT_VARIABLE CT2_STATUS_RESULT
+    OUTPUT_VARIABLE CT2_GIT_STATUS
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT CT2_GIT_RESULT EQUAL 0
+      OR NOT CT2_STATUS_RESULT EQUAL 0
+      OR NOT CT2_GIT_COMMIT STREQUAL HIKARU_ASR_CT2_SOURCE_REVISION
+      OR NOT CT2_GIT_STATUS STREQUAL "")
+    message(FATAL_ERROR "CTranslate2 source is not the clean pinned 4.8.0 commit")
+  endif()
 endif()
 
 set(WITH_MKL OFF CACHE BOOL "" FORCE)
 set(WITH_DNNL ON CACHE BOOL "" FORCE)
-set(DNNL_INCLUDE_DIR "${DNNL_ROOT}/include" CACHE PATH "" FORCE)
-set(DNNL_LIBRARY "${DNNL_ROOT}/lib/dnnl.lib" CACHE FILEPATH "" FORCE)
+if(NOT HIKARU_ASR_CT2_PREBUILT_ROOT)
+  set(DNNL_INCLUDE_DIR "${DNNL_ROOT}/include" CACHE PATH "" FORCE)
+  set(DNNL_LIBRARY "${DNNL_ROOT}/lib/dnnl.lib" CACHE FILEPATH "" FORCE)
+endif()
 set(WITH_OPENBLAS OFF CACHE BOOL "" FORCE)
 set(WITH_RUY OFF CACHE BOOL "" FORCE)
 if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT)
@@ -377,18 +476,27 @@ set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
 set(OPENMP_RUNTIME COMP CACHE STRING "" FORCE)
 if(HIKARU_ASR_CT2_PREBUILT_ROOT)
+  foreach(required_identity IN ITEMS
+      HIKARU_ASR_CT2_PREBUILT_DLL_SIZE
+      HIKARU_ASR_CT2_PREBUILT_DLL_SHA256
+      HIKARU_ASR_CT2_PREBUILT_IMPLIB_SIZE
+      HIKARU_ASR_CT2_PREBUILT_IMPLIB_SHA256)
+    if("${${required_identity}}" STREQUAL "")
+      message(FATAL_ERROR "${required_identity} is required with HIKARU_ASR_CT2_PREBUILT_ROOT")
+    endif()
+  endforeach()
   set(CT2_PREBUILT_DLL "${HIKARU_ASR_CT2_PREBUILT_ROOT}/bin/ctranslate2.dll")
   set(CT2_PREBUILT_IMPLIB "${HIKARU_ASR_CT2_PREBUILT_ROOT}/ctranslate2/ctranslate2.lib")
   require_pinned_file(
     "${CT2_PREBUILT_DLL}"
-    36974592
-    e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2
-    "T07 prebuilt CTranslate2 CUDA DLL")
+    "${HIKARU_ASR_CT2_PREBUILT_DLL_SIZE}"
+    "${HIKARU_ASR_CT2_PREBUILT_DLL_SHA256}"
+    "prebuilt CTranslate2 DLL")
   require_pinned_file(
     "${CT2_PREBUILT_IMPLIB}"
-    49653378
-    06075ad38a230ae3c1b2411a8733d441b8231b0bc79f49f33e05617f21ffe54e
-    "T07 prebuilt CTranslate2 CUDA import library")
+    "${HIKARU_ASR_CT2_PREBUILT_IMPLIB_SIZE}"
+    "${HIKARU_ASR_CT2_PREBUILT_IMPLIB_SHA256}"
+    "prebuilt CTranslate2 import library")
   add_library(ctranslate2 SHARED IMPORTED GLOBAL)
   set_target_properties(ctranslate2 PROPERTIES
     IMPORTED_LOCATION "${CT2_PREBUILT_DLL}"
@@ -405,7 +513,9 @@ set(TOKENIZER_DLL "${TOKENIZER_TARGET_DIR}/release/hikaru_asr_tokenizer.dll")
 set(TOKENIZER_IMPLIB "${TOKENIZER_TARGET_DIR}/release/hikaru_asr_tokenizer.dll.lib")
 add_custom_command(
   OUTPUT "${TOKENIZER_DLL}" "${TOKENIZER_IMPLIB}"
-  COMMAND "${CMAKE_COMMAND}" -E env "CARGO_TARGET_DIR=${TOKENIZER_TARGET_DIR}"
+  COMMAND "${CMAKE_COMMAND}" -E env
+          "CARGO_TARGET_DIR=${TOKENIZER_TARGET_DIR}"
+          "CARGO_INCREMENTAL=0"
           "${CARGO_EXECUTABLE}" build --locked --offline --release --manifest-path "${TOKENIZER_MANIFEST}"
   DEPENDS
     "${TOKENIZER_MANIFEST}"
@@ -428,9 +538,14 @@ endif()
 if(HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT)
   target_compile_definitions(hikaru-asr-ctranslate2 PUBLIC HIKARU_ASR_WHISPER_PARITY_BISECT=1)
 endif()
+if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT)
+  target_compile_definitions(
+    hikaru-asr-ctranslate2 PUBLIC HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT=1)
+  target_include_directories(hikaru-asr-ctranslate2 PRIVATE "${ORT_ROOT}/include")
+endif()
 target_include_directories(hikaru-asr-ctranslate2
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
-  PRIVATE "${POCKETFFT_SOURCE_DIR}" "${ORT_ROOT}/include")
+  PRIVATE "${POCKETFFT_SOURCE_DIR}")
 target_include_directories(hikaru-asr-ctranslate2 SYSTEM PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 target_link_libraries(hikaru-asr-ctranslate2
@@ -439,14 +554,20 @@ target_link_libraries(hikaru-asr-ctranslate2
     hikaru-asr-wav-audio
     ctranslate2
     "${TOKENIZER_IMPLIB}"
-    "${ORT_ROOT}/lib/onnxruntime.lib"
     bcrypt)
+if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT)
+  target_link_libraries(
+    hikaru-asr-ctranslate2 PRIVATE "${ORT_ROOT}/lib/onnxruntime.lib")
+endif()
 if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
   target_link_libraries(hikaru-asr-ctranslate2 PRIVATE hikaru-asr-zlib-static)
 endif()
 
 add_executable(hikaru-asr-worker src/main.cpp)
 target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-ctranslate2)
+if(HIKARU_ASR_MVP_CPU_RUNTIME)
+  target_compile_definitions(hikaru-asr-worker PRIVATE HIKARU_ASR_MVP_CPU_RUNTIME=1)
+endif()
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   target_compile_definitions(hikaru-asr-worker PRIVATE HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1)
   target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-crispasr hikaru-asr-parakeet-family-policy)
@@ -553,7 +674,8 @@ if(MSVC)
   endif()
 endif()
 
-# The worker binaries import the same CT2/tokenizer/ORT DLLs even when a test exercises only CrispASR.
+# Every worker binary imports the same CT2/tokenizer runtime. Candidate B adds ORT/VAD only
+# to its explicit development builds; the final MVP CPU runtime never copies those files.
 if(HIKARU_ASR_BUILD_CT2_WORKER)
   set(HIKARU_ASR_RUNTIME_TARGETS hikaru-asr-worker hikaru-asr-ctranslate2-tests)
   if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
@@ -566,33 +688,39 @@ if(HIKARU_ASR_BUILD_CT2_WORKER)
       COMMAND "${CMAKE_COMMAND}" -E copy_if_different
               "$<TARGET_FILE:ctranslate2>" "$<TARGET_FILE_DIR:${target}>"
       COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-              "${TOKENIZER_DLL}" "$<TARGET_FILE_DIR:${target}>"
-      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-              "${ORT_ROOT}/lib/onnxruntime.dll" "$<TARGET_FILE_DIR:${target}>"
-      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-              "${ORT_ROOT}/lib/onnxruntime_providers_shared.dll" "$<TARGET_FILE_DIR:${target}>"
-      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-              "${VAD_MODEL_SOURCE}" "$<TARGET_FILE_DIR:${target}>")
+              "${TOKENIZER_DLL}" "$<TARGET_FILE_DIR:${target}>")
+    if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT)
+      add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "${ORT_ROOT}/lib/onnxruntime.dll" "$<TARGET_FILE_DIR:${target}>"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "${ORT_ROOT}/lib/onnxruntime_providers_shared.dll" "$<TARGET_FILE_DIR:${target}>"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "${VAD_MODEL_SOURCE}" "$<TARGET_FILE_DIR:${target}>")
+    endif()
   endforeach()
 endif()
 
 include(CTest)
 if(BUILD_TESTING)
   add_test(NAME protocol-core COMMAND hikaru-asr-protocol-tests)
-  add_test(NAME fake-worker-contract
-           COMMAND hikaru-asr-protocol-tests --fake-contract $<TARGET_FILE:hikaru-asr-fake-worker>)
-  add_test(NAME fake-worker-hang
-           COMMAND hikaru-asr-protocol-tests --fake-hang $<TARGET_FILE:hikaru-asr-fake-worker> hang-after-ready)
-  add_test(NAME fake-worker-child-hang
-           COMMAND hikaru-asr-protocol-tests --fake-hang $<TARGET_FILE:hikaru-asr-fake-worker> child-process-hang)
-  add_test(NAME crispasr-backend-core
-           COMMAND hikaru-asr-crispasr-tests
-                   $<TARGET_FILE:hikaru-asr-fake-crispasr-abi>
-                   $<TARGET_FILE:hikaru-asr-fake-crispasr-abi-broken>
-                   $<TARGET_FILE:hikaru-asr-fake-crispasr-cuda-marker>)
-  add_test(NAME parakeet-family-policy COMMAND hikaru-asr-parakeet-family-policy-tests)
-  set_tests_properties(protocol-core fake-worker-contract crispasr-backend-core parakeet-family-policy PROPERTIES TIMEOUT 30)
-  set_tests_properties(fake-worker-hang fake-worker-child-hang PROPERTIES TIMEOUT 15)
+  set_tests_properties(protocol-core PROPERTIES TIMEOUT 30)
+  if(NOT HIKARU_ASR_MVP_CPU_RUNTIME)
+    add_test(NAME fake-worker-contract
+             COMMAND hikaru-asr-protocol-tests --fake-contract $<TARGET_FILE:hikaru-asr-fake-worker>)
+    add_test(NAME fake-worker-hang
+             COMMAND hikaru-asr-protocol-tests --fake-hang $<TARGET_FILE:hikaru-asr-fake-worker> hang-after-ready)
+    add_test(NAME fake-worker-child-hang
+             COMMAND hikaru-asr-protocol-tests --fake-hang $<TARGET_FILE:hikaru-asr-fake-worker> child-process-hang)
+    add_test(NAME crispasr-backend-core
+             COMMAND hikaru-asr-crispasr-tests
+                     $<TARGET_FILE:hikaru-asr-fake-crispasr-abi>
+                     $<TARGET_FILE:hikaru-asr-fake-crispasr-abi-broken>
+                     $<TARGET_FILE:hikaru-asr-fake-crispasr-cuda-marker>)
+    add_test(NAME parakeet-family-policy COMMAND hikaru-asr-parakeet-family-policy-tests)
+    set_tests_properties(fake-worker-contract crispasr-backend-core parakeet-family-policy PROPERTIES TIMEOUT 30)
+    set_tests_properties(fake-worker-hang fake-worker-child-hang PROPERTIES TIMEOUT 15)
+  endif()
   if(HIKARU_ASR_BUILD_CT2_WORKER)
     add_test(NAME ctranslate2-whisper-core COMMAND hikaru-asr-ctranslate2-tests --self-check)
     if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
@@ -609,6 +737,13 @@ if(BUILD_TESTING)
           "${CMAKE_CURRENT_SOURCE_DIR}/tests/assert_crispasr_route_disabled.py"
           "$<TARGET_FILE:hikaru-asr-worker>")
       set_tests_properties(crispasr-release-route-disabled PROPERTIES TIMEOUT 30)
+    endif()
+    if(HIKARU_ASR_MVP_CPU_RUNTIME)
+      add_test(NAME mvp-non-whisper-route-disabled
+        COMMAND "${Python3_EXECUTABLE}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/tests/assert_mvp_route_disabled.py"
+          "$<TARGET_FILE:hikaru-asr-worker>")
+      set_tests_properties(mvp-non-whisper-route-disabled PROPERTIES TIMEOUT 30)
     endif()
     set_tests_properties(ctranslate2-whisper-core PROPERTIES TIMEOUT 30)
     if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)

@@ -1,0 +1,318 @@
+{
+  "schemaVersion": 1,
+  "artifact": {
+    "id": "hikaru-asr-windows-x64-cpu-v1",
+    "path": "native-asr/artifacts/windows-x64-cpu.zip",
+    "root": "windows-x64/cpu/",
+    "sizeBytes": 6859911,
+    "sha256": "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3",
+    "sourceDateEpoch": 1780769646
+  },
+  "buildInput": {
+    "path": "native-asr/build-inputs/windows-x64-cpu-ct2.zip",
+    "sizeBytes": 7010741,
+    "sha256": "060b267ff841b47b4bac2e4602a0f7a5ea995eed31bcf2b1f3073a86c0c42681",
+    "entries": [
+      "bin/ctranslate2.dll",
+      "ctranslate2/ctranslate2.lib",
+      "licenses/CTranslate2-MIT.txt",
+      "licenses/oneDNN-Apache-2.0.txt"
+    ]
+  },
+  "platform": "windows-x64",
+  "arch": "x64",
+  "protocolVersion": 1,
+  "candidateConfig": {
+    "id": "selected-cpu-timestamp-no-history-beam1",
+    "sha256": "77120c8543e780231d8c65b3868c07f44d685a22a136da56c64e6a6922d4f9e6"
+  },
+  "capabilities": {
+    "backend": "ctranslate2",
+    "device": "cpu",
+    "engines": [
+      "faster-whisper"
+    ],
+    "vad": false,
+    "crispasr": false,
+    "cuda": false,
+    "vulkan": false,
+    "modelsBundled": false
+  },
+  "sources": {
+    "ctranslate2": {
+      "version": "4.8.0",
+      "revision": "54a546cec4262f9770d4674a0bfb4ac3c4f05698",
+      "url": "https://github.com/OpenNMT/CTranslate2/archive/refs/tags/v4.8.0.tar.gz",
+      "archiveName": "CTranslate2-v4.8.0.tar.gz",
+      "sizeBytes": 3429274,
+      "sha256": "cd142054c14aa7f7a4b20674d6b5e4bb7ff9c63b919e6491d3df261b214fcfa5",
+      "runtimeBinary": {
+        "dllSizeBytes": 22385664,
+        "dllSha256": "b59d5be411a16d81d17bccd1c502e42b898384af7bb326b6ff33e8d2a5d05c04",
+        "upstreamDllSha256": "42b24af5845e16fdf81d8cf25f0d35d25f550988100eb6c4689a1b44db32dedf",
+        "diagnosticPathNormalization": {
+          "replacementCount": 48,
+          "method": "same-length ASCII prefix replacement"
+        },
+        "importLibrarySizeBytes": 22046252,
+        "importLibrarySha256": "c9771d6d9e26b7b50c7b623ff270f772abd03fd32c961f85a52b2f560271e4b3"
+      }
+    },
+    "ctranslate2CpuFeatures": {
+      "revision": "8a494eb1e158ec2050e5f699a504fbc9b896a43b",
+      "url": "https://github.com/google/cpu_features/archive/8a494eb1e158ec2050e5f699a504fbc9b896a43b.tar.gz",
+      "archiveName": "cpu_features-8a494eb1e158ec2050e5f699a504fbc9b896a43b.tar.gz",
+      "sizeBytes": 86019,
+      "sha256": "9b2019dae7608630ab985129a5c3263fc788e4f82e26965a8d8c33b8c035802e"
+    },
+    "ctranslate2Spdlog": {
+      "revision": "76fb40d95455f249bd70824ecfcae7a8f0930fa3",
+      "url": "https://github.com/gabime/spdlog/archive/76fb40d95455f249bd70824ecfcae7a8f0930fa3.tar.gz",
+      "archiveName": "spdlog-76fb40d95455f249bd70824ecfcae7a8f0930fa3.tar.gz",
+      "sizeBytes": 368822,
+      "sha256": "4530d53b86d45228a5b8982a8f4fe7d95d3ba8e1944858d3f663732c7e949cb7"
+    },
+    "onednn": {
+      "version": "3.1.1",
+      "url": "https://github.com/oneapi-src/oneDNN/archive/refs/tags/v3.1.1.tar.gz",
+      "archiveName": "oneDNN-v3.1.1.tar.gz",
+      "sizeBytes": 7562169,
+      "sha256": "d1cd58f57b2308d362a9bc474acbc21524cb879cf5d8779b460c718f0fac82d6",
+      "staticLibrary": {
+        "sizeBytes": 385595736,
+        "sha256": "9104b04662d354793e593bb1b162740e7047c9ce3aa8c2b532049504d678c005"
+      }
+    },
+    "pocketfft": {
+      "revision": "c90e55b3d529f8efa40ed01a20de22405f45fc65",
+      "url": "https://github.com/mreineck/pocketfft/archive/c90e55b3d529f8efa40ed01a20de22405f45fc65.tar.gz",
+      "archiveName": "pocketfft-c90e55b3d529f8efa40ed01a20de22405f45fc65.tar.gz",
+      "sizeBytes": 28485,
+      "sha256": "2d90016da31a8cc1dd0ac0c89c1f2fb55df8f4ccc3f0386dcfbad09ac6d1c3ba",
+      "headerSha256": "3e9a05318d8e3b1446bda1c4617e6a103cdd23599ae0a776a92a6e8800e92fdc"
+    },
+    "tokenizer": {
+      "version": "0.22.1",
+      "cargoLockSizeBytes": 18696,
+      "cargoLockSha256": "6fbcf8227058918337c2b827243d08e13f7aafa72aa7531d25bd6462b4ce79b7"
+    },
+    "nlohmannJson": {
+      "version": "3.11.3",
+      "provenanceSha256": "f04ce243791555affe46a8637f60264805964e0121a651468138a220bf5ba623",
+      "headerSha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6",
+      "licenseSha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+    },
+    "microsoftVisualCppRuntimeLicense": {
+      "version": "2026",
+      "termsUrl": "https://visualstudio.microsoft.com/license-terms/vs2026-ga-visualcpp-v14-redist-runtime/",
+      "redistributionUrl": "https://aka.ms/vs/18/redistribution",
+      "url": "https://visualstudio.microsoft.com/wp-content/uploads/2025/10/Visual-C-V14-License-Redistributable_and_Runtime_ENU.docx",
+      "archiveName": "Visual-C-V14-License-Redistributable_and_Runtime-2026-ENU.docx",
+      "runtimePath": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+      "sizeBytes": 39553,
+      "sha256": "08651651a7602fc7c0e2763de0fde1ff9f868df2780597cd1775ee9d6441c783",
+      "acceptance": "BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS. IF YOU DO NOT ACCEPT THEM, DO NOT USE THE SOFTWARE."
+    }
+  },
+  "toolchain": {
+    "visualStudio": "18 Community",
+    "visualStudioVersion": "18.2.0",
+    "msvcCompilerVersion": "19.50.35722",
+    "msvcToolsVersion": "14.50.35717",
+    "windowsSdkVersion": "10.0.26100.0",
+    "cmakeVersion": "4.1.1-msvc1",
+    "ninjaVersion": "1.12.1",
+    "rustcVersion": "1.96.0",
+    "rustcCommit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+    "cargoVersion": "1.96.0",
+    "nodeVersion": "22.22.0",
+    "powershellVersion": "7.6.5"
+  },
+  "licenseInventory": {
+    "components": [
+      {
+        "name": "CTranslate2",
+        "version": "4.8.0",
+        "license": "MIT",
+        "source": "https://github.com/OpenNMT/CTranslate2/archive/refs/tags/v4.8.0.tar.gz"
+      },
+      {
+        "name": "oneDNN",
+        "version": "3.1.1",
+        "license": "Apache-2.0",
+        "source": "https://github.com/oneapi-src/oneDNN/archive/refs/tags/v3.1.1.tar.gz"
+      },
+      {
+        "name": "pocketfft",
+        "version": "c90e55b3d529f8efa40ed01a20de22405f45fc65",
+        "license": "BSD-3-Clause",
+        "source": "https://github.com/mreineck/pocketfft/archive/c90e55b3d529f8efa40ed01a20de22405f45fc65.tar.gz"
+      },
+      {
+        "name": "nlohmann/json",
+        "version": "3.11.3",
+        "license": "MIT",
+        "source": "https://github.com/nlohmann/json"
+      },
+      {
+        "name": "Microsoft Visual C++ Redistributable",
+        "version": "14.50.35717",
+        "license": "Microsoft Visual C++ V14 Redistributable and Runtime 2026 terms",
+        "source": "https://visualstudio.microsoft.com/license-terms/vs2026-ga-visualcpp-v14-redist-runtime/",
+        "redistributionSource": "https://aka.ms/vs/18/redistribution",
+        "localLicenseFile": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+        "projectLicenseExcluded": true,
+        "projectLicenseExclusion": "These Microsoft runtime files are excluded from Hikaru Sub's Apache-2.0 project license and are governed by the Microsoft Visual C++ V14 Redistributable and Runtime 2026 terms.",
+        "acceptance": "BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS. IF YOU DO NOT ACCEPT THEM, DO NOT USE THE SOFTWARE.",
+        "files": [
+          "msvcp140.dll",
+          "vcomp140.dll",
+          "vcruntime140.dll",
+          "vcruntime140_1.dll"
+        ]
+      }
+    ],
+    "requiredRustPackages": [
+      "tokenizers",
+      "onig",
+      "onig_sys"
+    ]
+  },
+  "redistributables": [
+    {
+      "fileName": "msvcp140.dll",
+      "sizeBytes": 553552,
+      "sha256": "def46aa6a8f72f27bafac0c43334419486a4d1dcdb6c479a8ef7034b3e1fa4cb"
+    },
+    {
+      "fileName": "vcruntime140.dll",
+      "sizeBytes": 123472,
+      "sha256": "184146852727a9db4eea06178716bec3cdbb1015c911f6b0f915b184ad7775b2"
+    },
+    {
+      "fileName": "vcruntime140_1.dll",
+      "sizeBytes": 47264,
+      "sha256": "e6bfb3662ab4b1969a73441dbe35c96d51441b6bff8cf1fe7430bd5b246ca605"
+    },
+    {
+      "fileName": "vcomp140.dll",
+      "sizeBytes": 213064,
+      "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7"
+    }
+  ],
+  "requiredFiles": [
+    {
+      "path": "hikaru-asr-worker.exe",
+      "role": "worker"
+    },
+    {
+      "path": "ctranslate2.dll",
+      "role": "runtime"
+    },
+    {
+      "path": "hikaru_asr_tokenizer.dll",
+      "role": "runtime"
+    },
+    {
+      "path": "msvcp140.dll",
+      "role": "microsoft-runtime"
+    },
+    {
+      "path": "vcruntime140.dll",
+      "role": "microsoft-runtime"
+    },
+    {
+      "path": "vcruntime140_1.dll",
+      "role": "microsoft-runtime"
+    },
+    {
+      "path": "vcomp140.dll",
+      "role": "microsoft-runtime"
+    },
+    {
+      "path": "licenses/THIRD-PARTY-NOTICES.json",
+      "role": "license-inventory"
+    },
+    {
+      "path": "licenses/CTranslate2-MIT.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/oneDNN-Apache-2.0.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/pocketfft-BSD-3-Clause.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/nlohmann-json-MIT.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/tokenizers-Apache-2.0.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/onig-MIT.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/onig-sys-MIT.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/Microsoft-Visual-Cpp-Runtime.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+      "role": "license"
+    }
+  ],
+  "systemDllAllowlist": [
+    "bcrypt.dll",
+    "bcryptprimitives.dll",
+    "kernel32.dll",
+    "ntdll.dll",
+    "api-ms-win-core-synch-l1-2-0.dll",
+    "api-ms-win-crt-convert-l1-1-0.dll",
+    "api-ms-win-crt-environment-l1-1-0.dll",
+    "api-ms-win-crt-filesystem-l1-1-0.dll",
+    "api-ms-win-crt-heap-l1-1-0.dll",
+    "api-ms-win-crt-locale-l1-1-0.dll",
+    "api-ms-win-crt-math-l1-1-0.dll",
+    "api-ms-win-crt-runtime-l1-1-0.dll",
+    "api-ms-win-crt-stdio-l1-1-0.dll",
+    "api-ms-win-crt-string-l1-1-0.dll",
+    "api-ms-win-crt-time-l1-1-0.dll"
+  ],
+  "forbiddenPathFragments": [
+    "python",
+    "fastapi",
+    "pytorch",
+    "torch",
+    "nemo",
+    "crispasr",
+    "cuda",
+    "cudnn",
+    "vulkan",
+    "onnxruntime",
+    "silero"
+  ],
+  "forbiddenExtensions": [
+    ".bin",
+    ".gguf",
+    ".onnx",
+    ".pt",
+    ".pth",
+    ".safetensors",
+    ".pdb"
+  ],
+  "budgets": {
+    "windowsSetupBytes": 83886080,
+    "portableZipBytes": 94371840,
+    "unpackedRuntimeBytes": 262144000,
+    "bundledModelWeights": 0
+  }
+}

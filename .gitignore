@@ -28,6 +28,7 @@ __pycache__/
 *.sln
 *.sw?
 .cache
+/src-tauri/resources/native-asr/
 
 # Local agent brainstorm / plan artifacts
 .superpowers/

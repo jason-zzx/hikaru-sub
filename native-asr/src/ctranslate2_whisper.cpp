@@ -16,9 +16,11 @@
 #ifdef HIKARU_ASR_CT2_WITH_CUDA
 #include <cuda.h>
 #endif
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
 #include <cpu_provider_factory.h>
-#include <nlohmann/json.hpp>
 #include <onnxruntime_cxx_api.h>
+#endif
+#include <nlohmann/json.hpp>
 #include <pocketfft_hdronly.h>
 #ifdef HIKARU_ASR_WHISPER_FALLBACK_PARITY
 #include <zlib.h>
@@ -288,7 +290,9 @@ std::string sha256_text(const std::string& text) {
   return digest_hex(digest.data(), digest.size());
 }
 
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
 static_assert(ORT_API_VERSION == 28, "Candidate B requires ONNX Runtime C API 28");
+#endif
 
 void check_cancelled(const CancellationCallback& is_cancelled) {
   if (is_cancelled && is_cancelled()) {
@@ -568,6 +572,7 @@ std::vector<float> compress_vad_audio(
   return compressed;
 }
 
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
 void validate_vad_schema(Ort::Session& session) {
   const std::array<const char*, 3> input_names{"input", "h", "c"};
   const std::array<const char*, 3> output_names{"speech_probs", "hn", "cn"};
@@ -737,6 +742,7 @@ CandidateBVadResult run_vad_session(
   result.compressed_samples = compress_vad_audio(samples, result.intervals);
   return result;
 }
+#endif
 
 std::string token_trace(const std::vector<std::size_t>& ids) {
   std::ostringstream output;
@@ -1543,6 +1549,7 @@ std::int64_t candidate_b_restore_time_ms_for_test(
   return restore_vad_time_ms(intervals, compressed_time_ms, is_end);
 }
 
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
 CandidateBVadResult candidate_b_run_vad_for_test(
     const fs::path& vad_model_path,
     const std::vector<float>& samples,
@@ -1602,6 +1609,7 @@ void candidate_b_force_ort_run_failure_for_test(const fs::path& vad_model_path) 
   }
   throw BackendError("vad_runtime_failed", "Silero VAD invalid-input negative unexpectedly passed");
 }
+#endif
 
 class CTranslate2WhisperBackend::Impl {
  public:
@@ -1615,6 +1623,11 @@ class CTranslate2WhisperBackend::Impl {
         tokenizer(validated_tokenizer_path(model_path, require_kotoba_model)),
         config(std::move(config)),
         vad_model_path(std::move(vad_model_path)) {
+#ifndef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
+    if (this->vad_model_path) {
+      throw BackendError("vad_not_built", "Candidate B VAD support is not included in this worker");
+    }
+#endif
     if (this->config.max_source_frames <= 0
         || this->config.max_source_frames > max_model_frames
         || this->config.max_applied_seek_frames < 0
@@ -1678,6 +1691,7 @@ class CTranslate2WhisperBackend::Impl {
     mel_bins = static_cast<int>(model_mels);
   }
 
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
   void ensure_vad_session(const CancellationCallback& is_cancelled) {
     if (!vad_model_path || vad_session) {
       return;
@@ -1689,6 +1703,7 @@ class CTranslate2WhisperBackend::Impl {
     vad_session = make_vad_session(*vad_environment, *vad_model_path, true);
     check_cancelled(is_cancelled);
   }
+#endif
 
   BackendExecutionAttestation attestation;
   Tokenizer tokenizer;
@@ -1699,8 +1714,10 @@ class CTranslate2WhisperBackend::Impl {
   std::size_t inter_threads = 1;
   std::unique_ptr<ctranslate2::models::Whisper> model;
   std::optional<fs::path> vad_model_path;
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
   std::unique_ptr<Ort::Env> vad_environment;
   std::unique_ptr<Ort::Session> vad_session;
+#endif
 };
 
 CTranslate2WhisperBackend::CTranslate2WhisperBackend(
@@ -1756,6 +1773,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
   const std::vector<float>* decode_samples = &audio.samples;
   std::int64_t decode_duration_ms = audio.duration_ms;
   if (impl_->vad_model_path) {
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
     result.vad_enabled = true;
     impl_->ensure_vad_session(is_cancelled);
     vad = run_vad_session(
@@ -1780,6 +1798,9 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     decode_duration_ms =
         (static_cast<std::int64_t>(decode_samples->size()) * 1000 + sample_rate / 2)
         / sample_rate;
+#else
+    throw BackendError("vad_not_built", "Candidate B VAD support is not included in this worker");
+#endif
   } else {
     result.compressed_sample_count = audio.samples.size();
   }

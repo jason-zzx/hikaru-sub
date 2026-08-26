@@ -333,6 +333,7 @@ std::int64_t candidate_b_restore_time_ms_for_test(
     const std::vector<VadSpeechInterval>& intervals,
     std::int64_t compressed_time_ms,
     bool is_end);
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
 CandidateBVadResult candidate_b_run_vad_for_test(
     const std::filesystem::path& vad_model_path,
     const std::vector<float>& samples,
@@ -340,6 +341,7 @@ CandidateBVadResult candidate_b_run_vad_for_test(
     bool verify_identity = true);
 void candidate_b_force_ort_run_failure_for_test(
     const std::filesystem::path& vad_model_path);
+#endif
 
 class CTranslate2WhisperBackend {
  public:

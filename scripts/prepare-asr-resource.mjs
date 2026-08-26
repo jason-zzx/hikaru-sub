@@ -1,10 +1,21 @@
 import { cpSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  readRuntimeLock,
+  verifyRuntimeArchive,
+} from "./verify-native-asr-runtime.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const source = join(root, "asr-service");
 const target = join(root, "src-tauri", "resources", "asr-service");
+const runtimeLockPath = join(
+  root,
+  "native-asr",
+  "runtime",
+  "windows-x64-cpu-lock.json",
+);
+const nativeRuntimeTarget = join(root, "src-tauri", "resources", "native-asr");
 
 const ignoredNames = new Set([
   ".cache",
@@ -14,6 +25,7 @@ const ignoredNames = new Set([
   ".ruff_cache",
   ".venv",
   "__pycache__",
+  "benchmarks",
   "model-cache",
   "models",
   "tests",
@@ -47,3 +59,14 @@ cpSync(source, target, {
 });
 
 console.log(`prepared ASR resource: ${target}`);
+
+const runtimeLock = readRuntimeLock(runtimeLockPath);
+const runtimeArchive = join(root, runtimeLock.artifact.path);
+const verifiedRuntime = verifyRuntimeArchive({
+  archivePath: runtimeArchive,
+  lockPath: runtimeLockPath,
+  extractTo: nativeRuntimeTarget,
+});
+console.log(
+  `prepared Native ASR runtime: ${verifiedRuntime.runtimeRoot} (${verifiedRuntime.archiveSha256})`,
+);
