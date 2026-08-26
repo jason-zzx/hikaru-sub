@@ -1051,3 +1051,37 @@ Reworked the Native ASR roadmap around a Windows x64 CPU-only faster-whisper lar
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: Complete native ASR CPU runtime package
+
+**Date**: 2026-08-27
+**Task**: Complete native ASR CPU runtime package
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Built and verified the reproducible Windows x64 Native ASR CPU runtime package, integrated shared NSIS/portable resource preparation, locked the final artifact and build input, bundled and verified Microsoft Runtime 2026 terms, completed installed/portable model-backed smoke and release size gates, and preserved Python legacy production routing.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8009018` | (see git log) |
+| `280858f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
