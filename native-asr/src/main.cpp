@@ -235,12 +235,21 @@ fs::path model_path(const WorkerRequestV1& request) {
 int run_ctranslate2(const WorkerRequestV1& request) {
   const bool ordinary = request.engine == Engine::FasterWhisper;
   const bool kotoba = request.engine == Engine::KotobaFasterWhisper;
+#ifdef HIKARU_ASR_MVP_CPU_RUNTIME
+  if (!ordinary || request.backend != Backend::CTranslate2) {
+    emit_pre_ready_error(
+        "route_not_built",
+        "requested native ASR route is not included in the MVP CPU runtime");
+    return 2;
+  }
+#else
   if ((!ordinary && !kotoba) || request.backend != Backend::CTranslate2) {
     emit_pre_ready_error(
         "route_not_implemented",
         "requested native ASR route is not implemented by this worker");
     return 2;
   }
+#endif
   if (request.device == Device::Vulkan) {
     emit_pre_ready_error(
         "device_not_implemented",
@@ -253,17 +262,27 @@ int run_ctranslate2(const WorkerRequestV1& request) {
           "kotoba_vad_not_qualified",
           "Native Kotoba VAD is not qualified");
     }
-    if (ordinary) {
+    if (ordinary && request.use_vad) {
+#ifndef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
+      throw whisper::BackendError(
+          "vad_not_built",
+          "Candidate B VAD support is not included in this worker");
+#else
       validate_candidate_b_config(request);
+#endif
     }
     const fs::path audio = fs::u8path(request.audio_path);
     const fs::path model = model_path(request);
     whisper::validate_model_directory(model, kotoba);
     const std::int64_t duration_ms = whisper::verified_wav_duration_ms(audio);
+#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
     const std::optional<fs::path> vad_model = ordinary && request.use_vad
         ? std::optional<fs::path>(
               current_executable_directory() / "silero_vad_v6.onnx")
         : std::nullopt;
+#else
+    const std::optional<fs::path> vad_model = std::nullopt;
+#endif
     const whisper::BackendExecutionConfig execution = request.device == Device::Cuda
         ? whisper::cuda_execution_config()
         : whisper::cpu_execution_config();

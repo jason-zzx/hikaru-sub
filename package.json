@@ -24,6 +24,8 @@
     "version:check": "node scripts/version.mjs check",
     "runtime:lock-sources": "node scripts/lock-runtime-sources.mjs",
     "asr:prepare-resource": "node scripts/prepare-asr-resource.mjs",
+    "asr:runtime:build": "pwsh -NoProfile -File scripts/build-native-asr-runtime.ps1 -WorkRoot .cache/native-asr-runtime/build -OutputPath native-asr/artifacts/windows-x64-cpu.zip",
+    "asr:runtime:verify": "node scripts/verify-native-asr-runtime.mjs",
     "asr:setup": "bash scripts/setup-asr.sh"
   },
   "dependencies": {

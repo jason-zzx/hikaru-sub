@@ -25,10 +25,38 @@
     },
     {
       "name": "windows-x64-ct2-release",
-      "displayName": "Windows x64 CTranslate2 Release",
+      "displayName": "Windows x64 CTranslate2 Development Release",
       "inherits": "windows-x64-release",
       "cacheVariables": {
-        "HIKARU_ASR_BUILD_CT2_WORKER": "ON"
+        "HIKARU_ASR_BUILD_CT2_WORKER": "ON",
+        "HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT": "ON",
+        "HIKARU_ASR_CT2_SOURCE_DIR": "${sourceDir}/../.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/src/CTranslate2",
+        "HIKARU_ASR_CT2_SOURCE_REVISION": "54a546cec4262f9770d4674a0bfb4ac3c4f05698",
+        "HIKARU_ASR_POCKETFFT_SOURCE_DIR": "${sourceDir}/../.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/src/pocketfft",
+        "HIKARU_ASR_DNNL_ROOT": "${sourceDir}/../.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/installed/onednn-3.1.1",
+        "HIKARU_ASR_DNNL_LIBRARY_SIZE": "385595736",
+        "HIKARU_ASR_DNNL_LIBRARY_SHA256": "9104b04662d354793e593bb1b162740e7047c9ce3aa8c2b532049504d678c005",
+        "HIKARU_ASR_CANDIDATE_B_ROOT": "${sourceDir}/../.trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/local/candidate-b"
+      }
+    },
+    {
+      "name": "windows-x64-cpu-runtime",
+      "displayName": "Windows x64 final Native ASR CPU runtime",
+      "inherits": "windows-x64-release",
+      "binaryDir": "${sourceDir}/build/windows-x64-cpu-runtime",
+      "cacheVariables": {
+        "HIKARU_ASR_BUILD_CT2_WORKER": "ON",
+        "HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT": "OFF",
+        "HIKARU_ASR_MVP_CPU_RUNTIME": "ON",
+        "HIKARU_ASR_REPRODUCIBLE_BUILD": "ON",
+        "HIKARU_ASR_CT2_SOURCE_DIR": "${sourceDir}/../.cache/native-asr-runtime/manual/sources/CTranslate2-4.8.0",
+        "HIKARU_ASR_CT2_SOURCE_REVISION": "54a546cec4262f9770d4674a0bfb4ac3c4f05698",
+        "HIKARU_ASR_POCKETFFT_SOURCE_DIR": "${sourceDir}/../.cache/native-asr-runtime/manual/sources/pocketfft-c90e55b3d529f8efa40ed01a20de22405f45fc65",
+        "HIKARU_ASR_CT2_PREBUILT_ROOT": "${sourceDir}/../.cache/native-asr-runtime/manual/inputs/ctranslate2",
+        "HIKARU_ASR_CT2_PREBUILT_DLL_SIZE": "22385664",
+        "HIKARU_ASR_CT2_PREBUILT_DLL_SHA256": "b59d5be411a16d81d17bccd1c502e42b898384af7bb326b6ff33e8d2a5d05c04",
+        "HIKARU_ASR_CT2_PREBUILT_IMPLIB_SIZE": "22046252",
+        "HIKARU_ASR_CT2_PREBUILT_IMPLIB_SHA256": "c9771d6d9e26b7b50c7b623ff270f772abd03fd32c961f85a52b2f560271e4b3"
       }
     },
     {
@@ -37,7 +65,11 @@
       "inherits": "windows-x64-ct2-release",
       "binaryDir": "${sourceDir}/../.trellis/tasks/08-04-native-asr-ctranslate2-cuda-development/research/local/build/windows-x64-ct2-cuda",
       "cacheVariables": {
-        "HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT": "ON"
+        "HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT": "ON",
+        "HIKARU_ASR_CT2_PREBUILT_DLL_SIZE": "36974592",
+        "HIKARU_ASR_CT2_PREBUILT_DLL_SHA256": "e2d74b6f9992da14bb8c2b931983b1bcac7c9410565712cb56c5fd64f2fb6ba2",
+        "HIKARU_ASR_CT2_PREBUILT_IMPLIB_SIZE": "49653378",
+        "HIKARU_ASR_CT2_PREBUILT_IMPLIB_SHA256": "06075ad38a230ae3c1b2411a8733d441b8231b0bc79f49f33e05617f21ffe54e"
       }
     },
     {
@@ -66,6 +98,10 @@
   ],
   "buildPresets": [
     {
+      "name": "windows-x64-cpu-runtime",
+      "configurePreset": "windows-x64-cpu-runtime"
+    },
+    {
       "name": "windows-x64-ct2-release",
       "configurePreset": "windows-x64-ct2-release"
     },
@@ -87,6 +123,16 @@
     }
   ],
   "testPresets": [
+    {
+      "name": "windows-x64-cpu-runtime",
+      "configurePreset": "windows-x64-cpu-runtime",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
     {
       "name": "windows-x64-ct2-release",
       "configurePreset": "windows-x64-ct2-release",

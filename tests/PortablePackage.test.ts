@@ -8,6 +8,7 @@ import {
   createPortableArchive,
   createPortableStaging,
   packageMetadata,
+  preparePortableNativeRuntime,
   portableArchiveName,
   portableStageName,
 } from "../scripts/package-portable.mjs";
@@ -21,8 +22,13 @@ async function makeReleaseDir() {
   const root = mkdtempSync(join(tmpdir(), "hikaru-sub-portable-"));
   tempRoots.push(root);
   const releaseDir = join(root, "src-tauri", "target", "release");
+  const resourceDir = join(root, "src-tauri", "resources");
 
-  await mkdir(join(releaseDir, "asr-service"), { recursive: true });
+  await mkdir(join(resourceDir, "asr-service"), { recursive: true });
+  await mkdir(join(resourceDir, "native-asr", "windows-x64", "cpu"), {
+    recursive: true,
+  });
+  await mkdir(join(releaseDir, "asr-service", "benchmarks"), { recursive: true });
   await mkdir(join(releaseDir, "resources"), { recursive: true });
   await mkdir(join(releaseDir, "deps", "ffmpeg", "current"), {
     recursive: true,
@@ -30,8 +36,13 @@ async function makeReleaseDir() {
   await mkdir(join(releaseDir, "tauri-generated"), { recursive: true });
 
   await writeFile(join(releaseDir, "hikaru-sub.exe"), "exe");
-  await writeFile(join(releaseDir, "runtime-dependency-sources.json"), "{}");
-  await writeFile(join(releaseDir, "asr-service", "main.py"), "print('ok')");
+  await writeFile(join(resourceDir, "runtime-dependency-sources.json"), "{}");
+  await writeFile(join(resourceDir, "asr-service", "main.py"), "print('ok')");
+  await writeFile(
+    join(resourceDir, "native-asr", "windows-x64", "cpu", "runtime-manifest.json"),
+    "{}",
+  );
+  await writeFile(join(releaseDir, "asr-service", "benchmarks", "stale.wav"), "stale");
   await writeFile(join(releaseDir, "resources", "icon.ico"), "icon");
   await writeFile(join(releaseDir, "hikaru_sub.pdb"), "debug");
   await writeFile(join(releaseDir, "deps", "ffmpeg", "current", "ffmpeg.exe"), "ffmpeg");
@@ -109,6 +120,18 @@ describe("portable package", () => {
       true,
     );
     expect(existsSync(join(result.stageDir, "asr-service", "main.py"))).toBe(true);
+    expect(existsSync(join(result.stageDir, "asr-service", "benchmarks"))).toBe(false);
+    expect(
+      existsSync(
+        join(
+          result.stageDir,
+          "native-asr",
+          "windows-x64",
+          "cpu",
+          "runtime-manifest.json",
+        ),
+      ),
+    ).toBe(true);
     expect(existsSync(join(result.stageDir, "resources"))).toBe(false);
     expect(existsSync(join(result.stageDir, "deps"))).toBe(false);
     expect(existsSync(join(result.stageDir, "tauri-generated"))).toBe(false);
@@ -135,6 +158,19 @@ describe("portable package", () => {
     },
     20_000,
   );
+
+  it("re-verifies the tracked native runtime before portable staging", () => {
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const lock = JSON.parse(
+      readFileSync(
+        join(root, "native-asr", "runtime", "windows-x64-cpu-lock.json"),
+        "utf8",
+      ),
+    );
+    expect(preparePortableNativeRuntime(root).archiveSha256).toBe(
+      lock.artifact.sha256,
+    );
+  }, 30_000);
 
   it("wires local and GitHub release packaging to create the portable zip", () => {
     const packageJson = JSON.parse(readFileSync(rootFile("package.json"), "utf8"));

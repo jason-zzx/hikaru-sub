@@ -1,3 +1,5 @@
 third_party/nlohmann/json.hpp -text
 third_party/nlohmann/LICENSE.MIT -text whitespace=-trailing-space
 third_party/nlohmann/provenance.json text eol=lf
+artifacts/*.zip -text
+build-inputs/*.zip -text

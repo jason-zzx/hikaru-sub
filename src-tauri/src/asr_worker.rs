@@ -1987,6 +1987,23 @@ mod tests {
         })
     }
 
+    fn production_worker_supports_vad(worker: &Path) -> bool {
+        let Some(parent) = worker.parent() else {
+            return true;
+        };
+        let manifest = parent.join("runtime-manifest.json");
+        if !manifest.is_file() {
+            return true;
+        }
+        let value: Value = serde_json::from_slice(
+            &fs::read(&manifest).expect("packaged worker runtime manifest cannot be read"),
+        )
+        .expect("packaged worker runtime manifest is invalid");
+        value["capabilities"]["vad"]
+            .as_bool()
+            .expect("packaged worker runtime manifest is missing capabilities.vad")
+    }
+
     fn production_worker_inputs() -> Option<ProductionWorkerInputs> {
         let values = [
             std::env::var_os("HIKARU_ASR_PRODUCTION_WORKER"),
@@ -3094,6 +3111,23 @@ mod tests {
     }
 
     #[test]
+    fn packaged_cpu_runtime_manifest_disables_candidate_b_host_paths() {
+        let temp = tempfile::tempdir().unwrap();
+        let worker = temp.path().join("hikaru-asr-worker.exe");
+        fs::write(&worker, b"worker").unwrap();
+        assert!(production_worker_supports_vad(&worker));
+        fs::write(
+            temp.path().join("runtime-manifest.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "capabilities": { "vad": false }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(!production_worker_supports_vad(&worker));
+    }
+
+    #[test]
     fn production_worker_runs_the_selected_device_through_the_native_host() {
         let _guard = FAKE_WORKER_TEST_LOCK
             .lock()
@@ -3103,7 +3137,10 @@ mod tests {
             return;
         };
         let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
-        let cases = if inputs.device == "cuda" || inputs.engine == "kotoba-faster-whisper" {
+        let cases = if inputs.device == "cuda"
+            || inputs.engine == "kotoba-faster-whisper"
+            || !production_worker_supports_vad(&inputs.worker)
+        {
             vec![("production-ct2-selected", false)]
         } else {
             vec![
@@ -3221,12 +3258,14 @@ mod tests {
         let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
         let temp = tempfile::tempdir().unwrap();
         let gate = Arc::new(ActiveJobGate::default());
-        let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
         let expected_error = if inputs.engine == "kotoba-faster-whisper" {
             "[kotoba_vad_not_qualified]"
-        } else {
+        } else if production_worker_supports_vad(&inputs.worker) {
             "[vad_config_identity_mismatch]"
+        } else {
+            "[vad_not_built]"
         };
+        let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
         let launch = production_launch(
             &temp,
             "production-ct2-vad-error",
@@ -3327,6 +3366,9 @@ mod tests {
         let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
         let temp = tempfile::tempdir().unwrap();
         let gate = Arc::new(ActiveJobGate::default());
+        let use_vad = inputs.engine == "faster-whisper"
+            && inputs.device == "cpu"
+            && production_worker_supports_vad(&inputs.worker);
         let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
         let launch = production_launch(
             &temp,
@@ -3335,7 +3377,7 @@ mod tests {
             inputs.model,
             &inputs.cancel_audio,
             &inputs.device,
-            inputs.engine == "faster-whisper" && inputs.device == "cpu",
+            use_vad,
             None,
         );
         let output = launch.output_ass_path.clone();

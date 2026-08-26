@@ -9,14 +9,12 @@ import {
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import {
+  readRuntimeLock,
+  verifyRuntimeArchive,
+} from "./verify-native-asr-runtime.mjs";
 
 const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
-
-const installedReleaseEntries = [
-  "hikaru-sub.exe",
-  "runtime-dependency-sources.json",
-  "asr-service",
-];
 
 export function portableStageName({ productName, version, arch }) {
   return `${productName}_${version}_${arch}-portable`;
@@ -34,13 +32,22 @@ export function createPortableStaging({
   arch = "x64",
 }) {
   const exePath = join(releaseDir, "hikaru-sub.exe");
-  const asrResource = join(releaseDir, "asr-service");
+  const resourceDir = join(root, "src-tauri", "resources");
+  const runtimeSources = join(resourceDir, "runtime-dependency-sources.json");
+  const asrResource = join(resourceDir, "asr-service");
+  const nativeAsrResource = join(resourceDir, "native-asr");
 
   if (!existsSync(exePath)) {
     throw new Error(`missing release executable: ${exePath}`);
   }
+  if (!existsSync(runtimeSources)) {
+    throw new Error(`missing runtime source manifest: ${runtimeSources}`);
+  }
   if (!existsSync(asrResource)) {
     throw new Error(`missing ASR resource directory: ${asrResource}`);
+  }
+  if (!existsSync(nativeAsrResource)) {
+    throw new Error(`missing Native ASR resource directory: ${nativeAsrResource}`);
   }
 
   const portableDir = join(releaseDir, "bundle", "portable");
@@ -57,13 +64,13 @@ export function createPortableStaging({
   rmSync(archivePath, { force: true });
   mkdirSync(stageDir, { recursive: true });
 
-  for (const entry of installedReleaseEntries) {
-    const source = join(releaseDir, entry);
-    const target = join(stageDir, entry);
-    if (!existsSync(source)) {
-      throw new Error(`missing release package entry: ${source}`);
-    }
-    cpSync(source, target, { recursive: true });
+  for (const [source, entry] of [
+    [exePath, "hikaru-sub.exe"],
+    [runtimeSources, "runtime-dependency-sources.json"],
+    [asrResource, "asr-service"],
+    [nativeAsrResource, "native-asr"],
+  ]) {
+    cpSync(source, join(stageDir, entry), { recursive: true });
   }
 
   writeFileSync(join(stageDir, ".portable"), "");
@@ -126,10 +133,21 @@ export function packageMetadata(root) {
   };
 }
 
+export function preparePortableNativeRuntime(root = defaultRoot) {
+  const lockPath = join(root, "native-asr", "runtime", "windows-x64-cpu-lock.json");
+  const lock = readRuntimeLock(lockPath);
+  return verifyRuntimeArchive({
+    archivePath: join(root, lock.artifact.path),
+    lockPath,
+    extractTo: join(root, "src-tauri", "resources", "native-asr"),
+  });
+}
+
 export function packagePortable({
   root = defaultRoot,
   arch = process.env.HIKARU_PORTABLE_ARCH ?? "x64",
 } = {}) {
+  preparePortableNativeRuntime(root);
   const metadata = packageMetadata(root);
   const staged = createPortableStaging({
     root,
