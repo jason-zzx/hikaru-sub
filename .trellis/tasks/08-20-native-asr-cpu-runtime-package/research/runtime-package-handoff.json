@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "artifact": {
+    "id": "hikaru-asr-windows-x64-cpu-v1",
+    "path": "native-asr/artifacts/windows-x64-cpu.zip",
+    "sizeBytes": 6859911,
+    "sha256": "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3",
+    "unpackedRuntimeBytes": 26023959,
+    "payloadFileCount": 17,
+    "bundledModelWeightCount": 0
+  },
+  "reproducibility": {
+    "policy": "byte-identical-complete-zip",
+    "buildA": {
+      "workRootRole": "fresh-build-d",
+      "sizeBytes": 6859911,
+      "sha256": "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3"
+    },
+    "buildB": {
+      "workRootRole": "fresh-build-e",
+      "sizeBytes": 6859911,
+      "sha256": "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3"
+    },
+    "byteIdentical": true,
+    "privatePathScan": "passed for ASCII and UTF-16 payload strings; verifier rejects user-profile and task-local build paths",
+    "inputPolicy": "Each worker build used fresh extracted CT2/pocketfft sources and fresh output roots. The exact locked CT2 4.8.0 DLL/import-library pair is stored in native-asr/build-inputs/windows-x64-cpu-ct2.zip and verified before extraction; its lock preserves the pinned oneDNN 3.1.1 provenance. Historical oneDNN diagnostic source prefixes in the CT2 DLL were normalized to a stable source label before locking, then model-backed smoke requalified the bytes. App release consumes only the tracked final ZIP and never accesses build caches or task-local paths."
+  },
+  "capabilities": {
+    "backend": "ctranslate2",
+    "device": "cpu",
+    "engines": [
+      "faster-whisper"
+    ],
+    "vad": false,
+    "crispasr": false,
+    "cuda": false,
+    "vulkan": false,
+    "modelsBundled": false
+  },
+  "functionalSmoke": {
+    "workerSha256": "095a19ca896867efe64a19501594e7a7ee0539f58411051f83504b4900de2c14",
+    "finalArtifactRevalidated": true,
+    "model": {
+      "repository": "Systran/faster-whisper-large-v3",
+      "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "modelBinSha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1"
+    },
+    "shortInput": {
+      "durationMs": 24102,
+      "sha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+      "installedLike": {
+        "segmentCount": 5,
+        "eventCount": 9,
+        "status": "passed"
+      },
+      "portableLike": {
+        "segmentCount": 5,
+        "eventCount": 9,
+        "status": "passed"
+      }
+    },
+    "longInput": {
+      "durationMs": 601000,
+      "derivation": "first 601 seconds of the private long WAV; no audio or transcript is tracked",
+      "sha256": "3b5be877c448121723b36cd6e4d52740fe71eedaf3d95a95bc73bafaedb6a544",
+      "installedLike": {
+        "segmentCount": 168,
+        "eventCount": 193,
+        "status": "passed"
+      },
+      "portableLike": {
+        "segmentCount": 168,
+        "eventCount": 193,
+        "status": "passed"
+      }
+    },
+    "checks": [
+      "stdout was JSONL-only and valid UTF-8",
+      "progress was monotonic and reached audio duration",
+      "output was non-empty",
+      "segments were ordered, positive-duration, and audio-bounded"
+    ]
+  },
+  "hostCompatibility": {
+    "workerSha256": "095a19ca896867efe64a19501594e7a7ee0539f58411051f83504b4900de2c14",
+    "finalArtifactRevalidated": true,
+    "restrictedPathAndLoadedModuleIsolation": "passed; every non-Windows module loaded from the artifact root",
+    "packagedWorkerSuccessAndRecovery": "passed",
+    "packagedWorkerVadNotBuiltFailure": "passed",
+    "nonMvpRouteNotBuiltFailure": "passed",
+    "cancelWithinTwoSecondsAndNoCompletedSnapshot": "passed",
+    "packagedManifestDisablesCandidateBHostPath": "passed"
+  },
+  "packageSizes": {
+    "windowsSetup": {
+      "sizeBytes": 11101801,
+      "budgetBytes": 83886080,
+      "sha256": "92d5d038eeca5a4d3ba5389cf9be6559d8cdbafa7e466acc13f06130abfd89f1",
+      "status": "passed"
+    },
+    "portableZip": {
+      "sizeBytes": 15357148,
+      "budgetBytes": 94371840,
+      "sha256": "38a3c8a398baa769b58e8bfc968733b2f78ddc65f9e36e09d046ebf7377380bb",
+      "status": "passed"
+    },
+    "unpackedRuntime": {
+      "sizeBytes": 26023959,
+      "budgetBytes": 262144000,
+      "status": "passed"
+    }
+  },
+  "validation": {
+    "workerCtest": "4/4 passed in both final build roots; the MVP target graph excludes development-only fake/CrispASR/Parakeet targets and retains protocol, CT2, CrispASR-route rejection, and non-Whisper-route rejection checks",
+    "runtimeVerifierMutationTests": "10/10 passed, including Microsoft Runtime notice semantics and license-document identity drift",
+    "frontendTests": "passed",
+    "frontendBuild": "passed with pre-existing chunk-size warning",
+    "rustTests": "passed",
+    "releaseLocal": "passed; final NSIS and portable include the unchanged official Runtime 2026 license document",
+    "productionDefault": "Python legacy unchanged"
+  },
+  "privacy": {
+    "trackedTranscriptText": false,
+    "trackedAudioOrModelBytes": false,
+    "trackedAbsoluteUserPaths": false
+  },
+  "licensing": {
+    "microsoftRuntimeTerms": "Microsoft Visual C++ V14 Redistributable and Runtime 2026",
+    "termsUrl": "https://visualstudio.microsoft.com/license-terms/vs2026-ga-visualcpp-v14-redist-runtime/",
+    "redistributionUrl": "https://aka.ms/vs/18/redistribution",
+    "localLicenseFile": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+    "licenseSizeBytes": 39553,
+    "licenseSha256": "08651651a7602fc7c0e2763de0fde1ff9f868df2780597cd1775ee9d6441c783",
+    "projectLicenseExcluded": true,
+    "useBasedAcceptance": "BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS. IF YOU DO NOT ACCEPT THEM, DO NOT USE THE SOFTWARE.",
+    "bundledDllBytesUnchanged": true
+  }
+}

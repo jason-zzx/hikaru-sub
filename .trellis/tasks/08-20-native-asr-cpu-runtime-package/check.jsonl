@@ -1,0 +1,4 @@
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Check installed/portable resource placement, managed-root constraints, and zero bundled model weight behavior."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Check worker/host protocol, cancel/crash/recovery, restricted-path launch, and no premature production cutover."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Check full Rust validation, trust-boundary handling, structured process arguments, privacy, and honest reporting of missing model/tool capabilities."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/selected-cpu-candidate-lock.md","reason":"Check that the final package preserves the selected Candidate A config and dependency identities without promoting rejected Candidate B inputs."}
