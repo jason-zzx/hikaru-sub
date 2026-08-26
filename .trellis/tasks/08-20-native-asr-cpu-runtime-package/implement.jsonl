@@ -1,0 +1,4 @@
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Preserve installed/portable managed-root and release-resource boundaries while adding the bundled native runtime."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Preserve native worker protocol, host lifecycle, cancellation, recovery, path containment, and Python-default-until-cutover contracts."}
+{"file":".trellis/tasks/archive/2026-08/08-02-native-asr-ctranslate2-whisper/research/selected-cpu-candidate-lock.md","reason":"Authoritative Candidate A CPU algorithm, model, dependency, toolchain, and historical runtime identity input."}
+{"file":".trellis/tasks/07-25-native-asr-migration/research/native-asr-technical-design.md","reason":"Parent authority for bundled-runtime architecture, release consumption seam, and fixed setup/portable/runtime size budgets."}

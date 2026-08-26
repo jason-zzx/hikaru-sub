@@ -164,6 +164,90 @@ Wrong:   Release/product code reads model-backed env keys, or a CUDA test breaks
 Correct: test module validates the required/optional env set → uses a CPU-only worker for deterministic cuda_not_built → copies audio to temporary workspace → exercises the unchanged host
 ```
 
+## Bundled Native ASR CPU Runtime (Pre-cutover)
+
+### Scope / Trigger
+
+Apply this contract whenever changing the Windows x64 bundled Native ASR worker, its binary dependencies, runtime lock/manifest, release resource preparation, NSIS/portable staging, or package evidence. The bundled runtime is available for qualification, but Release/default inference remains on the Python sidecar until the explicit cutover task.
+
+### Signatures
+
+```text
+pnpm asr:runtime:build
+  -> scripts/build-native-asr-runtime.ps1
+  -> native-asr/artifacts/windows-x64-cpu.zip
+
+pnpm asr:runtime:verify
+  -> scripts/verify-native-asr-runtime.mjs
+
+pnpm asr:prepare-resource
+  -> verify/extract native-asr/artifacts/windows-x64-cpu.zip
+  -> src-tauri/resources/native-asr/windows-x64/cpu/
+```
+
+Tracked identities:
+
+```text
+native-asr/runtime/windows-x64-cpu-lock.json
+native-asr/build-inputs/windows-x64-cpu-ct2.zip   # build/link input only
+native-asr/artifacts/windows-x64-cpu.zip          # the only native archive shipped
+```
+
+The extracted Tauri resource is generated and ignored. End-user packaging never invokes CMake or consumes the build-input ZIP.
+
+### Contracts
+
+- `windows-x64-cpu-lock.json` is the outer authority for artifact/build-input size and SHA-256, source/toolchain identities, Candidate A config, exact payload roles, import allowlists, license components/Rust packages, forbidden capabilities/files, and size budgets.
+- The final preset sets `HIKARU_ASR_MVP_CPU_RUNTIME=ON`, reproducible-build mode on, and Candidate B/CUDA/CrispASR development flags off. Development-only fake/CrispASR/Parakeet targets are excluded from the default final target graph.
+- Final capability is exactly ordinary `faster-whisper` through CTranslate2 on CPU. `useVad=true` returns `vad_not_built`; GPU requests return `cuda_not_built`; CrispASR, Kotoba, and other non-MVP routes return the controlled route-not-built error. Missing DLLs are not capability control.
+- Runtime verification is closed-world: archive root/path safety, outer hash, manifest/checksum/file closure, source/toolchain/config equality, imports, license inventory, forbidden content, and ASCII/UTF-16 private build paths must all pass before extraction.
+- Resource preparation verifies the ZIP, extracts to a temporary sibling, verifies the tree again, then atomically replaces `src-tauri/resources/native-asr/`. NSIS and portable staging consume that same generated tree.
+- If any payload byte, manifest field, or target graph changes, rebuild two independent roots to a byte-identical complete ZIP, rerun model-backed installed/portable smoke against the final worker SHA, rebuild NSIS/portable packages, and refresh the handoff. Evidence for an older worker is invalid even if source code is unchanged.
+- The package includes no model weights, Python runtime, ORT/Silero VAD, CrispASR, CUDA/Vulkan runtime, PDB, or development/test executable. The legacy `asr-service` resource and production route remain until cutover.
+- Bundled VC145 DLLs come unmodified from VS18 `VC/Redist`, are excluded from Hikaru Sub's Apache-2.0 project license, and are governed by the official **Microsoft Visual C++ V14 Redistributable and Runtime 2026** terms. Package the unchanged official DOCX locally, lock its immutable URL/size/SHA-256, record `https://aka.ms/vs/18/redistribution`, and preserve Microsoft's `BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS` statement; do not substitute the VS2022 terms or invent a custom EULA.
+
+### Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| Archive/build-input size or SHA-256 differs from lock | Fail before extraction/build |
+| Tokenizer lock, nlohmann source, toolchain version, or required license inventory drifts | Fail before compilation/package acceptance |
+| Microsoft Runtime terms URL/version/local path/use-acceptance/project-license exclusion/DLL list or official DOCX bytes drift | Fail before compilation/package acceptance |
+| ZIP contains absolute/drive/`..` path, missing/extra file, undeclared DLL, model, ORT/VAD/GPU/CrispASR file, or private build path | Verifier rejects it |
+| Manifest source/toolchain/config/capability/import/license data differs from outer lock or payload bytes | Verifier rejects it |
+| Final preset enables a development capability or default-builds a development-only target | CMake configure/check fails; artifact is not releasable |
+| `useVad=true` on bundled CPU worker | Structured `vad_not_built` before model loading |
+| Non-CPU or non-MVP backend/engine request | Structured controlled not-built error; no fallback |
+| Prepared runtime differs from tracked ZIP, or portable embeds a stale manifest | Packaging/evidence gate fails; rebuild packages |
+| Setup `>80 MiB`, portable ZIP `>90 MiB`, unpacked runtime `>250 MiB`, or model count `>0` | Release blocker |
+
+### Good/Base/Bad Cases
+
+- Good: two independent clean roots produce the same ZIP; shared verifier accepts it; installed-like and portable-like final bytes pass short and `>10` minute large-v3 smoke; packages embed that manifest identity.
+- Base: normal frontend/Tauri development keeps using Python legacy; the bundled resource is inert unless an explicit debug/test native launch exercises it.
+- Bad: update the worker/manifest, reuse old smoke or package hashes, or let release packaging rebuild/download a different runtime. The handoff then describes bytes users will not receive.
+
+### Tests Required
+
+- Verifier mutation tests: outer/file/manifest hash drift, missing/extra/wrong DLL, traversal/absolute paths, forbidden capability/file, private-path leakage, source/toolchain/config mismatch, incomplete/duplicate license inventory, and Microsoft Runtime notice/document identity drift.
+- Final CMake/CTest: protocol core, ordinary CT2 core, CrispASR-route rejection, and non-Whisper-route rejection; final default target graph must not build development-only workers/tests.
+- Build gate: two independent roots, complete ZIP byte comparison, restricted PATH launch, import closure, and non-system module containment under the artifact root.
+- Model-backed gate against the final worker SHA: installed-like and portable-like short plus `>10` minute audio; UTF-8 JSONL-only output, non-empty ordered positive-duration audio-bounded segments, normal completion, controlled unsupported request, host recovery/active-gate, and cancel within two seconds.
+- Release gate: `pnpm asr:prepare-resource`, full tests/build/Cargo tests, `pnpm release:local`, manifest equality in portable staging, package sizes, model count zero, `git diff --check`, and no staged files unless the user explicitly authorizes commit preparation.
+
+### Wrong vs Correct
+
+```text
+Wrong:   change worker bytes -> keep previous smoke/package evidence -> claim the new artifact passed
+Correct: freeze final worker SHA -> rerun model/host smoke -> rebuild NSIS/portable -> record matching hashes
+
+Wrong:   omit ORT/VAD files but compile/link Candidate B -> capability fails via missing DLL
+Correct: compile Candidate B out -> useVad=true returns vad_not_built before model loading
+
+Wrong:   release:local runs CMake or consumes a machine-local dependency tree
+Correct: release:local verifies/extracts the tracked final ZIP; only the dedicated build command compiles
+```
+
 ## ASR Sidecar Process
 
 - Tauri starts/manages the Python FastAPI sidecar (`asr.rs`) and continues to proxy production/default inference plus model download until an explicit native cutover task changes that boundary.

@@ -13,10 +13,10 @@ Tauri owns:
 - File I/O, FFmpeg/ffprobe, waveform, proxy transcode
 - Portable vs installed path roots (`app_paths.rs`)
 - Runtime dependency probe / prepare / measure / cleanup
-- ASR sidecar process lifecycle and HTTP proxying to the Python service
+- ASR sidecar/native-worker lifecycle, bundled runtime resource preparation, and task orchestration
 - Download, clip, burn jobs and local HTTP media playback server
 
-It does **not** own ASS domain editing logic (React) or ASR model inference (Python).
+It does **not** own ASS domain editing logic (React) or execute ASR model inference inside the Tauri process; inference stays in the Python sidecar or independent native worker.
 
 ---
 
