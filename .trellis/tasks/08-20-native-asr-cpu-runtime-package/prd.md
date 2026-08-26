@@ -1,42 +1,55 @@
-# Build provisional native ASR CPU runtime package
+# Build final Native ASR MVP CPU runtime package
 
 ## Goal
 
-建立可复现的 Windows x64 CPU runtime packaging pipeline 和 provisional smoke artifact，提前验证 worker/DLL/manifest/license/size/installed/portable 形状，同时把最终 worker/runtime identity 的 rebuild 与 attestation 明确保留给 T18。
+产出首个 Native ASR MVP 可直接发布的 Windows x64 bundled CPU runtime artifact，使安装版和 portable 在 end-user 机器上无需 CMake、Python、venv 或模型权重即可加载 `faster-whisper / large-v3` CTranslate2 worker。
+
+本任务不再产出 provisional-only artifact；它拥有首版最终 worker/DLL/runtime-manifest/license/hash identity。T18 负责集成和复核，不因 post-MVP engine identities 再次重建该 artifact。
+
+## Priority And Release Role
+
+- Priority: P1。
+- Native MVP critical-path task。
+- 与 T12 model manager 可并行；model-backed smoke 在 T12 large-v3 identity 可用后完成。
 
 ## Authority And Dependencies
 
-- 依赖归档 T04 protocol/fake-worker contract 和 T06 已稳定的 production worker seam。
-- 可与 T06R/T08R/T11/T12 并行，但 provisional artifact 不等待或冻结最终 accepted engine identity。
-- T18 是最终 immutable CPU worker/runtime rebuild、hash、license 和 release attestation owner。
-- Candidate B ORT/VAD、Parakeet P1、ReazonSpeech R2 及其他 rejected/non-accepted candidate 不得因本任务进入 release package。
+- 依赖归档 T04 protocol/fake-worker、T05 Rust host 和 T06 production CTranslate2 worker seam。
+- 复用 Candidate A `selected-cpu-beam1-no-history` 的稳定 algorithm/config seam。
+- 首版只交付 CTranslate2 CPU capability；CrispASR、CUDA/Vulkan、Candidate B ORT/VAD 和其他 rejected/non-MVP capability 默认省略。
+- T12 冻结 large-v3 model identity；本任务不下载或捆绑模型。
 
 ## Requirements
 
-1. Pin CTranslate2、CrispASR、compiler、CMake、Ninja 和必要 CPU runtime dependencies，生成可重复执行的 packaging pipeline。
-2. 产出仅用于 protocol/backend smoke 的 provisional worker/DLL/runtime-manifest/license/SHA-256 artifact；不得包含模型权重。
-3. 验证 installed 与 portable layout、artifact verification hook、`pnpm release:local`/portable consumption seam，但不切换 production package input。
-4. 编译仅需要的已稳定 capability；不得加入 rejected ORT/VAD candidate 或把未通过模型算法固化为 final worker identity。
-5. 测量 provisional setup、portable ZIP 和 unpacked CPU runtime 体积，证明父任务预算可达或记录 blocker。
-6. 定义 T18 final rebuild input contract：accepted engine source/config identities、toolchain、runtime dependencies、licenses、hashes 和 deterministic attestation。
-7. End-user packaging 不得运行 CMake，也不得下载或捆绑模型。
+1. Pin CTranslate2、oneDNN、compiler、CMake、Ninja、tokenizer/build inputs 和必要 Windows runtime dependencies。
+2. 从干净输入可重复构建 `hikaru-asr-worker.exe`、必需 DLL、`runtime-manifest.json`、licenses 和 SHA-256 清单。
+3. 只编译 protocol、large-v3 CTranslate2 CPU inference 和 host integration 所需 capability；不为 post-MVP 引擎增加交付范围。
+4. Artifact 内 Python runtime、venv、FastAPI、PyTorch、NeMo、CrispASR、CUDA/Vulkan 和模型权重数量均为 0。
+5. 为 `pnpm release:local`、installer 和 portable 提供 verified artifact preparation/consumption seam；end-user packaging 不运行 CMake。
+6. 验证 artifact hash、missing/wrong DLL、manifest mismatch、PATH/DLL isolation 和 managed-root load。
+7. 在 installed/portable layout 使用 T12-ready cached large-v3 完成短音频和 >10 分钟音频功能 smoke；只要求完成、非空合法输出和协议稳定，不要求 Python quality parity。
+8. 测量 setup、portable ZIP 和 unpacked CPU runtime 体积，并对父任务预算给出明确 pass/blocker。
+9. 发布可由 T18 唯一消费的 final MVP runtime identity 和第三方 license/attribution handoff。
 
 ## Acceptance Criteria
 
-- [ ] 从干净输入重复构建得到符合已定义 reproducibility policy 的 provisional artifact 和完整 component/license manifest。
-- [ ] Provisional artifact 在 installed/portable smoke 中通过 protocol/backend loading，且模型权重数量为 0。
-- [ ] Artifact verification、hash mismatch、missing DLL、wrong manifest、path isolation 和 package-consumption seam 测试通过。
-- [ ] 体积测量覆盖 setup/portable/unpacked 三项，并明确是否满足父任务预算；不以缺失测量声称通过。
-- [ ] 文档和 metadata 明确标记所有 worker/hash 为 provisional，T18 final rebuild/attestation contract 可由 accepted engine identities 唯一驱动。
-- [ ] Production/default 仍为 Python legacy，现有 release inputs 未被替换。
+- [ ] 两次 clean build 满足冻结的 reproducibility policy，component/source/toolchain/runtime identity 完整。
+- [ ] Final artifact 在 installed/portable layout 通过 protocol/backend loading、短音频和 >10 分钟 cached-model smoke。
+- [ ] 输出非空、UTF-8 合法、时间有序、正时长且 audio-bounded；cancel/crash/recovery host contract 不因 packaging 改变。
+- [ ] Artifact verification、hash mismatch、missing/wrong DLL、manifest mismatch、path isolation 和 package-consumption seam 测试通过。
+- [ ] Artifact 不包含 Python/CrispASR/GPU/ORT/VAD/模型权重等非 MVP 内容。
+- [ ] Setup/portable/unpacked 三项体积完成测量并满足预算，或发布明确 blocker 而不是声称通过。
+- [ ] T18 可直接验证并消费该 final artifact，无需基于 optional engine identities 重建。
+- [ ] Production/default 在 T18 通过前仍为 Python legacy，现有 release inputs 未提前切换。
 
-## Forbidden Premature Claims
+## Rollback
 
-- 不得声称 provisional worker、hash、runtime manifest、CPU route、installer 或 native release 为 final/qualified。
-- 不得让 provisional packaging 反向授权任何 `stop-revise`、`baseline-incomplete` 或 omitted model lane。
+- 删除或撤回本 task 的 artifact/manifest consumption seam，恢复前一 production package input。
+- 不删除用户模型、缓存、项目、字幕或设置。
 
 ## Out Of Scope
 
-- 最终 T18 rebuild/attestation、T14/T15 GPU packs/device qualification。
-- 模型 manifest/downloader、模型权重打包、质量 benchmark acquisition 或算法修订。
-- 设置、前端、production route、安装器默认切换和 Python legacy 移除。
+- T12 model downloader/manifest 实现和模型权重打包。
+- CrispASR、Kotoba、Qwen3、Parakeet、ReazonSpeech 或其他 Whisper 模型。
+- CUDA/Vulkan packs、设备 qualification、设置、前端和 production route cutover。
+- 字幕质量 parity 修订或 benchmark candidate discovery。
