@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 31
+- **Total Sessions**: 32
 - **Last Active**: 2026-08-27
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1087 | Active |
+| `journal-1.md` | ~1121 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 32 | 2026-08-27 | Complete Native ASR MVP model manager | `940fa29`, `46f2cce` | `dev-crisp-asr` |
 | 31 | 2026-08-27 | Complete native ASR CPU runtime package | `8009018`, `280858f` | `dev-crisp-asr` |
 | 30 | 2026-08-26 | Reprioritize Native ASR for release-first MVP | `1e32ba3` | `dev-crisp-asr` |
 | 29 | 2026-08-25 | Close native Whisper execution parity discovery | `dff1b52`, `309bd2e` | `dev-crisp-asr` |
