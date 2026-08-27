@@ -248,6 +248,89 @@ Wrong:   release:local runs CMake or consumes a machine-local dependency tree
 Correct: release:local verifies/extracts the tracked final ZIP; only the dedicated build command compiles
 ```
 
+## Native ASR Model Delivery (Pre-cutover)
+
+### Scope / Trigger
+
+Apply this contract when changing the bundled Native ASR model manifest, exact readiness, legacy Hugging Face reuse, direct CT2 installs, resumable download jobs, or the future T16 command wiring. T12 provides an internal Rust seam only; production/default model commands remain on the Python sidecar until the explicit backend/frontend cutover.
+
+### Signatures
+
+```rust
+struct NativeAsrModelManager;
+
+async fn status(app, engine, model) -> Result<NativeAsrModelStatus, String>;
+async fn resolve_ready_model(app, engine, model)
+    -> Result<Option<ResolvedNativeAsrModel>, String>;
+async fn start_download(app, engine, model) -> Result<String, String>;
+async fn job_snapshot(job_id) -> Option<ModelDownloadSnapshot>;
+```
+
+Bundled authority:
+
+```text
+src-tauri/resources/native-asr-models.json
+  schemaVersion = 1
+  faster-whisper/large-v3
+  Systran/faster-whisper-large-v3
+  revision edaa852ec7e145841d8ffdb056a99866b5f0a478
+```
+
+### Contracts
+
+- The bundled manifest is the sole model identity authority. Reject unsupported schemas, duplicate logical/model identities, unsafe segments, malformed hashes, missing roles, Windows reserved/trailing-dot aliases, and ASCII case-colliding identities/paths before network or filesystem mutation.
+- Ordinary faster-whisper large-v3 requires exactly `config.json`, `model.bin`, `tokenizer.json`, and `vocabulary.json`; do not extend Kotoba's `preprocessor_config.json` requirement to ordinary Whisper.
+- Readiness order is exact direct install, then exact immutable HF snapshot. Every required file must match size and SHA-256; readiness hashing and blocking directory verification run through `spawn_blocking` from async callers.
+- Direct model paths and required files reject symlinks/reparse points. Legacy HF snapshot/file canonical targets must remain below the canonical managed HF root; legacy snapshots are read-only and never copied, mutated, or deleted by the model manager.
+- Official/China URLs derive only from the validated repository/revision/file row plus the existing runtime source profile. Do not accept custom model URLs or log headers/response bodies.
+- `.part` resume appends only for matching `206 Content-Range`; ignored ranges (`200`), incompatible `206`, `416`, oversized partials, and known-corrupt complete partials restart safely. Useful network-interrupted partials remain resumable.
+- Verify every file and the complete staging tree before renaming into the immutable final revision directory. Preserve a valid final install; move an invalid final only after replacement staging validates, and restore it when publication fails.
+- Same logical-model requests share one active job. Terminal snapshots remain pollable for the process lifetime. Do not hold manager locks across network waits or multi-gigabyte hashing.
+- Before T16/T17, `check_asr_model`, `download_asr_model`, and `get_model_download_progress` continue proxying the Python sidecar; do not expose a mixed native-download/Python-launch product state.
+
+### Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| Wrong schema/revision/hash/size, missing role/file, framework-only cache | Not ready / controlled manifest error; no fallback |
+| `CON.json`, trailing-dot component, traversal, case-colliding path or identity | Reject manifest before path join |
+| Direct symlink/reparse point or legacy canonical target outside managed HF root | Reject candidate before ready |
+| Matching partial + valid `206 Content-Range` | Append and continue aggregate progress |
+| Range ignored with `200` | Truncate and restart the file from byte 0 |
+| Incompatible `206`, `416`, oversized or corrupt complete partial | Remove/restart once; never append uncertain bytes |
+| Network interruption | Fail job but preserve useful bounded partial |
+| Hash mismatch after complete transfer | Remove corrupt complete partial; never publish |
+| Valid final exists | Reuse it; never replace or damage it |
+| Same-model request while active | Return the existing active job ID |
+| Known non-MVP model / unknown identity | `postMvpUnavailable` / `unsupported`; no Python or model fallback |
+
+### Good / Base / Bad Cases
+
+- Good: exact manifest row → resumable verified staging → immutable direct install → exact resolved path accepted by the packaged CPU worker.
+- Base: exact legacy HF snapshot exists → full validation → reuse in place; current product commands and Python-default route remain unchanged.
+- Bad: accept `main`, model-name-only directories, same-name framework caches, Windows path aliases, escaped symlinks, or stream directly into the final model directory.
+
+### Tests Required
+
+- Manifest: exact frozen four-file closure/license/source plus schema, duplicate, unsafe segment, Windows alias, case-collision, hash, and missing-role rejection.
+- Readiness: direct/legacy preference, missing/wrong-size/wrong-hash/wrong-revision/framework-cache failure, direct link rejection, and contained/escaped legacy link behavior.
+- Download: fresh, matching resume, ignored range, incompatible range, `416`, oversized partial, interruption preservation, bad hash, complete-stage publication, repair rollback, and same-model coalescing.
+- Gates: focused `asr_models` tests, full Cargo tests, `pnpm build`, task validation, implementation `rustfmt`, and `git diff --check`.
+- Real handoff: exact cached large-v3 path + packaged CPU worker + short audio; long installed/portable release smoke remains owned by T18.
+
+### Wrong vs Correct
+
+```text
+Wrong:   model alias/name exists -> report ready -> Python/native silently chooses files
+Correct: exact repo + revision + four size/hash rows -> resolve one exact contained path
+
+Wrong:   append any 206 body to a partial, or download directly into the final revision path
+Correct: validate Content-Range -> verify .part -> verify complete stage -> rename immutable directory
+
+Wrong:   T12 rewires public model commands while start_asr still defaults to Python
+Correct: T12 lands the internal seam -> T16/T17 wire contracts -> T18 cuts over production
+```
+
 ## ASR Sidecar Process
 
 - Tauri starts/manages the Python FastAPI sidecar (`asr.rs`) and continues to proxy production/default inference plus model download until an explicit native cutover task changes that boundary.
