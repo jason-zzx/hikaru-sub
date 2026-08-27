@@ -2,60 +2,133 @@
 
 ## Goal
 
-为首个 Native ASR MVP 交付唯一必需的 `faster-whisper / large-v3` CTranslate2 模型管理能力：冻结精确模型身份，实现安全下载、校验、原子安装和 readiness，使全新安装无需 Python 即可使用已缓存模型完成本地转录。
+Deliver the exact native model-management capability required by the first Hikaru Sub Native ASR MVP: identify, download, verify, install, reuse, and resolve `faster-whisper / large-v3` as an immutable CTranslate2 model without Python.
 
-Manifest 和下载器保持可扩展，但其他 CT2/GGUF/Qwen companion entries 属于 post-MVP，不阻塞首版。
+This task is T12 in the Native ASR migration roadmap and has priority P1. It delivers a production-ready model-manager contract for T16–T18, but does not switch the current Python-default product route.
 
-## Priority And Release Role
+## Background and authority
 
-- Priority: P1.
-- Native MVP critical-path task。
-- 首版只要求 large-v3 CT2 model identity/readiness。
-- 不负责字幕质量改进、runtime 打包、设置/UI 或 release cutover。
+- The parent migration fixes the first Native MVP route as Windows x64, built-in CPU runtime, `faster-whisper / large-v3 / CTranslate2`, with no bundled model weights.
+- T13 has delivered the final CPU runtime artifact. T16 depends on T12 and T13; T17 depends on T16 and T12 metadata; T18 owns release cutover.
+- Archived T02/T06/T07 evidence freezes the model repository, revision, file identities, and native-worker compatibility.
+- The official immutable repository metadata identifies the model as a CTranslate2 conversion licensed under MIT.
+- Model readiness is only an artifact-integrity statement. It does not claim subtitle-quality qualification, runtime availability, route enablement, or release readiness.
 
-## Authority And Dependencies
+## Frozen MVP identity
 
-- 依赖归档 T02 已证明可加载的 CT2 格式和 `faster-whisper -> ctranslate2` route。
-- 依赖父任务的 installed/portable managed-root、official/China source 和下载安全合同。
-- 可读取归档 logical-model mapping，但不得把 Python artifact 当作 Native 可用文件。
-- Candidate A 的质量 disposition 不由本任务改变；model ready 不等于 subtitle-quality qualified。
+- Logical identity: `faster-whisper/large-v3`
+- Repository: `Systran/faster-whisper-large-v3`
+- Revision: `edaa852ec7e145841d8ffdb056a99866b5f0a478`
+- Backend/format: `ctranslate2`
+- License: MIT
+- Attribution: Systran conversion of `openai/whisper-large-v3`
+
+Required files:
+
+| Role | File | Bytes | SHA-256 |
+|---|---|---:|---|
+| model-config | `config.json` | 2,394 | `a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9` |
+| model-weights | `model.bin` | 3,087,284,237 | `69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1` |
+| tokenizer | `tokenizer.json` | 2,480,617 | `6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca` |
+| vocabulary | `vocabulary.json` | 1,068,114 | `c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1` |
+
+Ordinary faster-whisper readiness must not require `preprocessor_config.json`; that requirement remains Kotoba-only.
 
 ## Requirements
 
-1. 冻结 large-v3 CT2 的 engine/backend、variant、revision、必需文件角色、URL/source role、精确大小、SHA-256、许可证和 attribution。
-2. 使用版本化 manifest；结构允许后续增加其他 CT2/GGUF/companion entries，但首版无需补齐它们。
-3. 实现官方/中国大陆源解析、受管 `.part`、可用时断点续传、大小/SHA 校验和原子安装。
-4. 只有 large-v3 全部必需文件验证完成后才标记 ready；同名、不完整、错 hash 或错误 framework 文件必须 fail closed。
-5. 并发相同下载合并；失败不得破坏已验证文件或旧可用版本。
-6. 新下载限制在 `deps/models/ctranslate2`，临时文件限制在 `deps/downloads`；cleanup 不得越出受管 `deps/`。
-7. 合法旧 Hugging Face CT2 snapshot 可在精确验证后复用，不强制复制。
-8. 模型状态合同必须能向 T16/T17 区分 `large-v3 available` 与其他模型 `post-mvp-unavailable`。
+### R1 — Versioned trusted manifest
 
-## Acceptance Criteria
+- Add a bundled, versioned manifest that is the sole runtime authority for native model repository, revision, backend, format, license, attribution, required file roles, exact sizes, and SHA-256 values.
+- The schema may represent future entries, but T12 contains only the MVP large-v3 entry.
+- Runtime code must reject unsupported schema versions, duplicate logical identities, unsafe relative paths, missing required metadata, and malformed hashes before network or filesystem mutation.
+- `main`, model aliases, repository-name matching, and Python framework metadata must never substitute for the frozen revision.
 
-- [ ] large-v3 CT2 条目具备完整 revision/size/SHA/license/file-role metadata，不以 floating `main` 作为唯一 release lock。
-- [ ] official/China source routing、resume、hash mismatch、partial failure、atomic install 和 duplicate coalescing 测试通过。
-- [ ] valid legacy CT2 snapshot 可复用；同名文件、Python framework cache、不完整目录或 identity drift 不会误报 ready。
-- [ ] installed/portable 路径和 bounded cleanup 测试通过。
-- [ ] 输出稳定的 large-v3 identity/readiness contract，供 T13 smoke、T16、T17 和 T18 消费。
-- [ ] 其他模型未完成时明确返回 post-MVP/unavailable，不阻塞 large-v3 MVP。
+### R2 — Managed paths and containment
 
-## Post-MVP Expansion
+- New native installs live under `deps/models/ctranslate2`.
+- Partials and staging trees live under `deps/downloads/native-asr-models`.
+- Every manifest-derived path must remain a normal relative path below its owning managed root.
+- Cleanup of failed/stale T12 staging data must remain within the exact managed download namespace.
+- Direct native installs must reject required-file symlinks. Legacy Hugging Face snapshot symlinks may be reused only when their canonical targets remain inside the managed Hugging Face root.
 
-- 其他 ordinary Whisper 模型和 large-v2。
-- Kotoba CT2 model/preprocessor identity。
-- Parakeet、ReazonSpeech GGUF。
-- Qwen3 ASR + ForcedAligner companion pair。
+### R3 — Exact readiness and ready-path resolution
 
-这些 entries 可在同一 manifest/downloader architecture 上增量加入，但不属于本 task 的 MVP 完成条件。
+- A model is ready only when every required file exists with the exact size and SHA-256 from the bundled manifest.
+- Missing files, directories in place of files, wrong sizes, wrong hashes, symlink escapes, incomplete staging trees, or identity drift must fail closed.
+- Resolution prefers a valid direct native install, then a valid exact legacy Hugging Face CT2 snapshot.
+- Readiness returns the exact resolved model directory and its origin to Rust consumers.
+- Unsupported/post-MVP model IDs return an explicit unavailable disposition rather than falling back to Python or another model.
 
-## Forbidden Claims
+### R4 — Official and China source routing
 
-- 不得声称 model ready 等于字幕质量 qualified、runtime packaged、production route enabled 或 release ready。
-- 不得为了未来模型提前实现不需要的 companion/grouping/engine policy。
+- Reuse the existing runtime source setting. Do not add another model-source preference.
+- Official downloads resolve against Hugging Face; China downloads resolve against the configured `hf-mirror` endpoint.
+- URLs are derived only from trusted manifest repository/revision/file values and the bundled source profile.
+- Redirects may be followed, but no credentials, headers, subtitles, or private user data may be logged.
 
-## Out Of Scope
+### R5 — Resumable verified download
 
-- Native inference、benchmark acquisition、字幕质量修订。
-- CPU/GPU runtime 构建、设置、前端和 release cutover。
-- 自动迁移或复制不兼容的 Python framework 模型权重。
+- Download each required file through a managed `.part` file.
+- Resume when the server returns a valid matching range response.
+- If a server ignores the range, reports an incompatible range, or the partial exceeds the expected size, restart that file safely rather than appending corrupt bytes.
+- Verify exact final size and SHA-256 before a file enters the install staging tree.
+- Progress reports aggregate downloaded and total bytes across the complete model.
+- A network failure or hash failure must preserve useful resumable partials but must never create a ready model.
+
+### R6 — Atomic install and failure preservation
+
+- Verify the complete staged model before publishing the immutable revision directory.
+- A valid existing final install is never replaced or damaged.
+- An invalid existing final directory may be replaced only after the new staging tree fully verifies.
+- Interrupted or failed installation leaves no partial final directory that can pass readiness.
+- Successful installation resolves to the same exact model identity used by the native worker and T13/T18 smoke tests.
+
+### R7 — Duplicate-download coalescing and stable job state
+
+- Concurrent requests for the same logical model identity return the same active job rather than starting duplicate 3 GB downloads.
+- Job state exposes a stable ID, running/completed/failed status, aggregate progress, downloaded bytes, total bytes, resolved path on success, source identity, and a sanitized error on failure.
+- Job state remains available for polling after terminal completion during the application process lifetime.
+- Different future model identities must not share progress or failure state.
+
+### R8 — Compatibility and handoff
+
+- T12 must not change the current production Python-default transcription route or silently rewire the existing frontend model commands.
+- T12 exposes a Rust-owned internal contract that T16 can wire into the stable Tauri command names and T17 can represent in the frontend.
+- The contract must distinguish:
+  - large-v3 supported but missing;
+  - large-v3 ready with an exact resolved path;
+  - known post-MVP models unavailable;
+  - unknown/unsupported identities.
+- Existing managed Hugging Face snapshots are read-only reuse candidates; T12 does not copy, mutate, or delete them.
+
+## Acceptance criteria
+
+- [ ] AC1: The bundled manifest contains the exact large-v3 repository, immutable revision, backend/format, MIT attribution, and all required file roles/sizes/SHA-256 values.
+- [ ] AC2: Manifest validation rejects unsupported versions, unsafe paths, duplicate identities, malformed hashes, and incomplete entries.
+- [ ] AC3: Exact direct installs and exact managed legacy snapshots resolve ready; missing, wrong-size, wrong-hash, wrong-revision, framework-cache, and symlink-escape cases do not.
+- [ ] AC4: Official and China URL resolution is deterministic and uses only bundled manifest/source-profile data.
+- [ ] AC5: Fresh download, valid resume, ignored-range restart, bad-range restart, network interruption, wrong hash, and partial-file recovery tests pass.
+- [ ] AC6: Full staging verification precedes final publication; failed replacement preserves an existing valid install, and no partial final directory reports ready.
+- [ ] AC7: Simultaneous same-model requests coalesce to one job and one network transfer; terminal snapshots remain pollable.
+- [ ] AC8: Installed and portable executable-root layouts resolve the same bounded `deps` structure without AppData model storage.
+- [ ] AC9: The resolved large-v3 path is accepted by the packaged native CPU worker for the T12-backed smoke handoff.
+- [ ] AC10: Current Python-default commands and frontend behavior remain unchanged until T16/T17/T18.
+- [ ] AC11: Focused Rust tests and `cargo test --manifest-path src-tauri/Cargo.toml` pass; `pnpm build` confirms no cross-layer contract regression.
+
+## Out of scope
+
+- Native inference implementation or subtitle-quality changes.
+- CPU/GPU runtime packaging, device detection, or GPU packs.
+- Production route cutover, settings migration, or Python dependency removal.
+- Frontend model-manager UX changes.
+- Models other than faster-whisper large-v3.
+- Companion/group policy for Kotoba, Qwen3, Parakeet, or ReazonSpeech.
+- Importing arbitrary user models or custom download URLs.
+- Copying or mutating legacy Hugging Face snapshots.
+- A persistent verification cache before readiness hashing is measured as a real bottleneck.
+
+## Dependencies and rollback boundary
+
+- Depends on archived T02 model-format evidence and the parent managed-path/source contracts.
+- Produces the model identity/readiness/download contract consumed by T16–T18.
+- Rollback removes the native model manifest/module and its managed staging/install data only. It does not delete legacy Hugging Face snapshots, user projects, settings, subtitles, or the Python-default route.

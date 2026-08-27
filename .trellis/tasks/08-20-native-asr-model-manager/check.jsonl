@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/tauri/paths-and-runtime-deps.md", "reason": "Check installed/portable roots, direct and legacy model containment, and bounded staging cleanup."}
+{"file": ".trellis/spec/tauri/async-and-blocking.md", "reason": "Check hashing and blocking disk work use spawn_blocking and do not stall async commands."}
+{"file": ".trellis/spec/tauri/quality-guidelines.md", "reason": "Check trust boundaries, tests, privacy-safe errors, and full Rust validation."}
+{"file": ".trellis/spec/tauri/media-ffmpeg-asr.md", "reason": "Check no premature public command or production route cutover and preserve native launch contracts."}
+{"file": ".trellis/tasks/07-25-native-asr-migration/prd.md", "reason": "Check T12 against the parent MVP critical path, release-first scope, model lifecycle, and no-Python final target."}
+{"file": ".trellis/tasks/08-20-native-asr-model-manager/research/planning-evidence.md", "reason": "Check exact large-v3 metadata, existing code anchors, legacy reuse, and the minimal T12/T16 boundary."}
+{"file": ".trellis/tasks/08-20-native-asr-model-manager/research/implementation-evidence.md", "reason": "Check the delivered AC mapping, independent review fixes, real packaged-worker short smoke, validation results, and remaining T18-only release smoke."}

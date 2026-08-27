@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/tauri/paths-and-runtime-deps.md", "reason": "Preserve executable-adjacent managed model/download roots, portable behavior, probe/measure separation, and bounded cleanup."}
+{"file": ".trellis/spec/tauri/async-and-blocking.md", "reason": "Keep multi-gigabyte hashing and blocking filesystem verification off the async runtime."}
+{"file": ".trellis/spec/tauri/quality-guidelines.md", "reason": "Apply Rust validation, path and URL trust-boundary rules, privacy-safe diagnostics, and honest capability reporting."}
+{"file": ".trellis/spec/tauri/media-ffmpeg-asr.md", "reason": "Preserve the pre-cutover Python-default route and existing native worker model-path/lifecycle contracts."}
+{"file": ".trellis/tasks/08-20-native-asr-model-manager/research/planning-evidence.md", "reason": "Use the repository-backed large-v3 identity, current command seams, minimal ownership boundary, and exact path decisions."}
+{"file": ".trellis/tasks/archive/2026-08/07-25-native-asr-ctranslate2-poc/research/inputs.lock.json", "reason": "Authoritative immutable large-v3 repository, revision, required file sizes, SHA-256 values, and MIT license identity."}

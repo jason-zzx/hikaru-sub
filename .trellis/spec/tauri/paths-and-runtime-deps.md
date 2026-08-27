@@ -25,8 +25,12 @@ Typical install-dir layout (see `/AGENTS.md`):
 - `deps/ffmpeg/current` — managed FFmpeg
 - `deps/python311/current` — managed Python 3.11
 - `deps/asr-service/.venv` — managed ASR venv
-- `deps/models/huggingface` — model cache (`HF_HOME`)
-- `deps/downloads` — temporary archives
+- `deps/models/huggingface` — legacy Python/Hugging Face cache (`HF_HOME`); Native ASR may reuse only an exact pinned CT2 snapshot after full validation
+- `deps/models/ctranslate2/<engine>/<model>/<revision>` — immutable direct Native ASR CT2 installs
+- `deps/downloads/native-asr-models/<engine>/<model>/<revision>` — Native ASR `.part`, staging, and repair data
+- `deps/downloads` — other temporary archives
+
+Native model manifest segments must reject traversal, Windows reserved device names, trailing-dot/space aliases, and ASCII case collisions before joining paths. Direct required files reject symlinks/reparse points; legacy HF symlinks are allowed only when the snapshot and canonical file target stay below the canonical managed Hugging Face root.
 
 Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI chooses official vs China mirror (default official). Legacy `auto`/`custom` migrate silently to official. China mirror injects `HF_ENDPOINT=https://hf-mirror.com` for the sidecar.
 
@@ -37,6 +41,8 @@ Settings entry: **probe only**. Storage sizes: user-triggered measure. Cleanup b
 ## Anti-Patterns
 
 - Reintroducing `%APPDATA%` / `%LOCALAPPDATA%\com.hikaru.sub` as large managed dependency roots
+- Treating a model-name-only directory, framework cache, wrong revision, or escaped HF symlink as a ready Native model
+- Streaming model bytes directly into the final immutable revision directory instead of verified download staging
 - Using `app.path().app_cache_dir()` directly as the workspace root (missing the `cache/` child on installed builds)
 - Recursive size in probe
 - Portable bootstrap that sets `is_portable` before directories succeed
