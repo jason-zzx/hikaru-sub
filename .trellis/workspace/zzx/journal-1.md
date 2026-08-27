@@ -1085,3 +1085,37 @@ Built and verified the reproducible Windows x64 Native ASR CPU runtime package, 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 32: Complete Native ASR MVP model manager
+
+**Date**: 2026-08-27
+**Task**: Complete Native ASR MVP model manager
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Implemented the exact faster-whisper large-v3 Native ASR model manifest and Rust model manager with fail-closed readiness, legacy HF reuse, resumable verified downloads, atomic publication, job coalescing, Windows path-alias hardening, updated Tauri specs, full Rust/frontend validation, and packaged-worker short smoke.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `940fa29` | (see git log) |
+| `46f2cce` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
