@@ -1,5 +1,6 @@
 mod app_paths;
 mod asr;
+mod asr_models;
 mod asr_setup;
 mod asr_worker;
 mod ass;

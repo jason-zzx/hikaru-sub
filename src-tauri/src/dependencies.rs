@@ -314,6 +314,14 @@ fn downloads_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(deps_dir(app)?.join("downloads"))
 }
 
+pub(crate) fn managed_downloads_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    downloads_dir(app)
+}
+
+pub(crate) fn managed_ctranslate2_model_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(deps_dir(app)?.join("models").join("ctranslate2"))
+}
+
 pub fn managed_ffmpeg_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(deps_dir(app)?.join("ffmpeg").join("current"))
 }

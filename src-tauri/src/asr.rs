@@ -3,6 +3,7 @@
 //! Product/default routing remains the Python HTTP sidecar. Setting the debug-only
 //! fake-worker environment enables the Rust-owned JSONL host without changing IPC.
 
+use crate::asr_models::NativeAsrModelManager;
 use crate::asr_worker::{native_job_id, ActiveJobGate, NativeAsrHost, ResolvedNativeLaunch};
 use crate::dependencies::{
     effective_asr_service_dir, effective_source_profile, ensure_runtime_deps_writable_or_elevate,
@@ -62,6 +63,8 @@ pub struct AsrState {
     job_base_urls: Mutex<HashMap<String, String>>,
     job_recovery_paths: Mutex<HashMap<String, PathBuf>>,
     active_job: Arc<ActiveJobGate>,
+    #[allow(dead_code)] // T16 wires this internal T12 seam into the stable commands.
+    pub(crate) native_models: NativeAsrModelManager,
     native_host: Option<NativeAsrHost>,
 }
 
@@ -74,6 +77,7 @@ impl Default for AsrState {
             job_base_urls: Mutex::new(HashMap::new()),
             job_recovery_paths: Mutex::new(HashMap::new()),
             active_job,
+            native_models: NativeAsrModelManager::default(),
             native_host,
         }
     }
@@ -1068,6 +1072,7 @@ mod tests {
             job_base_urls: Mutex::new(HashMap::new()),
             job_recovery_paths: Mutex::new(HashMap::new()),
             active_job: Arc::clone(&active_job),
+            native_models: NativeAsrModelManager::default(),
             native_host: None,
         };
         state.shutdown();
