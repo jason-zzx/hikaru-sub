@@ -114,6 +114,9 @@ export interface AsrEngineInfo {
   name: string;
   /** 依赖是否就绪（如 faster-whisper 是否已安装） */
   available: boolean;
+  backend?: string | null;
+  device?: string | null;
+  reason?: string | null;
 }
 
 export type AsrJobStatus =
@@ -160,6 +163,16 @@ export interface StartAsrArgs {
   vadConfig?: VadConfig | null;
 }
 
+export type NativeAsrModelDisposition =
+  | "supportedMissing"
+  | "ready"
+  | "postMvpUnavailable"
+  | "unsupported";
+
+export type NativeAsrModelOrigin =
+  | "directInstall"
+  | "legacyHuggingFaceSnapshot";
+
 /** ASR 模型在本地缓存中的就绪状态。 */
 export interface AsrModelStatus {
   engine: string;
@@ -168,6 +181,11 @@ export interface AsrModelStatus {
   available: boolean;
   /** 模型文件是否已在本地缓存 */
   downloaded: boolean;
+  disposition?: NativeAsrModelDisposition;
+  backend?: string | null;
+  revision?: string | null;
+  origin?: NativeAsrModelOrigin | null;
+  reason?: string | null;
 }
 
 export type ModelDownloadStatus = "running" | "completed" | "failed";
@@ -183,6 +201,8 @@ export interface ModelDownloadSnapshot {
   hfEndpoint?: string | null;
   hfHome?: string | null;
   debugLogPath?: string | null;
+  revision?: string | null;
+  resolvedPath?: string | null;
 }
 
 export type AsrSetupProfile =
@@ -242,6 +262,7 @@ export interface AsrSetupEnvironment {
 
 export type RuntimeDependencyKind =
   | "ffmpeg"
+  | "nativeAsrCpu"
   | "python311"
   | "asrVenv"
   | "asrModels"

@@ -1,0 +1,10 @@
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Owns stable ASR commands, Native host lifecycle, bundled CPU runtime, T12 model delivery, recovery, and no-silent-fallback boundaries."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Owns installed/portable roots, Native model/download layouts, probe-vs-measure behavior, current-video cache preservation, and cleanup containment."}
+{"file":".trellis/spec/tauri/async-and-blocking.md","reason":"Requires exact hashing, runtime reads, recursive measurement, and cleanup to keep blocking work off async workers."}
+{"file":".trellis/spec/tauri/command-guidelines.md","reason":"Requires the stable Rust command, registration, typed bridge, lifecycle, and long-job polling chain to remain complete."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Defines Rust formatting, tests, error handling, logging, and full Cargo validation for backend changes."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Owns typed wrappers and requires backend payload changes to remain centralized without raw invoke or duplicate state."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Guides additive typed Native disposition/runtime-kind handoff while preserving current compatibility fields for T17."}
+{"file":".trellis/tasks/08-27-native-asr-runtime-settings-backend/research/planning-evidence.md","reason":"Records the confirmed current settings, dependency, ASR command, T12/T13 handoff, and minimal T16/T17/T18 boundaries."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-model-manager/research/implementation-evidence.md","reason":"Provides verified T12 readiness/download/path behavior and the residual T16 public-command handoff."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-cpu-runtime-package/research/runtime-package-handoff.json","reason":"Freezes the exact T13 artifact identity, capabilities, resource layout, worker hash, model handoff, and release-validation boundary consumed by T16."}

@@ -164,6 +164,79 @@ Wrong:   Release/product code reads model-backed env keys, or a CUDA test breaks
 Correct: test module validates the required/optional env set → uses a CPU-only worker for deterministic cuda_not_built → copies audio to temporary workspace → exercises the unchanged host
 ```
 
+## Native ASR Backend Routing (T16 Pre-cutover)
+
+### 1. Scope / Trigger
+
+Apply this contract when changing the stable ASR engine/model commands, selecting legacy vs Native routing, resolving the packaged CPU worker, or turning a T12-ready model path into `ResolvedNativeLaunch`. T16 lands the complete Native backend branch; T18 still owns enabling it for Release/default.
+
+### 2. Signatures
+
+```rust
+enum AsrRoutePolicy { Legacy, NativeMvp }
+
+#[tauri::command]
+async fn list_asr_engines(app: AppHandle, state: State<'_, AsrState>)
+    -> Result<serde_json::Value, String>;
+#[tauri::command]
+async fn check_asr_model(app: AppHandle, state: State<'_, AsrState>, engine: String, model: String)
+    -> Result<serde_json::Value, String>;
+#[tauri::command]
+async fn download_asr_model(app: AppHandle, state: State<'_, AsrState>, engine: String, model: String)
+    -> Result<String, String>;
+#[tauri::command]
+async fn get_model_download_progress(state: State<'_, AsrState>, job_id: String)
+    -> Result<serde_json::Value, String>;
+```
+
+The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `AsrJobSnapshot` remain unchanged.
+
+### 3. Contracts
+
+- One immutable process-lifetime `AsrRoutePolicy` selects engine list, model status/download/progress, and inference as one family. Never let Native direct download feed legacy Python launch.
+- `AsrState::default` remains `Legacy` in Release until T18. A valid debug fake host may select `NativeMvp` only in debug/test; there is no persisted route setting or Release environment switch.
+- Native MVP accepts exactly `faster-whisper/large-v3`, `auto|cpu`, Japanese source, and no VAD. It resolves the T13 worker from `resource_dir()/native-asr/windows-x64/cpu` and passes only T12's exact hash-verified model path to `ResolvedNativeLaunch`.
+- Native preflight/runtime/model failures return directly. They never call `ensure_base_url` or silently fall back to Python.
+- Model status keeps compatibility booleans and adds `disposition`, `backend`, `revision`, `origin`, and `reason`. Download progress keeps current polling fields and maps T12 `sourceEndpoint` to compatibility field `hfEndpoint`.
+- Progress/cancel check the Native host first. In Native mode, an unknown job returns the established missing-job error rather than starting the sidecar.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| Release/default before T18 | Entire command family stays legacy |
+| Native large-v3 ready + CPU/auto | Resolve T13 worker + exact T12 path; start existing host |
+| Native model missing | Controlled download-required error; release unactivated slot |
+| Post-MVP/unknown model or engine | Explicit unavailable/unsupported result; no fallback |
+| CUDA/Vulkan/non-Japanese/VAD request | Reject before worker launch |
+| Missing/wrong T13 runtime identity or required entry | Controlled runtime error; no sidecar |
+| Native progress/cancel unknown job | `转录任务不存在`; no sidecar |
+
+### 5. Good / Base / Bad Cases
+
+- Good: `NativeMvp` + exact ready large-v3 + CPU -> one host job with unchanged progress/cancel/recovery behavior.
+- Base: normal Release build before T18 -> unchanged Python legacy route, while Native code remains testable.
+- Bad: model commands use T12 but `start_asr` still enters Python, or a Native preflight error falls through to `ensure_base_url`.
+
+### 6. Tests Required
+
+- Route-policy/default tests, including Release check with malicious debug env values.
+- All T12 disposition-to-public-payload mappings.
+- CPU/auto acceptance and engine/model/device/language/VAD rejection.
+- Native missing-job progress/cancel does not contact the sidecar.
+- Existing host reducer, recovery, crash, cancellation, active-slot, and full Cargo regressions.
+- `pnpm build` for additive TypeScript payload compatibility and `pnpm asr:runtime:verify` for the exact T13 archive.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong:   check/download -> Native manager; start failure -> Python sidecar fallback
+Correct: one route policy -> all model/inference commands -> direct controlled failure
+
+Wrong:   accept model name/path from settings and build a worker request
+Correct: T12 exact readiness -> resolved path -> ResolvedNativeLaunch
+```
+
 ## Bundled Native ASR CPU Runtime (Pre-cutover)
 
 ### Scope / Trigger

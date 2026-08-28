@@ -1,14 +1,17 @@
-//! Stable ASR commands with a Python legacy route and debug-only native worker host.
+//! Stable ASR commands with one internal legacy/Native MVP route policy.
 //!
-//! Product/default routing remains the Python HTTP sidecar. Setting the debug-only
-//! fake-worker environment enables the Rust-owned JSONL host without changing IPC.
+//! Product/default routing remains the Python HTTP sidecar until T18. The Native branch
+//! consumes the bundled CPU worker and exact managed model without changing public IPC.
 
-use crate::asr_models::NativeAsrModelManager;
+use crate::asr_models::{
+    known_native_asr_engines, ModelDownloadSnapshot, NativeAsrModelDisposition,
+    NativeAsrModelManager, NativeAsrModelOrigin, NativeAsrModelStatus,
+};
 use crate::asr_worker::{native_job_id, ActiveJobGate, NativeAsrHost, ResolvedNativeLaunch};
 use crate::dependencies::{
     effective_asr_service_dir, effective_source_profile, ensure_runtime_deps_writable_or_elevate,
-    managed_asr_service_dir, managed_model_cache_dir, work_cache_dir,
-    RuntimeDependencySourceProfile,
+    managed_asr_service_dir, managed_model_cache_dir, resolve_native_asr_cpu_runtime,
+    work_cache_dir, RuntimeDependencySourceProfile,
 };
 use crate::process::{hidden_command, terminate_process_tree};
 use crate::settings::{load_settings, AppSettings};
@@ -20,7 +23,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
@@ -57,35 +60,72 @@ impl Drop for Sidecar {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AsrRoutePolicy {
+    Legacy,
+    NativeMvp,
+}
+
+impl AsrRoutePolicy {
+    fn uses_native(self) -> bool {
+        self == Self::NativeMvp
+    }
+}
+
+fn default_route_policy(has_debug_native_host: bool) -> AsrRoutePolicy {
+    if has_debug_native_host {
+        AsrRoutePolicy::NativeMvp
+    } else {
+        AsrRoutePolicy::Legacy
+    }
+}
+
 /// 受 Tauri 托管的全局 ASR 状态；legacy/native 共用一个活跃任务槽。
 pub struct AsrState {
     sidecar: Mutex<Option<Sidecar>>,
     job_base_urls: Mutex<HashMap<String, String>>,
     job_recovery_paths: Mutex<HashMap<String, PathBuf>>,
     active_job: Arc<ActiveJobGate>,
-    #[allow(dead_code)] // T16 wires this internal T12 seam into the stable commands.
+    route_policy: AsrRoutePolicy,
     pub(crate) native_models: NativeAsrModelManager,
-    native_host: Option<NativeAsrHost>,
+    native_host: StdMutex<Option<NativeAsrHost>>,
 }
 
 impl Default for AsrState {
     fn default() -> Self {
         let active_job = Arc::new(ActiveJobGate::default());
         let native_host = debug_native_host(Arc::clone(&active_job));
+        let route_policy = default_route_policy(native_host.is_some());
         Self {
             sidecar: Mutex::new(None),
             job_base_urls: Mutex::new(HashMap::new()),
             job_recovery_paths: Mutex::new(HashMap::new()),
             active_job,
+            route_policy,
             native_models: NativeAsrModelManager::default(),
-            native_host,
+            native_host: StdMutex::new(native_host),
         }
     }
 }
 
 impl AsrState {
+    fn native_host(&self) -> Result<Option<NativeAsrHost>, String> {
+        self.native_host
+            .lock()
+            .map(|host| host.clone())
+            .map_err(|_| "native ASR host 状态已损坏".to_string())
+    }
+
+    fn install_native_host(&self, host: NativeAsrHost) -> Result<NativeAsrHost, String> {
+        let mut current = self
+            .native_host
+            .lock()
+            .map_err(|_| "native ASR host 状态已损坏".to_string())?;
+        Ok(current.get_or_insert(host).clone())
+    }
+
     pub fn shutdown(&self) {
-        if let Some(host) = &self.native_host {
+        if let Ok(Some(host)) = self.native_host() {
             host.shutdown();
         }
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -128,6 +168,85 @@ fn debug_native_host(active_job: Arc<ActiveJobGate>) -> Option<NativeAsrHost> {
 #[cfg(not(debug_assertions))]
 fn debug_native_host(_active_job: Arc<ActiveJobGate>) -> Option<NativeAsrHost> {
     None
+}
+
+async fn packaged_native_host(app: &AppHandle, state: &AsrState) -> Result<NativeAsrHost, String> {
+    if let Some(host) = state.native_host()? {
+        return Ok(host);
+    }
+    let app = app.clone();
+    let active_job = Arc::clone(&state.active_job);
+    let host = tauri::async_runtime::spawn_blocking(move || {
+        let runtime = resolve_native_asr_cpu_runtime(&app)?;
+        NativeAsrHost::new(runtime.worker, Vec::new(), active_job)
+    })
+    .await
+    .map_err(|error| format!("解析 Native ASR CPU 运行时失败：{error}"))??;
+    state.install_native_host(host)
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PublicAsrModelStatus {
+    engine: String,
+    model: String,
+    available: bool,
+    downloaded: bool,
+    disposition: NativeAsrModelDisposition,
+    backend: Option<String>,
+    revision: Option<String>,
+    origin: Option<NativeAsrModelOrigin>,
+    reason: Option<String>,
+}
+
+fn public_asr_model_status(status: NativeAsrModelStatus) -> PublicAsrModelStatus {
+    let (available, downloaded, reason) = match status.disposition {
+        NativeAsrModelDisposition::Ready => (true, true, None),
+        NativeAsrModelDisposition::SupportedMissing => (true, false, Some("需要下载模型".into())),
+        NativeAsrModelDisposition::PostMvpUnavailable => {
+            (false, false, Some("该模型将在后续版本支持".into()))
+        }
+        NativeAsrModelDisposition::Unsupported => (false, false, Some("不支持该引擎或模型".into())),
+    };
+    PublicAsrModelStatus {
+        engine: status.engine,
+        model: status.model,
+        available,
+        downloaded,
+        disposition: status.disposition,
+        backend: status.backend,
+        revision: status.revision,
+        origin: status.origin,
+        reason,
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PublicModelDownloadSnapshot {
+    id: String,
+    status: crate::asr_models::ModelDownloadJobStatus,
+    progress: f64,
+    downloaded_bytes: u64,
+    total_bytes: u64,
+    error: Option<String>,
+    hf_endpoint: String,
+    revision: String,
+    resolved_path: Option<String>,
+}
+
+fn public_model_download_snapshot(snapshot: ModelDownloadSnapshot) -> PublicModelDownloadSnapshot {
+    PublicModelDownloadSnapshot {
+        id: snapshot.id,
+        status: snapshot.status,
+        progress: snapshot.progress.unwrap_or(0.0),
+        downloaded_bytes: snapshot.downloaded_bytes,
+        total_bytes: snapshot.total_bytes,
+        error: snapshot.error,
+        hf_endpoint: snapshot.source_endpoint,
+        revision: snapshot.revision,
+        resolved_path: snapshot.resolved_path,
+    }
 }
 
 #[derive(Deserialize)]
@@ -179,6 +298,29 @@ fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_native_mvp_request(args: &StartAsrArgs) -> Result<(), String> {
+    if args.engine != "faster-whisper" || args.model != "large-v3" {
+        return Err("当前 Native MVP 仅支持 faster-whisper/large-v3".into());
+    }
+    if !matches!(args.device.as_str(), "auto" | "cpu") {
+        return Err(format!(
+            "当前 Native MVP 不支持设备：{}（仅支持 auto/cpu）",
+            args.device
+        ));
+    }
+    if args.use_vad {
+        return Err("[vad_not_built] 内置 Native ASR CPU 运行时未包含 VAD".into());
+    }
+    if args
+        .language
+        .as_deref()
+        .is_some_and(|language| language != "ja")
+    {
+        return Err("当前 Native MVP 仅支持日语源语言".into());
+    }
+    Ok(())
+}
+
 #[cfg(debug_assertions)]
 fn resolve_debug_native_launch(
     args: StartAsrArgs,
@@ -212,15 +354,6 @@ fn resolve_debug_native_launch(
         args.use_vad,
         args.vad_config,
     )
-}
-
-#[cfg(not(debug_assertions))]
-fn resolve_debug_native_launch(
-    _args: StartAsrArgs,
-    _job_id: String,
-    _cache_root: PathBuf,
-) -> Result<ResolvedNativeLaunch, String> {
-    Err("release build 禁止 native ASR debug override".into())
 }
 
 /// 解析 asr-service 目录（含 main.py）：设置 → 有效目录（debug 仓库 / release deps）→ 资源 → cwd。
@@ -589,6 +722,23 @@ pub async fn list_asr_engines(
     app: AppHandle,
     state: State<'_, AsrState>,
 ) -> Result<serde_json::Value, String> {
+    if state.route_policy.uses_native() {
+        let engines = known_native_asr_engines()
+            .into_iter()
+            .map(|name| {
+                let available = name == "faster-whisper";
+                serde_json::json!({
+                    "name": name,
+                    "available": available,
+                    "backend": available.then_some("ctranslate2"),
+                    "device": available.then_some("cpu"),
+                    "reason": (!available).then_some("该引擎将在后续版本支持"),
+                })
+            })
+            .collect::<Vec<_>>();
+        return Ok(serde_json::json!({ "engines": engines }));
+    }
+
     let base = ensure_base_url(&app, &state).await?;
     let client = reqwest::Client::new();
     let resp = client
@@ -610,11 +760,60 @@ pub async fn start_asr(
     validate_start_asr_args(&args)?;
     let reservation = state.active_job.reserve()?;
 
-    if let Some(host) = state.native_host.clone() {
+    if state.route_policy.uses_native() {
+        #[cfg(debug_assertions)]
+        if std::env::var_os("HIKARU_ASR_FAKE_WORKER").is_some() {
+            let host = packaged_native_host(&app, &state).await?;
+            let cache_root = work_cache_dir(&app)?;
+            let job_id = native_job_id();
+            let launch = tauri::async_runtime::spawn_blocking(move || {
+                resolve_debug_native_launch(args, job_id, cache_root)
+            })
+            .await
+            .map_err(|error| format!("解析 native ASR 启动参数失败：{error}"))??;
+            return tauri::async_runtime::spawn_blocking(move || host.start(launch, reservation))
+                .await
+                .map_err(|error| format!("启动 native ASR 任务失败：{error}"))?;
+        }
+
+        validate_native_mvp_request(&args)?;
+        let status = state
+            .native_models
+            .status(&app, &args.engine, &args.model)
+            .await?;
+        let model_path = match status.disposition {
+            NativeAsrModelDisposition::Ready => status
+                .resolved_path
+                .ok_or_else(|| "Native ASR 模型状态缺少已解析路径".to_string())?,
+            NativeAsrModelDisposition::SupportedMissing => {
+                return Err("Native ASR 模型尚未下载".into())
+            }
+            NativeAsrModelDisposition::PostMvpUnavailable => {
+                return Err("该模型将在后续版本支持".into())
+            }
+            NativeAsrModelDisposition::Unsupported => {
+                return Err("当前 Native MVP 不支持该引擎或模型".into())
+            }
+        };
+        let host = packaged_native_host(&app, &state).await?;
         let cache_root = work_cache_dir(&app)?;
         let job_id = native_job_id();
         let launch = tauri::async_runtime::spawn_blocking(move || {
-            resolve_debug_native_launch(args, job_id, cache_root)
+            ResolvedNativeLaunch::resolve(
+                job_id,
+                args.engine,
+                vec![("model".into(), model_path)],
+                "cpu".into(),
+                args.language.unwrap_or_else(|| "ja".into()),
+                PathBuf::from(args.audio_path),
+                PathBuf::from(
+                    args.output_ass_path
+                        .expect("outputAssPath was validated before native resolution"),
+                ),
+                &cache_root,
+                args.use_vad,
+                args.vad_config,
+            )
         })
         .await
         .map_err(|error| format!("解析 native ASR 启动参数失败：{error}"))??;
@@ -683,14 +882,14 @@ pub async fn get_asr_progress(
     include_segments: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     let seg = include_segments.unwrap_or(true);
-    if let Some(host) = &state.native_host {
+    if let Some(host) = state.native_host()? {
         if let Some(snapshot) = host.snapshot(&job_id, seg)? {
             return Ok(snapshot);
         }
     }
 
     let known_base = known_job_base_url(&state, &job_id).await;
-    if state.native_host.is_some() && known_base.is_none() {
+    if state.route_policy.uses_native() && known_base.is_none() {
         return Err(format!("转录任务不存在（jobId={job_id}）"));
     }
     let base = match known_base {
@@ -740,6 +939,11 @@ pub async fn check_asr_model(
     engine: String,
     model: String,
 ) -> Result<serde_json::Value, String> {
+    if state.route_policy.uses_native() {
+        let status = state.native_models.status(&app, &engine, &model).await?;
+        return serde_json::to_value(public_asr_model_status(status)).map_err(|e| e.to_string());
+    }
+
     let base = ensure_base_url(&app, &state).await?;
     let client = reqwest::Client::new();
     let resp = client
@@ -760,6 +964,13 @@ pub async fn download_asr_model(
     engine: String,
     model: String,
 ) -> Result<String, String> {
+    if state.route_policy.uses_native() {
+        return state
+            .native_models
+            .start_download(&app, &engine, &model)
+            .await;
+    }
+
     let base = ensure_base_url(&app, &state).await?;
     let client = reqwest::Client::new();
     let body = serde_json::json!({ "engine": engine, "model": model });
@@ -788,6 +999,16 @@ pub async fn get_model_download_progress(
     state: State<'_, AsrState>,
     job_id: String,
 ) -> Result<serde_json::Value, String> {
+    if state.route_policy.uses_native() {
+        let snapshot = state
+            .native_models
+            .job_snapshot(&job_id)
+            .await
+            .ok_or_else(|| "下载任务不存在".to_string())?;
+        return serde_json::to_value(public_model_download_snapshot(snapshot))
+            .map_err(|e| e.to_string());
+    }
+
     let base = match known_job_base_url(&state, &job_id).await {
         Some(url) => url,
         None => ensure_base_url(&app, &state).await?,
@@ -813,10 +1034,8 @@ pub async fn cancel_asr(
     job_id: String,
 ) -> Result<(), String> {
     if let Some(host) = state
-        .native_host
-        .as_ref()
+        .native_host()?
         .filter(|host| host.contains_job(&job_id))
-        .cloned()
     {
         return tauri::async_runtime::spawn_blocking(move || host.cancel(&job_id))
             .await
@@ -824,7 +1043,7 @@ pub async fn cancel_asr(
     }
 
     let known_base = known_job_base_url(&state, &job_id).await;
-    if state.native_host.is_some() && known_base.is_none() {
+    if state.route_policy.uses_native() && known_base.is_none() {
         return Err(format!("转录任务不存在（jobId={job_id}）"));
     }
     let base = match known_base {
@@ -914,6 +1133,70 @@ mod tests {
         let err = validate_start_asr_args(&args).unwrap_err();
 
         assert!(err.contains("缺少转录字幕输出路径"));
+    }
+
+    #[test]
+    fn one_route_policy_controls_the_complete_backend_family() {
+        assert!(!default_route_policy(false).uses_native());
+        assert!(default_route_policy(true).uses_native());
+        assert!(AsrRoutePolicy::NativeMvp.uses_native());
+        assert!(!AsrRoutePolicy::Legacy.uses_native());
+    }
+
+    #[test]
+    fn native_mvp_request_accepts_auto_cpu_and_rejects_unsupported_routes() {
+        let args = |device: &str, use_vad: bool| StartAsrArgs {
+            audio_path: "cache/workspace/abc/audio.wav".into(),
+            engine: "faster-whisper".into(),
+            model: "large-v3".into(),
+            device: device.into(),
+            language: Some("ja".into()),
+            output_ass_path: Some("output.ass".into()),
+            use_vad,
+            vad_config: None,
+        };
+        assert!(validate_native_mvp_request(&args("auto", false)).is_ok());
+        assert!(validate_native_mvp_request(&args("cpu", false)).is_ok());
+        assert!(validate_native_mvp_request(&args("cuda", false))
+            .unwrap_err()
+            .contains("仅支持 auto/cpu"));
+        assert!(validate_native_mvp_request(&args("cpu", true))
+            .unwrap_err()
+            .contains("vad_not_built"));
+
+        let mut unsupported = args("cpu", false);
+        unsupported.model = "large-v3-turbo".into();
+        assert!(validate_native_mvp_request(&unsupported)
+            .unwrap_err()
+            .contains("仅支持 faster-whisper/large-v3"));
+    }
+
+    #[test]
+    fn native_model_status_mapper_preserves_booleans_and_typed_metadata() {
+        let status = |disposition| NativeAsrModelStatus {
+            engine: "faster-whisper".into(),
+            model: "large-v3".into(),
+            backend: Some("ctranslate2".into()),
+            revision: Some("revision".into()),
+            disposition,
+            origin: None,
+            resolved_path: None,
+        };
+        let ready = public_asr_model_status(status(NativeAsrModelDisposition::Ready));
+        assert!(ready.available && ready.downloaded && ready.reason.is_none());
+
+        let missing = public_asr_model_status(status(NativeAsrModelDisposition::SupportedMissing));
+        assert!(missing.available && !missing.downloaded);
+        assert!(missing.reason.unwrap().contains("下载"));
+
+        let deferred =
+            public_asr_model_status(status(NativeAsrModelDisposition::PostMvpUnavailable));
+        assert!(!deferred.available && !deferred.downloaded);
+        assert!(deferred.reason.unwrap().contains("后续"));
+
+        let unsupported = public_asr_model_status(status(NativeAsrModelDisposition::Unsupported));
+        assert!(!unsupported.available && !unsupported.downloaded);
+        assert!(unsupported.reason.unwrap().contains("不支持"));
     }
 
     #[test]
@@ -1072,8 +1355,9 @@ mod tests {
             job_base_urls: Mutex::new(HashMap::new()),
             job_recovery_paths: Mutex::new(HashMap::new()),
             active_job: Arc::clone(&active_job),
+            route_policy: AsrRoutePolicy::Legacy,
             native_models: NativeAsrModelManager::default(),
-            native_host: None,
+            native_host: StdMutex::new(None),
         };
         state.shutdown();
         assert!(active_job.current().is_none());

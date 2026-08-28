@@ -1,0 +1,33 @@
+{
+  "id": "native-asr-runtime-settings-backend",
+  "name": "native-asr-runtime-settings-backend",
+  "title": "Migrate Native ASR runtime and settings backend",
+  "description": "Consume the completed Native large-v3 model manager and bundled CPU runtime, remove Python/venv from production runtime and settings behavior, and prepare one coherent stable-command backend for T18 cutover.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "Migrate Tauri ASR routing, model availability/download commands, runtime dependency reporting/storage, and legacy settings input to the Native CPU MVP contracts while preserving T17/T18 boundaries.",
+  "package": null,
+  "priority": "P2",
+  "creator": "zzx",
+  "assignee": "zzx",
+  "createdAt": "2026-08-27",
+  "completedAt": null,
+  "branch": "dev-crisp-asr",
+  "base_branch": "dev-crisp-asr",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-25-native-asr-migration",
+  "relatedFiles": [
+    "src-tauri/src/asr.rs",
+    "src-tauri/src/asr_models.rs",
+    "src-tauri/src/dependencies.rs",
+    "src-tauri/src/settings.rs",
+    "src/types/index.ts",
+    "src/constants/runtimeDependencies.ts"
+  ],
+  "notes": "T17 owns the visible frontend migration. T18 owns Release/default Native enablement and Python package removal.",
+  "meta": {}
+}

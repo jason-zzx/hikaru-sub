@@ -1,3 +1,6 @@
+use crate::asr_models::{
+    is_link_like, NativeAsrModelDisposition, NativeAsrModelOrigin, NativeAsrModelStatus,
+};
 use crate::process::hidden_command;
 use crate::settings::{load_settings, AppSettings, RuntimeDependencySourceMode};
 use futures::StreamExt;
@@ -14,11 +17,57 @@ use tokio::sync::Mutex;
 
 const LOG_TAIL_LIMIT: usize = 200;
 const MANIFEST_JSON: &str = include_str!("../resources/runtime-dependency-sources.json");
+const NATIVE_ASR_CPU_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cpu-v1";
+const NATIVE_ASR_CPU_RESOURCE_PATH: [&str; 3] = ["native-asr", "windows-x64", "cpu"];
+const NATIVE_ASR_CPU_WORKER: &str = "hikaru-asr-worker.exe";
+const NATIVE_ASR_CPU_REQUIRED_ENTRIES: &[&str] = &[
+    NATIVE_ASR_CPU_WORKER,
+    "ctranslate2.dll",
+    "hikaru_asr_tokenizer.dll",
+    "msvcp140.dll",
+    "vcomp140.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "runtime-manifest.json",
+    "SHA256SUMS",
+];
+
+#[derive(Debug, Clone)]
+pub(crate) struct ResolvedNativeAsrCpuRuntime {
+    pub root: PathBuf,
+    pub worker: PathBuf,
+    pub artifact_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrCpuRuntimeManifest {
+    schema_version: u32,
+    artifact_id: String,
+    platform: String,
+    arch: String,
+    protocol_version: u32,
+    capabilities: NativeAsrCpuCapabilities,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrCpuCapabilities {
+    backend: String,
+    device: String,
+    engines: Vec<String>,
+    vad: bool,
+    crispasr: bool,
+    cuda: bool,
+    vulkan: bool,
+    models_bundled: bool,
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub enum RuntimeDependencyKind {
     Ffmpeg,
+    NativeAsrCpu,
     Python311,
     AsrVenv,
     AsrModels,
@@ -194,6 +243,7 @@ impl PythonCommand {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolvedPython {
@@ -318,8 +368,12 @@ pub(crate) fn managed_downloads_dir(app: &AppHandle) -> Result<PathBuf, String> 
     downloads_dir(app)
 }
 
+pub(crate) fn managed_models_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(deps_dir(app)?.join("models"))
+}
+
 pub(crate) fn managed_ctranslate2_model_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(deps_dir(app)?.join("models").join("ctranslate2"))
+    Ok(managed_models_dir(app)?.join("ctranslate2"))
 }
 
 pub fn managed_ffmpeg_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -422,7 +476,7 @@ pub fn effective_asr_service_dir(
 }
 
 pub fn managed_model_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(deps_dir(app)?.join("models").join("huggingface"))
+    Ok(managed_models_dir(app)?.join("huggingface"))
 }
 
 pub fn managed_asr_venv_python_path(service_dir: &Path) -> PathBuf {
@@ -610,6 +664,7 @@ pub(crate) fn python311_lookup_fallbacks(
     }
 }
 
+#[allow(dead_code)]
 pub fn resolve_python311(app: &AppHandle, settings: &AppSettings) -> Option<ResolvedPython> {
     let (managed, venv_exe) = python311_lookup_fallbacks(app, settings);
     let settings_path = settings
@@ -708,6 +763,67 @@ pub fn resolve_ffmpeg_paths(app: &AppHandle, settings: &AppSettings) -> Resolved
         ffprobe: exe_name("ffprobe"),
         source: ResolvedFfmpegSource::Missing,
     }
+}
+
+fn resolve_native_asr_cpu_runtime_at(
+    resource_dir: &Path,
+) -> Result<ResolvedNativeAsrCpuRuntime, String> {
+    let root = NATIVE_ASR_CPU_RESOURCE_PATH
+        .iter()
+        .fold(resource_dir.to_path_buf(), |path, segment| {
+            path.join(segment)
+        });
+    let manifest_path = root.join("runtime-manifest.json");
+    let worker = root.join(NATIVE_ASR_CPU_WORKER);
+    let missing = NATIVE_ASR_CPU_REQUIRED_ENTRIES
+        .iter()
+        .filter(|entry| !root.join(entry).is_file())
+        .copied()
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(format!(
+            "Native ASR CPU 运行时资源不完整（缺少 {}）：{}",
+            missing.join(", "),
+            root.display()
+        ));
+    }
+    let manifest: NativeAsrCpuRuntimeManifest = serde_json::from_slice(
+        &fs::read(&manifest_path)
+            .map_err(|error| format!("无法读取 Native ASR CPU 运行时清单：{error}"))?,
+    )
+    .map_err(|error| format!("Native ASR CPU 运行时清单无效：{error}"))?;
+    let capability_ok = manifest.capabilities.backend == "ctranslate2"
+        && manifest.capabilities.device == "cpu"
+        && manifest.capabilities.engines == ["faster-whisper"]
+        && !manifest.capabilities.vad
+        && !manifest.capabilities.crispasr
+        && !manifest.capabilities.cuda
+        && !manifest.capabilities.vulkan
+        && !manifest.capabilities.models_bundled;
+    if manifest.schema_version != 1
+        || manifest.artifact_id != NATIVE_ASR_CPU_ARTIFACT_ID
+        || manifest.platform != "windows-x64"
+        || manifest.arch != "x64"
+        || manifest.protocol_version != 1
+        || !capability_ok
+    {
+        return Err("Native ASR CPU 运行时身份或能力与 MVP 契约不匹配".into());
+    }
+    Ok(ResolvedNativeAsrCpuRuntime {
+        root,
+        worker,
+        artifact_id: manifest.artifact_id,
+    })
+}
+
+pub(crate) fn resolve_native_asr_cpu_runtime(
+    app: &AppHandle,
+) -> Result<ResolvedNativeAsrCpuRuntime, String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|error| format!("无法解析应用资源目录：{error}"))?;
+    resolve_native_asr_cpu_runtime_at(&resource_dir)
 }
 
 fn load_source_manifest() -> Result<RuntimeDependencySourceManifest, String> {
@@ -1349,6 +1465,9 @@ async fn run_prepare_job(
 
     match args.kind {
         RuntimeDependencyKind::Ffmpeg => prepare_ffmpeg(&app, &job, &profile).await,
+        RuntimeDependencyKind::NativeAsrCpu => {
+            Err("内置 Native ASR CPU 运行时不可下载或准备".into())
+        }
         RuntimeDependencyKind::Python311 => prepare_python311(&app, &job, &profile).await,
         RuntimeDependencyKind::AsrVenv => Err("ASR 引擎依赖由 ASR 一键配置流程准备".into()),
         RuntimeDependencyKind::AsrModels => Err("ASR 模型由模型管理器按具体引擎和模型下载".into()),
@@ -1384,20 +1503,18 @@ fn dir_size(path: &Path) -> u64 {
         .filter_map(Result::ok)
         .map(|entry| {
             let path = entry.path();
-            if path.is_dir() {
+            let Ok(metadata) = fs::symlink_metadata(&path) else {
+                return 0;
+            };
+            if is_link_like(&metadata) {
+                0
+            } else if metadata.is_dir() {
                 dir_size(&path)
             } else {
-                entry.metadata().map(|m| m.len()).unwrap_or(0)
+                metadata.len()
             }
         })
         .sum()
-}
-
-fn dir_nonempty(path: &Path) -> bool {
-    fs::read_dir(path)
-        .ok()
-        .and_then(|mut entries| entries.find_map(Result::ok))
-        .is_some()
 }
 
 fn normalized_components(path: &Path) -> Vec<String> {
@@ -1468,12 +1585,13 @@ fn cleanup_target_for_kind(
 ) -> Result<PathBuf, String> {
     match kind {
         RuntimeDependencyKind::Ffmpeg => managed_ffmpeg_dir(app),
+        RuntimeDependencyKind::NativeAsrCpu => Err("内置 Native ASR CPU 运行时不可清理".into()),
         RuntimeDependencyKind::Python311 => managed_python_dir(app),
         RuntimeDependencyKind::AsrVenv => {
             let settings = load_settings(app).unwrap_or_default();
             Ok(effective_asr_service_dir(app, settings.asr_service_path.as_deref())?.join(".venv"))
         }
-        RuntimeDependencyKind::AsrModels => managed_model_cache_dir(app),
+        RuntimeDependencyKind::AsrModels => managed_models_dir(app),
         RuntimeDependencyKind::Downloads => downloads_dir(app),
         RuntimeDependencyKind::AppCache => work_cache_dir(app),
     }
@@ -1685,76 +1803,65 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         expected_download_bytes: ffmpeg_expected,
     });
 
-    let python = resolve_python311(app, &settings);
-    let (python_managed_dir, python_venv_exe) = python311_lookup_fallbacks(app, &settings);
-    let python_expected = source_profile
-        .as_ref()
-        .and_then(|profile| profile.python311.as_ref())
-        .map(|source| source.size_bytes)
-        .filter(|_| python.is_none());
+    let runtime_root = app.path().resource_dir().ok().map(|path| {
+        NATIVE_ASR_CPU_RESOURCE_PATH
+            .iter()
+            .fold(path, |path, segment| path.join(segment))
+    });
+    let runtime = resolve_native_asr_cpu_runtime(app);
     items.push(RuntimeDependencyItem {
-        kind: RuntimeDependencyKind::Python311,
-        status: if python.is_some() {
+        kind: RuntimeDependencyKind::NativeAsrCpu,
+        status: if runtime.is_ok() {
             RuntimeDependencyStatus::Available
         } else {
             RuntimeDependencyStatus::Missing
         },
-        path: python
+        path: runtime
             .as_ref()
-            .map(|value| value.command.clone())
-            .or_else(|| {
-                python_venv_exe
-                    .as_ref()
-                    .map(|path| path.to_string_lossy().into_owned())
-                    .or_else(|| {
-                        python_managed_dir
-                            .as_ref()
-                            .map(|path| path.to_string_lossy().into_owned())
-                    })
-            }),
-        source: python.as_ref().map(|value| value.source.clone()),
-        version: python.as_ref().map(|value| value.version.clone()),
-        managed: python.as_ref().is_some_and(|value| value.managed),
-        expected_download_bytes: python_expected,
-    });
-
-    let service = effective_asr_service_dir(app, settings.asr_service_path.as_deref())?;
-    let venv_python = managed_asr_venv_python_path(&service);
-    let source_checkout = is_source_checkout_asr_service_dir(&service);
-    items.push(RuntimeDependencyItem {
-        kind: RuntimeDependencyKind::AsrVenv,
-        status: if venv_python.is_file() {
-            RuntimeDependencyStatus::Available
-        } else {
-            RuntimeDependencyStatus::NeedsSetup
-        },
-        path: Some(service.to_string_lossy().into_owned()),
-        source: Some(if source_checkout {
-            "source".into()
-        } else {
-            "managed".into()
-        }),
-        version: None,
-        managed: !source_checkout,
-        expected_download_bytes: None,
-    });
-
-    let models = managed_model_cache_dir(app)?;
-    items.push(RuntimeDependencyItem {
-        kind: RuntimeDependencyKind::AsrModels,
-        status: if dir_nonempty(&models) {
-            RuntimeDependencyStatus::Available
-        } else {
-            RuntimeDependencyStatus::Missing
-        },
-        path: Some(models.to_string_lossy().into_owned()),
-        source: Some("managed".into()),
-        version: None,
-        managed: true,
+            .ok()
+            .map(|value| value.root.to_string_lossy().into_owned())
+            .or_else(|| runtime_root.map(|path| path.to_string_lossy().into_owned())),
+        source: Some("builtIn".into()),
+        version: runtime.ok().map(|value| value.artifact_id),
+        managed: false,
         expected_download_bytes: None,
     });
 
     Ok(RuntimeDependencyProbe { items, source_mode })
+}
+
+fn native_model_dependency_item(
+    models_root: &Path,
+    status: NativeAsrModelStatus,
+) -> RuntimeDependencyItem {
+    RuntimeDependencyItem {
+        kind: RuntimeDependencyKind::AsrModels,
+        status: if status.disposition == NativeAsrModelDisposition::Ready {
+            RuntimeDependencyStatus::Available
+        } else {
+            RuntimeDependencyStatus::Missing
+        },
+        path: Some(
+            status
+                .resolved_path
+                .unwrap_or_else(|| models_root.to_path_buf())
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        source: Some(
+            match status.origin {
+                Some(NativeAsrModelOrigin::DirectInstall) => "directInstall",
+                Some(NativeAsrModelOrigin::LegacyHuggingFaceSnapshot) => {
+                    "legacyHuggingFaceSnapshot"
+                }
+                None => "managed",
+            }
+            .into(),
+        ),
+        version: status.revision,
+        managed: true,
+        expected_download_bytes: None,
+    }
 }
 
 fn measure_runtime_dependency_storage_inner(
@@ -1764,8 +1871,6 @@ fn measure_runtime_dependency_storage_inner(
     let settings = load_settings(app).unwrap_or_default();
     let kinds = [
         RuntimeDependencyKind::Ffmpeg,
-        RuntimeDependencyKind::Python311,
-        RuntimeDependencyKind::AsrVenv,
         RuntimeDependencyKind::AsrModels,
         RuntimeDependencyKind::Downloads,
         RuntimeDependencyKind::AppCache,
@@ -1776,23 +1881,14 @@ fn measure_runtime_dependency_storage_inner(
             RuntimeDependencyKind::Ffmpeg => {
                 resolve_ffmpeg_paths(app, &settings).source == ResolvedFfmpegSource::Managed
             }
-            RuntimeDependencyKind::Python311 => {
-                resolve_python311(app, &settings).is_some_and(|python| python.managed)
-            }
-            RuntimeDependencyKind::AsrVenv => {
-                let service = effective_asr_service_dir(app, settings.asr_service_path.as_deref())?;
-                !is_source_checkout_asr_service_dir(&service)
-            }
             RuntimeDependencyKind::AsrModels
             | RuntimeDependencyKind::Downloads
             | RuntimeDependencyKind::AppCache => true,
+            RuntimeDependencyKind::NativeAsrCpu
+            | RuntimeDependencyKind::Python311
+            | RuntimeDependencyKind::AsrVenv => unreachable!(),
         };
-        // 系统/自定义 FFmpeg、Python 不占用受管安装目录，存储列表中不展示。
-        if matches!(
-            kind,
-            RuntimeDependencyKind::Ffmpeg | RuntimeDependencyKind::Python311
-        ) && !managed
-        {
+        if kind == RuntimeDependencyKind::Ffmpeg && !managed {
             continue;
         }
         let target = cleanup_target_for_kind(app, kind)?;
@@ -1812,10 +1908,24 @@ fn measure_runtime_dependency_storage_inner(
 }
 
 #[tauri::command]
-pub async fn probe_runtime_dependencies(app: AppHandle) -> Result<RuntimeDependencyProbe, String> {
-    tauri::async_runtime::spawn_blocking(move || probe_runtime_dependencies_inner(&app))
-        .await
-        .map_err(|e| format!("探测运行时依赖失败：{e}"))?
+pub async fn probe_runtime_dependencies(
+    app: AppHandle,
+    asr_state: State<'_, crate::asr::AsrState>,
+) -> Result<RuntimeDependencyProbe, String> {
+    let probe_app = app.clone();
+    let mut probe =
+        tauri::async_runtime::spawn_blocking(move || probe_runtime_dependencies_inner(&probe_app))
+            .await
+            .map_err(|e| format!("探测运行时依赖失败：{e}"))??;
+    let model_status = asr_state
+        .native_models
+        .status(&app, "faster-whisper", "large-v3")
+        .await?;
+    probe.items.push(native_model_dependency_item(
+        &managed_models_dir(&app)?,
+        model_status,
+    ));
+    Ok(probe)
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -1920,6 +2030,9 @@ pub async fn cleanup_runtime_dependency(
     app: AppHandle,
     args: CleanupRuntimeDependencyArgs,
 ) -> Result<(), String> {
+    if args.kind == RuntimeDependencyKind::NativeAsrCpu {
+        return Err("内置 Native ASR CPU 运行时不可清理".into());
+    }
     if args.kind == RuntimeDependencyKind::AppCache {
         let preserve = args.preserve_video_path;
         return tauri::async_runtime::spawn_blocking(move || {
@@ -2004,6 +2117,101 @@ mod tests {
             .ends_with(Path::new("deps").join("python311").join("current")));
     }
 
+    fn write_native_runtime(resource_dir: &Path, artifact_id: &str) -> PathBuf {
+        let root = NATIVE_ASR_CPU_RESOURCE_PATH
+            .iter()
+            .fold(resource_dir.to_path_buf(), |path, segment| {
+                path.join(segment)
+            });
+        fs::create_dir_all(&root).unwrap();
+        for entry in NATIVE_ASR_CPU_REQUIRED_ENTRIES {
+            let path = root.join(entry);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            fs::write(path, b"runtime").unwrap();
+        }
+        fs::write(root.join("SHA256SUMS"), b"checksums").unwrap();
+        fs::write(
+            root.join("runtime-manifest.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "schemaVersion": 1,
+                "artifactId": artifact_id,
+                "platform": "windows-x64",
+                "arch": "x64",
+                "protocolVersion": 1,
+                "capabilities": {
+                    "backend": "ctranslate2",
+                    "device": "cpu",
+                    "engines": ["faster-whisper"],
+                    "vad": false,
+                    "crispasr": false,
+                    "cuda": false,
+                    "vulkan": false,
+                    "modelsBundled": false
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        root
+    }
+
+    #[test]
+    fn native_cpu_runtime_resolves_same_locked_layout_for_installed_and_portable_resources() {
+        for mode in ["installed", "portable"] {
+            let temp = tempfile::tempdir().unwrap();
+            let resource_dir = temp.path().join(mode).join("resources");
+            let expected_root = write_native_runtime(&resource_dir, NATIVE_ASR_CPU_ARTIFACT_ID);
+
+            let runtime = resolve_native_asr_cpu_runtime_at(&resource_dir).unwrap();
+
+            assert_eq!(runtime.root, expected_root);
+            assert_eq!(runtime.worker, expected_root.join(NATIVE_ASR_CPU_WORKER));
+            assert_eq!(runtime.artifact_id, NATIVE_ASR_CPU_ARTIFACT_ID);
+        }
+    }
+
+    #[test]
+    fn native_cpu_runtime_rejects_missing_or_wrong_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let resource_dir = temp.path().join("resources");
+        assert!(resolve_native_asr_cpu_runtime_at(&resource_dir).is_err());
+
+        write_native_runtime(&resource_dir, "wrong-artifact");
+        let error = resolve_native_asr_cpu_runtime_at(&resource_dir).unwrap_err();
+        assert!(error.contains("身份或能力"));
+    }
+
+    #[test]
+    fn native_model_dependency_item_maps_exact_readiness_without_python_kinds() {
+        let root = PathBuf::from("deps").join("models");
+        let ready = native_model_dependency_item(
+            &root,
+            NativeAsrModelStatus {
+                engine: "faster-whisper".into(),
+                model: "large-v3".into(),
+                backend: Some("ctranslate2".into()),
+                revision: Some("revision".into()),
+                disposition: NativeAsrModelDisposition::Ready,
+                origin: Some(NativeAsrModelOrigin::DirectInstall),
+                resolved_path: Some(root.join("ctranslate2").join("large-v3")),
+            },
+        );
+        assert_eq!(ready.kind, RuntimeDependencyKind::AsrModels);
+        assert_eq!(ready.status, RuntimeDependencyStatus::Available);
+        assert_eq!(ready.source.as_deref(), Some("directInstall"));
+        assert_eq!(ready.version.as_deref(), Some("revision"));
+
+        let emitted = [
+            RuntimeDependencyKind::Ffmpeg,
+            RuntimeDependencyKind::NativeAsrCpu,
+            ready.kind,
+        ];
+        assert!(!emitted.contains(&RuntimeDependencyKind::Python311));
+        assert!(!emitted.contains(&RuntimeDependencyKind::AsrVenv));
+    }
+
     #[test]
     fn dependency_paths_ignore_app_data_even_for_debug_builds() {
         let exe = PathBuf::from("C:/Users/example/AppData/Local/Programs/hikaru-sub")
@@ -2037,15 +2245,6 @@ mod tests {
 
         assert_eq!(dir_size(temp.path()), 17);
         assert_eq!(dir_size(&temp.path().join("missing")), 0);
-    }
-
-    #[test]
-    fn dir_nonempty_checks_first_entry_only() {
-        let temp = tempfile::tempdir().unwrap();
-        assert!(!dir_nonempty(temp.path()));
-        fs::write(temp.path().join("marker"), b"x").unwrap();
-        assert!(dir_nonempty(temp.path()));
-        assert!(!dir_nonempty(&temp.path().join("missing")));
     }
 
     #[test]

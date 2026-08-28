@@ -1,0 +1,10 @@
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Review stable command/job/recovery contracts, packaged-runtime consumption, exact model delivery, and zero silent Python fallback."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Review installed/portable path behavior, managed model/download roots, current-video preservation, and cleanup containment."}
+{"file":".trellis/spec/tauri/async-and-blocking.md","reason":"Review probe/measure/cleanup and exact readiness for blocking work on the correct executor."}
+{"file":".trellis/spec/tauri/command-guidelines.md","reason":"Review the complete Rust-to-TypeScript command chain and prevent a dead or parallel IPC surface."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Review Rust formatting, focused/full tests, errors, logs, and regression validation."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Review typed payload compatibility and ensure no raw invoke or duplicated availability source appears."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review the minimum frontend handoff, focused tests, full test suite, and build without absorbing T17 UX scope."}
+{"file":".trellis/tasks/08-27-native-asr-runtime-settings-backend/research/planning-evidence.md","reason":"Check the implementation against the confirmed pre-change flow and the agreed T16/T17/T18 ownership boundaries."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-model-manager/research/implementation-evidence.md","reason":"Verify no regression in exact T12 readiness, model isolation, immutable install, or public-command handoff."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-cpu-runtime-package/research/runtime-package-handoff.json","reason":"Verify T16 consumes the exact T13 worker/runtime identity without rebuilding or weakening its capability and package boundaries."}

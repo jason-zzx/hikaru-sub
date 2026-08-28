@@ -101,6 +101,90 @@ Frontend types mirror camelCase JSON from Tauri and the ASR sidecar (e.g. `durat
 3. Update wrappers in `services/tauri.ts`
 4. Prefer shared types over local `as` casts in views
 
+## Scenario: Native ASR Availability Payload (T16 Handoff)
+
+### 1. Scope / Trigger
+
+Apply when Rust changes Native ASR engine/model availability or runtime dependency payloads consumed by the existing `tauri.ts` wrappers. T16 adds backend metadata; T17 owns the final visible UX.
+
+### 2. Signatures
+
+```typescript
+type NativeAsrModelDisposition =
+  | "supportedMissing"
+  | "ready"
+  | "postMvpUnavailable"
+  | "unsupported";
+
+type NativeAsrModelOrigin =
+  | "directInstall"
+  | "legacyHuggingFaceSnapshot";
+
+interface AsrModelStatus {
+  engine: string;
+  model: string;
+  available: boolean;
+  downloaded: boolean;
+  disposition?: NativeAsrModelDisposition;
+  backend?: string | null;
+  revision?: string | null;
+  origin?: NativeAsrModelOrigin | null;
+  reason?: string | null;
+}
+
+type RuntimeDependencyKind =
+  | "ffmpeg"
+  | "nativeAsrCpu"
+  | "python311"
+  | "asrVenv"
+  | "asrModels"
+  | "downloads"
+  | "appCache";
+```
+
+### 3. Contracts
+
+- `available` / `downloaded` remain for current `ModelManager` compatibility. Native metadata is additive and optional until T17 migrates all callers.
+- Disposition mapping is backend-owned: ready `true/true`, supported-missing `true/false`, deferred or unsupported `false/false`.
+- Components continue using `checkAsrModel`, `downloadAsrModel`, and `getModelDownloadProgress` from `src/services/tauri.ts`; do not parse invoke payloads locally.
+- Download progress keeps numeric `progress`, byte counts, `error`, and compatibility `hfEndpoint`; optional revision/resolved path are diagnostics.
+- Every backend-emitted runtime kind must exist in the TypeScript union and `RUNTIME_DEPENDENCY_LABEL`; `nativeAsrCpu` is built-in and has no frontend prepare/cleanup action.
+- T16 does not remove legacy optional settings/type fields needed by the still-present T17 UI. T17 removes the visible Python setup flow after all callers migrate.
+
+### 4. Validation & Error Matrix
+
+| Payload | Frontend meaning |
+|---|---|
+| `ready` | model selectable/usable and already downloaded |
+| `supportedMissing` | model route exists; offer model download |
+| `postMvpUnavailable` | keep visible but disabled with later-support reason (T17) |
+| `unsupported` | disabled unsupported identity; never imply missing Python |
+| `nativeAsrCpu` | render built-in runtime status; no prepare/cleanup |
+| Unknown runtime kind | Type/build failure rather than unchecked local cast |
+
+### 5. Good / Base / Bad Cases
+
+- Good: one typed wrapper returns compatibility booleans plus Native disposition; T17 renders the reason.
+- Base: legacy sidecar response omits optional Native fields; current components continue using booleans.
+- Bad: a view casts `disposition` from raw JSON, or interprets `available: false` only as “Python engine not installed”.
+
+### 6. Tests Required
+
+- Runtime dependency constant test includes `nativeAsrCpu`.
+- `pnpm build` verifies Rust camelCase payload additions match shared types.
+- T17 component tests must later cover every disposition/reason and removal of Python setup copy.
+- Full `pnpm test` after shared type or wrapper changes.
+
+### 7. Wrong vs Correct
+
+```typescript
+// Wrong: local duplicate payload definition
+const disposition = (status as { disposition?: string }).disposition;
+
+// Correct: shared IPC contract
+const disposition: NativeAsrModelDisposition | undefined = status.disposition;
+```
+
 ## Translation Types
 
 OpenAI-compatible, Gemini, and Anthropic adapters live under `src/services/translation/` with shared batching, fallback, scheduling, and `types.ts`. Persist provider records in `AppSettings.translationProviders`; every provider carries an `apiKey: string`, where an empty/whitespace-only value is persisted but fails readiness. `defaultTranslationProviderId` initializes the Translation view's page-local provider selection; changing that selection does not update settings.
