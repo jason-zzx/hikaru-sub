@@ -1,41 +1,26 @@
 import { Select } from "../ui/select-adapter";
-import { AsrEngineSetupPanel } from "./AsrEngineSetupPanel";
 import { ModelManager } from "./ModelManager";
 import { SettingsField, SettingsSection } from "./settingsForm";
+import { Button } from "../ui/button";
 import type { AppSettings } from "../../types";
-import {
-  ASR_ENGINE_OPTIONS,
-  KOTOBA_FASTER_WHISPER_DESCRIPTION,
-  REAZONSPEECH_NEMO_DESCRIPTION,
-  asrModelOptions,
-  defaultAsrModel,
-} from "../../constants/asr";
-
-const ASR_DEVICES = [
-  { value: "auto", label: "自动" },
-  { value: "cpu", label: "CPU" },
-  { value: "cuda", label: "CUDA（NVIDIA GPU）" },
-];
+import { defaultAsrModel } from "../../constants/asr";
+import { useAsrAvailability } from "../../hooks/useAsrAvailability";
 
 interface SettingsTranscriptionPanelProps {
   settings: AppSettings;
   update: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
-  asrSetupRefreshKey: number;
-  saving: boolean;
-  onBeforeAsrSetupStart: () => Promise<void>;
-  onAsrSetupRunningChange: (running: boolean) => void;
-  onAsrSetupComplete: () => void | Promise<void>;
 }
 
 export function SettingsTranscriptionPanel({
   settings,
   update,
-  asrSetupRefreshKey,
-  saving,
-  onBeforeAsrSetupStart,
-  onAsrSetupRunningChange,
-  onAsrSetupComplete,
 }: SettingsTranscriptionPanelProps) {
+  const availability = useAsrAvailability(
+    settings.asrEngine,
+    settings.asrModel,
+    settings.asrDevice,
+  );
+
   const updateAsrEngine = (engine: string) => {
     update("asrEngine", engine);
     update("asrModel", defaultAsrModel(engine));
@@ -44,63 +29,58 @@ export function SettingsTranscriptionPanel({
   return (
     <SettingsSection
       title="日语转录（ASR）默认"
-      desc="新建视频会话时使用的默认转录配置（源语言固定为日语）"
+      desc="内置 Native CPU 运行时；模型按需下载，不可用路线保留显示"
     >
       <SettingsField label="引擎">
         <Select
           value={settings.asrEngine}
           onChange={updateAsrEngine}
-          options={ASR_ENGINE_OPTIONS}
+          options={availability.engineOptions}
         />
       </SettingsField>
       <SettingsField label="模型">
         <Select
           value={settings.asrModel}
-          onChange={(v) => update("asrModel", v)}
-          options={asrModelOptions(settings.asrEngine)}
+          onChange={(value) => update("asrModel", value)}
+          options={availability.modelOptions}
         />
-        {settings.asrEngine === "parakeet" && (
-          <p className="mt-1 text-xs text-text-muted">
-            Parakeet 使用 NVIDIA NeMo，可选依赖需单独安装；当前集成针对日语模型。
-          </p>
-        )}
-        {settings.asrEngine === "reazonspeech-nemo" && (
-          <p className="mt-1 text-xs text-text-muted">
-            ReazonSpeech 复用 NeMo 可选依赖（独立 CPU/CUDA profile，不含 torchaudio
-            直接依赖）。CPU 较慢，推荐 CUDA。{REAZONSPEECH_NEMO_DESCRIPTION}。
-          </p>
-        )}
-        {settings.asrEngine === "kotoba-faster-whisper" && (
-          <p className="mt-1 text-xs text-text-muted">
-            {KOTOBA_FASTER_WHISPER_DESCRIPTION}
-          </p>
-        )}
         <div className="mt-1.5">
           <ModelManager
-            key={`${settings.asrEngine}:${settings.asrModel}:${asrSetupRefreshKey}`}
+            key={`${settings.asrEngine}:${settings.asrModel}`}
             engine={settings.asrEngine}
             model={settings.asrModel}
+            status={availability.selectedModelStatus}
+            checking={availability.modelLoading}
+            checkError={availability.selectedModelError}
+            refreshStatus={availability.refreshSelectedModel}
           />
         </div>
       </SettingsField>
       <SettingsField label="设备">
         <Select
           value={settings.asrDevice}
-          onChange={(v) => update("asrDevice", v)}
-          options={ASR_DEVICES}
+          onChange={(value) => update("asrDevice", value)}
+          options={availability.deviceOptions}
         />
       </SettingsField>
-      <AsrEngineSetupPanel
-        engine={settings.asrEngine}
-        device={settings.asrDevice}
-        pythonPath={settings.pythonPath}
-        asrServicePath={settings.asrServicePath}
-        refreshKey={asrSetupRefreshKey}
-        disabled={saving}
-        onBeforeStart={onBeforeAsrSetupStart}
-        onRunningChange={onAsrSetupRunningChange}
-        onComplete={onAsrSetupComplete}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+        <span className={availability.routeAvailable ? "text-success" : "text-warning"}>
+          {availability.loading
+            ? "正在检测 Native ASR 可用性…"
+            : availability.routeAvailable
+              ? "当前路线可用"
+              : availability.unavailableReason || "当前路线不可用"}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void availability.refresh()}
+          disabled={availability.loading}
+          className="px-2.5 py-1 text-xs"
+        >
+          重新检测可用性
+        </Button>
+      </div>
     </SettingsSection>
   );
 }

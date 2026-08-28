@@ -101,11 +101,11 @@ Frontend types mirror camelCase JSON from Tauri and the ASR sidecar (e.g. `durat
 3. Update wrappers in `services/tauri.ts`
 4. Prefer shared types over local `as` casts in views
 
-## Scenario: Native ASR Availability Payload (T16 Handoff)
+## Scenario: Native ASR Availability and Frontend UX
 
 ### 1. Scope / Trigger
 
-Apply when Rust changes Native ASR engine/model availability or runtime dependency payloads consumed by the existing `tauri.ts` wrappers. T16 adds backend metadata; T17 owns the final visible UX.
+Apply when changing the Native ASR engine/model/device selectors, model download gate, or runtime dependency UI that consumes the stable Tauri ASR commands. T16 owns backend metadata; T17 makes that metadata the frontend availability authority. T18 still owns Release/default Native routing and packaged Python removal.
 
 ### 2. Signatures
 
@@ -116,9 +116,13 @@ type NativeAsrModelDisposition =
   | "postMvpUnavailable"
   | "unsupported";
 
-type NativeAsrModelOrigin =
-  | "directInstall"
-  | "legacyHuggingFaceSnapshot";
+interface AsrEngineInfo {
+  name: string;
+  available: boolean;
+  backend?: string | null;
+  device?: string | null;
+  reason?: string | null;
+}
 
 interface AsrModelStatus {
   engine: string;
@@ -128,61 +132,77 @@ interface AsrModelStatus {
   disposition?: NativeAsrModelDisposition;
   backend?: string | null;
   revision?: string | null;
-  origin?: NativeAsrModelOrigin | null;
+  origin?: "directInstall" | "legacyHuggingFaceSnapshot" | null;
   reason?: string | null;
 }
 
 type RuntimeDependencyKind =
   | "ffmpeg"
   | "nativeAsrCpu"
-  | "python311"
-  | "asrVenv"
   | "asrModels"
   | "downloads"
   | "appCache";
+
+useAsrAvailability(engine: string, model: string, device: string)
 ```
+
+`AppSettings` keeps `asrEngine`, `asrModel`, and `asrDevice`; frontend `pythonPath` / `asrServicePath` and ASR setup job/environment types no longer exist. Rust may still accept legacy settings keys for rollback compatibility.
 
 ### 3. Contracts
 
-- `available` / `downloaded` remain for current `ModelManager` compatibility. Native metadata is additive and optional until T17 migrates all callers.
-- Disposition mapping is backend-owned: ready `true/true`, supported-missing `true/false`, deferred or unsupported `false/false`.
-- Components continue using `checkAsrModel`, `downloadAsrModel`, and `getModelDownloadProgress` from `src/services/tauri.ts`; do not parse invoke payloads locally.
-- Download progress keeps numeric `progress`, byte counts, `error`, and compatibility `hfEndpoint`; optional revision/resolved path are diagnostics.
-- Every backend-emitted runtime kind must exist in the TypeScript union and `RUNTIME_DEPENDENCY_LABEL`; `nativeAsrCpu` is built-in and has no frontend prepare/cleanup action.
-- T16 does not remove legacy optional settings/type fields needed by the still-present T17 UI. T17 removes the visible Python setup flow after all callers migrate.
+- `ASR_ENGINE_OPTIONS`, `ASR_ENGINE_MODELS`, and `ASR_DEVICE_OPTIONS` are presentation registries only. `listAsrEngines` / `checkAsrModel` decide whether each known option is enabled.
+- One mounted `useAsrAvailability` owner supplies Settings and Transcribe with typed engine/model/device options, selected status, route gate, refresh, and stale-request rejection. `ModelManager` must consume that owner; it must not call `checkAsrModel` through a fallback checker.
+- Load the product model list when the engine changes. A same-engine model selection reuses the loaded status map; check only a selected legacy/unknown model missing from that map. This prevents repeated exact large-v3 readiness scans.
+- Disabled options remain visible with a concise backend reason. An unavailable persisted value stays displayed and is never silently rewritten; only an explicit user selection changes settings.
+- `ready` and `supportedMissing` are runnable routes; only `supportedMissing` offers model download. Deferred/unsupported identities never show Python setup actions.
+- A Native engine reporting `device: "cpu"` enables `auto` / `cpu` and disables CUDA. Legacy payloads without device metadata remain compatible until T18.
+- Native MVP transcription sends `useVad: false` and `vadConfig: null`; the request schema remains for rollback/future runtime capability work.
+- Frontend runtime dependencies contain only production-visible kinds. `nativeAsrCpu` is bundled/status-only and has no prepare or cleanup action; missing `asrModels` routes the user to Transcription.
+- Components continue using typed wrappers from `src/services/tauri.ts`; no raw invoke, local payload cast, or second support registry.
 
 ### 4. Validation & Error Matrix
 
-| Payload | Frontend meaning |
+| Condition | Required frontend behavior |
 |---|---|
-| `ready` | model selectable/usable and already downloaded |
-| `supportedMissing` | model route exists; offer model download |
-| `postMvpUnavailable` | keep visible but disabled with later-support reason (T17) |
-| `unsupported` | disabled unsupported identity; never imply missing Python |
-| `nativeAsrCpu` | render built-in runtime status; no prepare/cleanup |
-| Unknown runtime kind | Type/build failure rather than unchecked local cast |
+| `ready` | option enabled; show model ready; no download button |
+| `supportedMissing` | option enabled; show model download button; refresh shared status after completion |
+| `postMvpUnavailable` | option visible/disabled with backend later-support reason |
+| `unsupported` | option visible/disabled with unsupported reason |
+| Engine/model check error | keep persisted value; disable Start; show controlled retryable error |
+| Stale engine/model response | ignore it; never replace the current selection's state |
+| Native CPU + CUDA | CUDA visible/disabled; Start remains disabled |
+| `nativeAsrCpu` missing | show application runtime/reinstall error; no download/cleanup action |
+| Legacy payload without disposition/device | use compatibility booleans and do not infer missing Python |
 
 ### 5. Good / Base / Bad Cases
 
-- Good: one typed wrapper returns compatibility booleans plus Native disposition; T17 renders the reason.
-- Base: legacy sidecar response omits optional Native fields; current components continue using booleans.
-- Bad: a view casts `disposition` from raw JSON, or interprets `available: false` only as “Python engine not installed”.
+- Good: one engine change checks its known model list once; selecting an already-loaded model performs no extra readiness scan.
+- Base: an old unavailable setting remains selected with a disabled/reason label until the user chooses large-v3 CPU explicitly.
+- Bad: `ModelManager` performs its own `checkAsrModel`, a component hardcodes `large-v3` as the only enabled ID, or unavailable means “install Python”.
 
 ### 6. Tests Required
 
-- Runtime dependency constant test includes `nativeAsrCpu`.
-- `pnpm build` verifies Rust camelCase payload additions match shared types.
-- T17 component tests must later cover every disposition/reason and removal of Python setup copy.
-- Full `pnpm test` after shared type or wrapper changes.
+- `useAsrAvailability.test.tsx`: option projection, stale engine result, same-engine no-rescan, unknown persisted model, and route/device gates.
+- `ModelManager.test.tsx` plus legacy gate/diagnostic suites: four dispositions, download promise reuse, diagnostics, completion refresh, and compatibility booleans.
+- Settings/runtime tests: no Python/venv/setup UI, unavailable values are not rewritten, Native runtime is status-only, and ASR model action routes to Transcription.
+- Transcribe seam tests: unavailable/CUDA gating, `useVad: false`, download-to-start, polling/cancel/document guard/recovery/PlayRes/ASS save/translation handoff.
+- Run full `pnpm test` and `pnpm build` after shared availability/type/UI changes.
 
 ### 7. Wrong vs Correct
 
 ```typescript
-// Wrong: local duplicate payload definition
-const disposition = (status as { disposition?: string }).disposition;
+// Wrong: a second support registry and a second model checker.
+const enabledModels = new Set(["large-v3"]);
+const status = await checkAsrModel(engine, model);
 
-// Correct: shared IPC contract
-const disposition: NativeAsrModelDisposition | undefined = status.disposition;
+// Correct: one typed owner projects backend metadata for every consumer.
+const availability = useAsrAvailability(engine, model, device);
+<ModelManager
+  status={availability.selectedModelStatus}
+  checking={availability.modelLoading}
+  checkError={availability.selectedModelError}
+  refreshStatus={availability.refreshSelectedModel}
+/>;
 ```
 
 ## Translation Types

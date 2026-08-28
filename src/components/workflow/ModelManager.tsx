@@ -1,22 +1,17 @@
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useImperativeHandle,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
-  checkAsrModel,
   downloadAsrModel,
   getModelDownloadProgress,
 } from "../../services/tauri";
 import type { AsrModelStatus, ModelDownloadSnapshot } from "../../types";
-import {
-  ASR_ENGINE_NOT_INSTALLED_LABEL,
-  isAsrEngineNotInstalledError,
-} from "../../utils/asrSidecarError";
+import type { AsrModelRefreshOutcome } from "../../hooks/useAsrAvailability";
 import { Button } from "../ui/button";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -29,6 +24,26 @@ function downloadSourceLabel(snapshot: ModelDownloadSnapshot | null): string {
   return snapshot?.hfEndpoint?.trim() || "官方 HuggingFace";
 }
 
+function isDownloadable(status: AsrModelStatus | null): boolean {
+  return status?.disposition === "supportedMissing" ||
+    (!status?.disposition && !!status?.available && !status.downloaded);
+}
+
+function transcribeGate(status: AsrModelStatus): ModelTranscribeGate {
+  switch (status.disposition) {
+    case "ready":
+      return "ready";
+    case "supportedMissing":
+      return "needs_download";
+    case "postMvpUnavailable":
+    case "unsupported":
+      return "unavailable";
+    default:
+      if (!status.available) return "unavailable";
+      return status.downloaded ? "ready" : "needs_download";
+  }
+}
+
 export type ModelTranscribeGate =
   | "ready"
   | "needs_download"
@@ -38,13 +53,8 @@ export type ModelTranscribeGate =
 
 export type ModelDownloadResult = "completed" | "failed";
 
-type RefreshOutcome =
-  | { kind: "ok"; status: AsrModelStatus }
-  | { kind: "error"; error: string }
-  | { kind: "aborted" };
-
 export type ModelManagerHandle = {
-  /** 重新检测模型状态，区分就绪 / 需下载 / 引擎不可用 / 检测失败 / 已取消。 */
+  /** 重新检测模型状态，区分就绪 / 需下载 / 路线不可用 / 检测失败 / 已取消。 */
   checkForTranscribe: () => Promise<ModelTranscribeGate>;
   /** 与「下载模型」按钮相同；若已有下载在进行则等待同一任务。 */
   startDownload: () => Promise<ModelDownloadResult>;
@@ -53,10 +63,10 @@ export type ModelManagerHandle = {
 interface ModelManagerProps {
   engine: string;
   model: string;
-  /** true：挂载即自动检测（设置页）。false：仅由 trigger 驱动（转录页）。 */
-  auto?: boolean;
-  /** auto=false 时，每次自增触发一次检测。 */
-  trigger?: number;
+  status: AsrModelStatus | null;
+  checking: boolean;
+  checkError: string | null;
+  refreshStatus: () => Promise<AsrModelRefreshOutcome>;
   /** 下载开始/结束时通知父组件（手动下载与 imperative 下载共用）。 */
   onDownloadingChange?: (downloading: boolean) => void;
 }
@@ -64,12 +74,17 @@ interface ModelManagerProps {
 /** ASR 模型本地缓存检测 + 一键下载（含进度），设置页/转录页共用。 */
 export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
   function ModelManager(
-    { engine, model, auto = true, trigger = 0, onDownloadingChange },
+    {
+      engine,
+      model,
+      status,
+      checking,
+      checkError,
+      refreshStatus,
+      onDownloadingChange,
+    },
     ref,
   ) {
-    const [status, setStatus] = useState<AsrModelStatus | null>(null);
-    const [checking, setChecking] = useState(false);
-    const [checkError, setCheckError] = useState<string | null>(null);
     const [downloading, setDownloading] = useState(false);
     const [progress, setProgress] = useState<{
       done: number;
@@ -78,7 +93,6 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
     const [downloadDiagnostics, setDownloadDiagnostics] =
       useState<ModelDownloadSnapshot | null>(null);
     const [downloadError, setDownloadError] = useState<string | null>(null);
-    const checkRequestRef = useRef(0);
     const downloadPromiseRef = useRef<Promise<ModelDownloadResult> | null>(null);
     const onDownloadingChangeRef = useRef(onDownloadingChange);
     onDownloadingChangeRef.current = onDownloadingChange;
@@ -88,36 +102,8 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
       onDownloadingChangeRef.current?.(next);
     }, []);
 
-    const refresh = useCallback(async (): Promise<RefreshOutcome> => {
-      const requestId = checkRequestRef.current + 1;
-      checkRequestRef.current = requestId;
-      setChecking(true);
-      setCheckError(null);
-      try {
-        const s = await checkAsrModel(engine, model);
-        if (checkRequestRef.current !== requestId) {
-          return { kind: "aborted" };
-        }
-        setStatus(s);
-        return { kind: "ok", status: s };
-      } catch (e) {
-        if (checkRequestRef.current !== requestId) {
-          return { kind: "aborted" };
-        }
-        setStatus(null);
-        setCheckError(String(e));
-        return { kind: "error", error: String(e) };
-      } finally {
-        if (checkRequestRef.current === requestId) {
-          setChecking(false);
-        }
-      }
-    }, [engine, model]);
-
     const runDownload = useCallback((): Promise<ModelDownloadResult> => {
-      if (downloadPromiseRef.current) {
-        return downloadPromiseRef.current;
-      }
+      if (downloadPromiseRef.current) return downloadPromiseRef.current;
 
       const promise = (async (): Promise<ModelDownloadResult> => {
         setDownloadingState(true);
@@ -132,7 +118,7 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
             setProgress({ done: snap.downloadedBytes, total: snap.totalBytes });
             setDownloadDiagnostics(snap);
             if (snap.status === "completed") {
-              await refresh();
+              await refreshStatus();
               return "completed";
             }
             if (snap.status === "failed") {
@@ -140,8 +126,8 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
               return "failed";
             }
           }
-        } catch (e) {
-          setDownloadError(String(e));
+        } catch (error) {
+          setDownloadError(String(error));
           return "failed";
         } finally {
           setDownloadingState(false);
@@ -151,46 +137,21 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
 
       downloadPromiseRef.current = promise;
       return promise;
-    }, [engine, model, refresh, setDownloadingState]);
+    }, [engine, model, refreshStatus, setDownloadingState]);
 
     useImperativeHandle(
       ref,
       () => ({
         checkForTranscribe: async () => {
-          const outcome = await refresh();
+          const outcome = await refreshStatus();
           if (outcome.kind === "aborted") return "aborted";
           if (outcome.kind === "error") return "check_failed";
-          if (!outcome.status.available) return "unavailable";
-          if (outcome.status.downloaded) return "ready";
-          return "needs_download";
+          return transcribeGate(outcome.status);
         },
         startDownload: () => runDownload(),
       }),
-      [refresh, runDownload],
+      [refreshStatus, runDownload],
     );
-
-    // engine/model 变更：清除旧结果，避免显示过期状态
-    useEffect(() => {
-      checkRequestRef.current += 1;
-      setStatus(null);
-      setChecking(false);
-      setCheckError(null);
-      setProgress(null);
-      setDownloadDiagnostics(null);
-      setDownloadError(null);
-    }, [engine, model]);
-
-    // 自动模式：挂载及 engine/model 变更时自动检测
-    useEffect(() => {
-      if (auto) void refresh();
-    }, [auto, refresh]);
-
-    // 手动模式：由外部 trigger 驱动检测
-    const refreshRef = useRef(refresh);
-    refreshRef.current = refresh;
-    useEffect(() => {
-      if (!auto && trigger) void refreshRef.current();
-    }, [auto, trigger]);
 
     const percent =
       progress && progress.total > 0
@@ -199,29 +160,40 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
             downloadDiagnostics?.status === "completed" ? 1 : 0.99,
           )
         : null;
-    const engineNotInstalled =
-      (!!checkError && isAsrEngineNotInstalledError(checkError)) ||
-      (!!status && !status.available);
 
     let statusText: ReactNode;
     if (checking) {
       statusText = <span className="text-text-muted">检测中…</span>;
-    } else if (engineNotInstalled) {
-      statusText = (
-        <span className="text-danger">{ASR_ENGINE_NOT_INSTALLED_LABEL}</span>
-      );
     } else if (checkError) {
       statusText = <span className="text-danger">检测失败</span>;
-    } else if (status?.downloaded) {
-      statusText = <span className="text-success">已下载</span>;
-    } else if (status) {
-      statusText = <span className="text-text-muted">未下载</span>;
+    } else if (status?.disposition === "ready" || (!status?.disposition && status?.downloaded)) {
+      statusText = <span className="text-success">模型已就绪</span>;
+    } else if (status?.disposition === "supportedMissing" || isDownloadable(status)) {
+      statusText = <span className="text-text-muted">模型未下载</span>;
+    } else if (status?.disposition === "postMvpUnavailable") {
+      statusText = (
+        <span className="text-warning">
+          {status.reason?.trim() || "后续版本支持"}
+        </span>
+      );
+    } else if (status?.disposition === "unsupported") {
+      statusText = (
+        <span className="text-warning">
+          当前版本不支持{status.reason ? `：${status.reason}` : ""}
+        </span>
+      );
+    } else if (status && !status.available) {
+      statusText = (
+        <span className="text-warning">
+          当前路线不可用{status.reason ? `：${status.reason}` : ""}
+        </span>
+      );
     } else {
       statusText = <span className="text-text-muted">未检测</span>;
     }
 
     const showDownloadBtn =
-      !!status && status.available && !status.downloaded && !downloading;
+      !checking && !checkError && isDownloadable(status) && !downloading;
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -232,7 +204,8 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => void refresh()}
+                onClick={() => void refreshStatus()}
+                disabled={checking}
                 className="text-text-muted hover:text-text"
               >
                 重新检测
@@ -252,7 +225,7 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
           </div>
         </div>
 
-        {checkError && !engineNotInstalled && (
+        {checkError && (
           <span className="break-all text-xs text-danger">{checkError}</span>
         )}
 

@@ -68,7 +68,6 @@ describe("SettingsView category navigation", () => {
 
   it("deep-links other pages into the matching settings category", () => {
     expect(uiStoreSource).toContain("openSettings:");
-    expect(transcribeSource).toContain('openSettings("transcription")');
     expect(transcribeSource).toContain('openSettings("runtime")');
     expect(translateSource).toContain('openSettings("providers")');
   });

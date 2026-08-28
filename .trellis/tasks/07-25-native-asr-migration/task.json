@@ -42,7 +42,8 @@
     "08-25-native-asr-whisper-execution-parity-discovery",
     "08-25-native-asr-release-first-reprioritization",
     "08-26-native-asr-whisper-model-expansion",
-    "08-27-native-asr-runtime-settings-backend"
+    "08-27-native-asr-runtime-settings-backend",
+    "08-28-native-asr-frontend-migration"
   ],
   "parent": null,
   "relatedFiles": [],

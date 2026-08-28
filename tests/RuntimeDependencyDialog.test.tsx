@@ -35,10 +35,10 @@ describe("RuntimeDependencyDialog", () => {
     render(
       <RuntimeDependencyDialog
         open
-        kind="python311"
-        reason="ASR 配置需要 Python 3.11。"
+        kind="ffmpeg"
+        reason="提取音轨需要 FFmpeg。"
         sizeBytes={40}
-        targetPath="C:/deps/python311/current"
+        targetPath="C:/deps/ffmpeg/current"
         sourceLabel="官方源"
         status="idle"
         onConfirm={onConfirm}

@@ -90,8 +90,6 @@ export function SettingsView() {
   const [settings, setLocal] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [asrSetupRunning, setAsrSetupRunning] = useState(false);
-  const [asrSetupRefreshKey, setAsrSetupRefreshKey] = useState(0);
   const [runtimeProbe, setRuntimeProbe] = useState<RuntimeDependencyProbe | null>(null);
   const [runtimeStorage, setRuntimeStorage] = useState<RuntimeDependencyStorage | null>(null);
   const [runtimeStorageLoading, setRuntimeStorageLoading] = useState(false);
@@ -191,16 +189,6 @@ export function SettingsView() {
     }
   };
 
-  const refreshSettingsAfterAsrSetup = async () => {
-    const next = await getSettings();
-    setLocal(next);
-    setDirty(false);
-    setAsrSetupRefreshKey((value) => value + 1);
-    setRuntimeStorage(null);
-    void refreshRuntimeDependencies();
-    setMessage(null);
-  };
-
   const handleRuntimeSourceModeChange = async (mode: RuntimeDependencySourceMode) => {
     if (!settings) return;
     const next = { ...settings, runtimeSourceMode: mode };
@@ -235,9 +223,6 @@ export function SettingsView() {
       });
       setCleanupKind(null);
       if (kind === "ffmpeg") refreshFfmpeg(true);
-      if (kind === "python311" || kind === "asrVenv") {
-        setAsrSetupRefreshKey((value) => value + 1);
-      }
       void refreshRuntimeDependencies();
       await refreshRuntimeStorage();
       setMessage(null);
@@ -278,9 +263,6 @@ export function SettingsView() {
         setRuntimePreparationSnapshot(kind, snapshot);
         if (snapshot.status === "completed") {
           if (kind === "ffmpeg") refreshFfmpeg(true);
-          if (kind === "python311") {
-            setAsrSetupRefreshKey((value) => value + 1);
-          }
           setRuntimeStorage(null);
           void refreshRuntimeDependencies();
           setMessage(null);
@@ -329,7 +311,7 @@ export function SettingsView() {
             <Button
               type="button"
               onClick={handleSave}
-              disabled={saving || !dirty || asrSetupRunning || !shortcutsValid}
+              disabled={saving || !dirty || !shortcutsValid}
               className="px-4 py-2"
             >
               {saving ? "保存中…" : "保存"}
@@ -392,19 +374,7 @@ export function SettingsView() {
             ) : null}
 
             {activeCategory === "transcription" ? (
-              <SettingsTranscriptionPanel
-                settings={settings}
-                update={update}
-                asrSetupRefreshKey={asrSetupRefreshKey}
-                saving={saving}
-                onBeforeAsrSetupStart={async () => {
-                  await setSettings(settings);
-                  setDirty(false);
-                  setMessage(null);
-                }}
-                onAsrSetupRunningChange={setAsrSetupRunning}
-                onAsrSetupComplete={refreshSettingsAfterAsrSetup}
-              />
+              <SettingsTranscriptionPanel settings={settings} update={update} />
             ) : null}
 
             {activeCategory === "providers" ? (

@@ -95,10 +95,8 @@ export function RuntimeDependenciesPanel({
         <div className="mt-4 divide-y divide-border">
           {(probe?.items ?? []).map((item) => {
             const needsAction = item.status !== "available";
-            const canDownload =
-              needsAction && (item.kind === "ffmpeg" || item.kind === "python311");
-            const canConfigure =
-              needsAction && (item.kind === "asrVenv" || item.kind === "asrModels");
+            const canDownload = needsAction && item.kind === "ffmpeg";
+            const canConfigure = needsAction && item.kind === "asrModels";
             const preparation = preparations[item.kind];
             const progress = preparationProgress(preparation);
             const isPreparing = isActivePreparation(preparation);
@@ -128,6 +126,17 @@ export function RuntimeDependenciesPanel({
                   {item.version && (
                     <p className="mt-1 truncate text-xs text-text-muted" title={item.version}>
                       {item.version}
+                    </p>
+                  )}
+                  {item.kind === "nativeAsrCpu" && (
+                    <p
+                      className={`mt-1 text-xs ${
+                        item.status === "available" ? "text-text-muted" : "text-danger"
+                      }`}
+                    >
+                      {item.status === "available"
+                        ? "随应用内置，无需单独下载"
+                        : "内置 Native ASR CPU 运行时缺失或损坏，请重新安装应用"}
                     </p>
                   )}
                   {preparation && (

@@ -1,0 +1,9 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Owns shadcn Select/UI composition, Chinese copy, Settings category behavior, and minimal workflow component changes."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Guides shared hook ownership and reuse of existing runtime dependency preparation patterns."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Defines the T16 Native ASR availability payload, disposition mapping, shared IPC types, and T17 removal boundary."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Requires typed tauri.ts wrappers and forbids raw invoke or duplicated payload parsing."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines focused/full pnpm tests, build validation, minimal diffs, and no aspirational abstractions."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Keeps T16 metadata, frontend selectors, model download, start gating, and T18 ownership coherent across boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Prevents a second ASR support registry and duplicated Settings/Transcribe availability logic."}
+{"file":".trellis/tasks/08-28-native-asr-frontend-migration/research/planning-evidence.md","reason":"Records current frontend debt, exact T16 handoff fields, reusable seams, unsupported VAD/CUDA state, and T18 boundary."}
+{"file":".trellis/tasks/archive/2026-08/08-27-native-asr-runtime-settings-backend/research/implementation-evidence.md","reason":"Provides the completed backend payloads, route-policy behavior, production dependency contract, and residual T17/T18 ownership."}
