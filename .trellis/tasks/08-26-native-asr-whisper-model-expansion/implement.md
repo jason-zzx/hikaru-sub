@@ -1,6 +1,6 @@
 # Native Faster-Whisper model expansion implementation plan
 
-> Status: planning. Production implementation is blocked until T18 provides the stable Native large-v3 CPU baseline, unless the user explicitly changes the parent roadmap. Do not commit, push, merge, rebase, reset, or archive without separate user authorization.
+> Status: planning and intentionally parked. T16 is complete; the enforced next tasks are T17 and then T18. Do not activate this task until T18 is completed and archived unless the user explicitly changes the parent roadmap. Do not commit, push, merge, rebase, reset, or archive without separate user authorization.
 
 ## Step 0 - Confirm the production baseline
 

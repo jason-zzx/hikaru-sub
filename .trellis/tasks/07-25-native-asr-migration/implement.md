@@ -30,27 +30,28 @@ Candidate A 历史 `stop-revise` 不改写。当前父任务只新增 `mvp-eligi
 ## MVP Gate Overview
 
 ```text
-Gate A - release inputs
-  T12 large-v3 model manager  ─┐
-                               ├─> T16 runtime/settings backend
-  T13 final CPU runtime pack ──┘
-                                      |
-Gate B - product contract             v
-                              T17 frontend migration
-                                      |
-Gate C - release cutover              v
-                              T18 Native MVP release
-
-Post-MVP:
-  first P1 -> 08-26 Faster-Whisper model expansion
-  then     -> T08R / T11 / Parakeet-Reazon revisions / T14-T15 GPU
+T12 model manager [done] + T13 CPU runtime [done]
+                         |
+                         v
+T16 runtime/settings backend [done]
+                         |
+                         v
+T17 frontend migration [NEXT; not created]
+                         |
+                         v
+T18 Native MVP release [create after T17]
+                         |
+                         v
+08-26 Faster-Whisper model expansion [activate only after T18]
 ```
 
-T12 and T13 may execute in parallel. T16 depends on both. T17 depends on T16 and T12 model metadata. T18 depends on T12/T13/T16/T17 and archived T04/T05/T06 foundation.
+The enforced next task is T17. T18 depends on T17, and the post-MVP Faster-Whisper expansion depends on completed and archived T18. Its P1 priority means first post-MVP priority, not the next executable task before T18.
 
-## Current Planning Children
+## Critical-Path Children
 
 ### T12 - Build Native ASR MVP Model Manager
+
+Status: completed and archived.
 
 Directory: `.trellis/tasks/08-20-native-asr-model-manager`
 
@@ -74,6 +75,8 @@ Rollback: retain current downloader/default Python path until T18.
 
 ### T13 - Build Final Native ASR MVP CPU Runtime Package
 
+Status: completed and archived.
+
 Directory: `.trellis/tasks/08-20-native-asr-cpu-runtime-package`
 
 MVP deliverables:
@@ -96,9 +99,11 @@ Exit criteria:
 
 Rollback: production package remains Python legacy until T18.
 
-## Next Children To Create
+## Current Sequence
 
 ### T16 - Migrate Native MVP Runtime And Settings Backend
+
+Status: completed and archived.
 
 Suggested slug: `native-asr-runtime-settings-backend`
 
@@ -123,6 +128,8 @@ Rollback: keep old settings fields as ignored input; do not destructively rewrit
 
 ### T17 - Migrate Native MVP Runtime And Model UX
 
+Status: next task; not yet created.
+
 Suggested slug: `native-asr-frontend-migration`
 
 Deliverables:
@@ -145,6 +152,8 @@ pnpm build
 Rollback: do not ship mixed legacy/new UI and backend contracts.
 
 ### T18 - Qualify And Cut Over Native ASR MVP Release
+
+Status: blocked by T17; create only after T17 completes.
 
 Suggested slug: `native-asr-release-cutover`
 
@@ -183,7 +192,9 @@ Rollback: restore previous package inputs/default route without deleting user mo
 
 ## Post-MVP Work
 
-### First P1 - Expand Native Faster-Whisper Model Support
+### First Post-MVP P1 - Expand Native Faster-Whisper Model Support
+
+Status: blocked until T17 and T18 are completed and archived. Do not select this task as the next executable child merely because it is P1.
 
 Directory: `.trellis/tasks/08-26-native-asr-whisper-model-expansion`
 
