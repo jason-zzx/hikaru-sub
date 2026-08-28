@@ -41,7 +41,8 @@
     "08-20-native-asr-cpu-runtime-package",
     "08-25-native-asr-whisper-execution-parity-discovery",
     "08-25-native-asr-release-first-reprioritization",
-    "08-26-native-asr-whisper-model-expansion"
+    "08-26-native-asr-whisper-model-expansion",
+    "08-27-native-asr-runtime-settings-backend"
   ],
   "parent": null,
   "relatedFiles": [],

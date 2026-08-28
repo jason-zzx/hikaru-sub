@@ -132,6 +132,8 @@ pub(crate) struct NativeAsrModelStatus {
     pub revision: Option<String>,
     pub disposition: NativeAsrModelDisposition,
     pub origin: Option<NativeAsrModelOrigin>,
+    #[serde(skip)]
+    pub resolved_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -221,7 +223,8 @@ impl NativeAsrModelManager {
             } else {
                 NativeAsrModelDisposition::SupportedMissing
             },
-            origin: resolved.map(|value| value.origin),
+            origin: resolved.as_ref().map(|value| value.origin),
+            resolved_path: resolved.map(|value| value.path),
         })
     }
 
@@ -512,7 +515,18 @@ fn unavailable_status(engine: &str, model: &str) -> NativeAsrModelStatus {
             NativeAsrModelDisposition::Unsupported
         },
         origin: None,
+        resolved_path: None,
     }
+}
+
+pub(crate) fn known_native_asr_engines() -> Vec<&'static str> {
+    let mut engines = vec!["faster-whisper"];
+    for (engine, _) in POST_MVP_MODELS {
+        if !engines.contains(&engine) {
+            engines.push(engine);
+        }
+    }
+    engines
 }
 
 fn direct_path(roots: &ManagedModelRoots, model: &ManifestModel) -> PathBuf {
@@ -1076,7 +1090,7 @@ fn remove_path_entry(path: &Path) -> Result<(), std::io::Error> {
     }
 }
 
-fn is_link_like(metadata: &fs::Metadata) -> bool {
+pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
     if metadata.file_type().is_symlink() {
         return true;
     }

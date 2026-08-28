@@ -18,7 +18,7 @@ Work cache children of interest: `workspace/`, `transcode/`, `preview/`, `clip-f
 
 ## Managed Dependencies Layout
 
-Release packages do **not** bundle FFmpeg, Python, ASR pip deps, or model weights — only a clean ASR service template.
+Release packages do **not** bundle FFmpeg, Python, ASR pip deps, or model weights. Before T18 they retain the clean legacy ASR service template for rollback evidence and also bundle the verified Native ASR CPU runtime resource; T18 owns removing the legacy packaged template.
 
 Typical install-dir layout (see `/AGENTS.md`):
 
@@ -37,6 +37,77 @@ Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI choo
 ## Probe / Prepare / Cleanup UX Contract
 
 Settings entry: **probe only**. Storage sizes: user-triggered measure. Cleanup buttons: only when measured size > 0 and the target is managed.
+
+## Scenario: Native MVP Runtime Dependency Payload (T16)
+
+### 1. Scope / Trigger
+
+Apply when changing `RuntimeDependencyKind`, production dependency probe/storage payloads, Native model storage cleanup, or the bundled CPU runtime status exposed to Settings.
+
+### 2. Signatures
+
+```rust
+enum RuntimeDependencyKind {
+    Ffmpeg,
+    NativeAsrCpu,
+    Python311, // accepted legacy input; not emitted by T16 production probe/measure
+    AsrVenv,   // accepted legacy input; not emitted by T16 production probe/measure
+    AsrModels,
+    Downloads,
+    AppCache,
+}
+
+#[tauri::command]
+async fn probe_runtime_dependencies(app: AppHandle, asr_state: State<'_, AsrState>)
+    -> Result<RuntimeDependencyProbe, String>;
+```
+
+### 3. Contracts
+
+- Production probe emits FFmpeg, `nativeAsrCpu`, and exact `faster-whisper/large-v3` readiness. It emits no Python 3.11 or ASR venv item.
+- `nativeAsrCpu` resolves from `resource_dir()/native-asr/windows-x64/cpu`, reports `source: "builtIn"`, `managed: false`, and the locked artifact ID. It is never downloadable or cleanable.
+- Exact model readiness comes from the process-owned `NativeAsrModelManager`; do not duplicate size/hash/path validation in `dependencies.rs`.
+- Probe remains status/path/version only. Runtime reads and model hashing use `spawn_blocking`; probe never calls recursive `dir_size`.
+- Explicit storage measurement emits managed FFmpeg when applicable, bounded `deps/models`, `deps/downloads`, and application work cache. It emits no Python/venv or bundled-runtime storage item.
+- `asrModels` cleanup targets only executable-adjacent `deps/models`; `downloads` remains `deps/downloads`; app-cache cleanup preserves current-video workspace/proxy data.
+- Legacy Python/venv enum variants may remain temporarily for T17/rollback compatibility, but production payloads do not offer them.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| Valid locked Native runtime resource | `nativeAsrCpu: available`, unmanaged |
+| Missing/wrong runtime identity/capability/required entry | `nativeAsrCpu: missing`; controlled runtime error on Native start |
+| Exact large-v3 direct or contained legacy snapshot | `asrModels: available` with exact path/revision |
+| Missing/wrong model bytes | `asrModels: missing`; no model-name-only readiness |
+| Cleanup `nativeAsrCpu` | Reject before deletion |
+| Cleanup target outside canonical `deps` | Reject |
+| Symlink/reparse entry during recursive measurement | Do not follow/count it |
+
+### 5. Good / Base / Bad Cases
+
+- Good: Settings probe shows built-in CPU runtime and exact model state; storage size appears only after explicit measure.
+- Base: model is missing -> runtime stays built-in/ready and the model item is missing/downloadable through the model manager.
+- Bad: report Python/venv as required production dependencies, include recursive size in probe, or delete packaged runtime resources through dependency cleanup.
+
+### 6. Tests Required
+
+- Installed-like and portable-like resource roots resolve the same locked runtime layout.
+- Missing/wrong artifact identity or capability fails.
+- Probe output contains no Python/venv kinds and no recursive size path.
+- Model dependency item maps exact ready/missing state and source.
+- Measure/cleanup cover only bounded models/downloads/app cache and preserve current-video cache.
+- Full Cargo tests plus frontend runtime-kind label test/build.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong:   dir_nonempty(deps/models) -> model ready
+Correct: NativeAsrModelManager exact readiness -> model dependency status
+
+Wrong:   include bundled native-asr resources in managed storage/cleanup
+Correct: report builtIn unmanaged runtime -> reject cleanup
+```
 
 ## Anti-Patterns
 

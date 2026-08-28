@@ -8,6 +8,9 @@ import {
 describe("runtime dependency constants", () => {
   it("labels managed dependency kinds", () => {
     expect(RUNTIME_DEPENDENCY_LABEL.ffmpeg).toBe("FFmpeg");
+    expect(RUNTIME_DEPENDENCY_LABEL.nativeAsrCpu).toBe(
+      "内置 Native ASR CPU 运行时",
+    );
     expect(RUNTIME_DEPENDENCY_LABEL.python311).toBe("Python 3.11");
     expect(RUNTIME_DEPENDENCY_LABEL.asrVenv).toBe("ASR 引擎依赖");
   });
