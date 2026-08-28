@@ -1,11 +1,11 @@
 {
   "id": "native-asr-whisper-model-expansion",
   "name": "native-asr-whisper-model-expansion",
-  "title": "Expand Native Faster-Whisper model support",
-  "description": "Immediately after the Native MVP, add large-v2, tiny, base, small, medium, and large-v3-turbo to the released CTranslate2 CPU route with independent functional enablement.",
+  "title": "Expand Native Faster-Whisper models after T18",
+  "description": "Blocked until T17 frontend migration and T18 Native MVP release cutover are completed and archived; then add large-v2, tiny, base, small, medium, and large-v3-turbo to the released CTranslate2 CPU route.",
   "status": "planning",
   "dev_type": null,
-  "scope": "Extend the released Native Faster-Whisper CPU route across exact model delivery, worker qualification, backend availability, and frontend enablement.",
+  "scope": "After T18, extend the released Native Faster-Whisper CPU route across exact model delivery, worker qualification, backend availability, and frontend enablement.",
   "package": null,
   "priority": "P1",
   "creator": "zzx",
@@ -21,6 +21,6 @@
   "children": [],
   "parent": "07-25-native-asr-migration",
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Activation blocked. Current parent sequence is T17 -> T18 -> this task. P1 means first post-MVP priority, not the next executable task before T18.",
   "meta": {}
 }

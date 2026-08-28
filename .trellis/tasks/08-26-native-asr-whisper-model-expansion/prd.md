@@ -1,4 +1,6 @@
-# Expand Native Faster-Whisper model support
+# Expand Native Faster-Whisper models after T18
+
+> **当前状态：阻塞。** T16 已完成；必须先完成并归档 T17 frontend migration 与 T18 release cutover，之后才能激活本任务。这里的 P1 仅表示“首个 post-MVP 优先级”，不表示当前下一项工作。
 
 ## Goal
 
@@ -30,7 +32,7 @@
 ## Confirmed Current Baseline
 
 - T12 model manager 与 T13 final CPU runtime 已完成并归档；当前 Native model manifest 仍只包含 `large-v3`。
-- T16 runtime/settings、T17 frontend migration 与 T18 release cutover 尚未创建或完成；当前生产命令仍由 Python sidecar 提供，Native worker host 仍是 debug/test seam。
+- T16 runtime/settings 已完成并归档；T17 frontend migration 与 T18 release cutover 尚未创建或完成。T17 是当前下一任务，T18 必须在 T17 后执行，本任务必须继续阻塞到 T18 完成归档。
 - Rust model manager 已把本任务的六个模型标记为 `postMvpUnavailable`，并已具备多 entry manifest、独立 readiness、断点续传、hash 校验和原子发布能力。
 - 前端 `ASR_ENGINE_MODELS` 已列出全部六个模型，因此本任务不需要新增第二套模型注册表。
 - 已发布 worker 源码按模型读取 `n_mels`，接受 80/128 Mel，并接受 `vocabulary.txt` 或 `vocabulary.json`；ordinary Whisper 不要求 `preprocessor_config.json`。因此默认假设无需修改或重建 worker，真实模型 smoke 才能推翻该假设。

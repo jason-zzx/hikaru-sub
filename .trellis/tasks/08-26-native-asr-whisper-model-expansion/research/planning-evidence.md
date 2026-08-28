@@ -2,12 +2,12 @@
 
 ## Current dependency state
 
-- The parent roadmap fixes the sequence as `T18 Native MVP -> Faster-Whisper model expansion`.
-- T12 model delivery and T13 CPU runtime packaging are archived as completed.
-- T16 runtime/settings, T17 frontend migration, and T18 release cutover do not exist as completed tasks in the current task tree.
-- `src-tauri/src/asr.rs:1-4` still states that product/default routing uses the Python HTTP sidecar; `check_asr_model` and `download_asr_model` still proxy it at `src-tauri/src/asr.rs:737` and `src-tauri/src/asr.rs:757`.
+- The parent roadmap fixes the executable sequence as `T17 frontend migration -> T18 Native MVP release -> Faster-Whisper model expansion`.
+- T12 model delivery, T13 CPU runtime packaging, and T16 runtime/settings backend are completed and archived.
+- T17 frontend migration is the current next task and has not been created; T18 must follow T17 and has not been created.
+- T16 established the shared Native backend route and dependency contract, while Release/default remains legacy for T18; T17 still owns visible Python setup removal and final model/device availability UX.
 
-Conclusion: detailed planning can proceed, but production implementation must not absorb or bypass T16-T18 without an explicit roadmap change.
+Conclusion: this task remains intentionally parked. Its P1 priority applies only after T18 and must never be used to infer that it is executable before T17/T18.
 
 ## Existing seams to reuse
 

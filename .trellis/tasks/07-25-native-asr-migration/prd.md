@@ -145,7 +145,7 @@
 
 - Gate 0/1 foundation 已关闭：T01～T10 系列已提供 ground truth、backend feasibility、worker protocol、Rust host、Candidate A 和后续模型实验历史。
 - T06R 已 non-qualified 收口，T06D 已以 `invalid-evidence` 关闭；两者不再触发新的 Whisper 质量任务。
-- 当前执行顺序改为：先完成 T12 model manager 与 T13 final CPU package，再创建/执行 T16、T17、T18。
-- `08-26-native-asr-whisper-model-expansion` 已创建为 post-MVP P1，T18 后立即扩展其余六个 Faster-Whisper 模型。
+- T12 model manager、T13 final CPU package 与 T16 runtime/settings backend 已完成并归档；当前唯一下一步是创建并完成 T17 frontend migration，随后执行 T18 release cutover。
+- `08-26-native-asr-whisper-model-expansion` 已创建但保持阻塞；其 P1 表示 T18 后的第一优先级，不表示可在 T17/T18 前激活。
 - T08R 与 T11 降为 post-MVP P3；Parakeet/Reazon 和 T14/T15 排在 Whisper expansion 之后。
 - Production/default 在 T18 通过前仍为 Python legacy。
