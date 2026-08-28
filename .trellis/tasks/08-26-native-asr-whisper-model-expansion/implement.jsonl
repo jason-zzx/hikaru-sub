@@ -1,1 +1,7 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Owns Native worker, bundled runtime, model delivery, protocol, and no-Python-fallback contracts."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Owns managed model/download roots, portable layout, containment, and cleanup boundaries."}
+{"file":".trellis/spec/tauri/async-and-blocking.md","reason":"Required for model hashing and filesystem verification through spawn_blocking."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Owns typed command wrappers and cross-layer model status/download contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines required frontend tests and build validation for availability UI changes."}
+{"file":".trellis/tasks/08-26-native-asr-whisper-model-expansion/research/planning-evidence.md","reason":"Records the current T12/T13 seams, T16-T18 dependency gate, worker capabilities, frontend reuse, and pinned upstream model research."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-model-manager/research/implementation-evidence.md","reason":"Provides verified behavior and residual boundaries of the existing exact model manager implementation."}

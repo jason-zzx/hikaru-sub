@@ -1,1 +1,7 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Review against Native worker/runtime/model delivery, protocol, rollback, and release gates."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Review managed-root containment, installed/portable behavior, and non-destructive rollback."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Review Rust test, logging, formatting, and full Cargo validation expectations."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Review command/type wiring and prevent raw or duplicated availability contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review frontend tests, build, minimal UI changes, and model-default behavior."}
+{"file":".trellis/tasks/08-26-native-asr-whisper-model-expansion/research/planning-evidence.md","reason":"Verify implementation against confirmed codebase seams, dependency state, and canonical upstream identities."}
+{"file":".trellis/tasks/archive/2026-08/08-20-native-asr-model-manager/research/implementation-evidence.md","reason":"Verify no regression in exact readiness, resume, publication, model isolation, or public-command boundaries."}
