@@ -12,6 +12,12 @@ export const ASR_ENGINE_OPTIONS = [
   { value: "reazonspeech-nemo", label: "ReazonSpeech NeMo" },
 ];
 
+export const ASR_DEVICE_OPTIONS = [
+  { value: "auto", label: "自动" },
+  { value: "cpu", label: "CPU" },
+  { value: "cuda", label: "CUDA（NVIDIA GPU）" },
+];
+
 export const ASR_ENGINE_MODELS: Record<string, Array<{ value: string; label: string }>> = {
   "faster-whisper": [
     "tiny",

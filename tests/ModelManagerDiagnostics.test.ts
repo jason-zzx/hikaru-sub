@@ -14,26 +14,16 @@ const asrSource = readFileSync(
 );
 
 describe("ModelManager diagnostics", () => {
-  it("shows the model download source and sidecar log path", () => {
+  it("keeps model download source and bounded diagnostic path rendering", () => {
     expect(modelManagerSource).toContain("hfEndpoint");
     expect(modelManagerSource).toContain("debugLogPath");
     expect(modelManagerSource).toContain("下载源：");
     expect(modelManagerSource).toContain("诊断日志：");
   });
 
-  it("keeps model download progress pinned to the sidecar that created the job", () => {
+  it("keeps legacy-route download polling pinned to the backend that created the job", () => {
     expect(asrSource).toContain("remember_job_base_url(&state, &job_id, &base).await");
     expect(asrSource).toContain("known_job_base_url(&state, &job_id).await");
     expect(asrSource).toContain("get_model_download_progress");
-  });
-
-  it("shows ASR engine not installed instead of generic check failure", () => {
-    expect(modelManagerSource).toContain("isAsrEngineNotInstalledError");
-    expect(modelManagerSource).toContain("ASR_ENGINE_NOT_INSTALLED_LABEL");
-    expect(modelManagerSource).toContain("engineNotInstalled");
-    expect(modelManagerSource).not.toContain("ASR_ENGINE_NOT_INSTALLED_HINT");
-    expect(modelManagerSource).toMatch(
-      /engineNotInstalled[\s\S]{0,200}ASR_ENGINE_NOT_INSTALLED_LABEL/,
-    );
   });
 });

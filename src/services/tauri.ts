@@ -6,8 +6,6 @@ import type {
   AsrEngineInfo,
   AsrJobSnapshot,
   AsrModelStatus,
-  AsrSetupEnvironment,
-  AsrSetupSnapshot,
   AudioExtractProgress,
   BurnSnapshot,
   BurnVideoProbe,
@@ -19,7 +17,6 @@ import type {
   LatestGithubRelease,
   ModelDownloadSnapshot,
   ProbeDownloadMediaArgs,
-  ProbeAsrSetupEnvironmentArgs,
   PreviewFontFile,
   PrepareRuntimeDependencyArgs,
   RenderSubtitlePreviewFrameArgs,
@@ -29,7 +26,6 @@ import type {
   RuntimeDependencySnapshot,
   RuntimeDependencyStorage,
   StartAsrArgs,
-  StartAsrSetupArgs,
   StartBurnArgs,
   StartVideoClipArgs,
   StartVideoDownloadArgs,
@@ -107,15 +103,9 @@ export async function pickSaveSubtitleFile(
   return { path: ensureAssExtension(selected), format: "ass" };
 }
 
-/** 弹出目录对话框，取消返回 null（如选择保存目录、sidecar 目录）。 */
+/** 弹出目录对话框，取消返回 null。 */
 export async function pickDirectory(): Promise<string | null> {
   const selected = await open({ multiple: false, directory: true });
-  return typeof selected === "string" ? selected : null;
-}
-
-/** 弹出文件对话框选择可执行文件（如 ffmpeg、python），取消返回 null。 */
-export async function pickExecutableFile(): Promise<string | null> {
-  const selected = await open({ multiple: false, directory: false });
   return typeof selected === "string" ? selected : null;
 }
 
@@ -215,7 +205,7 @@ export async function pathExists(path: string): Promise<boolean> {
   return invoke<boolean>("path_exists", { path });
 }
 
-/** 列出 sidecar 已注册的 ASR 引擎（首次调用会按需拉起 sidecar）。 */
+/** 列出当前 ASR 后端报告的引擎与可用性。 */
 export async function listAsrEngines(): Promise<AsrEngineInfo[]> {
   const res = await invoke<{ engines: AsrEngineInfo[] }>("list_asr_engines");
   return res.engines;
@@ -262,31 +252,7 @@ export async function getModelDownloadProgress(
   return invoke<ModelDownloadSnapshot>("get_model_download_progress", { jobId });
 }
 
-/** 探测 ASR 一键配置所需的模板、Python 与虚拟环境状态。 */
-export async function probeAsrSetupEnvironment(
-  args: ProbeAsrSetupEnvironmentArgs = {},
-): Promise<AsrSetupEnvironment> {
-  return invoke<AsrSetupEnvironment>("probe_asr_setup_environment", { args });
-}
-
-/** 启动 ASR 引擎依赖配置任务，返回 jobId。 */
-export async function startAsrSetup(args: StartAsrSetupArgs): Promise<string> {
-  return invoke<string>("start_asr_setup", { args });
-}
-
-/** 查询 ASR 引擎依赖配置任务进度。 */
-export async function getAsrSetupProgress(
-  jobId: string,
-): Promise<AsrSetupSnapshot> {
-  return invoke<AsrSetupSnapshot>("get_asr_setup_progress", { jobId });
-}
-
-/** 取消 ASR 引擎依赖配置任务。 */
-export async function cancelAsrSetup(jobId: string): Promise<void> {
-  await invoke("cancel_asr_setup", { jobId });
-}
-
-/** 探测 FFmpeg、Python、ASR 依赖和模型缓存的运行时状态（不含磁盘占用）。 */
+/** 探测 FFmpeg、Native ASR 运行时和模型缓存状态（不含磁盘占用）。 */
 export async function probeRuntimeDependencies(): Promise<RuntimeDependencyProbe> {
   return invoke<RuntimeDependencyProbe>("probe_runtime_dependencies");
 }

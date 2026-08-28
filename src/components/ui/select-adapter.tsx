@@ -9,6 +9,7 @@ import {
 export interface SelectOption {
   value: string;
   label: string;
+  disabled?: boolean;
 }
 
 /**
@@ -42,7 +43,7 @@ export function Select({
       </SelectTrigger>
       <SelectContent>
         {options.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value}>
+          <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
             {opt.label}
           </SelectItem>
         ))}

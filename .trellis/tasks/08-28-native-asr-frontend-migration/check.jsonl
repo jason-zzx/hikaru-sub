@@ -1,0 +1,8 @@
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review shadcn/Radix option disabling, Chinese copy, Settings/Transcribe composition, and removal of Python setup UI."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Review every Native disposition/reason, runtime kind, shared type, and legacy-payload compatibility path."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Review that all commands remain behind existing typed wrappers with no raw invoke or duplicate contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review tests, build, minimal file scope, user-visible flows, and absence of speculative abstractions."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review T16-to-frontend data flow, model download/start gating, and preservation of the T18 route/package boundary."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Review that Settings and Transcribe share availability logic and no second support registry was introduced."}
+{"file":".trellis/tasks/08-28-native-asr-frontend-migration/research/planning-evidence.md","reason":"Verify deletion completeness, availability semantics, stale-request risk, unsupported VAD/CUDA presentation, and planned file boundaries."}
+{"file":".trellis/tasks/archive/2026-08/08-27-native-asr-runtime-settings-backend/research/trellis-check-report.md","reason":"Preserves the verified T16 residual gates: T17 owns visible migration while T18 owns Release/default and packaged Python removal."}

@@ -22,7 +22,7 @@ describe("RuntimeDependenciesPanel", () => {
               managed: true,
             },
             {
-              kind: "python311",
+              kind: "nativeAsrCpu",
               status: "missing",
               path: null,
               source: null,
@@ -151,139 +151,40 @@ describe("RuntimeDependenciesPanel", () => {
     expect(onCleanup).toHaveBeenCalledWith("appCache");
   });
 
-  it("does not list downloads under the dependency status card", () => {
-    render(
-      <RuntimeDependenciesPanel
-        probe={{
-          sourceMode: "official",
-          items: [
-            {
-              kind: "ffmpeg",
-              status: "available",
-              managed: true,
-            },
-            {
-              kind: "python311",
-              status: "available",
-              managed: true,
-            },
-            {
-              kind: "asrVenv",
-              status: "available",
-              managed: true,
-            },
-            {
-              kind: "asrModels",
-              status: "available",
-              managed: true,
-            },
-          ],
-        }}
-        storage={null}
-        onChangeSourceMode={vi.fn()}
-        onMeasureStorage={vi.fn()}
-        onCleanup={vi.fn()}
-        onPrepareDependency={vi.fn()}
-        onConfigureAsr={vi.fn()}
-      />,
-    );
-
+  it("lists only production runtime dependencies under the status card", () => {
+    render(<RuntimeDependenciesPanel probe={{ sourceMode: "official", items: [
+      { kind: "ffmpeg", status: "available", managed: true },
+      { kind: "nativeAsrCpu", status: "available", managed: false },
+      { kind: "asrModels", status: "available", managed: true },
+    ] }} storage={null} onChangeSourceMode={vi.fn()} onMeasureStorage={vi.fn()}
+      onCleanup={vi.fn()} onPrepareDependency={vi.fn()} onConfigureAsr={vi.fn()} />);
     expect(screen.getByText("FFmpeg")).toBeTruthy();
-    expect(screen.getByText("Python 3.11")).toBeTruthy();
+    expect(screen.getByText("内置 Native ASR CPU 运行时")).toBeTruthy();
+    expect(screen.queryByText(/Python|虚拟环境/)).toBeNull();
     expect(screen.queryByText("临时下载缓存")).toBeNull();
   });
 
-  it("offers direct downloads for missing FFmpeg and Python", async () => {
+  it("offers a direct download only for missing FFmpeg", async () => {
     const onPrepareDependency = vi.fn();
-    render(
-      <RuntimeDependenciesPanel
-        probe={{
-          sourceMode: "china",
-          items: [
-            {
-              kind: "ffmpeg",
-              status: "missing",
-              managed: false,
-            },
-            {
-              kind: "python311",
-              status: "missing",
-              managed: false,
-            },
-          ],
-        }}
-        storage={null}
-        onChangeSourceMode={vi.fn()}
-        onMeasureStorage={vi.fn()}
-        onCleanup={vi.fn()}
-        onPrepareDependency={onPrepareDependency}
-        onConfigureAsr={vi.fn()}
-      />,
-    );
-
-    const buttons = screen.getAllByRole("button", { name: "下载" });
-    expect(buttons).toHaveLength(2);
-
-    await userEvent.click(buttons[0]);
-    await userEvent.click(buttons[1]);
-
-    expect(onPrepareDependency).toHaveBeenNthCalledWith(1, "ffmpeg");
-    expect(onPrepareDependency).toHaveBeenNthCalledWith(2, "python311");
+    render(<RuntimeDependenciesPanel probe={{ sourceMode: "china", items: [
+      { kind: "ffmpeg", status: "missing", managed: false },
+      { kind: "nativeAsrCpu", status: "missing", managed: false },
+    ] }} storage={null} onChangeSourceMode={vi.fn()} onMeasureStorage={vi.fn()}
+      onCleanup={vi.fn()} onPrepareDependency={onPrepareDependency} onConfigureAsr={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "下载" }));
+    expect(onPrepareDependency).toHaveBeenCalledWith("ffmpeg");
+    expect(screen.getByText(/请重新安装应用/)).toBeTruthy();
   });
 
-  it("shows simultaneous download progress per dependency row", () => {
-    render(
-      <RuntimeDependenciesPanel
-        probe={{
-          sourceMode: "china",
-          items: [
-            {
-              kind: "ffmpeg",
-              status: "missing",
-              managed: false,
-            },
-            {
-              kind: "python311",
-              status: "missing",
-              managed: false,
-            },
-          ],
-        }}
-        storage={null}
-        onChangeSourceMode={vi.fn()}
-        onMeasureStorage={vi.fn()}
-        onCleanup={vi.fn()}
-        onPrepareDependency={vi.fn()}
-        onConfigureAsr={vi.fn()}
-        preparations={{
-          ffmpeg: {
-            id: "ffmpeg-job",
-            kind: "ffmpeg",
-            status: "running",
-            stage: "下载安装包",
-            progress: 0.24,
-            downloadedBytes: 24,
-            totalBytes: 100,
-            logTail: [],
-            error: null,
-          },
-          python311: {
-            id: "python-job",
-            kind: "python311",
-            status: "running",
-            stage: "下载安装包",
-            progress: 0.67,
-            downloadedBytes: 67,
-            totalBytes: 100,
-            logTail: [],
-            error: null,
-          },
-        }}
-      />,
-    );
-
+  it("shows FFmpeg download progress", () => {
+    render(<RuntimeDependenciesPanel probe={{ sourceMode: "china", items: [
+      { kind: "ffmpeg", status: "missing", managed: false },
+    ] }} storage={null} onChangeSourceMode={vi.fn()} onMeasureStorage={vi.fn()}
+      onCleanup={vi.fn()} onPrepareDependency={vi.fn()} onConfigureAsr={vi.fn()}
+      preparations={{ ffmpeg: { id: "ffmpeg-job", kind: "ffmpeg", status: "running",
+        stage: "下载安装包", progress: 0.24, downloadedBytes: 24, totalBytes: 100,
+        logTail: [], error: null } }} />);
     expect(screen.getByRole("button", { name: "下载中 24%" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "下载中 67%" })).toBeTruthy();
   });
 
   it("shows runtime dependency download logs with source details", () => {
@@ -329,74 +230,23 @@ describe("RuntimeDependenciesPanel", () => {
     expect(screen.getByText(/https:\/\/mirror\.example\/ffmpeg\.zip/)).toBeTruthy();
   });
 
-  it("routes ASR dependency gaps to the ASR setup section", async () => {
+  it("routes ASR model gaps to the transcription section", async () => {
     const onConfigureAsr = vi.fn();
-    render(
-      <RuntimeDependenciesPanel
-        probe={{
-          sourceMode: "china",
-          items: [
-            {
-              kind: "asrVenv",
-              status: "needsSetup",
-              managed: false,
-            },
-            {
-              kind: "asrModels",
-              status: "missing",
-              managed: false,
-            },
-          ],
-        }}
-        storage={null}
-        onChangeSourceMode={vi.fn()}
-        onMeasureStorage={vi.fn()}
-        onCleanup={vi.fn()}
-        onPrepareDependency={vi.fn()}
-        onConfigureAsr={onConfigureAsr}
-      />,
-    );
-
-    const buttons = screen.getAllByRole("button", { name: "去配置" });
-    expect(buttons).toHaveLength(2);
-
-    await userEvent.click(buttons[0]);
-
+    render(<RuntimeDependenciesPanel probe={{ sourceMode: "china", items: [
+      { kind: "asrModels", status: "missing", managed: false },
+    ] }} storage={null} onChangeSourceMode={vi.fn()} onMeasureStorage={vi.fn()}
+      onCleanup={vi.fn()} onPrepareDependency={vi.fn()} onConfigureAsr={onConfigureAsr} />);
+    await userEvent.click(screen.getByRole("button", { name: "去配置" }));
     expect(onConfigureAsr).toHaveBeenCalledTimes(1);
   });
 
-  it("hides cleanup for non-managed storage items", () => {
-    render(
-      <RuntimeDependenciesPanel
-        probe={{
-          sourceMode: "official",
-          items: [
-            {
-              kind: "asrVenv",
-              status: "available",
-              managed: false,
-            },
-          ],
-        }}
-        storage={{
-          items: [
-            {
-              kind: "asrVenv",
-              path: "C:/repo/asr-service/.venv",
-              managed: false,
-              sizeBytes: 50 * 1024 * 1024,
-            },
-          ],
-        }}
-        onChangeSourceMode={vi.fn()}
-        onMeasureStorage={vi.fn()}
-        onCleanup={vi.fn()}
-        onPrepareDependency={vi.fn()}
-        onConfigureAsr={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText(/50.0 MB/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /清理/ })).toBeNull();
+  it("hides cleanup for the non-managed Native runtime", () => {
+    render(<RuntimeDependenciesPanel probe={{ sourceMode: "official", items: [
+      { kind: "nativeAsrCpu", status: "available", managed: false },
+    ] }} storage={{ items: [{ kind: "nativeAsrCpu", path: "resources/native-asr/windows-x64/cpu",
+      managed: false, sizeBytes: 50 * 1024 * 1024 }] }} onChangeSourceMode={vi.fn()}
+      onMeasureStorage={vi.fn()} onCleanup={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "清理" })).toBeNull();
   });
+
 });

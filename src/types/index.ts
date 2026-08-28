@@ -66,8 +66,6 @@ export interface EditorHotkeyOverride {
 
 export interface AppSettings {
   ffmpegPath?: string;
-  pythonPath?: string;
-  asrServicePath?: string;
   asrEngine: string;
   asrModel: string;
   asrDevice: string;
@@ -205,93 +203,14 @@ export interface ModelDownloadSnapshot {
   resolvedPath?: string | null;
 }
 
-export type AsrSetupProfile =
-  | "default"
-  | "parakeet-cpu"
-  | "parakeet-cuda"
-  | "qwen3-cpu"
-  | "qwen3-cuda"
-  | "reazonspeech-cpu"
-  | "reazonspeech-cuda";
-
-export type AsrSetupStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled";
-
-export interface StartAsrSetupArgs {
-  profile: AsrSetupProfile;
-  engine: string;
-  recreate?: boolean;
-  pythonPath?: string | null;
-  asrServicePath?: string | null;
-}
-
-export interface ProbeAsrSetupEnvironmentArgs {
-  pythonPath?: string | null;
-  asrServicePath?: string | null;
-  engine?: string | null;
-}
-
-export interface AsrSetupSnapshot {
-  id: string;
-  status: AsrSetupStatus;
-  profile: AsrSetupProfile;
-  stage: string;
-  progress: number | null;
-  logTail: string[];
-  exitCode?: number | null;
-  error: string | null;
-}
-
-export interface AsrSetupEnvironment {
-  serviceTemplatePath?: string | null;
-  managedServicePath: string;
-  pythonPath?: string | null;
-  pythonVersion?: string | null;
-  pythonOk: boolean;
-  venvPath: string;
-  venvExists: boolean;
-  engine: string;
-  engineOk: boolean;
-  engineError?: string | null;
-  hasNvidiaGpu: boolean;
-}
-
 export type RuntimeDependencyKind =
   | "ffmpeg"
   | "nativeAsrCpu"
-  | "python311"
-  | "asrVenv"
   | "asrModels"
   | "downloads"
   | "appCache";
 
 export type RuntimeDependencySourceMode = "official" | "china";
-
-export interface RuntimeDependencyBinarySource {
-  url: string;
-  sha256: string;
-  sizeBytes: number;
-  archive: "zip" | "tar.gz" | "tar.xz" | "windowsInstaller";
-  stripPrefix?: string | null;
-}
-
-export interface RuntimeDependencySourceProfile {
-  id: "official" | "china";
-  label: string;
-  ffmpeg?: RuntimeDependencyBinarySource;
-  python311?: RuntimeDependencyBinarySource;
-  pipIndexUrl?: string | null;
-  pipExtraIndexUrls?: string[];
-  pytorchCpuIndexUrl?: string | null;
-  pytorchCudaIndexUrl?: string | null;
-  pytorchCpuFindLinksUrl?: string | null;
-  pytorchCudaFindLinksUrl?: string | null;
-  huggingfaceEndpoint?: string | null;
-}
 
 export type RuntimeDependencyJobStatus =
   | "pending"
@@ -329,10 +248,6 @@ export interface RuntimeDependencyStorage {
 
 export interface PrepareRuntimeDependencyArgs {
   kind: RuntimeDependencyKind;
-  engine?: string | null;
-  model?: string | null;
-  profile?: AsrSetupProfile | null;
-  recreate?: boolean;
 }
 
 export interface RuntimeDependencySnapshot {

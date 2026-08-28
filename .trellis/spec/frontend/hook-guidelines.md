@@ -63,6 +63,16 @@ Because listener registration is asynchronous and the app runs under React Stric
 
 `useRuntimeDependencyPreparation` coordinates prepare/progress UI for managed deps — pair with Settings / setup panels, not ad-hoc invoke loops in unrelated views.
 
+## Native ASR Availability
+
+`useAsrAvailability(engine, model, device)` is the mounted owner for Settings/Transcribe ASR engine metadata, model dispositions, device capability, disabled options, route gating, and stale-request rejection.
+
+- Reuse `ASR_ENGINE_OPTIONS`, `ASR_ENGINE_MODELS`, and `ASR_DEVICE_OPTIONS`; backend metadata decides enabled state.
+- On engine change, load the known model list once. Same-engine model changes reuse that status map; only a selected legacy/unknown model missing from the map gets an extra check.
+- Pass the selected status/loading/error/refresh contract into `ModelManager`. Do not restore a component-local fallback `checkAsrModel` path.
+- Keep unavailable persisted values visible and unchanged until the user explicitly selects another option.
+- Settings and Transcribe each own one mounted hook instance; no global Zustand availability store is needed.
+
 ## Anti-Patterns
 
 - Putting clip/burn finalize logic only in `ImportView` / `BurnView` effects

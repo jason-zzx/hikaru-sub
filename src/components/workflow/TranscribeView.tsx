@@ -17,13 +17,8 @@ import { Button } from "../ui/button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Select } from "../ui/select-adapter";
 import { ModelManager, type ModelManagerHandle } from "./ModelManager";
-import {
-  ASR_ENGINE_OPTIONS,
-  KOTOBA_FASTER_WHISPER_DESCRIPTION,
-  asrModelOptions,
-  defaultAsrModel,
-  REAZONSPEECH_NEMO_DESCRIPTION,
-} from "../../constants/asr";
+import { defaultAsrModel } from "../../constants/asr";
+import { useAsrAvailability } from "../../hooks/useAsrAvailability";
 import {
   cancelAsr,
   checkFfmpeg,
@@ -32,48 +27,20 @@ import {
   getSettings,
   getVideoInfo,
   invalidateFfmpegStatus,
-  listAsrEngines,
   onAudioExtractProgress,
   pathExists,
   saveAssText,
   startAsr,
 } from "../../services/tauri";
-import type {
-  AsrEngineInfo,
-  AsrJobSnapshot,
-  FfmpegStatus,
-  VadConfig,
-} from "../../types";
+import type { AsrJobSnapshot, FfmpegStatus } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
-import {
-  ASR_ENGINE_NOT_INSTALLED_HINT,
-  ASR_ENGINE_NOT_INSTALLED_LABEL,
-  isAsrEngineNotInstalledError,
-  isSelectedAsrEngineUnavailable,
-} from "../../utils/asrSidecarError";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
-const ASR_DEVICES = [
-  { value: "auto", label: "自动" },
-  { value: "cpu", label: "CPU" },
-  { value: "cuda", label: "CUDA（NVIDIA GPU）" },
-];
 const ASR_POLL_INTERVAL_MS = 700;
 const ASR_PROGRESS_RETRY_LIMIT = 90;
 const ASR_PROGRESS_RETRY_MAX_DELAY_MS = 3000;
-
-const VAD_INPUT_CLASS =
-  "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
-
-const DEFAULT_VAD_CONFIG: Required<VadConfig> = {
-  threshold: 0.5,
-  minSpeechDurationMs: 500,
-  minSilenceDurationMs: 300,
-  speechPadMs: 400,
-  maxSegmentDurationMs: 25000,
-};
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -117,17 +84,10 @@ export function TranscribeView() {
   const [engine, setEngine] = useState("faster-whisper");
   const [model, setModel] = useState("large-v3");
   const [device, setDevice] = useState("auto");
-  const [engines, setEngines] = useState<AsrEngineInfo[] | null>(null);
-  const [engineMsg, setEngineMsg] = useState<string | null>("未检测");
-  const [sidecarEngineMissing, setSidecarEngineMissing] = useState(false);
-  const [modelCheckTrigger, setModelCheckTrigger] = useState(0);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const [confirmDownloadOpen, setConfirmDownloadOpen] = useState(false);
   const [modelDownloading, setModelDownloading] = useState(false);
   const [checkingModel, setCheckingModel] = useState(false);
-
-  // VAD 语音检测预处理配置（仅当前会话有效，不写入项目/全局设置）
-  const [useVad, setUseVad] = useState(false);
-  const [vadConfig, setVadConfig] = useState<VadConfig>({});
 
   // 转录任务
   const [transcribing, setTranscribing] = useState(false);
@@ -139,9 +99,9 @@ export function TranscribeView() {
   const mountedRef = useRef(true);
   const pollingRef = useRef(false);
   const jobIdRef = useRef<string | null>(null);
-  const engineCheckRequestRef = useRef(0);
   const modelManagerRef = useRef<ModelManagerHandle | null>(null);
   const confirmDownloadBusyRef = useRef(false);
+  const availability = useAsrAvailability(engine, model, device);
 
   const refreshFfmpeg = useCallback(async (force = false) => {
     if (force) invalidateFfmpegStatus();
@@ -158,6 +118,7 @@ export function TranscribeView() {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
+    setSettingsLoading(true);
 
     getSettings()
       .then((settings) => {
@@ -172,6 +133,9 @@ export function TranscribeView() {
         setEngine("faster-whisper");
         setModel("large-v3");
         setDevice("auto");
+      })
+      .finally(() => {
+        if (!cancelled) setSettingsLoading(false);
       });
 
     pathExists(session.audioPath)
@@ -217,12 +181,7 @@ export function TranscribeView() {
 
   const audioPath = session.audioPath;
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
-  const selectedEngineUnavailable = isSelectedAsrEngineUnavailable(
-    engines,
-    engine,
-  );
-  const engineSetupRequired =
-    selectedEngineUnavailable || sidecarEngineMissing;
+  const availabilityPending = settingsLoading || availability.loading;
 
   const runExtract = async () => {
     if (!audioPath) {
@@ -270,44 +229,9 @@ export function TranscribeView() {
     await runExtract();
   };
 
-  const detectEngines = useCallback(async () => {
-    const requestId = engineCheckRequestRef.current + 1;
-    engineCheckRequestRef.current = requestId;
-    setEngineMsg("检测中…");
-    setModelCheckTrigger((value) => value + 1);
-    try {
-      const list = await listAsrEngines();
-      if (engineCheckRequestRef.current !== requestId) return;
-      setEngines(list);
-      setSidecarEngineMissing(false);
-      const current = list.find((e) => e.name === engine);
-      if (!current || !current.available) {
-        setEngineMsg(
-          `${ASR_ENGINE_NOT_INSTALLED_LABEL}：${engine}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
-        );
-      } else {
-        setEngineMsg("sidecar 就绪");
-      }
-    } catch (e) {
-      if (engineCheckRequestRef.current !== requestId) return;
-      setEngines(null);
-      if (isAsrEngineNotInstalledError(e)) {
-        setSidecarEngineMissing(true);
-        setEngineMsg(
-          `${ASR_ENGINE_NOT_INSTALLED_LABEL}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
-        );
-      } else {
-        setSidecarEngineMissing(false);
-        setEngineMsg(`无法启动 sidecar：${String(e)}`);
-      }
-    }
-  }, [engine]);
-
   const handleEngineChange = (nextEngine: string) => {
     setEngine(nextEngine);
     setModel(defaultAsrModel(nextEngine));
-    setEngineMsg("未检测");
-    setSidecarEngineMissing(false);
   };
 
   const pollLoop = async (
@@ -337,7 +261,7 @@ export function TranscribeView() {
         if (!isMissingJobError(message) && progressQueryFailures < ASR_PROGRESS_RETRY_LIMIT) {
           progressQueryFailures += 1;
           setAsrError(
-            `sidecar 暂时无响应，正在重试进度查询（${progressQueryFailures}/${ASR_PROGRESS_RETRY_LIMIT}）：${message}`,
+            `ASR 运行时暂时无响应，正在重试进度查询（${progressQueryFailures}/${ASR_PROGRESS_RETRY_LIMIT}）：${message}`,
           );
           await sleep(progressRetryDelay(progressQueryFailures));
           continue;
@@ -486,19 +410,8 @@ export function TranscribeView() {
         device,
         language: "ja",
         outputAssPath: session.transcribedAssPath,
-        useVad,
-        vadConfig: useVad
-          ? {
-              threshold: vadConfig.threshold ?? DEFAULT_VAD_CONFIG.threshold,
-              minSpeechDurationMs:
-                vadConfig.minSpeechDurationMs ?? DEFAULT_VAD_CONFIG.minSpeechDurationMs,
-              minSilenceDurationMs:
-                vadConfig.minSilenceDurationMs ?? DEFAULT_VAD_CONFIG.minSilenceDurationMs,
-              speechPadMs: vadConfig.speechPadMs ?? DEFAULT_VAD_CONFIG.speechPadMs,
-              maxSegmentDurationMs:
-                vadConfig.maxSegmentDurationMs ?? DEFAULT_VAD_CONFIG.maxSegmentDurationMs,
-            }
-          : null,
+        useVad: false,
+        vadConfig: null,
       });
       if (
         !mountedRef.current ||
@@ -531,10 +444,12 @@ export function TranscribeView() {
   };
 
   const handleTranscribe = async () => {
-    if (engineSetupRequired) {
-      setAsrError(
-        `${ASR_ENGINE_NOT_INSTALLED_LABEL}。${ASR_ENGINE_NOT_INSTALLED_HINT}`,
-      );
+    if (availabilityPending) {
+      setAsrError("正在检测 Native ASR 可用性，请稍后重试。");
+      return;
+    }
+    if (!availability.routeAvailable) {
+      setAsrError(availability.unavailableReason || "当前转录路线不可用。");
       return;
     }
     if (modelDownloading || transcribing || checkingModel) return;
@@ -553,9 +468,7 @@ export function TranscribeView() {
         return;
       }
       if (gate === "unavailable") {
-        setAsrError(
-          "当前引擎不可用，无法检测或下载模型。请先在设置中配置引擎依赖。",
-        );
+        setAsrError(availability.unavailableReason || "当前模型路线不可用。");
         return;
       }
       if (gate === "needs_download") {
@@ -689,7 +602,7 @@ export function TranscribeView() {
               value={engine}
               onChange={handleEngineChange}
               disabled={settingsLocked}
-              options={ASR_ENGINE_OPTIONS}
+              options={availability.engineOptions}
             />
           </Labeled>
           <Labeled label="模型">
@@ -697,194 +610,46 @@ export function TranscribeView() {
               value={model}
               onChange={setModel}
               disabled={settingsLocked}
-              options={asrModelOptions(engine)}
+              options={availability.modelOptions}
             />
-            {engine === "kotoba-faster-whisper" && (
-              <p className="mt-1 text-xs text-text-muted">
-                {KOTOBA_FASTER_WHISPER_DESCRIPTION}
-              </p>
-            )}
-            {engine === "parakeet" && (
-              <p className="mt-1 text-xs text-text-muted">
-                Parakeet 日语模型优先使用 char timestamps，并会重新按日语标点与长度切分字幕。
-              </p>
-            )}
-            {engine === "qwen3-asr" && (
-              <p className="mt-1 text-xs text-text-muted">
-                Qwen3-ASR 自带 ForcedAligner 产出字级时间戳，文本质量与时间轴精度优于 Parakeet；长音频自动分块转录。
-              </p>
-            )}
-            {engine === "reazonspeech-nemo" && (
-              <p className="mt-1 text-xs text-text-muted">
-                {REAZONSPEECH_NEMO_DESCRIPTION}。不使用 VAD；短音频整段推理，取消在当前块推理完成后生效。
-              </p>
-            )}
           </Labeled>
           <Labeled label="设备">
             <Select
               value={device}
               onChange={setDevice}
               disabled={settingsLocked}
-              options={ASR_DEVICES}
+              options={availability.deviceOptions}
             />
           </Labeled>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          <span className="text-text-muted">引擎状态：</span>
-          {engineMsg && (
-            <span
-              className={
-                engineSetupRequired ? "text-warning" : "text-text-muted"
-              }
-            >
-              {engineMsg}
-            </span>
-          )}
-          {engineSetupRequired && !transcribing && (
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => openSettings("transcription")}
-              className="rounded-md border border-warning/50 px-2.5 py-1 text-xs font-medium text-warning hover:bg-warning/20"
-            >
-              前往设置
-            </Button>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+          <span className={availability.routeAvailable ? "text-success" : "text-warning"}>
+            {availabilityPending
+              ? "正在检测 Native ASR 可用性…"
+              : availability.routeAvailable
+                ? "Native ASR 路线可用"
+                : availability.unavailableReason || "当前转录路线不可用"}
+          </span>
           <Button
             variant="outline"
             type="button"
-            onClick={detectEngines}
-            disabled={settingsLocked}
-            className="rounded-md px-2.5 py-1 text-xs text-text disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => void availability.refresh()}
+            disabled={settingsLocked || availability.loading}
+            className="rounded-md px-2.5 py-1 text-xs"
           >
-            检测引擎状态
+            重新检测可用性
           </Button>
         </div>
 
-        {engine !== "reazonspeech-nemo" && (
-        <div className="rounded-lg border border-border bg-surface px-4 py-3">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={useVad}
-              disabled={settingsLocked}
-              onChange={(e) => setUseVad(e.target.checked)}
-              className="h-4 w-4 accent-accent"
-            />
-            <span className="text-sm text-text">启用 VAD 语音检测预处理</span>
-          </label>
-
-          {useVad && (
-            <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
-              <Labeled label="语音阈值 (0.0–1.0)">
-                <input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  disabled={settingsLocked}
-                  value={vadConfig.threshold ?? DEFAULT_VAD_CONFIG.threshold}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value);
-                    setVadConfig({
-                      ...vadConfig,
-                      threshold: Number.isNaN(v) ? undefined : v,
-                    });
-                  }}
-                  className={VAD_INPUT_CLASS}
-                />
-                <p className="mt-1 text-xs text-text-muted">
-                  默认 0.5。提高减少误检，降低提升灵敏度。
-                </p>
-              </Labeled>
-
-              <Labeled label="最小语音段长度 (ms)">
-                <input
-                  type="number"
-                  min={0}
-                  max={2000}
-                  step={100}
-                  disabled={settingsLocked}
-                  value={
-                    vadConfig.minSpeechDurationMs ??
-                    DEFAULT_VAD_CONFIG.minSpeechDurationMs
-                  }
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    setVadConfig({
-                      ...vadConfig,
-                      minSpeechDurationMs: Number.isNaN(v) ? undefined : v,
-                    });
-                  }}
-                  className={VAD_INPUT_CLASS}
-                />
-                <p className="mt-1 text-xs text-text-muted">
-                  过滤短于此时长的语音片段，避免噪声干扰。
-                </p>
-              </Labeled>
-
-              <Labeled label="最小静音间隔 (ms)">
-                <input
-                  type="number"
-                  min={100}
-                  max={3000}
-                  step={100}
-                  disabled={settingsLocked}
-                  value={
-                    vadConfig.minSilenceDurationMs ??
-                    DEFAULT_VAD_CONFIG.minSilenceDurationMs
-                  }
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    setVadConfig({
-                      ...vadConfig,
-                      minSilenceDurationMs: Number.isNaN(v) ? undefined : v,
-                    });
-                  }}
-                  className={VAD_INPUT_CLASS}
-                />
-                <p className="mt-1 text-xs text-text-muted">
-                  语音段之间需多长静音才分割。降低会产生更多更短的语音段。
-                </p>
-              </Labeled>
-
-              {(engine === "parakeet" || engine === "qwen3-asr") && (
-                <Labeled label="最大语音段长度 (ms)">
-                  <input
-                    type="number"
-                    min={15000}
-                    max={35000}
-                    step={1000}
-                    disabled={settingsLocked}
-                    value={
-                      vadConfig.maxSegmentDurationMs ??
-                      DEFAULT_VAD_CONFIG.maxSegmentDurationMs
-                    }
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      setVadConfig({
-                        ...vadConfig,
-                        maxSegmentDurationMs: Number.isNaN(v) ? undefined : v,
-                      });
-                    }}
-                    className={VAD_INPUT_CLASS}
-                  />
-                  <p className="mt-1 text-xs text-text-muted">
-                    {engine === "parakeet" ? "Parakeet" : "Qwen3-ASR"} 专用：超过此长度的语音段会被切分。默认 25 秒。
-                  </p>
-                </Labeled>
-              )}
-            </div>
-          )}
-        </div>
-        )}
-
         <ModelManager
+          key={`${engine}:${model}`}
           ref={modelManagerRef}
           engine={engine}
           model={model}
-          auto={false}
-          trigger={modelCheckTrigger}
+          status={availability.selectedModelStatus}
+          checking={availability.modelLoading}
+          checkError={availability.selectedModelError}
+          refreshStatus={availability.refreshSelectedModel}
           onDownloadingChange={setModelDownloading}
         />
       </StepCard>
@@ -948,7 +713,8 @@ export function TranscribeView() {
               onClick={handleTranscribe}
               disabled={
                 !audioReady ||
-                engineSetupRequired ||
+                availabilityPending ||
+                !availability.routeAvailable ||
                 modelDownloading ||
                 checkingModel
               }
