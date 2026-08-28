@@ -1153,3 +1153,37 @@ Planned the post-MVP Faster-Whisper model expansion, completed T16 Native ASR ba
 ### Next Steps
 
 - None - task complete
+
+
+## Session 34: Migrate Native ASR Frontend UX
+
+**Date**: 2026-08-28
+**Task**: Migrate Native ASR Frontend UX
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Corrected the Native ASR task sequence, completed and verified T17 frontend migration to T16 availability metadata, removed Python setup UX, preserved transcription workflows, and left T18 release cutover as the next task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `10776fe` | (see git log) |
+| `5e787b9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
