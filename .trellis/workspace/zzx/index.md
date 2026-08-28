@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 32
-- **Last Active**: 2026-08-27
+- **Total Sessions**: 33
+- **Last Active**: 2026-08-28
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1121 | Active |
+| `journal-1.md` | ~1155 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 33 | 2026-08-28 | Migrate Native ASR Runtime and Settings Backend | `b9123ea`, `34398a4` | `dev-crisp-asr` |
 | 32 | 2026-08-27 | Complete Native ASR MVP model manager | `940fa29`, `46f2cce` | `dev-crisp-asr` |
 | 31 | 2026-08-27 | Complete native ASR CPU runtime package | `8009018`, `280858f` | `dev-crisp-asr` |
 | 30 | 2026-08-26 | Reprioritize Native ASR for release-first MVP | `1e32ba3` | `dev-crisp-asr` |

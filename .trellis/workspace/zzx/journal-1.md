@@ -1119,3 +1119,37 @@ Implemented the exact faster-whisper large-v3 Native ASR model manifest and Rust
 ### Next Steps
 
 - None - task complete
+
+
+## Session 33: Migrate Native ASR Runtime and Settings Backend
+
+**Date**: 2026-08-28
+**Task**: Migrate Native ASR Runtime and Settings Backend
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Planned the post-MVP Faster-Whisper model expansion, completed T16 Native ASR backend routing and runtime/settings migration, verified the implementation, updated executable specs, and preserved T17/T18 rollout boundaries.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b9123ea` | (see git log) |
+| `34398a4` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
