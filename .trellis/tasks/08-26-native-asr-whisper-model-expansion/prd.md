@@ -27,6 +27,20 @@
 - 用户 `.asr-benchmark` 仍是质量诊断真值，但 Python quality parity 不作为这些模型的支持门禁。
 - Ordinary Whisper 模型必须读取各自 exact CT2 model 的 `n_mels`，支持官方 80/128 Mel contract，并接受 `vocabulary.txt` 或 `vocabulary.json`；不得套用 Kotoba-only `preprocessor_config.json` readiness。
 
+## Confirmed Current Baseline
+
+- T12 model manager 与 T13 final CPU runtime 已完成并归档；当前 Native model manifest 仍只包含 `large-v3`。
+- T16 runtime/settings、T17 frontend migration 与 T18 release cutover 尚未创建或完成；当前生产命令仍由 Python sidecar 提供，Native worker host 仍是 debug/test seam。
+- Rust model manager 已把本任务的六个模型标记为 `postMvpUnavailable`，并已具备多 entry manifest、独立 readiness、断点续传、hash 校验和原子发布能力。
+- 前端 `ASR_ENGINE_MODELS` 已列出全部六个模型，因此本任务不需要新增第二套模型注册表。
+- 已发布 worker 源码按模型读取 `n_mels`，接受 80/128 Mel，并接受 `vocabulary.txt` 或 `vocabulary.json`；ordinary Whisper 不要求 `preprocessor_config.json`。因此默认假设无需修改或重建 worker，真实模型 smoke 才能推翻该假设。
+- Hugging Face 当前可冻结的仓库 revision 已确认：Systran 的 `tiny/base/small/medium/large-v2` 与 canonical `dropbox-dash/faster-whisper-large-v3-turbo`。实现时仍须重新获取每个必需文件的精确 size/SHA-256 并验证许可证来源，不能依赖 floating `main` 或重定向 alias。
+
+## Activation Gate
+
+- 本任务可以在 T18 前完成详细规划、模型 identity 调研和不改变生产行为的准备。
+- 生产实现与启用必须等待 T18 建立稳定的 Native large-v3 CPU baseline；若用户决定提前实施，必须先显式调整父任务顺序和本任务边界，不能在本任务中顺手吸收 T16/T17/T18。
+
 ## Requirements
 
 ### R1 - Add exact model delivery identities
@@ -64,6 +78,7 @@
 
 ## Acceptance Criteria
 
+- [ ] T18 已提供稳定的 Native large-v3 CPU production baseline，或用户已明确批准并记录新的父任务执行顺序。
 - [ ] 六个模型均具备精确、非 floating 的 model manifest identity、license 和 atomic readiness 测试。
 - [ ] 六个模型均能通过 released/revised CTranslate2 CPU worker 加载并完成短音频端到端转录。
 - [ ] `large-v2` 通过超过 10 分钟日语音频功能 smoke。
