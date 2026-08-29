@@ -1187,3 +1187,36 @@ Corrected the Native ASR task sequence, completed and verified T17 frontend migr
 ### Next Steps
 
 - None - task complete
+
+
+## Session 35: Complete Native ASR release cutover
+
+**Date**: 2026-08-29
+**Task**: Complete Native ASR release cutover
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Cut over production ASR to the verified Native large-v3 CPU route, removed packaged Python sidecar resources, fixed model detection/progress/cancellation UX, qualified installed and portable artifacts, and recorded final user acceptance.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4c10a38` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
