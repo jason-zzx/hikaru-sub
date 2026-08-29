@@ -1,0 +1,11 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace the production ASR route, release resources, frontend availability contract, and package evidence across Tauri, scripts, docs, and Native worker boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Keep the removed packaged sidecar tree absent and reuse the existing Native runtime/model/package authorities instead of adding duplicate registries or sync paths."}
+{"file":".trellis/spec/tauri/index.md","reason":"Apply the Tauri pre-development checklist and backend ownership rules."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Authoritative pre-cutover Native route, model, bundled runtime, cancellation, recovery, packaging, size, and license contracts that T18 must implement and then update."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Preserve installed/portable roots, bundled runtime status, exact model readiness, bounded deps storage, and cleanup containment."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Use repository Rust testing, logging, security, and release validation conventions."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Preserve T17 availability-driven selectors, no-Python UX, stable typed command bridge, and Native request gating while the backend default changes."}
+{"file":".trellis/spec/asr/index.md","reason":"Respect the legacy sidecar development-source boundary while removing it from production packaging."}
+{"file":".trellis/spec/asr/directory-structure.md","reason":"Preserve the post-cutover rule that repo-root sidecar source is not mirrored into Tauri release resources."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Preserve Native model/runtime evidence identity, output legality, privacy, and diagnostic-only quality policy."}
+{"file":".trellis/tasks/08-28-native-asr-release-cutover/research/release-cutover-audit.md","reason":"Use the audited current seams, frozen handoffs, local qualification inputs, documentation drift, risks, and minimal cutover strategy."}

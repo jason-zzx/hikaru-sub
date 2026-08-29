@@ -71,11 +71,11 @@ Correct: … -vn -af aresample=async=1:first_pts=0 …     → return covered_ms
 | Clip | `clip.rs` | Soft/hard cut; progress polling; optional replace working video is a **frontend** session decision |
 | Burn | `burn.rs` | Hard-sub export via FFmpeg/libass; burn page has no subtitle preview |
 
-## Native ASR Job Host (Development-only)
+## Native ASR Job Host (Production MVP)
 
 ### Scope / Trigger
 
-Use the Rust host in `asr_worker.rs` when a reviewed native worker must be exercised through the existing product job contract. Until production cutover is explicitly approved, Release/default routing and model list/status/download remain on the Python sidecar; native routing is available only through test construction or debug-only `HIKARU_ASR_FAKE_WORKER` injection.
+Use the Rust host in `asr_worker.rs` for the production Native ASR route and for reviewed worker compatibility tests through the existing product job contract. Release/default routing, model list/status/download, and inference use the bundled CPU worker with the exact managed large-v3 model. `HIKARU_ASR_FAKE_WORKER` remains debug/test-only host injection and never selects the product route.
 
 ### Signatures
 
@@ -109,7 +109,7 @@ struct ResolvedNativeLaunch {
 - Release the active slot before publishing `reaped`/returning cancel, so a caller cannot observe cleanup completion while a replacement start is still rejected.
 - Bound both `segment` append accumulation and `segmentsReplace` with canonical `maxReplacementSegments`. Embed `native-asr/protocol-v1-limits.json`; do not maintain a handwritten Rust limits copy.
 - Recovery/stderr artifact job IDs must use the host-safe generated character set, not merely the protocol's byte/control-character rules; otherwise separators can escape managed directories.
-- `HIKARU_ASR_FAKE_WORKER` and `HIKARU_ASR_FAKE_SCENARIO` are debug/test-only routing overrides. `#[cfg(not(debug_assertions))]` must leave Release on legacy routing.
+- `HIKARU_ASR_FAKE_WORKER` and `HIKARU_ASR_FAKE_SCENARIO` are debug/test-only host-injection inputs. `#[cfg(not(debug_assertions))]` ignores them, while Release/default remains Native and resolves only the packaged runtime.
 - Model-backed worker compatibility tests use required `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH` only inside `asr_worker.rs`'s test module. All three must be set together; optional `HIKARU_ASR_CT2_DEVICE` is exactly `cpu|cuda`, optional `HIKARU_ASR_CT2_ENGINE` is exactly `faster-whisper|kotoba-faster-whisper` (default ordinary), and optional `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH` selects a longer cancellation input. Kotoba tests require the exact immutable Hugging Face snapshot revision directory. CUDA mode additionally requires `HIKARU_ASR_CT2_CPU_WORKER` so the same suite can deterministically prove pre-ready `cuda_not_built` without damaging the machine CUDA environment. The test copies every exercised audio into a temporary managed workspace before `ResolvedNativeLaunch::resolve(...)`. Product/Release code never reads these keys.
 - Keep the generic CrispASR real-worker input contract (`HIKARU_ASR_CRISPASR_INPUTS`) available for T09/T10 Parakeet/Qwen/Reazon compatibility tests. A task-specific lifecycle matrix must use separate test-only keys rather than replacing or reinterpreting that decoder. Reazon R2 uses `HIKARU_ASR_R2_STEP6_MANIFEST`, `HIKARU_ASR_R2_STEP6_REQUIRED=1`, and `HIKARU_ASR_R2_STEP6_LANE`; the reviewed manifest bytes are source/lock-bound and required mode fails instead of skipping. Each decoder reads only its own keys, and bytes from the generic config cannot satisfy the R2 manifest contract or vice versa.
 
@@ -138,7 +138,7 @@ struct ResolvedNativeLaunch {
 ### Good/Base/Bad Cases
 
 - Good: valid fake-worker success → pending/running, bounded progress/segments, exit 0, recovery writes, then completed becomes visible and the active slot is free. A model-backed CUDA suite selects `cuda`, uses a CUDA-enabled worker for success/cancel, a CPU-only worker for deterministic `cuda_not_built`, and temporary managed audio copies throughout.
-- Base: no debug/test override or Release build → unchanged Python legacy route and model APIs; the required model-backed triple absent with no optional keys means the tests skip.
+- Base: no debug/test host override → the product resolves the verified packaged Native CPU worker; the required model-backed test triple absent with no optional keys means only those optional real-worker tests skip.
 - Bad: let product code read model-backed test env keys, partially configure the optional CUDA keys, sabotage the system CUDA environment to force failure, pass authoritative corpus audio directly from an unmanaged root, publish completed before fallback ASS persistence, release the slot after notifying reap, or return early from terminal cancel while a PID remains.
 
 ### Tests Required
@@ -164,11 +164,11 @@ Wrong:   Release/product code reads model-backed env keys, or a CUDA test breaks
 Correct: test module validates the required/optional env set → uses a CPU-only worker for deterministic cuda_not_built → copies audio to temporary workspace → exercises the unchanged host
 ```
 
-## Native ASR Backend Routing (T16 Pre-cutover)
+## Native ASR Backend Routing (Production MVP)
 
 ### 1. Scope / Trigger
 
-Apply this contract when changing the stable ASR engine/model commands, selecting legacy vs Native routing, resolving the packaged CPU worker, or turning a T12-ready model path into `ResolvedNativeLaunch`. T16 lands the complete Native backend branch; T18 still owns enabling it for Release/default.
+Apply this contract when changing the stable ASR engine/model commands, the production Native route, the packaged CPU worker resolution, or the conversion of a T12-ready model path into `ResolvedNativeLaunch`.
 
 ### 2. Signatures
 
@@ -194,7 +194,7 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 ### 3. Contracts
 
 - One immutable process-lifetime `AsrRoutePolicy` selects engine list, model status/download/progress, and inference as one family. Never let Native direct download feed legacy Python launch.
-- `AsrState::default` remains `Legacy` in Release until T18. A valid debug fake host may select `NativeMvp` only in debug/test; there is no persisted route setting or Release environment switch.
+- `AsrState::default` is always `NativeMvp` in debug and Release. A valid debug fake host changes only the injected host executable; there is no persisted route setting or Release environment switch.
 - Native MVP accepts exactly `faster-whisper/large-v3`, `auto|cpu`, Japanese source, and no VAD. It resolves the T13 worker from `resource_dir()/native-asr/windows-x64/cpu` and passes only T12's exact hash-verified model path to `ResolvedNativeLaunch`.
 - Native preflight/runtime/model failures return directly. They never call `ensure_base_url` or silently fall back to Python.
 - Model status keeps compatibility booleans and adds `disposition`, `backend`, `revision`, `origin`, and `reason`. Download progress keeps current polling fields and maps T12 `sourceEndpoint` to compatibility field `hfEndpoint`.
@@ -204,7 +204,7 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 
 | Condition | Result |
 |---|---|
-| Release/default before T18 | Entire command family stays legacy |
+| Release/default | Entire command family uses Native MVP |
 | Native large-v3 ready + CPU/auto | Resolve T13 worker + exact T12 path; start existing host |
 | Native model missing | Controlled download-required error; release unactivated slot |
 | Post-MVP/unknown model or engine | Explicit unavailable/unsupported result; no fallback |
@@ -215,7 +215,7 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 ### 5. Good / Base / Bad Cases
 
 - Good: `NativeMvp` + exact ready large-v3 + CPU -> one host job with unchanged progress/cancel/recovery behavior.
-- Base: normal Release build before T18 -> unchanged Python legacy route, while Native code remains testable.
+- Base: normal Release build -> packaged Native large-v3 CPU route with no Python dependency.
 - Bad: model commands use T12 but `start_asr` still enters Python, or a Native preflight error falls through to `ensure_base_url`.
 
 ### 6. Tests Required
@@ -237,11 +237,11 @@ Wrong:   accept model name/path from settings and build a worker request
 Correct: T12 exact readiness -> resolved path -> ResolvedNativeLaunch
 ```
 
-## Bundled Native ASR CPU Runtime (Pre-cutover)
+## Bundled Native ASR CPU Runtime
 
 ### Scope / Trigger
 
-Apply this contract whenever changing the Windows x64 bundled Native ASR worker, its binary dependencies, runtime lock/manifest, release resource preparation, NSIS/portable staging, or package evidence. The bundled runtime is available for qualification, but Release/default inference remains on the Python sidecar until the explicit cutover task.
+Apply this contract whenever changing the Windows x64 bundled Native ASR worker, its binary dependencies, runtime lock/manifest, release resource preparation, NSIS/portable staging, or package evidence. This runtime is the Release/default inference dependency.
 
 ### Signatures
 
@@ -276,7 +276,7 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 - Runtime verification is closed-world: archive root/path safety, outer hash, manifest/checksum/file closure, source/toolchain/config equality, imports, license inventory, forbidden content, and ASCII/UTF-16 private build paths must all pass before extraction.
 - Resource preparation verifies the ZIP, extracts to a temporary sibling, verifies the tree again, then atomically replaces `src-tauri/resources/native-asr/`. NSIS and portable staging consume that same generated tree.
 - If any payload byte, manifest field, or target graph changes, rebuild two independent roots to a byte-identical complete ZIP, rerun model-backed installed/portable smoke against the final worker SHA, rebuild NSIS/portable packages, and refresh the handoff. Evidence for an older worker is invalid even if source code is unchanged.
-- The package includes no model weights, Python runtime, ORT/Silero VAD, CrispASR, CUDA/Vulkan runtime, PDB, or development/test executable. The legacy `asr-service` resource and production route remain until cutover.
+- The package includes no model weights, Python sidecar/runtime/venv/packages, ORT/Silero VAD, CrispASR, CUDA/Vulkan runtime, PDB, or development/test executable. Resource preparation deletes stale `src-tauri/resources/asr-service` before bundling.
 - Bundled VC145 DLLs come unmodified from VS18 `VC/Redist`, are excluded from Hikaru Sub's Apache-2.0 project license, and are governed by the official **Microsoft Visual C++ V14 Redistributable and Runtime 2026** terms. Package the unchanged official DOCX locally, lock its immutable URL/size/SHA-256, record `https://aka.ms/vs/18/redistribution`, and preserve Microsoft's `BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS` statement; do not substitute the VS2022 terms or invent a custom EULA.
 
 ### Validation & Error Matrix
@@ -297,7 +297,7 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 ### Good/Base/Bad Cases
 
 - Good: two independent clean roots produce the same ZIP; shared verifier accepts it; installed-like and portable-like final bytes pass short and `>10` minute large-v3 smoke; packages embed that manifest identity.
-- Base: normal frontend/Tauri development keeps using Python legacy; the bundled resource is inert unless an explicit debug/test native launch exercises it.
+- Base: normal frontend/Tauri development and Release use the same packaged Native resource identity; debug fake-worker injection may replace only the host executable in tests.
 - Bad: update the worker/manifest, reuse old smoke or package hashes, or let release packaging rebuild/download a different runtime. The handoff then describes bytes users will not receive.
 
 ### Tests Required
@@ -321,11 +321,11 @@ Wrong:   release:local runs CMake or consumes a machine-local dependency tree
 Correct: release:local verifies/extracts the tracked final ZIP; only the dedicated build command compiles
 ```
 
-## Native ASR Model Delivery (Pre-cutover)
+## Native ASR Model Delivery
 
 ### Scope / Trigger
 
-Apply this contract when changing the bundled Native ASR model manifest, exact readiness, legacy Hugging Face reuse, direct CT2 installs, resumable download jobs, or the future T16 command wiring. T12 provides an internal Rust seam only; production/default model commands remain on the Python sidecar until the explicit backend/frontend cutover.
+Apply this contract when changing the bundled Native ASR model manifest, exact readiness, legacy Hugging Face reuse, direct CT2 installs, resumable download jobs, or stable Tauri command wiring. Production/default model commands use this manager.
 
 ### Signatures
 
@@ -354,12 +354,13 @@ src-tauri/resources/native-asr-models.json
 - The bundled manifest is the sole model identity authority. Reject unsupported schemas, duplicate logical/model identities, unsafe segments, malformed hashes, missing roles, Windows reserved/trailing-dot aliases, and ASCII case-colliding identities/paths before network or filesystem mutation.
 - Ordinary faster-whisper large-v3 requires exactly `config.json`, `model.bin`, `tokenizer.json`, and `vocabulary.json`; do not extend Kotoba's `preprocessor_config.json` requirement to ordinary Whisper.
 - Readiness order is exact direct install, then exact immutable HF snapshot. Every required file must match size and SHA-256; readiness hashing and blocking directory verification run through `spawn_blocking` from async callers.
+- The process-owned manager caches only successful exact ready resolutions for the current process. Repeated status and start preflight reuse that immutable identity; missing/corrupt results are not cached, and a verified managed download may seed the cache after publication. A new process always performs fresh exact verification.
 - Direct model paths and required files reject symlinks/reparse points. Legacy HF snapshot/file canonical targets must remain below the canonical managed HF root; legacy snapshots are read-only and never copied, mutated, or deleted by the model manager.
 - Official/China URLs derive only from the validated repository/revision/file row plus the existing runtime source profile. Do not accept custom model URLs or log headers/response bodies.
 - `.part` resume appends only for matching `206 Content-Range`; ignored ranges (`200`), incompatible `206`, `416`, oversized partials, and known-corrupt complete partials restart safely. Useful network-interrupted partials remain resumable.
 - Verify every file and the complete staging tree before renaming into the immutable final revision directory. Preserve a valid final install; move an invalid final only after replacement staging validates, and restore it when publication fails.
 - Same logical-model requests share one active job. Terminal snapshots remain pollable for the process lifetime. Do not hold manager locks across network waits or multi-gigabyte hashing.
-- Before T16/T17, `check_asr_model`, `download_asr_model`, and `get_model_download_progress` continue proxying the Python sidecar; do not expose a mixed native-download/Python-launch product state.
+- `check_asr_model`, `download_asr_model`, and `get_model_download_progress` use the Native manager under the same process-lifetime route policy as inference; never expose a mixed Native-download/Python-launch product state.
 
 ### Validation & Error Matrix
 
@@ -380,7 +381,7 @@ src-tauri/resources/native-asr-models.json
 ### Good / Base / Bad Cases
 
 - Good: exact manifest row → resumable verified staging → immutable direct install → exact resolved path accepted by the packaged CPU worker.
-- Base: exact legacy HF snapshot exists → full validation → reuse in place; current product commands and Python-default route remain unchanged.
+- Base: exact legacy HF snapshot exists → full validation → reuse in place through the production Native route; no copy or Python fallback occurs.
 - Bad: accept `main`, model-name-only directories, same-name framework caches, Windows path aliases, escaped symlinks, or stream directly into the final model directory.
 
 ### Tests Required
@@ -388,7 +389,7 @@ src-tauri/resources/native-asr-models.json
 - Manifest: exact frozen four-file closure/license/source plus schema, duplicate, unsafe segment, Windows alias, case-collision, hash, and missing-role rejection.
 - Readiness: direct/legacy preference, missing/wrong-size/wrong-hash/wrong-revision/framework-cache failure, direct link rejection, and contained/escaped legacy link behavior.
 - Download: fresh, matching resume, ignored range, incompatible range, `416`, oversized partial, interruption preservation, bad hash, complete-stage publication, repair rollback, and same-model coalescing.
-- Gates: focused `asr_models` tests, full Cargo tests, `pnpm build`, task validation, implementation `rustfmt`, and `git diff --check`.
+- Gates: focused `asr_models` tests including ready-cache reuse/missing non-cache/download seeding, full Cargo tests, `pnpm build`, task validation, implementation `rustfmt`, and `git diff --check`.
 - Real handoff: exact cached large-v3 path + packaged CPU worker + short audio; long installed/portable release smoke remains owned by T18.
 
 ### Wrong vs Correct
@@ -404,17 +405,17 @@ Wrong:   T12 rewires public model commands while start_asr still defaults to Pyt
 Correct: T12 lands the internal seam -> T16/T17 wire contracts -> T18 cuts over production
 ```
 
-## ASR Sidecar Process
+## Legacy ASR Sidecar Source
 
-- Tauri starts/manages the Python FastAPI sidecar (`asr.rs`) and continues to proxy production/default inference plus model download until an explicit native cutover task changes that boundary.
-- ASR setup (venv/deps) is separate (`asr_setup.rs`).
-- App exit calls idempotent `AsrState.shutdown()` so native workers and the legacy sidecar share cleanup policy; `lib.rs` must not reach into process fields.
-- Diagnostics: host may set `HIKARU_ASR_DEBUG_LOG` → sidecar writes JSONL (often under managed `deps/asr-service/asr-debug.log`). Prefer `model_download_*` events when model download fails.
-- Rust owns orchestration only. Python or the independent native worker owns inference; do not run model inference inside the Tauri process.
+- Production/default inference and model management use the independent Native worker; Tauri does not start or fall back to the Python FastAPI sidecar.
+- Legacy sidecar/setup source in `asr.rs` and `asr_setup.rs` may remain for one stable release cycle as rollback/diagnostic evidence, but no frontend caller or packaged `asr-service` resource exposes it.
+- App exit calls idempotent `AsrState.shutdown()` so active Native workers and any explicitly constructed legacy test process share cleanup policy; `lib.rs` must not reach into process fields.
+- Legacy `HIKARU_ASR_DEBUG_LOG`/`deps/asr-service/asr-debug.log` guidance applies only to intentional sidecar development or rollback testing, not production model downloads.
+- Rust owns orchestration only. The independent Native worker owns production inference; do not run model inference inside the Tauri process.
 
 ## ASS Files on Disk
 
-`ass.rs` loads/saves text. Semantic parse/serialize is frontend `src/lib/ass/`. Transcription may write ASS via the sidecar `ass_writer` when `outputAssPath` is set; editor still owns bilingual merge modes on save.
+`ass.rs` loads/saves text. Semantic parse/serialize is frontend `src/lib/ass/`. The Native host may persist a minimal fallback ASS after non-empty completion; the frontend remains authoritative for the final transcription ASS, and the legacy sidecar writer applies only to intentional rollback testing. Editor still owns bilingual merge modes on save.
 
 ## Anti-Patterns
 

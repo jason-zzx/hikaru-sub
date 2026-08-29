@@ -28,7 +28,7 @@
 - `.trellis/tasks/archive/2026-08/08-18-native-asr-python-legacy-baseline/` 和后续质量重评保留为历史质量诊断 authority，不再决定 Native MVP 是否可发布。
 - Candidate A 的历史质量 disposition 仍是 `stop-revise`，不得改写。按本轮 release-first 政策，它被前瞻性标记为 `mvp-eligible-with-known-quality-limitations`。
 - T06R/T06D 的 non-qualified/invalid-evidence 结论保持不变；本路线不再开启新的 ordinary Whisper parity、discovery 或 candidate-acquisition 循环。
-- 当前产品默认仍为 Python legacy，直到 T18 Native MVP 集成门禁通过。
+- T18 已通过集成门禁；当前产品默认使用 Native `faster-whisper / large-v3 / CPU`，Python legacy 仅保留为未打包的开发/回退源码。
 
 ## Requirements
 
@@ -145,7 +145,7 @@
 
 - Gate 0/1 foundation 已关闭：T01～T10 系列已提供 ground truth、backend feasibility、worker protocol、Rust host、Candidate A 和后续模型实验历史。
 - T06R 已 non-qualified 收口，T06D 已以 `invalid-evidence` 关闭；两者不再触发新的 Whisper 质量任务。
-- T12 model manager、T13 final CPU package 与 T16 runtime/settings backend 已完成并归档；当前唯一下一步是创建并完成 T17 frontend migration，随后执行 T18 release cutover。
-- `08-26-native-asr-whisper-model-expansion` 已创建但保持阻塞；其 P1 表示 T18 后的第一优先级，不表示可在 T17/T18 前激活。
+- T12 model manager、T13 final CPU package、T16 runtime/settings backend 与 T17 frontend migration 已完成并归档；T18 release cutover 已由用户验收，完成其归档后进入 post-MVP 扩展。
+- `08-26-native-asr-whisper-model-expansion` 已创建并保持 planning；它是 T18 归档后的下一可执行 child，不得在 T18 active task 归档前激活。
 - T08R 与 T11 降为 post-MVP P3；Parakeet/Reazon 和 T14/T15 排在 Whisper expansion 之后。
-- Production/default 在 T18 通过前仍为 Python legacy。
+- Production/default 已切换为 Native `faster-whisper / large-v3 / CPU`，且发布包不依赖 Python sidecar。

@@ -34,7 +34,6 @@ export function createPortableStaging({
   const exePath = join(releaseDir, "hikaru-sub.exe");
   const resourceDir = join(root, "src-tauri", "resources");
   const runtimeSources = join(resourceDir, "runtime-dependency-sources.json");
-  const asrResource = join(resourceDir, "asr-service");
   const nativeAsrResource = join(resourceDir, "native-asr");
 
   if (!existsSync(exePath)) {
@@ -42,9 +41,6 @@ export function createPortableStaging({
   }
   if (!existsSync(runtimeSources)) {
     throw new Error(`missing runtime source manifest: ${runtimeSources}`);
-  }
-  if (!existsSync(asrResource)) {
-    throw new Error(`missing ASR resource directory: ${asrResource}`);
   }
   if (!existsSync(nativeAsrResource)) {
     throw new Error(`missing Native ASR resource directory: ${nativeAsrResource}`);
@@ -67,7 +63,6 @@ export function createPortableStaging({
   for (const [source, entry] of [
     [exePath, "hikaru-sub.exe"],
     [runtimeSources, "runtime-dependency-sources.json"],
-    [asrResource, "asr-service"],
     [nativeAsrResource, "native-asr"],
   ]) {
     cpSync(source, join(stageDir, entry), { recursive: true });

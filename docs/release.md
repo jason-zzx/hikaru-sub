@@ -18,9 +18,9 @@ The desktop package contains:
 
 - the `hikaru-sub` application;
 - `runtime-dependency-sources.json`;
-- a clean ASR service template.
+- the verified `native-asr/windows-x64/cpu` runtime, manifest, checksums, and license inventory.
 
-It does not bundle FFmpeg, Python 3.11, an ASR virtual environment, Python engine dependencies, or model weights. Those dependencies are reused from the system or prepared after installation with user confirmation. See [Runtime Dependencies](./runtime-dependencies.md).
+It does not bundle FFmpeg, a Python sidecar or interpreter, a virtual environment, Python packages, or model weights. FFmpeg and the exact Faster-Whisper large-v3 model remain managed on-demand dependencies. See [Runtime Dependencies](./runtime-dependencies.md).
 
 The portable staging directory also contains an empty `.portable` marker. Keep the marker beside `hikaru-sub.exe`; removing it changes where Hikaru Sub stores application data and caches.
 
@@ -33,7 +33,7 @@ pnpm install
 pnpm release:local
 ```
 
-`release:local` prepares the clean ASR resource, runs the Tauri build, and creates the portable archive. It does not download FFmpeg, Python, ASR dependencies, or model weights.
+`release:local` removes any stale packaged Python sidecar resource, verifies and extracts the tracked Native ASR runtime, runs the Tauri build, and creates the portable archive. It does not download FFmpeg, Python, or model weights.
 
 Expected artifacts:
 
@@ -95,17 +95,14 @@ A tag containing `-` is marked as a prerelease. Updater metadata and signatures 
 After `pnpm release:local`, validate the build on a Windows release machine:
 
 1. Confirm that `bundle/nsis/` contains the Hikaru Sub setup and `bundle/portable/` contains the portable zip. A clean bundle directory must not contain a newly generated MSI.
-2. Extract the portable zip and confirm that `.portable` is present. Starting `hikaru-sub.exe` must create `data/`, `cache/`, and `webview/` beside the executable, and later managed downloads must use the sibling `deps/` directory. If the directory is not writable, startup must show an error and exit without partially entering portable mode.
-3. Run the NSIS setup and verify that the installation directory can be changed. When unchanged, the installer should use `%LOCALAPPDATA%\Programs\hikaru-sub`; the installed app must start from the Start menu or installation directory.
-4. Initial startup and navigation to Download, Import, Transcription, and Burn must not stall. Visiting those pages may reuse cached FFmpeg status but must not automatically download FFmpeg.
-5. Visiting Transcription must not start the ASR sidecar. The sidecar starts only when the user checks engine status or begins transcription.
-6. Visiting Burn must not probe source bitrate or encoders. Probing begins only after the user requests source parameter detection.
-7. ASR checks, ASR setup, and FFmpeg or ffprobe operations must not flash a terminal window.
-8. Without system FFmpeg, an FFmpeg-dependent action must show a dependency confirmation containing the dependency name, expected size, managed destination, and selected source. Cancelling must stop the original action; confirming must prepare FFmpeg and resume it.
-9. Without Python 3.11, configuring an ASR engine must first request confirmation, then prepare managed Python under `deps/python311/current/` before creating the ASR virtual environment.
-10. Runtime Dependency settings must support Official and China sources. Entering Settings must only probe status; storage size appears only after Calculate Storage Usage. Cleanup must appear only for a measured, non-empty managed target and must never delete custom external paths or a source-checkout `.venv`.
-11. An installed build previously used after a development build must not keep pointing to the source checkout's `asr-service/.venv`. Managed setup must select `deps/asr-service/.venv`.
-12. After transcription with managed FFmpeg, a present `deps/ffmpeg/current/ffprobe.exe` must be used to determine PlayRes instead of falling back to 1920×1080.
-13. Model download status must show the effective source and diagnostic log. With the China source, diagnostics should report `HF_ENDPOINT=https://hf-mirror.com` and the managed Hugging Face cache under `deps/models/huggingface`.
-14. Selecting `kotoba-faster-whisper` must verify Kotoba itself. An old sidecar or insufficient `faster-whisper` version must remain unavailable until setup updates the shared dependencies and service template.
-15. After editing subtitles, closing or switching the Working Video must warn about unsaved changes; cancelling must preserve the document, while reopening the same video after an unexpected exit must offer recovery and an explicit discard must prevent the prompt from recurring.
+2. Audit both artifacts: they must contain the same locked Native CPU runtime identity and must not contain `asr-service`, Python/venv/package trees, model weights, PDBs, GPU/VAD/CrispASR runtimes, caches, or staged `deps/` data. Setup must be `<= 80 MiB`, portable zip `<= 90 MiB`, unpacked Native runtime `<= 250 MiB`, and bundled model count must be zero.
+3. Extract the portable zip and confirm that `.portable` is present. Starting `hikaru-sub.exe` must create `data/`, `cache/`, and `webview/` beside the executable, and later managed downloads must use the sibling `deps/` directory. If the directory is not writable, startup must show an error and exit without partially entering portable mode.
+4. Run the NSIS setup and verify that the installation directory can be changed. When unchanged, the installer should use `%LOCALAPPDATA%\Programs\hikaru-sub`; the installed app must start from the Start menu or installation directory.
+5. Initial startup and navigation to Download, Import, Transcription, and Burn must not stall. Visiting those pages may reuse cached dependency status but must not automatically download FFmpeg or a model.
+6. Runtime Dependencies must report the Native CPU runtime as built-in/status-only. Entering Settings must only probe status; storage size appears only after Calculate Storage Usage. Cleanup must appear only for a measured, non-empty managed target and must never delete the bundled runtime, custom external paths, projects, subtitles, or protected current-video cache.
+7. With the exact cached `Systran/faster-whisper-large-v3` revision, run short and >10-minute Japanese transcription in installed and portable layouts without Python configured. Progress, completion, output creation, cancellation, crash recovery, restart, and the active-job gate must work without starting a Python/sidecar process or accessing the model network.
+8. A missing large-v3 model must use the managed confirmation/download/progress flow. Wrong revision, missing file, size/hash mismatch, partial install, or escaped path must not report ready. Other models, engines, CUDA, and VAD must remain visible but unavailable and must never fall back to Python.
+9. Native ASR and FFmpeg/ffprobe operations must not flash a terminal window. Visiting Burn must not probe source bitrate or encoders until the user requests source parameter detection.
+10. Without system FFmpeg, an FFmpeg-dependent action must show a dependency confirmation containing the dependency name, expected size, managed destination, and selected source. Cancelling must stop the original action; confirming must prepare FFmpeg and resume it.
+11. After transcription with managed FFmpeg, a present `deps/ffmpeg/current/ffprobe.exe` must be used to determine PlayRes instead of falling back to 1920×1080.
+12. After editing subtitles, closing or switching the Working Video must warn about unsaved changes; cancelling must preserve the document, while reopening the same video after an unexpected exit must offer recovery and an explicit discard must prevent the prompt from recurring.

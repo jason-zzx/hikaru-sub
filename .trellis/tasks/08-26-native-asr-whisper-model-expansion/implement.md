@@ -1,6 +1,6 @@
 # Native Faster-Whisper model expansion implementation plan
 
-> Status: planning and intentionally parked. T16 is complete; the enforced next tasks are T17 and then T18. Do not activate this task until T18 is completed and archived unless the user explicitly changes the parent roadmap. Do not commit, push, merge, rebase, reset, or archive without separate user authorization.
+> Status: planning and temporarily parked. T18 is accepted; do not activate this task until the T18 active task is archived. It is the next executable child immediately afterward. Do not commit, push, merge, rebase, reset, or archive without separate user authorization.
 
 ## Step 0 - Confirm the production baseline
 
@@ -8,7 +8,7 @@
 - Read their final PRD/design/implementation evidence and inspect the current command/status/type contracts.
 - Confirm product/default `start_asr`, model check/download/progress, and availability metadata are Native rather than Python-sidecar backed.
 - Confirm the released worker/runtime identity and the exact `large-v3` regression commands.
-- If T18 is not complete, stop after planning/research. Do not implement a mixed native-download/Python-launch state.
+- If the accepted T18 task has not yet been archived, stop after planning/research. Do not overlap its finish-work or create a mixed release baseline.
 - If the user explicitly reprioritizes, update the parent roadmap and this task design before code changes; do not silently absorb T16-T18.
 
 Rollback: none; this is an evidence gate.

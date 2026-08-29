@@ -23,9 +23,9 @@
 | `engines/vad.py` / `chunking.py` | VAD + chunking helpers |
 | `tests/` | `unittest` modules (`test_jobs.py`, engine/cache/VAD tests, …) |
 
-## Related Template
+## Release boundary
 
-`src-tauri/resources/asr-service/` — bundled clean template for releases. Keep behavioral changes intentional across both trees when shipping.
+`src-tauri/resources/asr-service/` is intentionally absent. The repo-root sidecar is development/historical rollback source only; release preparation deletes stale packaged copies and ships the independent Native runtime instead.
 
 ## Placement Rules
 

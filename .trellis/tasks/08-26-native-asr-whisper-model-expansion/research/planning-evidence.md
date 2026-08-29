@@ -1,13 +1,12 @@
 # Faster-Whisper model expansion planning evidence
 
-## Current dependency state
+## Dependency state
 
-- The parent roadmap fixes the executable sequence as `T17 frontend migration -> T18 Native MVP release -> Faster-Whisper model expansion`.
-- T12 model delivery, T13 CPU runtime packaging, and T16 runtime/settings backend are completed and archived.
-- T17 frontend migration is the current next task and has not been created; T18 must follow T17 and has not been created.
-- T16 established the shared Native backend route and dependency contract, while Release/default remains legacy for T18; T17 still owns visible Python setup removal and final model/device availability UX.
+- The parent roadmap sequence remains `T17 frontend migration -> T18 Native MVP release -> Faster-Whisper model expansion`.
+- T12, T13, T16, and T17 are completed and archived.
+- T18 is accepted and provides the production Native large-v3 CPU baseline; its active task is awaiting finish-work archival.
 
-Conclusion: this task remains intentionally parked. Its P1 priority applies only after T18 and must never be used to infer that it is executable before T17/T18.
+Conclusion: this task remains planning only until the T18 archive completes, then becomes the next executable child. The model-identity research below remains the non-authoritative planning input for that implementation.
 
 ## Existing seams to reuse
 
@@ -57,7 +56,7 @@ The implementation must refetch the pinned revision, compute/verify the exact SH
 
 ## Minimal implementation shape
 
-1. Wait for or explicitly replan around the T18 production baseline.
+1. Confirm the accepted T18 production baseline is archived and load its final evidence.
 2. Freeze six exact manifest rows and add regression tests for every tuple.
 3. Reuse the existing model manager; only generalize code where a real failing test proves large-v3-only behavior.
 4. Run each model through exact readiness, download, worker load, and short Japanese transcription.
@@ -70,4 +69,4 @@ The implementation must refetch the pinned revision, compute/verify the exact SH
 - Accidentally requiring `preprocessor_config.json` for ordinary Whisper because the turbo repository happens to contain it.
 - Rebuilding the final runtime before a real model test proves a worker incompatibility.
 - Shipping a manifest row before its functional smoke passes, which would expose a downloadable but nonfunctional route.
-- Starting implementation before T18 and creating a mixed native-download/Python-launch product state.
+- Starting implementation before T18 finish-work completes and overlapping an unstable archive/commit baseline.

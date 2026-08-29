@@ -1,33 +1,31 @@
 # Runtime Dependencies
 
-Hikaru Sub keeps release packages small by preparing large media and ASR dependencies only when they are needed. This document describes dependency ownership, lookup order, storage, setup, and cleanup.
+Hikaru Sub keeps release packages small by bundling only the fixed Native ASR CPU runtime and preparing large media tools and model weights when they are needed. This document describes dependency ownership, lookup order, storage, download, and cleanup.
 
 ## Packaging model
 
-Release artifacts include a clean ASR service template and a locked dependency-source manifest. They do not include:
+Release artifacts include:
+
+- the verified Native ASR Windows x64 CPU runtime, manifest, checksums, and licenses;
+- the locked runtime dependency source manifest;
+- no ASR model weights.
+
+They do not include:
 
 - FFmpeg or ffprobe;
-- Python 3.11;
-- the ASR virtual environment or Python packages;
+- a Python sidecar or interpreter;
+- an ASR virtual environment or Python packages;
 - ASR model weights.
 
-An operation that needs a missing managed dependency asks for confirmation before downloading it. Model weights are prepared separately from ASR engine dependencies.
+The bundled Native runtime is status-only: it is neither downloaded nor removed through Settings. FFmpeg and the exact Faster-Whisper large-v3 model are prepared separately after user confirmation when missing.
 
 ## Licenses and third-party components
 
-Hikaru Sub's own source code is licensed under Apache License 2.0. Runtime
-dependencies and model weights remain under their respective licenses; the
-application does not relicense them. The release package does not preinstall
-FFmpeg, Python, a Python environment, or model weights, but a managed download
-or a future bundled distribution must preserve the component's required
-license, notices, source materials, and attributions.
+Hikaru Sub's own source code is licensed under Apache License 2.0. Runtime dependencies and model weights remain under their respective licenses; the application does not relicense them.
 
-See [Third-Party Notices](../THIRD_PARTY_NOTICES.md) for the maintained list
-of major runtime components, model licenses, and the release-maintainer
-checklist. In particular, a managed FFmpeg build with GPL components such as
-`libx264` remains a separately licensed GPL component; record the exact build,
-license output, corresponding source, and build configuration before
-redistributing it.
+The Native runtime package includes the license inventory and required materials for its actual CTranslate2, oneDNN, pocketfft, tokenizer/Rust, nlohmann/json, and Microsoft Visual C++ runtime payload. The bundled Microsoft runtime files are excluded from Hikaru Sub's Apache-2.0 license and remain governed by Microsoft's included terms.
+
+FFmpeg and model weights are not bundled. Any managed download or future bundled distribution must preserve the component's required license, notices, source materials, and attributions. See [Third-Party Notices](../THIRD_PARTY_NOTICES.md).
 
 ## Resolution order
 
@@ -37,13 +35,12 @@ Hikaru Sub resolves FFmpeg in this order:
 2. the system `PATH`;
 3. managed FFmpeg under `deps/ffmpeg/current`.
 
-Python is restricted to Python 3.11 and is resolved in this order:
+The production ASR route does not resolve Python. It resolves:
 
-1. the path selected in Settings;
-2. a system Python 3.11 interpreter, including supported platform launchers;
-3. managed Python under `deps/python311/current`.
+1. the verified Native worker from the packaged `native-asr/windows-x64/cpu` resource;
+2. an exact ready Faster-Whisper large-v3 model from managed model roots.
 
-Custom and system dependencies are external: Hikaru Sub may use them, but storage cleanup must not delete them.
+The repo-root Python sidecar and its Python 3.11 setup helpers remain development/historical rollback source for one stable release cycle. They are not production runtime dependencies and are not included in release artifacts.
 
 ## Managed storage layout
 
@@ -52,17 +49,20 @@ Large managed dependencies live below the application installation or portable d
 ```text
 deps/
 ├── ffmpeg/current/
-├── python311/current/
-├── asr-service/.venv/
-├── models/huggingface/
+├── models/
+│   ├── ctranslate2/faster-whisper/large-v3/<revision>/
+│   └── huggingface/hub/models--Systran--faster-whisper-large-v3/snapshots/<revision>/
 └── downloads/
+    └── native-asr-models/faster-whisper/large-v3/<revision>/
 ```
 
-The ASR service directory also contains `asr-debug.log` when diagnostics are enabled. Temporary dependency archives belong in `deps/downloads/`.
+The direct CTranslate2 install is immutable after complete verification. An exact legacy Hugging Face snapshot may be reused in place only after every required file matches the bundled manifest. Wrong revisions, framework-only caches, partials, symlink/reparse escapes, and wrong size/hash files are not ready.
+
+Old `deps/python311` or `deps/asr-service` directories from a previous release are not production dependency targets. The Native cutover does not delete them automatically; rollback and user-data safety take precedence.
 
 ### Installed mode
 
-Installed builds use the operating system's application data locations for settings and `<LocalAppData>/com.hikaru.sub/cache` for working caches. Managed dependencies still live in the installation directory's `deps/` tree.
+Installed builds use the operating system's application data locations for settings and `<LocalAppData>/com.hikaru.sub/cache` for working caches. Managed FFmpeg, models, and downloads still live in the installation directory's `deps/` tree.
 
 ### Portable mode
 
@@ -72,7 +72,7 @@ Portable mode is enabled only when `.portable` exists beside `hikaru-sub.exe`. T
 data/       # settings and application data
 cache/      # working media caches
 webview/    # WebView2 user data
-deps/       # managed runtime dependencies
+deps/       # managed FFmpeg, models, and downloads
 ```
 
 The portable directory must be writable. If initialization fails, Hikaru Sub reports a fatal startup error and exits without locking the process into portable mode.
@@ -96,57 +96,40 @@ Cleanup may preserve cache entries associated with the current Working Video, in
 
 ## Download sources and integrity
 
-`src-tauri/resources/runtime-dependency-sources.json` defines the available source profiles and locks binary archives by SHA-256 and expected size.
+`src-tauri/resources/runtime-dependency-sources.json` defines Official and China source profiles. The production UI uses the selected profile for managed FFmpeg and exact Native model downloads:
 
 - **Official** is the default source.
-- **China** may provide mirrors for FFmpeg, Python, PyPI, PyTorch wheels, and Hugging Face.
+- **China** uses the configured FFmpeg mirror and `https://hf-mirror.com` for model files.
 
-Legacy `auto` or `custom` source settings migrate silently to Official. The China profile injects `HF_ENDPOINT=https://hf-mirror.com` into the ASR sidecar, while `HF_HOME` always points at the managed `deps/models/huggingface` cache.
+Legacy `auto` or `custom` source settings migrate silently to Official. Historical Python/PyPI source rows remain only as rollback/source metadata for the retained development code; production dependency probe, preparation, measurement, and UI do not offer Python or venv actions.
 
-`hf-mirror.com` may redirect traffic to the upstream Hugging Face service depending on the network exit. If a model download still fails, inspect the effective endpoint and `model_download_*` events in `asr-debug.log`, then try the Official source or a network route that can reach the selected endpoint.
+Native model URLs are derived only from the bundled model repository, immutable revision, required file row, and selected source profile. Every file downloads through bounded `.part`/staging paths and must match the exact expected size and SHA-256 before atomic publication. Custom model URLs are not accepted.
 
-## ASR environment setup
+## Native ASR runtime and model flow
 
-The in-app setup flow copies or refreshes the clean ASR service template, creates `deps/asr-service/.venv`, installs the selected dependency profile, and verifies the selected engine rather than only checking a shared package.
+The production ASR route is the bundled independent Native worker with exactly:
 
-| Profile | Engines provided | Notes |
-| --- | --- | --- |
-| `default` | faster-whisper and kotoba-faster-whisper | Uses `requirements.txt`; Kotoba requires `faster-whisper>=1.1.1` |
-| `parakeet-cpu` | Parakeet | Installs the CPU NeMo/PyTorch requirements |
-| `parakeet-cuda` | Parakeet | Requires a detected NVIDIA GPU |
-| `qwen3-cpu` | Qwen3-ASR | Installs the CPU Qwen/PyTorch requirements |
-| `qwen3-cuda` | Qwen3-ASR | Requires a detected NVIDIA GPU |
-| `reazonspeech-cpu` | ReazonSpeech NeMo | CPU torch + shared NeMo core (no torchaudio direct dep) |
-| `reazonspeech-cuda` | ReazonSpeech NeMo | CUDA torch + shared NeMo core |
+```text
+faster-whisper / large-v3 / CTranslate2 / auto|cpu / Japanese / no VAD
+```
 
-Both ReazonSpeech profiles install `requirements-reazonspeech.txt`; the profile selects the CPU or CUDA PyTorch wheel source.
+Settings reports the Native CPU runtime as built-in and unmanaged. Missing or corrupt runtime files indicate an application/package problem and do not trigger a runtime download or Python fallback.
 
-Model weights are checked and downloaded after engine setup. Kotoba's model cache must include `preprocessor_config.json`; that requirement does not apply to ordinary faster-whisper models.
+The large-v3 model is checked and downloaded separately. A missing exact model can be downloaded after confirmation with aggregate progress. Other Faster-Whisper models, Kotoba, Qwen3, Parakeet, ReazonSpeech, CUDA/Vulkan, and Native VAD remain unavailable until their independent follow-up tasks qualify them.
 
-For source-checkout development, the default setup command installs the shared faster-whisper and Kotoba dependencies:
+For development or historical sidecar diagnostics only:
 
 ```bash
 pnpm asr:setup
 ```
 
-Optional engines require an explicit profile:
-
-```bash
-./scripts/setup-asr.sh parakeet-cpu
-./scripts/setup-asr.sh parakeet-cuda
-./scripts/setup-asr.sh qwen3-cpu
-./scripts/setup-asr.sh qwen3-cuda
-./scripts/setup-asr.sh reazonspeech-cpu
-./scripts/setup-asr.sh reazonspeech-cuda
-```
-
-Use `./scripts/setup-asr.sh --recreate` when the development virtual environment must be rebuilt. See [ASR Service](../asr-service/README.md) for engine behavior and HTTP API details.
+Optional Python profiles and the sidecar HTTP API are documented in [ASR Service](../asr-service/README.md). They are not shipped or used by the production desktop route.
 
 ## Storage measurement and cleanup
 
 Opening Settings probes dependency availability, paths, sources, and versions without recursively measuring directories. Storage usage is calculated only after the user requests it.
 
-Cleanup is available only after measurement reports a non-zero managed target. It can remove managed FFmpeg, managed Python, the managed ASR virtual environment, managed models, temporary downloads, or owned application-cache directories. It must not remove custom external dependencies, source-checkout development environments, user videos, or visible subtitle documents.
+Cleanup is available only after measurement reports a non-zero managed target. It can remove managed FFmpeg, bounded managed model storage, temporary downloads, or owned application-cache directories. It must not remove the bundled Native runtime, old Python/sidecar directories automatically, custom external dependencies, user videos, projects, settings, or visible subtitle documents.
 
 ## Write access and elevation
 

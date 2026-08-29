@@ -1,72 +1,73 @@
 # Third-Party Notices
 
-This file describes the licensing boundary for Hikaru Sub and the major
-runtime components it may use. It does not change, replace, or sublicense
-any third-party license.
+This file describes the licensing boundary for Hikaru Sub and the major runtime components it may use. It does not change, replace, or sublicense any third-party license.
 
 ## Scope
 
-The `LICENSE` file applies only to Hikaru Sub's original source code and is
-Apache License 2.0. Third-party code, binaries, Python packages, and model
-weights remain subject to their own licenses and notices.
+The `LICENSE` file applies only to Hikaru Sub's original source code and is Apache License 2.0. Third-party code, binaries, Python packages, and model weights remain subject to their own licenses and notices.
 
-Release packages contain a clean ASR service template and the manifest of
-approved runtime download sources. They do **not** include FFmpeg, CPython,
-Python package environments, or model weights. These components are reused
-from the system or downloaded after the user confirms the operation. A future
-release that bundles, mirrors, or otherwise redistributes one of them must
-include every license text, notice, source-offer, attribution, and other
-material required by that component's license.
+Windows release packages include the verified `hikaru-asr-windows-x64-cpu-v1` Native runtime and the manifest of approved runtime download sources. They do **not** include FFmpeg, a Python sidecar/interpreter/environment, optional Python engines, or model weights.
 
-This document records the persistent runtime components. A release also needs
-an inventory of the exact JavaScript and Rust dependency versions included in
-that release; `pnpm-lock.yaml` and `src-tauri/Cargo.lock` are the version
-sources for that inventory.
+The Native runtime's machine-readable inventory is shipped at `native-asr/windows-x64/cpu/licenses/THIRD-PARTY-NOTICES.json` together with each required license file. `native-asr/runtime/windows-x64-cpu-lock.json` locks the exact payload, source, hash, license, attribution, and Microsoft runtime terms identity. Any future change to those bytes requires a new closed-world verification and package audit.
 
-## Runtime components
+This document records the persistent runtime components. A release also needs an inventory of the exact JavaScript and Rust dependency versions included in the application; `pnpm-lock.yaml` and `src-tauri/Cargo.lock` are the version sources for that inventory.
+
+## Components distributed in the Native ASR runtime
+
+| Component | License / terms | Source and notes |
+| --- | --- | --- |
+| [CTranslate2](https://github.com/OpenNMT/CTranslate2) 4.8.0 | MIT | Bundled as the CPU inference runtime. Exact source revision, DLL hash, imports, and license file are locked by `windows-x64-cpu-lock.json`. |
+| [oneDNN](https://github.com/oneapi-src/oneDNN) 3.1.1 | Apache-2.0 | Linked into the locked CTranslate2 CPU runtime; source identity and notice are included in the runtime inventory. |
+| [pocketfft](https://github.com/mreineck/pocketfft) `c90e55b…` | BSD-3-Clause | Used by the Native Whisper feature path; exact source/header identity and license are locked. |
+| [nlohmann/json](https://github.com/nlohmann/json) 3.11.3 | MIT | Used by the independent worker protocol implementation; exact header/source identity is locked. |
+| Rust tokenizer dependency graph (`tokenizers`, `onig`, `onig-sys`, and transitive crates) | Per-crate licenses recorded in the runtime inventory | The exact Cargo.lock SHA-256 and complete package/license list are shipped in `licenses/THIRD-PARTY-NOTICES.json`; required license texts are included in the runtime. |
+| Microsoft Visual C++ Redistributable 14.50.35717 | Microsoft Visual C++ V14 Redistributable and Runtime 2026 terms | `msvcp140.dll`, `vcomp140.dll`, `vcruntime140.dll`, and `vcruntime140_1.dll` are bundled unchanged, excluded from Hikaru Sub's Apache-2.0 license, and governed by the included official `Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx`. Official terms: <https://visualstudio.microsoft.com/license-terms/vs2026-ga-visualcpp-v14-redist-runtime/>; redistribution list: <https://aka.ms/vs/18/redistribution>. By using those files, Microsoft's included acceptance terms apply. |
+
+## Managed but not bundled components
 
 | Component | License / terms | Source and notes |
 | --- | --- | --- |
 | [FFmpeg](https://ffmpeg.org/) and ffprobe | The actual binary's license controls. FFmpeg builds enabled with GPL components such as `libx264` are GPL-2.0-or-later. | Hikaru Sub invokes FFmpeg as an independent process. For every managed archive, retain its exact version, SHA-256, license output (`ffmpeg -L`), archive distributor, corresponding source, patches, and build configuration. The configured archive URLs are in `src-tauri/resources/runtime-dependency-sources.json`. |
-| [CPython](https://www.python.org/) 3.11 | Python Software Foundation License Version 2 | The managed interpreter is supplied by [python-build-standalone](https://github.com/astral-sh/python-build-standalone). Its release notices and CPython's notices apply to the exact downloaded archive. |
-| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and [CTranslate2](https://github.com/OpenNMT/CTranslate2) | MIT | `asr-service/engines/faster_whisper_model.py` vendors and modifies the faster-whisper 1.2.1 `generate_segments` loop from commit `65882eee9f5cdbeeb2d877f1131d48cf241b327d`; its full MIT notice is shipped as `src-tauri/resources/asr-service/LICENSE.faster-whisper` (development copy: `asr-service/LICENSE.faster-whisper`). The runtime packages are installed for the default and Kotoba ASR profiles. |
-| [FastAPI](https://github.com/fastapi/fastapi), [Pydantic](https://github.com/pydantic/pydantic), [Hugging Face Hub](https://github.com/huggingface/huggingface_hub) | MIT, MIT, Apache-2.0 respectively | Sidecar and model-download dependencies. |
-| [Uvicorn](https://github.com/Kludex/uvicorn) | BSD-3-Clause | Sidecar HTTP server. |
-| [PyAV](https://github.com/PyAV-Org/PyAV) | BSD-3-Clause for PyAV; wheel-bundled native libraries retain their own licenses | A wheel can contain FFmpeg libraries. Before redistributing a Python environment, inspect the exact wheel and include the notices and source materials for its bundled native libraries. |
-| [NVIDIA NeMo](https://github.com/NVIDIA-NeMo/NeMo) | Apache-2.0 | Optional Parakeet and ReazonSpeech profiles share this NeMo ASR core. |
-| [PyTorch](https://github.com/pytorch/pytorch) and [torchaudio](https://github.com/pytorch/audio) | BSD-style | Optional ASR profiles. Parakeet/Qwen3 may install torchaudio; ReazonSpeech profiles declare torch only (NeMo extras may still pull transitive deps). CUDA-enabled wheels also include NVIDIA components subject to NVIDIA's separate redistribution terms and notices. |
-| [ReazonSpeech](https://github.com/reazon-research/reazonspeech) NeMo ASR decode algorithm | Apache-2.0 | Local timestamp/segment adapter adapted from `pkg/nemo-asr` (`decode.py` / `transcribe.py`); not installed as the GitHub helper package. |
-| [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) and [Transformers](https://github.com/huggingface/transformers) | Apache-2.0 | Optional Qwen3-ASR profile. Audit the resolved transitive dependencies for the exact package set before distributing an ASR environment. |
-| [soynlp](https://github.com/lovit/soynlp) | The exact package artifact must be verified before redistribution | The Qwen3-ASR dependency graph can install this package. Its published package metadata and upstream license file have reported different GPL-family identifiers; do not bundle it until the exact artifact's license is resolved and its required materials are included. |
-| [Silero VAD](https://github.com/snakers4/silero-vad) | MIT | Ordinary Japanese `large-v2` recordings of at least ten minutes use the official V4 ONNX from tag `v4.0`, commit `915dd3d639b8333a52e001af095f87c5b7f1e0ac`. It is downloaded after model confirmation into managed `HF_HOME`, verified as SHA-256 `a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28`, and is not bundled. `asr-service/engines/silero_v4.py` implements the V4 ONNX state and timestamp behavior with project-specific asset management and cancellation. Parakeet and Qwen3 can separately download Silero through `torch.hub` when their VAD path is used. |
+| [Systran/faster-whisper-large-v3](https://huggingface.co/Systran/faster-whisper-large-v3), revision `edaa852e…` | MIT | The current production model is downloaded on demand and never included in the setup or portable package. The bundled model manifest locks the exact repository, revision, four required file sizes/SHA-256 values, attribution, and source URLs. |
 
-## Model weights
+## Development and historical Python components not distributed
 
-The following model repositories are selectable by the application. The
-model card and license in the exact downloaded revision control their use and
-redistribution.
+The repo-root `asr-service/` remains for development, historical engine research, and one stable release cycle of rollback evidence. None of the following is part of the current desktop release runtime:
+
+| Component | License / terms | Source and notes |
+| --- | --- | --- |
+| [CPython](https://www.python.org/) 3.11 | Python Software Foundation License Version 2 | Historical managed interpreter metadata uses [python-build-standalone](https://github.com/astral-sh/python-build-standalone). If a future release distributes it again, its exact notices must be restored and audited. |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) Python implementation | MIT | `asr-service/engines/faster_whisper_model.py` vendors and modifies the faster-whisper 1.2.1 `generate_segments` loop from commit `65882eee9f5cdbeeb2d877f1131d48cf241b327d`; the development notice remains at `asr-service/LICENSE.faster-whisper`. The removed packaged template is no longer a license delivery path. |
+| [FastAPI](https://github.com/fastapi/fastapi), [Pydantic](https://github.com/pydantic/pydantic), [Hugging Face Hub](https://github.com/huggingface/huggingface_hub), and [Uvicorn](https://github.com/Kludex/uvicorn) | MIT, MIT, Apache-2.0, and BSD-3-Clause respectively | Historical sidecar/API and model-download dependencies; not shipped in the Native MVP release. |
+| [PyAV](https://github.com/PyAV-Org/PyAV) | BSD-3-Clause for PyAV; wheel-bundled native libraries retain their own licenses | A Python wheel can contain FFmpeg libraries. Audit exact wheels and source obligations before any future redistribution. |
+| [NVIDIA NeMo](https://github.com/NVIDIA-NeMo/NeMo) | Apache-2.0 | Development-only Parakeet and ReazonSpeech profiles. |
+| [PyTorch](https://github.com/pytorch/pytorch) and [torchaudio](https://github.com/pytorch/audio) | BSD-style | Development-only optional ASR profiles. CUDA wheels also carry separate NVIDIA redistribution terms. |
+| [ReazonSpeech](https://github.com/reazon-research/reazonspeech) NeMo ASR decode algorithm | Apache-2.0 | Historical local timestamp/segment adapter; not part of the Native MVP route. |
+| [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) and [Transformers](https://github.com/huggingface/transformers) | Apache-2.0 | Development-only profile pending an independent productization task. |
+| [soynlp](https://github.com/lovit/soynlp) | Exact artifact license must be verified before redistribution | The optional Qwen3 dependency graph has conflicting published GPL-family identifiers; it must not be bundled until resolved. |
+| [Silero VAD](https://github.com/snakers4/silero-vad) | MIT | Historical/development VAD inputs are not bundled, and Native VAD is not enabled in the current release. |
+
+## Model repositories
+
+Model cards and the license in each exact downloaded revision control use and redistribution. **No model weights are bundled.** Only the pinned Faster-Whisper large-v3 revision is runnable in the current release; the other rows remain visible/development metadata for independent follow-up work.
 
 | Model repository | License / obligation |
 | --- | --- |
 | [Systran/faster-whisper-tiny](https://huggingface.co/Systran/faster-whisper-tiny), `base`, `small`, `medium`, `large-v2`, and `large-v3` | MIT |
-| [mobiuslabsgmbh/faster-whisper-large-v3-turbo](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo) (short name `large-v3-turbo`) | MIT |
+| [mobiuslabsgmbh/faster-whisper-large-v3-turbo](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo) | MIT |
 | [kotoba-tech/kotoba-whisper-v2.0-faster](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster) | MIT |
-| [nvidia/parakeet-tdt_ctc-0.6b-ja](https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja) | CC-BY-4.0; preserve the attribution, license link, and change indication required by that license when redistributing the model or an adaptation. |
+| [nvidia/parakeet-tdt_ctc-0.6b-ja](https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja) | CC-BY-4.0; preserve attribution, license link, and change indication when redistributing the model or an adaptation. |
 | [Qwen/Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) and [Qwen/Qwen3-ForcedAligner-0.6B](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B) | Apache-2.0 |
 | [reazon-research/reazonspeech-nemo-v2](https://huggingface.co/reazon-research/reazonspeech-nemo-v2) | Apache-2.0 |
 
 ## Release-maintainer checklist
 
-Before publishing a release that changes a runtime archive, Python package
-profile, or model revision:
+Before publishing a release that changes a runtime archive, managed dependency, or model revision:
 
-1. Lock the exact artifact versions and hashes, including transitive Python
-   packages.
-2. Recheck the artifact's license and bundled native libraries.
-3. Update this notice with the exact source, version, and any required
-   attribution or NOTICE material.
-4. If the release distributes a GPL component, provide that component's
-   corresponding source and satisfy its GPL obligations for that component.
+1. Lock the exact artifact versions, bytes, hashes, source identities, and transitive dependency inventory.
+2. Recheck the artifact's license and every bundled native library.
+3. Update this notice and the packaged machine-readable inventory with every required attribution, NOTICE, source, and license material.
+4. If the release distributes a GPL component, provide that component's corresponding source and satisfy its GPL obligations for that component.
+5. Confirm the final setup and portable packages contain no undeclared runtime, model, Python, GPU/VAD, debug, or cache file.
 
-Hikaru Sub and the names of third-party projects are their respective owners'
-trademarks. Their use here is descriptive only.
+Hikaru Sub and the names of third-party projects are their respective owners' trademarks. Their use here is descriptive only.

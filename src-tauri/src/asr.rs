@@ -1,7 +1,7 @@
-//! Stable ASR commands with one internal legacy/Native MVP route policy.
+//! Stable ASR commands with one internal Native MVP route policy.
 //!
-//! Product/default routing remains the Python HTTP sidecar until T18. The Native branch
-//! consumes the bundled CPU worker and exact managed model without changing public IPC.
+//! Product/default routing uses the bundled CPU worker and exact managed model without
+//! changing public IPC. Legacy sidecar source remains temporarily for rollback evidence.
 
 use crate::asr_models::{
     known_native_asr_engines, ModelDownloadSnapshot, NativeAsrModelDisposition,
@@ -62,6 +62,7 @@ impl Drop for Sidecar {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AsrRoutePolicy {
+    #[cfg_attr(not(test), allow(dead_code))]
     Legacy,
     NativeMvp,
 }
@@ -69,14 +70,6 @@ enum AsrRoutePolicy {
 impl AsrRoutePolicy {
     fn uses_native(self) -> bool {
         self == Self::NativeMvp
-    }
-}
-
-fn default_route_policy(has_debug_native_host: bool) -> AsrRoutePolicy {
-    if has_debug_native_host {
-        AsrRoutePolicy::NativeMvp
-    } else {
-        AsrRoutePolicy::Legacy
     }
 }
 
@@ -89,13 +82,17 @@ pub struct AsrState {
     route_policy: AsrRoutePolicy,
     pub(crate) native_models: NativeAsrModelManager,
     native_host: StdMutex<Option<NativeAsrHost>>,
+    #[cfg(debug_assertions)]
+    debug_native_host_injected: bool,
 }
 
 impl Default for AsrState {
     fn default() -> Self {
         let active_job = Arc::new(ActiveJobGate::default());
         let native_host = debug_native_host(Arc::clone(&active_job));
-        let route_policy = default_route_policy(native_host.is_some());
+        #[cfg(debug_assertions)]
+        let debug_native_host_injected = native_host.is_some();
+        let route_policy = AsrRoutePolicy::NativeMvp;
         Self {
             sidecar: Mutex::new(None),
             job_base_urls: Mutex::new(HashMap::new()),
@@ -104,6 +101,8 @@ impl Default for AsrState {
             route_policy,
             native_models: NativeAsrModelManager::default(),
             native_host: StdMutex::new(native_host),
+            #[cfg(debug_assertions)]
+            debug_native_host_injected,
         }
     }
 }
@@ -762,7 +761,7 @@ pub async fn start_asr(
 
     if state.route_policy.uses_native() {
         #[cfg(debug_assertions)]
-        if std::env::var_os("HIKARU_ASR_FAKE_WORKER").is_some() {
+        if state.debug_native_host_injected {
             let host = packaged_native_host(&app, &state).await?;
             let cache_root = work_cache_dir(&app)?;
             let job_id = native_job_id();
@@ -1137,8 +1136,7 @@ mod tests {
 
     #[test]
     fn one_route_policy_controls_the_complete_backend_family() {
-        assert!(!default_route_policy(false).uses_native());
-        assert!(default_route_policy(true).uses_native());
+        assert!(AsrState::default().route_policy.uses_native());
         assert!(AsrRoutePolicy::NativeMvp.uses_native());
         assert!(!AsrRoutePolicy::Legacy.uses_native());
     }
@@ -1358,6 +1356,8 @@ mod tests {
             route_policy: AsrRoutePolicy::Legacy,
             native_models: NativeAsrModelManager::default(),
             native_host: StdMutex::new(None),
+            #[cfg(debug_assertions)]
+            debug_native_host_injected: false,
         };
         state.shutdown();
         assert!(active_job.current().is_none());

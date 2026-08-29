@@ -1,6 +1,6 @@
 # Expand Native Faster-Whisper models after T18
 
-> **当前状态：阻塞。** T16 已完成；必须先完成并归档 T17 frontend migration 与 T18 release cutover，之后才能激活本任务。这里的 P1 仅表示“首个 post-MVP 优先级”，不表示当前下一项工作。
+> **当前状态：等待 T18 归档。** T18 已由用户验收；本任务保持 planning，待 T18 active task 归档后立即成为下一可执行 child。
 
 ## Goal
 
@@ -19,7 +19,7 @@
 
 - Priority: P1。
 - Roadmap position: `T18 Native MVP -> Faster-Whisper model expansion -> other post-MVP engines/GPU`。
-- 可在 T18 前完成详细规划和非侵入性准备，但 production implementation/cutover 以 T18 已稳定发布的 large-v3 CPU 路线为基线。
+- Production implementation/cutover 以 T18 已验收的稳定 large-v3 CPU 路线为基线；当前仅等待 T18 finish-work 归档。
 - 本任务完成前，T08R、T11、Parakeet/Reazon 新候选和 T14/T15 默认不抢占其优先级；用户另行明确调整时除外。
 
 ## Authority And Dependencies
@@ -32,7 +32,7 @@
 ## Confirmed Current Baseline
 
 - T12 model manager 与 T13 final CPU runtime 已完成并归档；当前 Native model manifest 仍只包含 `large-v3`。
-- T16 runtime/settings 已完成并归档；T17 frontend migration 与 T18 release cutover 尚未创建或完成。T17 是当前下一任务，T18 必须在 T17 后执行，本任务必须继续阻塞到 T18 完成归档。
+- T16 runtime/settings 与 T17 frontend migration 已完成并归档；T18 release cutover 已由用户验收，本任务只需等待 T18 active task 完成归档。
 - Rust model manager 已把本任务的六个模型标记为 `postMvpUnavailable`，并已具备多 entry manifest、独立 readiness、断点续传、hash 校验和原子发布能力。
 - 前端 `ASR_ENGINE_MODELS` 已列出全部六个模型，因此本任务不需要新增第二套模型注册表。
 - 已发布 worker 源码按模型读取 `n_mels`，接受 80/128 Mel，并接受 `vocabulary.txt` 或 `vocabulary.json`；ordinary Whisper 不要求 `preprocessor_config.json`。因此默认假设无需修改或重建 worker，真实模型 smoke 才能推翻该假设。
@@ -40,8 +40,8 @@
 
 ## Activation Gate
 
-- 本任务可以在 T18 前完成详细规划、模型 identity 调研和不改变生产行为的准备。
-- 生产实现与启用必须等待 T18 建立稳定的 Native large-v3 CPU baseline；若用户决定提前实施，必须先显式调整父任务顺序和本任务边界，不能在本任务中顺手吸收 T16/T17/T18。
+- T18 已建立并通过稳定 Native large-v3 CPU baseline；在其 active task 归档前，本任务只做规划检查，不启动生产实现。
+- T18 归档后按父任务顺序激活本任务；不得重新吸收或重做 T16/T17/T18 的已交付职责。
 
 ## Requirements
 

@@ -1,4 +1,0 @@
-# Compatibility entry for Parakeet NeMo deps (no PyTorch).
-# Prefer: ./scripts/setup-asr.sh parakeet-cpu|parakeet-cuda
-
--r requirements-nemo.txt

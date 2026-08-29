@@ -105,7 +105,7 @@ Frontend types mirror camelCase JSON from Tauri and the ASR sidecar (e.g. `durat
 
 ### 1. Scope / Trigger
 
-Apply when changing the Native ASR engine/model/device selectors, model download gate, or runtime dependency UI that consumes the stable Tauri ASR commands. T16 owns backend metadata; T17 makes that metadata the frontend availability authority. T18 still owns Release/default Native routing and packaged Python removal.
+Apply when changing the Native ASR engine/model/device selectors, model download gate, or runtime dependency UI that consumes the stable Tauri ASR commands. Backend metadata and the shared T17 availability owner remain authoritative after the Release/default Native cutover and packaged Python removal.
 
 ### 2. Signatures
 
@@ -155,8 +155,10 @@ useAsrAvailability(engine: string, model: string, device: string)
 - Load the product model list when the engine changes. A same-engine model selection reuses the loaded status map; check only a selected legacy/unknown model missing from that map. This prevents repeated exact large-v3 readiness scans.
 - Disabled options remain visible with a concise backend reason. An unavailable persisted value stays displayed and is never silently rewritten; only an explicit user selection changes settings.
 - `ready` and `supportedMissing` are runnable routes; only `supportedMissing` offers model download. Deferred/unsupported identities never show Python setup actions.
-- A Native engine reporting `device: "cpu"` enables `auto` / `cpu` and disables CUDA. Legacy payloads without device metadata remain compatible until T18.
+- A Native engine reporting `device: "cpu"` enables `auto` / `cpu` and disables CUDA. Legacy payloads without device metadata remain compatibility input for rollback/tests, but the production route emits Native metadata.
 - Native MVP transcription sends `useVad: false` and `vadConfig: null`; the request schema remains for rollback/future runtime capability work.
+- Before Native worker progress has advanced, Transcribe renders indeterminate launch/model-load/first-window progress. After `processedMs > 0`, the existing audio-based percentage remains authoritative.
+- User cancellation is separate from document-guard invalidation and unmount. Cancelling before `startAsr` returns keeps duplicate starts locked as `取消中…`, cancels the late job ID immediately, and reports only `已取消转录`; genuine document changes keep their own stale-result message.
 - Frontend runtime dependencies contain only production-visible kinds. `nativeAsrCpu` is bundled/status-only and has no prepare or cleanup action; missing `asrModels` routes the user to Transcription.
 - Components continue using typed wrappers from `src/services/tauri.ts`; no raw invoke, local payload cast, or second support registry.
 
@@ -185,7 +187,7 @@ useAsrAvailability(engine: string, model: string, device: string)
 - `useAsrAvailability.test.tsx`: option projection, stale engine result, same-engine no-rescan, unknown persisted model, and route/device gates.
 - `ModelManager.test.tsx` plus legacy gate/diagnostic suites: four dispositions, download promise reuse, diagnostics, completion refresh, and compatibility booleans.
 - Settings/runtime tests: no Python/venv/setup UI, unavailable values are not rewritten, Native runtime is status-only, and ASR model action routes to Transcription.
-- Transcribe seam tests: unavailable/CUDA gating, `useVad: false`, download-to-start, polling/cancel/document guard/recovery/PlayRes/ASS save/translation handoff.
+- Transcribe seam tests: unavailable/CUDA gating, `useVad: false`, download-to-start, indeterminate startup/first-window progress, pre-job-ID user cancellation, polling/document guard/recovery/PlayRes/ASS save/translation handoff.
 - Run full `pnpm test` and `pnpm build` after shared availability/type/UI changes.
 
 ### 7. Wrong vs Correct

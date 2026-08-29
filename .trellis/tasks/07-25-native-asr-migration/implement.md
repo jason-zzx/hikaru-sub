@@ -36,16 +36,16 @@ T12 model manager [done] + T13 CPU runtime [done]
 T16 runtime/settings backend [done]
                          |
                          v
-T17 frontend migration [NEXT; not created]
+T17 frontend migration [done]
                          |
                          v
-T18 Native MVP release [create after T17]
+T18 Native MVP release [accepted; archive before 08-26]
                          |
                          v
-08-26 Faster-Whisper model expansion [activate only after T18]
+08-26 Faster-Whisper model expansion [next after T18 archive]
 ```
 
-The enforced next task is T17. T18 depends on T17, and the post-MVP Faster-Whisper expansion depends on completed and archived T18. Its P1 priority means first post-MVP priority, not the next executable task before T18.
+T18 is accepted. Archive this child during finish-work before activating the post-MVP Faster-Whisper expansion; after that archive, `08-26-native-asr-whisper-model-expansion` is the next executable child. Its P1 priority does not authorize parallel activation while T18 remains active.
 
 ## Critical-Path Children
 
@@ -128,7 +128,7 @@ Rollback: keep old settings fields as ignored input; do not destructively rewrit
 
 ### T17 - Migrate Native MVP Runtime And Model UX
 
-Status: next task; not yet created.
+Status: completed and archived.
 
 Suggested slug: `native-asr-frontend-migration`
 
@@ -153,7 +153,9 @@ Rollback: do not ship mixed legacy/new UI and backend contracts.
 
 ### T18 - Qualify And Cut Over Native ASR MVP Release
 
-Status: blocked by T17; create only after T17 completes.
+Status: accepted. Archive this child before activating `08-26-native-asr-whisper-model-expansion`.
+
+Directory: `.trellis/tasks/08-28-native-asr-release-cutover`
 
 Suggested slug: `native-asr-release-cutover`
 
@@ -194,7 +196,7 @@ Rollback: restore previous package inputs/default route without deleting user mo
 
 ### First Post-MVP P1 - Expand Native Faster-Whisper Model Support
 
-Status: blocked until T17 and T18 are completed and archived. Do not select this task as the next executable child merely because it is P1.
+Status: next executable child after the accepted T18 task is archived; keep it planning until that archive completes.
 
 Directory: `.trellis/tasks/08-26-native-asr-whisper-model-expansion`
 
@@ -247,18 +249,18 @@ Each receives an independent child and release disposition after the P1 Faster-W
 
 ## MVP Cross-Task Review Checklist
 
-- [ ] Only large-v3 is runnable; all other model IDs remain visible/unavailable.
-- [ ] Command/state/type names align across worker, Rust and TypeScript.
-- [ ] Model download is pinned, hashed, atomic and path-contained.
-- [ ] Final CPU artifact is reproducible, attested and contains no models/Python/CrispASR/GPU dependencies.
-- [ ] Worker output is non-empty, UTF-8 valid, ordered, positive-duration and audio-bounded.
-- [ ] Cancel exits within two seconds; crash/recovery/active-gate behavior remains covered.
-- [ ] Installed/portable roots, probe/measure/cleanup and offline cached-model behavior pass.
-- [ ] UI removes Python setup and never silently falls back to Python.
-- [ ] Candidate A historical evidence remains unchanged; known quality limitations are diagnostic.
-- [ ] Setup/portable/runtime sizes and third-party notices pass.
-- [ ] T14/T15 and optional engine quality tasks are absent from the MVP dependency chain.
-- [ ] Specs are updated only when their owning architecture changes land.
+- [x] Only large-v3 is runnable; all other model IDs remain visible/unavailable.
+- [x] Command/state/type names align across worker, Rust and TypeScript.
+- [x] Model download is pinned, hashed, atomic and path-contained.
+- [x] Final CPU artifact is reproducible, attested and contains no models/Python/CrispASR/GPU dependencies.
+- [x] Worker output is non-empty, UTF-8 valid, ordered, positive-duration and audio-bounded.
+- [x] Cancel exits within two seconds; crash/recovery/active-gate behavior remains covered.
+- [x] Installed/portable roots, probe/measure/cleanup and offline cached-model behavior pass.
+- [x] UI removes Python setup and never silently falls back to Python.
+- [x] Candidate A historical evidence remains unchanged; known quality limitations are diagnostic.
+- [x] Setup/portable/runtime sizes and third-party notices pass.
+- [x] T14/T15 and optional engine quality tasks are absent from the MVP dependency chain.
+- [x] Specs are updated only when their owning architecture changes land.
 
 ## Parent Completion Gate
 
