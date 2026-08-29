@@ -18,21 +18,21 @@ Work cache children of interest: `workspace/`, `transcode/`, `preview/`, `clip-f
 
 ## Managed Dependencies Layout
 
-Release packages do **not** bundle FFmpeg, Python, ASR pip deps, or model weights. Before T18 they retain the clean legacy ASR service template for rollback evidence and also bundle the verified Native ASR CPU runtime resource; T18 owns removing the legacy packaged template.
+Release packages bundle the verified Native ASR CPU runtime and do **not** bundle FFmpeg, a Python sidecar/runtime/venv/packages, or model weights. Resource preparation deletes any stale packaged legacy sidecar before NSIS/portable staging.
 
-Typical install-dir layout (see `/AGENTS.md`):
+Typical production install-dir layout (see `/AGENTS.md`):
 
 - `deps/ffmpeg/current` — managed FFmpeg
-- `deps/python311/current` — managed Python 3.11
-- `deps/asr-service/.venv` — managed ASR venv
-- `deps/models/huggingface` — legacy Python/Hugging Face cache (`HF_HOME`); Native ASR may reuse only an exact pinned CT2 snapshot after full validation
+- `deps/models/huggingface` — exact legacy Hugging Face snapshot reuse after full validation
 - `deps/models/ctranslate2/<engine>/<model>/<revision>` — immutable direct Native ASR CT2 installs
 - `deps/downloads/native-asr-models/<engine>/<model>/<revision>` — Native ASR `.part`, staging, and repair data
 - `deps/downloads` — other temporary archives
 
+Old `deps/python311` / `deps/asr-service` directories may remain from prior releases but are not production dependency probe, measure, cleanup, or route inputs. Cutover and rollback never delete them automatically.
+
 Native model manifest segments must reject traversal, Windows reserved device names, trailing-dot/space aliases, and ASCII case collisions before joining paths. Direct required files reject symlinks/reparse points; legacy HF symlinks are allowed only when the snapshot and canonical file target stay below the canonical managed Hugging Face root.
 
-Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI chooses official vs China mirror (default official). Legacy `auto`/`custom` migrate silently to official. China mirror injects `HF_ENDPOINT=https://hf-mirror.com` for the sidecar.
+Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI chooses official vs China mirror (default official). Legacy `auto`/`custom` migrate silently to official. Native model URLs derive from the selected profile and exact bundled manifest; the China profile uses `https://hf-mirror.com`. Historical Python source rows remain rollback metadata only.
 
 ## Probe / Prepare / Cleanup UX Contract
 
@@ -70,7 +70,7 @@ async fn probe_runtime_dependencies(app: AppHandle, asr_state: State<'_, AsrStat
 - Probe remains status/path/version only. Runtime reads and model hashing use `spawn_blocking`; probe never calls recursive `dir_size`.
 - Explicit storage measurement emits managed FFmpeg when applicable, bounded `deps/models`, `deps/downloads`, and application work cache. It emits no Python/venv or bundled-runtime storage item.
 - `asrModels` cleanup targets only executable-adjacent `deps/models`; `downloads` remains `deps/downloads`; app-cache cleanup preserves current-video workspace/proxy data.
-- Legacy Python/venv enum variants may remain temporarily for T17/rollback compatibility, but production payloads do not offer them.
+- Legacy Python/venv enum variants may remain temporarily for rollback compatibility, but production payloads do not offer them.
 
 ### 4. Validation & Error Matrix
 

@@ -93,7 +93,7 @@ describe("portable package", () => {
     ).toBe("Hikaru Sub_0.1.0_x64-portable");
   });
 
-  it("stages the executable and installed app resources without build-only resources", async () => {
+  it("stages only approved Native app resources", async () => {
     const { root, releaseDir } = await makeReleaseDir();
 
     const result = createPortableStaging({
@@ -119,8 +119,7 @@ describe("portable package", () => {
     expect(existsSync(join(result.stageDir, "runtime-dependency-sources.json"))).toBe(
       true,
     );
-    expect(existsSync(join(result.stageDir, "asr-service", "main.py"))).toBe(true);
-    expect(existsSync(join(result.stageDir, "asr-service", "benchmarks"))).toBe(false);
+    expect(existsSync(join(result.stageDir, "asr-service"))).toBe(false);
     expect(
       existsSync(
         join(

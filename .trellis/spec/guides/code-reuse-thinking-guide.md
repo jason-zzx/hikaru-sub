@@ -158,9 +158,9 @@ of that replay model.
 
 **Good**: translation generation passes `subtitleMergeMode` and `subtitleTextOrder` to `serializeAss`, then physically re-parses; editor/clipboard use `primaryText` + `eventLine` helpers from `src/lib/ass/`.
 
-### Trap 3: Dual ASR service trees
+### Trap 3: Restoring the removed packaged sidecar tree
 
-Repo-root `asr-service/` (dev) and `src-tauri/resources/asr-service/` (packaged template) can drift. When changing engine/API behavior, search **both** trees and keep release sync intentional.
+Repo-root `asr-service/` is development/rollback source. `src-tauri/resources/asr-service/` must remain absent from production resources, and release preparation deletes stale local copies. Do not reintroduce template synchronization when changing legacy engine/API behavior.
 
 ### Trap 4: Job pollers vs page effects
 
@@ -174,4 +174,4 @@ Repo-root `asr-service/` (dev) and `src-tauri/resources/asr-service/` (packaged 
 
 ASR engines and job statuses are stringly typed across Python and TypeScript. Adding a new engine id or status without updating every `if`/`match`/`switch` silently falls through to a wrong default.
 
-**Prevention**: When adding an engine or status value, search both `asr-service/` and `src/` / `src-tauri/` for the existing ids (and the packaged copy under `src-tauri/resources/asr-service/`). Prefer a single registry/list where one already exists (see `asr-service/engines/`).
+**Prevention**: For production Native routes, search `native-asr/`, `src-tauri/`, and `src/` for existing IDs and use the bundled model/runtime authorities. For intentional legacy Python work, search repo-root `asr-service/` only; do not create a packaged copy. Prefer an existing single registry/list over another support table.

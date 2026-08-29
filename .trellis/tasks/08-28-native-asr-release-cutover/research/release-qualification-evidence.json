@@ -1,0 +1,398 @@
+{
+  "schemaVersion": 1,
+  "task": "08-28-native-asr-release-cutover",
+  "qualificationStatus": "passed",
+  "scope": {
+    "productionRoute": "faster-whisper/large-v3/ctranslate2/cpu",
+    "autoResolvesTo": "cpu",
+    "pythonFallback": false,
+    "versionChanged": false,
+    "versionSpecificChangelogChanged": false
+  },
+  "runtime": {
+    "artifactId": "hikaru-asr-windows-x64-cpu-v1",
+    "trackedArchiveRelativePath": "native-asr/artifacts/windows-x64-cpu.zip",
+    "trackedArchiveSizeBytes": 6859911,
+    "trackedArchiveSha256": "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3",
+    "independentFinalCheckArchiveSizeBytes": 6859911,
+    "independentFinalCheckArchiveSha256": "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3",
+    "byteIdenticalFinalCheck": true,
+    "workerSizeBytes": 466944,
+    "workerSha256": "095a19ca896867efe64a19501594e7a7ee0539f58411051f83504b4900de2c14",
+    "installedPortableWorkerIdentityEqual": true,
+    "capability": "ordinary Faster-Whisper CTranslate2 CPU only; no VAD/GPU/CrispASR/optional engine/model weights"
+  },
+  "model": {
+    "logicalId": "faster-whisper/large-v3",
+    "repository": "Systran/faster-whisper-large-v3",
+    "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "origin": "legacyHuggingFaceSnapshot",
+    "files": [
+      {
+        "role": "model-config",
+        "path": "config.json",
+        "sizeBytes": 2394,
+        "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+        "matches": true
+      },
+      {
+        "role": "model-weights",
+        "path": "model.bin",
+        "sizeBytes": 3087284237,
+        "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+        "matches": true
+      },
+      {
+        "role": "tokenizer",
+        "path": "tokenizer.json",
+        "sizeBytes": 2480617,
+        "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+        "matches": true
+      },
+      {
+        "role": "vocabulary",
+        "path": "vocabulary.json",
+        "sizeBytes": 1068114,
+        "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+        "matches": true
+      }
+    ],
+    "allFilesExact": true
+  },
+  "packages": {
+    "schemaVersion": 1,
+    "setup": {
+      "relativePath": "src-tauri/target/release/bundle/nsis/Hikaru Sub_0.4.1_x64-setup.exe",
+      "sizeBytes": 11144308,
+      "sha256": "c7732bcc7262108fd5802b971df12e3816b04a473622ce5954fbf4bfc63f8108",
+      "budgetBytes": 83886080
+    },
+    "portableZip": {
+      "relativePath": "src-tauri/target/release/bundle/portable/Hikaru Sub_0.4.1_x64-portable.zip",
+      "sizeBytes": 15443450,
+      "sha256": "f7ac3a5349844e6c72be8310617619215540d1d4e81fbcc921ec5759150ab427",
+      "budgetBytes": 94371840
+    },
+    "layouts": [
+      {
+        "role": "installed",
+        "fileCount": 23,
+        "forbiddenFiles": [],
+        "bundledModelWeightFiles": [],
+        "runtimeArtifactId": "hikaru-asr-windows-x64-cpu-v1",
+        "runtimeUnpackedBytes": 26023959,
+        "runtimeManifestSha256": "c2d1c41227b9c2626e2a5bfdbfbc0f2da4fc12f381775c38381695036bff6139",
+        "licenseInventorySha256": "2507579a88c0a3aac04c7f27002ee93a03cfd0512efd52bb62fc5ba586fdd4fd",
+        "hasExecutable": true,
+        "hasRuntimeSources": true,
+        "hasPortableMarker": false
+      },
+      {
+        "role": "portable",
+        "fileCount": 22,
+        "forbiddenFiles": [],
+        "bundledModelWeightFiles": [],
+        "runtimeArtifactId": "hikaru-asr-windows-x64-cpu-v1",
+        "runtimeUnpackedBytes": 26023959,
+        "runtimeManifestSha256": "c2d1c41227b9c2626e2a5bfdbfbc0f2da4fc12f381775c38381695036bff6139",
+        "licenseInventorySha256": "2507579a88c0a3aac04c7f27002ee93a03cfd0512efd52bb62fc5ba586fdd4fd",
+        "hasExecutable": true,
+        "hasRuntimeSources": true,
+        "hasPortableMarker": true
+      }
+    ],
+    "frozenRuntime": {
+      "artifactId": "hikaru-asr-windows-x64-cpu-v1",
+      "archiveSha256": "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3",
+      "archiveSizeBytes": 6859911,
+      "unpackedBudgetBytes": 262144000,
+      "bundledModelWeightBudget": 0
+    }
+  },
+  "modelBackedSmoke": {
+    "modelLogicalId": "faster-whisper/large-v3",
+    "modelRevision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "matrix": [
+      {
+        "layoutRole": "installed",
+        "inputRole": "short",
+        "inputSizeBytes": 771728,
+        "inputSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+        "durationMs": 24102,
+        "segmentCount": 5,
+        "eventCount": 9,
+        "workerSha256": "095a19ca896867efe64a19501594e7a7ee0539f58411051f83504b4900de2c14",
+        "status": "passed",
+        "validated": [
+          "validUtf8",
+          "jsonlOnly",
+          "readyCompletedOrder",
+          "monotonicProgress",
+          "nonEmptySegments",
+          "orderedSegments",
+          "positiveDurationSegments",
+          "audioBoundedSegments",
+          "completedDurationMatches"
+        ],
+        "ignoredLocalSource": ".cache/t18-smoke-installed-short.json"
+      },
+      {
+        "layoutRole": "portable",
+        "inputRole": "short",
+        "inputSizeBytes": 771728,
+        "inputSha256": "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
+        "durationMs": 24102,
+        "segmentCount": 5,
+        "eventCount": 9,
+        "workerSha256": "095a19ca896867efe64a19501594e7a7ee0539f58411051f83504b4900de2c14",
+        "status": "passed",
+        "validated": [
+          "validUtf8",
+          "jsonlOnly",
+          "readyCompletedOrder",
+          "monotonicProgress",
+          "nonEmptySegments",
+          "orderedSegments",
+          "positiveDurationSegments",
+          "audioBoundedSegments",
+          "completedDurationMatches"
+        ],
+        "ignoredLocalSource": ".cache/t18-smoke-portable-short.json"
+      },
+      {
+        "layoutRole": "installed",
+        "inputRole": "long-over-10-minutes",
+        "inputSizeBytes": 19232044,
+        "inputSha256": "3b5be877c448121723b36cd6e4d52740fe71eedaf3d95a95bc73bafaedb6a544",
+        "durationMs": 601000,
+        "segmentCount": 168,
+        "eventCount": 193,
+        "workerSha256": "095a19ca896867efe64a19501594e7a7ee0539f58411051f83504b4900de2c14",
+        "status": "passed",
+        "validated": [
+          "validUtf8",
+          "jsonlOnly",
+          "readyCompletedOrder",
+          "monotonicProgress",
+          "nonEmptySegments",
+          "orderedSegments",
+          "positiveDurationSegments",
+          "audioBoundedSegments",
+          "completedDurationMatches"
+        ],
+        "ignoredLocalSource": ".cache/t18-smoke-installed-long.json"
+      },
+      {
+        "layoutRole": "portable",
+        "inputRole": "long-over-10-minutes",
+        "inputSizeBytes": 19232044,
+        "inputSha256": "3b5be877c448121723b36cd6e4d52740fe71eedaf3d95a95bc73bafaedb6a544",
+        "durationMs": 601000,
+        "segmentCount": 168,
+        "eventCount": 193,
+        "workerSha256": "095a19ca896867efe64a19501594e7a7ee0539f58411051f83504b4900de2c14",
+        "status": "passed",
+        "validated": [
+          "validUtf8",
+          "jsonlOnly",
+          "readyCompletedOrder",
+          "monotonicProgress",
+          "nonEmptySegments",
+          "orderedSegments",
+          "positiveDurationSegments",
+          "audioBoundedSegments",
+          "completedDurationMatches"
+        ],
+        "ignoredLocalSource": ".cache/t18-smoke-portable-long.json"
+      }
+    ],
+    "longInputDerivation": "first 601 seconds of an ignored local Japanese WAV; no audio or transcript is tracked"
+  },
+  "hostAndLifecycle": {
+    "routePolicyTests": {
+      "passed": 12,
+      "failed": 0,
+      "source": ".cache/t18-rust-asr-route.log"
+    },
+    "nativeWorkerMatrix": {
+      "passed": 33,
+      "failed": 0,
+      "source": ".cache/t18-rust-asr-worker.log"
+    },
+    "realProductionWorker": {
+      "passed": 2,
+      "failed": 0,
+      "source": ".cache/t18-rust-production-worker.log"
+    },
+    "realProductionCancel": {
+      "passed": 1,
+      "failed": 0,
+      "source": ".cache/t18-rust-production-cancel.log",
+      "cancelWithinTwoSecondsContract": true
+    },
+    "nativeCtest": {
+      "passed": 4,
+      "failed": 0,
+      "source": ".cache/native-asr-runtime/t18-final-check/build/native-asr/Testing/Temporary/LastTest.log"
+    }
+  },
+  "applicationStartupSmoke": {
+    "installed": {
+      "role": "installed",
+      "processStayedRunning": true,
+      "childProcessNames": [
+        "msedgewebview2.exe"
+      ],
+      "forbiddenChildProcessNames": [],
+      "newPythonProcessCount": 0,
+      "portableMarker": false,
+      "dataDirectory": false,
+      "cacheDirectory": false,
+      "webviewDirectory": false,
+      "packagedSidecar": false
+    },
+    "portable": {
+      "role": "portable",
+      "processStayedRunning": true,
+      "childProcessNames": [
+        "msedgewebview2.exe"
+      ],
+      "forbiddenChildProcessNames": [],
+      "newPythonProcessCount": 0,
+      "portableMarker": true,
+      "dataDirectory": true,
+      "cacheDirectory": true,
+      "webviewDirectory": true,
+      "packagedSidecar": false
+    },
+    "releaseDebugHostOverrideIgnored": true,
+    "status": "passed"
+  },
+  "automatedValidation": [
+    {
+      "command": "pnpm exec vitest run src/components/workflow/TranscribeView.test.tsx src/hooks/useAsrAvailability.test.tsx tests/ModelManagerTranscribeGate.test.tsx",
+      "status": "passed",
+      "summary": "3 focused files; 12 tests passed"
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml asr_models::tests",
+      "status": "passed",
+      "summary": "22 model-manager tests passed"
+    },
+    {
+      "command": "node .cache/t18-package-audit.mjs",
+      "status": "passed",
+      "summary": "current installed and portable layouts passed size, runtime closure, license, forbidden-file, model-weight and marker checks"
+    },
+    {
+      "command": "pnpm asr:runtime:verify",
+      "status": "passed",
+      "summary": "tracked runtime archive accepted at exact size/SHA-256; frozen identity unchanged"
+    },
+    {
+      "command": "pnpm test",
+      "status": "passed",
+      "summary": "109 test files; 822 tests passed after the R8 fixes"
+    },
+    {
+      "command": "pnpm build",
+      "status": "passed",
+      "summary": "TypeScript and Vite production build passed; existing chunk-size warning only"
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1",
+      "status": "passed",
+      "summary": "244 Rust tests passed with one test thread"
+    },
+    {
+      "command": "rustfmt --edition 2021 --check src-tauri/src/asr.rs src-tauri/src/asr_models.rs",
+      "status": "passed",
+      "summary": "Both changed Rust source files pass rustfmt; full cargo fmt still reports the pre-existing unmodified ffmpeg.rs difference"
+    },
+    {
+      "command": "pnpm release:local",
+      "status": "passed",
+      "summary": "Current Native resource preparation, Release executable, NSIS and portable rebuild passed after the ponytail source simplifications"
+    },
+    {
+      "command": "python ./.trellis/scripts/task.py validate 08-28-native-asr-release-cutover",
+      "status": "passed",
+      "summary": "implement/check context manifests valid"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "summary": "no whitespace errors"
+    },
+    {
+      "command": "git diff --cached --name-only",
+      "status": "passed",
+      "summary": "no staged files"
+    }
+  ],
+  "manualProductGate": {
+    "status": "passed",
+    "completedEvidence": [
+      "installed and portable Release executables stay running",
+      "portable creates data/cache/webview",
+      "no packaged sidecar",
+      "no new Python/uvicorn process at startup",
+      "malicious Release fake-worker environment is ignored",
+      "user attested: In installed UI, confirm Native runtime/model availability and complete cached large-v3 transcription with progress and ASS output",
+      "user attested: In portable UI, repeat cached large-v3 transcription with progress and ASS output",
+      "user attested: Cancel a UI-started transcription and verify recovery/active-job release",
+      "user attested: Restart after interrupted/crashed UI job and verify recovery behavior",
+      "user attested: Observe or isolate network to prove cached-model product transcription performs no model/Python network access"
+    ],
+    "remainingRequiredChecks": [],
+    "reason": "The user reported final installed and portable product acceptance completed against the recorded final package identities.",
+    "attestation": {
+      "source": "user",
+      "date": "2026-08-29",
+      "setupSha256": "c7732bcc7262108fd5802b971df12e3816b04a473622ce5954fbf4bfc63f8108",
+      "portableZipSha256": "f7ac3a5349844e6c72be8310617619215540d1d4e81fbcc921ec5759150ab427"
+    }
+  },
+  "privacy": {
+    "containsTranscriptText": false,
+    "containsAssText": false,
+    "containsModelBytes": false,
+    "containsAbsolutePrivatePaths": false,
+    "containsCredentialsOrSecrets": false
+  },
+  "releaseSmokeBugfixValidation": {
+    "readyCache": {
+      "status": "passed",
+      "scope": "process-lifetime successful exact ready resolutions only",
+      "validated": [
+        "same-manager verified ready reuse",
+        "new-manager fresh verification",
+        "managed-root isolation",
+        "logical-model isolation",
+        "repository/format/revision/file size+SHA-256 identity binding",
+        "missing and corrupt results are not cached",
+        "verified fresh download seeds direct-install cache",
+        "already-ready legacy snapshot preserves legacy origin when seeded"
+      ]
+    },
+    "frontendProgressAndCancellation": {
+      "status": "passed",
+      "focusedTestFiles": 3,
+      "focusedTests": 12,
+      "validated": [
+        "startup indeterminate progress",
+        "model-load indeterminate progress",
+        "first-window indeterminate progress",
+        "transition to real percentage after processedMs > 0",
+        "pre-job-ID cancellation stays locked as 取消中…",
+        "late job ID is cancelled",
+        "final copy is only 已取消转录",
+        "no false model-check or document-change copy",
+        "unmount success and failure paths release global task state"
+      ]
+    },
+    "packageRebuiltAfterSourceChange": true,
+    "longModelSmokeReused": true,
+    "longModelSmokeReuseReason": "Native runtime archive, worker SHA-256, model manifest and exact model identity are unchanged"
+  }
+}

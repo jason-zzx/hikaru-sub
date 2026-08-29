@@ -1,4 +1,4 @@
-//! Internal native ASR model delivery seam. Public model commands remain on the Python sidecar.
+//! Native ASR model delivery used by the production model commands and inference route.
 
 #![allow(dead_code)]
 
@@ -50,7 +50,7 @@ struct ModelManifest {
     models: Vec<ManifestModel>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 struct ManifestModel {
     logical_id: String,
@@ -64,7 +64,7 @@ struct ManifestModel {
     files: Vec<ManifestFile>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 struct ModelLicense {
     spdx: String,
@@ -72,7 +72,7 @@ struct ModelLicense {
     source: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 struct ManifestFile {
     role: String,
@@ -86,6 +86,23 @@ struct ManagedModelRoots {
     direct: PathBuf,
     legacy_huggingface: PathBuf,
     downloads: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ReadyCacheKey {
+    direct_root: PathBuf,
+    legacy_root: PathBuf,
+    model: ManifestModel,
+}
+
+impl ReadyCacheKey {
+    fn new(roots: &ManagedModelRoots, model: &ManifestModel) -> Self {
+        Self {
+            direct_root: roots.direct.clone(),
+            legacy_root: roots.legacy_huggingface.clone(),
+            model: model.clone(),
+        }
+    }
 }
 
 impl ManagedModelRoots {
@@ -184,6 +201,7 @@ struct ManagerState {
 #[derive(Clone, Default)]
 pub(crate) struct NativeAsrModelManager {
     state: Arc<Mutex<ManagerState>>,
+    ready_cache: Arc<StdMutex<HashMap<ReadyCacheKey, ResolvedNativeAsrModel>>>,
 }
 
 impl NativeAsrModelManager {
@@ -208,11 +226,7 @@ impl NativeAsrModelManager {
             return Ok(unavailable_status(engine, model));
         };
         let entry = entry.clone();
-        let verify_entry = entry.clone();
-        let resolved =
-            tauri::async_runtime::spawn_blocking(move || resolve_sync(&roots, &verify_entry))
-                .await
-                .map_err(|error| format!("模型校验任务失败：{error}"))??;
+        let resolved = self.resolve_entry_with_roots(roots, entry.clone()).await?;
         Ok(NativeAsrModelStatus {
             engine: engine.to_string(),
             model: model.to_string(),
@@ -239,9 +253,48 @@ impl NativeAsrModelManager {
             return Ok(None);
         };
         let roots = ManagedModelRoots::from_app(app)?;
-        tauri::async_runtime::spawn_blocking(move || resolve_sync(&roots, &entry))
-            .await
-            .map_err(|error| format!("模型校验任务失败：{error}"))?
+        self.resolve_entry_with_roots(roots, entry).await
+    }
+
+    async fn resolve_entry_with_roots(
+        &self,
+        roots: ManagedModelRoots,
+        entry: ManifestModel,
+    ) -> Result<Option<ResolvedNativeAsrModel>, String> {
+        let key = ReadyCacheKey::new(&roots, &entry);
+        if let Some(resolved) = self
+            .ready_cache
+            .lock()
+            .map_err(|_| "Native ASR 模型验证缓存已损坏".to_string())?
+            .get(&key)
+            .cloned()
+        {
+            return Ok(Some(resolved));
+        }
+        let verify_roots = roots.clone();
+        let verify_entry = entry.clone();
+        let resolved = tauri::async_runtime::spawn_blocking(move || {
+            resolve_sync(&verify_roots, &verify_entry)
+        })
+        .await
+        .map_err(|error| format!("模型校验任务失败：{error}"))??;
+        if let Some(ready) = resolved.as_ref() {
+            self.remember_ready(&roots, &entry, ready.clone())?;
+        }
+        Ok(resolved)
+    }
+
+    fn remember_ready(
+        &self,
+        roots: &ManagedModelRoots,
+        entry: &ManifestModel,
+        resolved: ResolvedNativeAsrModel,
+    ) -> Result<(), String> {
+        self.ready_cache
+            .lock()
+            .map_err(|_| "Native ASR 模型验证缓存已损坏".to_string())?
+            .insert(ReadyCacheKey::new(roots, entry), resolved);
+        Ok(())
     }
 
     pub(crate) async fn start_download(
@@ -303,11 +356,13 @@ impl NativeAsrModelManager {
             let result = run_download(&entry, &roots, &endpoint, &terminal_id, &job).await;
             if let Ok(mut guard) = job.lock() {
                 match result {
-                    Ok(path) => {
+                    Ok(ready) => {
+                        let _ = manager.remember_ready(&roots, &entry, ready.clone());
                         guard.snapshot.status = ModelDownloadJobStatus::Completed;
                         guard.snapshot.progress = Some(1.0);
                         guard.snapshot.downloaded_bytes = guard.snapshot.total_bytes;
-                        guard.snapshot.resolved_path = Some(path.to_string_lossy().into_owned());
+                        guard.snapshot.resolved_path =
+                            Some(ready.path.to_string_lossy().into_owned());
                     }
                     Err(error) => {
                         guard.snapshot.status = ModelDownloadJobStatus::Failed;
@@ -745,7 +800,7 @@ async fn run_download(
     endpoint: &str,
     job_id: &str,
     job: &Arc<StdMutex<ModelDownloadJob>>,
-) -> Result<PathBuf, String> {
+) -> Result<ResolvedNativeAsrModel, String> {
     let resolve_roots = roots.clone();
     let resolve_model = model.clone();
     if let Some(ready) =
@@ -753,7 +808,7 @@ async fn run_download(
             .await
             .map_err(|error| format!("模型校验任务失败：{error}"))??
     {
-        return Ok(ready.path);
+        return Ok(ready);
     }
 
     let namespace = download_path(roots, model);
@@ -830,7 +885,11 @@ async fn run_download(
         for file in &model.files {
             let _ = tokio::fs::remove_file(parts.join(format!("{}.part", file.path))).await;
         }
-        Ok(published)
+        Ok(resolved(
+            model,
+            published,
+            NativeAsrModelOrigin::DirectInstall,
+        ))
     }
     .await;
 
@@ -1424,6 +1483,100 @@ mod tests {
         assert_eq!(resolved.origin, NativeAsrModelOrigin::DirectInstall);
     }
 
+    #[tokio::test]
+    async fn verified_ready_resolution_is_reused_only_within_the_same_manager() {
+        let dir = tempdir().unwrap();
+        let roots = ManagedModelRoots::below(dir.path());
+        let (model, files) = complete_fixture();
+        let direct = direct_path(&roots, &model);
+        write_model(&direct, &files);
+        let manager = NativeAsrModelManager::default();
+
+        assert!(manager
+            .resolve_entry_with_roots(roots.clone(), model.clone())
+            .await
+            .unwrap()
+            .is_some());
+        fs::remove_file(direct.join("model.bin")).unwrap();
+        assert!(manager
+            .resolve_entry_with_roots(roots.clone(), model.clone())
+            .await
+            .unwrap()
+            .is_some());
+        assert!(NativeAsrModelManager::default()
+            .resolve_entry_with_roots(roots, model)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn ready_cache_is_scoped_to_roots_and_exact_model_identity() {
+        let first_dir = tempdir().unwrap();
+        let first_roots = ManagedModelRoots::below(first_dir.path());
+        let (model, files) = complete_fixture();
+        write_model(&direct_path(&first_roots, &model), &files);
+        let manager = NativeAsrModelManager::default();
+        assert!(manager
+            .resolve_entry_with_roots(first_roots.clone(), model.clone())
+            .await
+            .unwrap()
+            .is_some());
+
+        let second_dir = tempdir().unwrap();
+        let second_roots = ManagedModelRoots::below(second_dir.path());
+        assert!(manager
+            .resolve_entry_with_roots(second_roots, model.clone())
+            .await
+            .unwrap()
+            .is_none());
+
+        let mut other_model = model.clone();
+        other_model.logical_id = "faster-whisper/other-model".into();
+        other_model.model = "other-model".into();
+        assert!(manager
+            .resolve_entry_with_roots(first_roots.clone(), other_model)
+            .await
+            .unwrap()
+            .is_none());
+
+        let mut other_file_identity = model;
+        other_file_identity.files[0].sha256 = "0".repeat(64);
+        assert!(manager
+            .resolve_entry_with_roots(first_roots, other_file_identity)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn missing_and_corrupt_resolutions_are_not_cached() {
+        let dir = tempdir().unwrap();
+        let roots = ManagedModelRoots::below(dir.path());
+        let (model, files) = complete_fixture();
+        let manager = NativeAsrModelManager::default();
+
+        assert!(manager
+            .resolve_entry_with_roots(roots.clone(), model.clone())
+            .await
+            .unwrap()
+            .is_none());
+        let direct = direct_path(&roots, &model);
+        write_model(&direct, &files);
+        fs::write(direct.join("model.bin"), b"corrupt").unwrap();
+        assert!(manager
+            .resolve_entry_with_roots(roots.clone(), model.clone())
+            .await
+            .unwrap()
+            .is_none());
+        fs::write(direct.join("model.bin"), b"weights").unwrap();
+        assert!(manager
+            .resolve_entry_with_roots(roots, model)
+            .await
+            .unwrap()
+            .is_some());
+    }
+
     #[test]
     fn readiness_fails_closed_for_missing_wrong_size_hash_and_revision() {
         let dir = tempdir().unwrap();
@@ -1521,13 +1674,52 @@ mod tests {
             .unwrap();
         let snapshot = wait_terminal(&manager, &id).await;
         assert_eq!(snapshot.status, ModelDownloadJobStatus::Completed);
-        verify_directory(
-            &direct_path(&roots, &model),
-            &model,
-            VerificationMode::Direct,
-            &roots,
-        )
-        .unwrap();
+        let direct = direct_path(&roots, &model);
+        verify_directory(&direct, &model, VerificationMode::Direct, &roots).unwrap();
+        fs::remove_file(direct.join("model.bin")).unwrap();
+        assert!(manager
+            .resolve_entry_with_roots(roots.clone(), model.clone())
+            .await
+            .unwrap()
+            .is_some());
+        assert!(NativeAsrModelManager::default()
+            .resolve_entry_with_roots(roots, model)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn already_verified_legacy_download_request_preserves_cached_origin() {
+        let dir = tempdir().unwrap();
+        let roots = ManagedModelRoots::below(dir.path());
+        let (model, files) = complete_fixture();
+        let legacy = legacy_path(&roots, &model);
+        write_model(&legacy, &files);
+        let manager = NativeAsrModelManager::default();
+        let id = manager
+            .start_download_for_model(model.clone(), roots.clone(), OFFICIAL_ENDPOINT.into())
+            .await
+            .unwrap();
+        assert_eq!(
+            wait_terminal(&manager, &id).await.status,
+            ModelDownloadJobStatus::Completed
+        );
+        fs::remove_file(legacy.join("model.bin")).unwrap();
+        let cached = manager
+            .resolve_entry_with_roots(roots.clone(), model.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            cached.origin,
+            NativeAsrModelOrigin::LegacyHuggingFaceSnapshot
+        );
+        assert!(NativeAsrModelManager::default()
+            .resolve_entry_with_roots(roots, model)
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]

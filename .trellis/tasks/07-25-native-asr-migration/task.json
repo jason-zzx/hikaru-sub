@@ -43,10 +43,11 @@
     "08-25-native-asr-release-first-reprioritization",
     "08-26-native-asr-whisper-model-expansion",
     "08-27-native-asr-runtime-settings-backend",
-    "08-28-native-asr-frontend-migration"
+    "08-28-native-asr-frontend-migration",
+    "08-28-native-asr-release-cutover"
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Next task is T17 native-asr-frontend-migration. Create and complete T18 only after T17; do not activate 08-26-native-asr-whisper-model-expansion until T18 is completed and archived.",
+  "notes": "T18 is accepted. 08-26-native-asr-whisper-model-expansion is the next executable child once the T18 active task is archived; keep it planning until then.",
   "meta": {}
 }

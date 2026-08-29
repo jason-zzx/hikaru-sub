@@ -12,13 +12,13 @@ Hikaru Sub 是一款面向日语视频的 AI 字幕桌面应用，将视频获�
 
 - **获取视频**：打开本地视频，或下载单路/分离音视频的 m3u8；支持常见加密 VOD、自定义请求头、进度显示和取消。
 - **选取片段**：通过静帧核对起止位置，选择快速软切或精确硬切，并可将结果设为新的工作视频。
-- **本地日语转录**：使用 faster-whisper、kotoba-faster-whisper、Parakeet、Qwen3-ASR 或 ReazonSpeech NeMo，在本机生成带时间轴的日语 ASS 字幕。
+- **本地日语转录**：通过随应用提供的独立 Native worker，在 CPU 上运行 Faster-Whisper large-v3，生成带时间轴的日语 ASS 字幕。
 - **批量翻译**：调用任意AI提供商接口，结合上下文窗口、自定义提示词和术语表，为字幕补充译文。
 - **字幕编辑**：按物理 ASS 行编辑文本、时间、样式与行内标签，配合视频预览、音频波形和多泳道时间轴；字幕修改共享撤销/重做历史；支持查找替换、条件筛选、字幕质检；未保存保护与异常退出恢复；支持字幕导出。
 - **Aegisub 兼容**：沿用常见 Aegisub 式快捷键与字幕网格工作流，支持与 Aegisub 跨应用复制/剪切/粘贴字幕行，便于与外部工具互通。
 - **双语排版**：在翻译生成时决定形态——支持行内拼接、分离双行与仅保留译文；前两种可调整原文/译文顺序。编辑阶段不再按该设置重排行。
 - **输出成片**：生成硬字幕 MP4，或将 ASS 作为可切换软字幕封装进 MKV。
-- **按需准备依赖**：优先复用系统 FFmpeg 和 Python 3.11，缺失时经确认下载受管副本；ASR 模型同样按需下载。
+- **按需准备依赖**：优先复用系统 FFmpeg，缺失时经确认下载受管副本；Native ASR runtime 随应用提供，large-v3 模型按需下载并精确校验。
 
 ## 支持功能
 
@@ -44,9 +44,9 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 
 ### 首次使用
 
-发布包不会捆绑 FFmpeg、Python、ASR Python 依赖或模型权重。首次触发相关功能时，Hikaru Sub 会先复用设置路径或系统依赖；仍不可用时，再显示下载内容、大小、来源和保存位置并请求确认。
+发布包会携带经过校验的 Native ASR CPU runtime，但不会捆绑 FFmpeg、Python sidecar、venv、Python packages 或模型权重。首次触发 FFmpeg 或模型下载时，Hikaru Sub 会显示下载内容、大小、来源和保存位置并请求确认。
 
-使用转录前，在「设置」中选择 ASR 引擎并配置依赖，再检查或下载对应模型。使用翻译前，需要配置 OpenAI 兼容 API 的地址、模型和凭据。
+使用转录前，确认 Faster-Whisper large-v3 模型已就绪或按提示下载；首版仅支持 `large-v3 / auto|CPU`，其他模型、引擎、CUDA 和 VAD 仍为后续能力。使用翻译前，需要配置翻译提供商的地址、模型和凭据。
 
 日语 ASR 在本机运行；翻译会把字幕文本发送到用户配置的 API 服务。视频、转录字幕和翻译字幕保存在用户选择的位置或视频同目录，临时音频与代理视频位于应用缓存。
 
@@ -63,7 +63,7 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 | UI | Tailwind CSS 4 + shadcn/ui |
 | 状态 | Zustand |
 | 字幕 | `src/lib/ass` + ASS |
-| ASR | Python FastAPI sidecar |
+| ASR | 独立 Native CTranslate2 CPU worker（Faster-Whisper large-v3） |
 | 音视频 | FFmpeg / ffprobe |
 
 ### 环境要求
@@ -71,9 +71,9 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 - Node.js 20+
 - pnpm 10+
 - Rust stable
-- Python 3.11（开发或调试 ASR 时需要）
+- Python 3.11（仅开发或调试历史 sidecar 源码时需要）
 - FFmpeg（运行完整媒体工作流时需要，也可由应用按需准备）
-- 可选 NVIDIA CUDA（运行部分 ASR 引擎的 GPU 版本时需要）
+- 可选 NVIDIA CUDA（仅后续 Native GPU/引擎开发验证使用，当前发布路线不使用）
 
 始终使用 pnpm 安装项目依赖：
 
@@ -95,13 +95,13 @@ pnpm tauri dev
 pnpm dev
 ```
 
-为源码开发环境配置默认的 faster-whisper / kotoba-faster-whisper 依赖：
+仅在开发或调试历史 Python sidecar 源码时配置其依赖：
 
 ```bash
 pnpm asr:setup
 ```
 
-Parakeet、Qwen3-ASR、ReazonSpeech、CPU/CUDA profile 和 sidecar HTTP API 见 [ASR 服务文档](asr-service/README.md)。
+历史 Python 引擎研究、可选 profile 和 sidecar HTTP API 见 [ASR 服务文档](asr-service/README.md)；这些内容不属于当前桌面发布运行时。
 
 ### 验证与构建
 
@@ -122,12 +122,12 @@ pnpm tauri build
 ## 文档
 
 - [许可证](LICENSE)：Hikaru Sub 自有源代码采用 Apache License 2.0。
-- [第三方声明](THIRD_PARTY_NOTICES.md)：FFmpeg、Python、ASR 依赖和模型权重的许可证边界与发布要求。
+- [第三方声明](THIRD_PARTY_NOTICES.md)：Native runtime、FFmpeg、历史 Python 依赖和模型权重的许可证边界与发布要求。
 - [更新日志](CHANGELOG.md)：各版本的用户可见变更与发布注意事项。
 - [领域词汇表](CONTEXT.md)：工作视频、视频会话、字幕条目、双语模式和压制等领域概念的统一含义。
 - [桌面发布手册](docs/release.md)：Windows 打包、GitHub Release 和发布验证。
-- [运行时依赖手册](docs/runtime-dependencies.md)：FFmpeg、Python、ASR 环境、模型、下载源与缓存管理。
-- [ASR 服务文档](asr-service/README.md)：引擎行为、模型、HTTP API 和诊断日志。
+- [运行时依赖手册](docs/runtime-dependencies.md)：FFmpeg、内置 Native ASR runtime、模型、下载源与缓存管理。
+- [ASR 服务文档](asr-service/README.md)：历史 Python sidecar 的开发、引擎研究、HTTP API 和诊断说明。
 - [Agent 指南](AGENTS.md)：面向 coding agents 的项目约束、架构和测试要求。
 
 功能请求、缺陷和后续计划统一通过 [GitHub Issues](https://github.com/jason-zzx/hikaru-sub/issues) 跟踪。

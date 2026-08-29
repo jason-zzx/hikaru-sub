@@ -1,6 +1,6 @@
-# ASR Sidecar Development Guidelines
+# Legacy ASR Sidecar Development Guidelines
 
-> Python FastAPI ASR service (`asr-service/`).
+> Development and historical rollback source for the Python FastAPI ASR service (`asr-service/`).
 
 **Global hard rules** (git commit policy, product naming, security, runtime dependency / model cache policy): see [`/AGENTS.md`](/AGENTS.md). This layer documents sidecar-local patterns.
 
@@ -8,11 +8,11 @@
 
 ## Overview
 
-The sidecar owns **ASR inference only**: pluggable engines, transcription jobs, model download status, ASS write-out when requested, and optional JSONL diagnostics.
+The sidecar owns its **development-only inference path**: pluggable Python engines, transcription jobs, model download status, ASS write-out when requested, and optional JSONL diagnostics.
 
-Tauri owns process lifecycle and HTTP proxying. React owns UI, ASS editing, and translation.
+Production desktop ASR uses the independent Native CTranslate2 CPU worker with exact Faster-Whisper large-v3 readiness. Tauri owns that worker lifecycle and protocol orchestration; React owns UI, ASS editing, and translation.
 
-Packaged template copy may also live under `src-tauri/resources/asr-service/`. Prefer editing the repo-root `asr-service/` as the development source of truth and keep template sync intentional when releasing.
+The repo-root `asr-service/` remains development and one-cycle rollback evidence. It is not copied to `src-tauri/resources/`, included in NSIS/portable artifacts, or used by the production default route. Do not restore packaged template synchronization as part of ordinary sidecar development.
 
 ---
 

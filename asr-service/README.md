@@ -1,6 +1,8 @@
-# ASR Sidecar
+# ASR Sidecar（开发与历史回退源码）
 
-Hikaru Sub 的本地语音转写服务，作为独立 Python 子进程运行，通过 localhost HTTP 与 Tauri 主进程通信。ASR 推理隔离在此进程，避免阻塞 UI 且便于更换模型/引擎。
+此目录保留 Hikaru Sub 旧版 Python ASR sidecar，用于开发、历史引擎研究、诊断和一个稳定发布周期的回退证据。当前桌面生产路线使用随应用提供的独立 Native CTranslate2 CPU worker，仅支持 Faster-Whisper large-v3；发布包不再包含、复制或启动此 Python sidecar。
+
+以下 HTTP API、Python 引擎和安装说明只适用于源码开发或有意进行的历史路径排障，不代表当前发布版能力。
 
 ## 目录结构
 
@@ -37,9 +39,7 @@ asr-service/
 
 ## 安装
 
-需要 Python 3.11。
-
-打包后的客户端优先使用应用内一键配置：在「设置 → 日语转录（ASR）默认」点击「配置当前引擎依赖」。客户端会先检测系统或用户配置的 Python 3.11；缺失时下载受管 Python 3.11 到安装目录 `deps/python311/current/`，再复制 ASR 服务模板到 `deps/asr-service/`、创建/复用 `deps/asr-service/.venv` 并安装当前选择的引擎依赖。客户端一键配置不会安装模型权重，权重仍由桌面端「模型状态」单独检测与下载；以下脚本主要用于开发环境和手动排障。
+源码开发此 sidecar 需要 Python 3.11。生产桌面应用不检测或下载 Python，也不创建 `deps/asr-service/.venv`；以下脚本仅用于开发环境和手动排障。
 
 ### 开发/排障：使用安装脚本
 
@@ -203,7 +203,7 @@ python main.py --host 127.0.0.1 --port 0
 
 诊断实现见 `diagnostics.py`（JSONL 事件、`HIKARU_ASR_TRACE_MS_RANGE` 时间窗过滤、`*_in_trace` 片段 diff）。
 
-桌面端启动 sidecar 时会写入 `asr-debug.log`（见 Tauri `asr.rs`；安装版通常在 `deps/asr-service/asr-debug.log`），并默认开启详细片段日志（`HIKARU_ASR_DEBUG_DETAIL=1`）。
+手动运行 sidecar 或显式测试 legacy 回退路径时可写入 `asr-debug.log`。当前生产 Native 路线不创建或读取 `deps/asr-service/asr-debug.log`。
 
 手动调试时可设置：
 
@@ -232,6 +232,5 @@ Parakeet 相关事件包括：
 
 1. 在 `engines/` 下实现 `AsrEngine` 子类（`load()` + `transcribe()`），通过惰性导入处理可选依赖。
 2. 在 `engines/registry.py` 的 `_REGISTRY` 中注册。
-3. 在 `src/constants/asr.ts` 增加引擎选项、模型映射和必要的专属说明；如果依赖组合不同，再同步 `src/constants/asrSetup.ts`。
-4. ASR 依赖配置必须继续传递实际选择的引擎名称；共享同一 profile 的多个引擎可以复用 requirements，但安装完成后要验证所选引擎本身存在且可用。
-5. 运行 `pnpm asr:prepare-resource` 同步打包模板，并补充 Python、前端及 Rust 对应测试。
+3. 补充 sidecar 单元测试，并在源码环境中验证对应 Python profile。
+4. 若要把引擎加入桌面产品，必须另建独立 Native/runtime/model/frontend 发布任务；不要通过 `pnpm asr:prepare-resource` 把此目录重新复制进发布包，也不要把 Python availability 当作生产支持依据。

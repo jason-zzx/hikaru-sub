@@ -91,6 +91,7 @@ export function TranscribeView() {
 
   // 转录任务
   const [transcribing, setTranscribing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [job, setJob] = useState<AsrJobSnapshot | null>(null);
   const [asrError, setAsrError] = useState<string | null>(null);
   const [resultCount, setResultCount] = useState<number | null>(null);
@@ -99,6 +100,7 @@ export function TranscribeView() {
   const mountedRef = useRef(true);
   const pollingRef = useRef(false);
   const jobIdRef = useRef<string | null>(null);
+  const cancelRequestedRef = useRef(false);
   const modelManagerRef = useRef<ModelManagerHandle | null>(null);
   const confirmDownloadBusyRef = useRef(false);
   const availability = useAsrAvailability(engine, model, device);
@@ -413,18 +415,33 @@ export function TranscribeView() {
         useVad: false,
         vadConfig: null,
       });
-      if (
-        !mountedRef.current ||
-        !pollingRef.current ||
-        !documentGuard.unchanged()
-      ) {
+      if (!mountedRef.current) {
+        pollingRef.current = false;
+        cancelRequestedRef.current = false;
+        updateTask("asr", { status: "idle" });
+        void cancelAsr(jobId).catch(() => undefined);
+        return;
+      }
+      if (cancelRequestedRef.current || !pollingRef.current) {
+        pollingRef.current = false;
+        try {
+          await cancelAsr(jobId);
+        } catch {
+          // 用户取消已生效；后端启动竞态的取消错误不覆盖用户原因。
+        }
+        cancelRequestedRef.current = false;
+        updateTask("asr", { status: "idle" });
+        setAsrError("已取消转录");
+        setTranscribing(false);
+        setCancelling(false);
+        return;
+      }
+      if (!documentGuard.unchanged()) {
         pollingRef.current = false;
         void cancelAsr(jobId).catch(() => undefined);
         updateTask("asr", { status: "error" });
-        if (mountedRef.current) {
-          setAsrError("字幕或工作视频已发生变化，已取消启动转录");
-          setTranscribing(false);
-        }
+        setAsrError("字幕或工作视频已发生变化，已取消启动转录");
+        setTranscribing(false);
         return;
       }
       jobIdRef.current = jobId;
@@ -435,10 +452,21 @@ export function TranscribeView() {
       );
     } catch (e) {
       pollingRef.current = false;
-      if (mountedRef.current) {
-        setAsrError(`启动转录失败：${String(e)}`);
-        setTranscribing(false);
+      if (!mountedRef.current) {
+        cancelRequestedRef.current = false;
+        updateTask("asr", { status: "idle" });
+        return;
       }
+      if (cancelRequestedRef.current) {
+        cancelRequestedRef.current = false;
+        updateTask("asr", { status: "idle" });
+        setAsrError("已取消转录");
+        setTranscribing(false);
+        setCancelling(false);
+        return;
+      }
+      setAsrError(`启动转录失败：${String(e)}`);
+      setTranscribing(false);
       updateTask("asr", { status: "error" });
     }
   };
@@ -452,8 +480,9 @@ export function TranscribeView() {
       setAsrError(availability.unavailableReason || "当前转录路线不可用。");
       return;
     }
-    if (modelDownloading || transcribing || checkingModel) return;
+    if (modelDownloading || transcribing || checkingModel || cancelling) return;
 
+    cancelRequestedRef.current = false;
     setCheckingModel(true);
     setAsrError(null);
     try {
@@ -504,23 +533,34 @@ export function TranscribeView() {
 
   const handleCancel = async () => {
     const jobId = jobIdRef.current;
-    // 立即停止轮询并恢复 UI，给出即时反馈
+    cancelRequestedRef.current = true;
     pollingRef.current = false;
     jobIdRef.current = null;
     setJob(null);
     setTranscribing(false);
+    setCheckingModel(false);
+    setCancelling(true);
+    setAsrError("已取消转录");
     updateTask("asr", { status: "idle" });
     if (!jobId) return;
     try {
-      await cancelAsr(jobId); // 通知后端在下个片段边界停止
+      await cancelAsr(jobId);
     } catch {
-      // 忽略取消请求本身的错误，轮询会反映最终状态
+      // 用户取消提示保持稳定，后端取消错误不改写实际原因。
+    } finally {
+      cancelRequestedRef.current = false;
+      if (mountedRef.current) setCancelling(false);
     }
   };
 
   const percent = job ? Math.round(job.progress * 100) : 0;
+  const hasMeasuredProgress = !!job && job.processedMs > 0;
   const settingsLocked =
-    transcribing || modelDownloading || checkingModel || confirmDownloadOpen;
+    transcribing ||
+    cancelling ||
+    modelDownloading ||
+    checkingModel ||
+    confirmDownloadOpen;
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
@@ -663,21 +703,31 @@ export function TranscribeView() {
       >
         {asrError && <p className="text-sm text-danger">{asrError}</p>}
 
-        {job && transcribing && (
+        {transcribing && (
           <div className="flex flex-col gap-2">
             <ProgressBar
-              percent={percent}
-              label={`${job.status === "pending" ? "排队中" : "转录中"} ${percent}%`}
+              percent={hasMeasuredProgress ? percent : null}
+              label={
+                !job
+                  ? "正在启动 Native ASR…"
+                  : !hasMeasuredProgress
+                    ? job.status === "pending"
+                      ? "正在加载 Native ASR 模型…"
+                      : "正在处理首个音频片段…"
+                    : `转录中 ${percent}%`
+              }
             />
-            <div className="flex flex-wrap gap-4 text-xs text-text-muted">
-              <span>
-                进度 {formatMs(job.processedMs)} / {formatMs(job.durationMs)}
-              </span>
-              <span>已生成 {job.segmentCount} 段</span>
-              {job.detectedLanguage && (
-                <span>检测语言 {job.detectedLanguage}</span>
-              )}
-            </div>
+            {job && (
+              <div className="flex flex-wrap gap-4 text-xs text-text-muted">
+                <span>
+                  进度 {formatMs(job.processedMs)} / {formatMs(job.durationMs)}
+                </span>
+                <span>已生成 {job.segmentCount} 段</span>
+                {job.detectedLanguage && (
+                  <span>检测语言 {job.detectedLanguage}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -716,15 +766,18 @@ export function TranscribeView() {
                 availabilityPending ||
                 !availability.routeAvailable ||
                 modelDownloading ||
-                checkingModel
+                checkingModel ||
+                cancelling
               }
               className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {checkingModel
-                ? "检测模型…"
-                : resultCount !== null
-                  ? "重新转录"
-                  : "开始转录"}
+              {cancelling
+                ? "取消中…"
+                : checkingModel
+                  ? "检测模型…"
+                  : resultCount !== null
+                    ? "重新转录"
+                    : "开始转录"}
             </Button>
           )}
           {!audioReady && !transcribing && (

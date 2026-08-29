@@ -1,0 +1,10 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review the complete frontend-to-Tauri-to-worker and release-resource data flow for split routing or stale contracts."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Verify the removed packaged sidecar tree and duplicate support/synchronization paths were not reintroduced."}
+{"file":".trellis/spec/tauri/index.md","reason":"Check Tauri ownership and mandatory quality pointers."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Verify one-policy Native routing, no Python fallback, runtime/model identity, cancellation/recovery, packaging, size, and license gates."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Verify installed/portable path behavior, bounded managed roots, probe/storage contracts, and no destructive cleanup."}
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Apply Rust tests, error/logging, privacy, and release-quality review rules."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Ensure T17 availability/no-Python UI and typed bridge remain accurate after cutover."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check exact model/runtime evidence identity, output legality, diagnostic quality policy, and private-data exclusions."}
+{"file":".trellis/spec/asr/directory-structure.md","reason":"Verify the sidecar remains development-only source and absent from packaged Tauri resources."}
+{"file":".trellis/tasks/08-28-native-asr-release-cutover/research/release-cutover-audit.md","reason":"Compare implementation against the audited seams, frozen identities, forbidden package contents, documentation drift, and rollback risks."}

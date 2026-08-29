@@ -14,7 +14,7 @@ In this repo the runtime layers are:
 |-------|------|------|
 | Frontend (React) | `src/` | UI, ASS parse/edit/serialize, translation HTTP, Zustand, Tauri wrappers |
 | Tauri (Rust) | `src-tauri/` | File I/O, FFmpeg, paths/portable, sidecar process, download/clip/burn, media HTTP |
-| ASR (Python) | `asr-service/` | Inference engines, transcription jobs, model download inside sidecar |
+| ASR runtime | `native-asr/` worker; `asr-service/` legacy source | Production Native inference/protocol; historical Python engine development |
 
 Putting logic in the wrong layer (e.g. Whisper in Rust, FFmpeg in React, ASS merge rules in Python) causes duplicated contracts and half-fixed bugs.
 
@@ -23,7 +23,7 @@ Putting logic in the wrong layer (e.g. Whisper in Rust, FFmpeg in React, ASS mer
 ## Primary Data Flow
 
 ```text
-UI (React) --invoke--> Tauri commands --spawn/HTTP--> ASR sidecar
+UI (React) --invoke--> Tauri commands --spawn/JSONL--> Native ASR worker
                 |                |
                 v                v
          ASS files / VideoSession paths     audio.wav + transcription
@@ -39,7 +39,7 @@ UI (React) --invoke--> Tauri commands --spawn/HTTP--> ASR sidecar
 
 - **File I/O, FFmpeg, process mgmt, download/clip/burn, portable paths** → Tauri
 - **ASS parse/edit/serialize, translation API, UI, job pollers** → React
-- **ASR inference only** → Python sidecar
+- **Production ASR inference only** → independent Native worker; Python sidecar is development/rollback source
 - **New Tauri command wiring** must stay intact: Rust impl → `lib.rs` register → `src/services/tauri.ts` → UI
 
 Global hard rules: [`/AGENTS.md`](/AGENTS.md).
@@ -54,8 +54,8 @@ Draw how data moves for *this* feature. Example — transcription:
 
 ```text
 Video path → prepare_video_session → extract_audio → start_asr
-  → sidecar /transcribe → segments / optional ASS write
-  → frontend load/parse ASS → projectStore cues → editor
+  → Native worker JSONL → segments / recovery + fallback ASS
+  → frontend authoritative ASS write/load → projectStore cues → editor
 ```
 
 For each arrow ask: format, validation owner, failure mode.
@@ -84,9 +84,9 @@ For each boundary, pin:
 
 ### Mistake 1: Wrong layer for the work
 
-**Bad**: Calling Whisper from Rust, or shelling FFmpeg from React.
+**Bad**: Running model inference inside the Tauri process, or shelling FFmpeg from React.
 
-**Good**: React invokes Tauri; Tauri runs FFmpeg / proxies ASR; Python runs engines.
+**Good**: React invokes Tauri; Tauri runs FFmpeg and manages the independent Native worker; the worker runs production inference. The Python sidecar is used only for intentional legacy development.
 
 ### Mistake 2: Breaking the command wiring chain
 

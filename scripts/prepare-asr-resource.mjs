@@ -1,72 +1,36 @@
-import { cpSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   readRuntimeLock,
   verifyRuntimeArchive,
 } from "./verify-native-asr-runtime.mjs";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
-const source = join(root, "asr-service");
-const target = join(root, "src-tauri", "resources", "asr-service");
-const runtimeLockPath = join(
-  root,
-  "native-asr",
-  "runtime",
-  "windows-x64-cpu-lock.json",
-);
-const nativeRuntimeTarget = join(root, "src-tauri", "resources", "native-asr");
+const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
 
-const ignoredNames = new Set([
-  ".cache",
-  ".gitignore",
-  ".mypy_cache",
-  ".pytest_cache",
-  ".ruff_cache",
-  ".venv",
-  "__pycache__",
-  "benchmarks",
-  "model-cache",
-  "models",
-  "tests",
-  "venv",
-]);
+export function prepareAsrResources(root = defaultRoot) {
+  const legacyTarget = join(root, "src-tauri", "resources", "asr-service");
+  const runtimeLockPath = join(
+    root,
+    "native-asr",
+    "runtime",
+    "windows-x64-cpu-lock.json",
+  );
+  const nativeRuntimeTarget = join(root, "src-tauri", "resources", "native-asr");
 
-function shouldCopy(src) {
-  const rel = relative(source, src);
-  if (!rel) return true;
-  const parts = rel.split(/[\\/]+/);
-  if (parts.some((part) => ignoredNames.has(part))) return false;
-  if (parts.some((part) => part.endsWith(".egg-info"))) return false;
-  if (parts.some((part) => part.endsWith(".log"))) return false;
-  return true;
+  rmSync(legacyTarget, { recursive: true, force: true });
+
+  const runtimeLock = readRuntimeLock(runtimeLockPath);
+  return verifyRuntimeArchive({
+    archivePath: join(root, runtimeLock.artifact.path),
+    lockPath: runtimeLockPath,
+    extractTo: nativeRuntimeTarget,
+  });
 }
 
-if (!existsSync(join(source, "main.py"))) {
-  throw new Error(`missing asr-service template: ${source}`);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const verifiedRuntime = prepareAsrResources();
+  console.log(
+    `prepared Native ASR runtime: ${verifiedRuntime.runtimeRoot} (${verifiedRuntime.archiveSha256})`,
+  );
 }
-
-rmSync(target, { recursive: true, force: true });
-mkdirSync(target, { recursive: true });
-
-cpSync(source, target, {
-  recursive: true,
-  filter(src) {
-    if (!shouldCopy(src)) return false;
-    const stats = statSync(src);
-    return stats.isDirectory() || stats.isFile();
-  },
-});
-
-console.log(`prepared ASR resource: ${target}`);
-
-const runtimeLock = readRuntimeLock(runtimeLockPath);
-const runtimeArchive = join(root, runtimeLock.artifact.path);
-const verifiedRuntime = verifyRuntimeArchive({
-  archivePath: runtimeArchive,
-  lockPath: runtimeLockPath,
-  extractTo: nativeRuntimeTarget,
-});
-console.log(
-  `prepared Native ASR runtime: ${verifiedRuntime.runtimeRoot} (${verifiedRuntime.archiveSha256})`,
-);
