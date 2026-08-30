@@ -101,7 +101,7 @@ option(
   OFF)
 option(
   HIKARU_ASR_MVP_CPU_RUNTIME
-  "Restrict the final CPU worker to ordinary faster-whisper only"
+  "Restrict the final CPU worker to released CTranslate2 CPU routes"
   OFF)
 set(HIKARU_ASR_CRISPASR_RUNTIME_FILE "" CACHE FILEPATH "Locked CrispASR development runtime")
 set(HIKARU_ASR_CRISPASR_RUNTIME_SIZE "" CACHE STRING "Locked CrispASR development runtime size")
@@ -739,11 +739,11 @@ if(BUILD_TESTING)
       set_tests_properties(crispasr-release-route-disabled PROPERTIES TIMEOUT 30)
     endif()
     if(HIKARU_ASR_MVP_CPU_RUNTIME)
-      add_test(NAME mvp-non-whisper-route-disabled
+      add_test(NAME release-route-contract
         COMMAND "${Python3_EXECUTABLE}"
           "${CMAKE_CURRENT_SOURCE_DIR}/tests/assert_mvp_route_disabled.py"
           "$<TARGET_FILE:hikaru-asr-worker>")
-      set_tests_properties(mvp-non-whisper-route-disabled PROPERTIES TIMEOUT 30)
+      set_tests_properties(release-route-contract PROPERTIES TIMEOUT 30)
     endif()
     set_tests_properties(ctranslate2-whisper-core PROPERTIES TIMEOUT 30)
     if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)

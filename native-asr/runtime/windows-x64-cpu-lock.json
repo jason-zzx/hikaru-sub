@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "artifact": {
-    "id": "hikaru-asr-windows-x64-cpu-v2",
+    "id": "hikaru-asr-windows-x64-cpu-v3",
     "path": "native-asr/artifacts/windows-x64-cpu.zip",
     "root": "windows-x64/cpu/",
-    "sizeBytes": 6860450,
-    "sha256": "958eba83b2426a7904296df4d0756b83ec084c646dfec2f48327cf38abf85d75",
+    "sizeBytes": 6860684,
+    "sha256": "5177c87160e7b8e78685b7d61c99acf29f740071c7cbe79fdae2ba9d5cb1fbcf",
     "sourceDateEpoch": 1788048000
   },
   "buildInput": {
@@ -23,14 +23,15 @@
   "arch": "x64",
   "protocolVersion": 1,
   "candidateConfig": {
-    "id": "selected-cpu-timestamp-no-history-beam1-v2",
-    "sha256": "41dfef646990d7fc47ae3149f77b631b4a1229566c166abb866f67b2b6cca235"
+    "id": "released-ct2-cpu-faster-whisper-v2-kotoba-k2-v1",
+    "sha256": "acb186ba9ecbeb2a3152587420bd4f616d1d94bf8405a9d80657767d120fa6d5"
   },
   "capabilities": {
     "backend": "ctranslate2",
     "device": "cpu",
     "engines": [
-      "faster-whisper"
+      "faster-whisper",
+      "kotoba-faster-whisper"
     ],
     "vad": false,
     "crispasr": false,

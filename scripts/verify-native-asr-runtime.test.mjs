@@ -203,7 +203,7 @@ function fixture({
     capabilities: {
       backend: "ctranslate2",
       device: "cpu",
-      engines: ["faster-whisper"],
+      engines: ["faster-whisper", "kotoba-faster-whisper"],
       vad: false,
       crispasr: false,
       cuda: false,
@@ -472,7 +472,24 @@ describe("Native ASR runtime verifier", () => {
     expect(() => verifyRuntimeArchive({ archivePath: hash.archive, lockPath: hash.lockPath })).toThrow(
       /manifest\/checksum mismatch/,
     );
-  }, 20_000);
+    for (const engines of [
+      ["faster-whisper"],
+      ["kotoba-faster-whisper", "faster-whisper"],
+      ["faster-whisper", "kotoba-faster-whisper", "qwen3-asr"],
+    ]) {
+      const capability = fixture({
+        lockMutation(lock) {
+          lock.capabilities = { ...lock.capabilities, engines };
+        },
+      });
+      expect(() =>
+        verifyRuntimeArchive({
+          archivePath: capability.archive,
+          lockPath: capability.lockPath,
+        }),
+      ).toThrow(/manifest identity/);
+    }
+  }, 30_000);
 
   it("preserves the previous extraction on verification failure and swaps valid output", () => {
     const valid = fixture();

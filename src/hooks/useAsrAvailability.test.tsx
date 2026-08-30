@@ -39,14 +39,24 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("useAsrAvailability", () => {
-  it("keeps all qualified Whisper models enabled while other routes stay deferred", () => {
+  it("keeps released Whisper and Kotoba routes enabled while other engines stay deferred", () => {
     const engines = [
       { name: "faster-whisper", available: true, device: "cpu" },
+      { name: "kotoba-faster-whisper", available: true, device: "cpu" },
+      { name: "parakeet", available: false, reason: "该引擎将在后续版本支持" },
       { name: "qwen3-asr", available: false, reason: "该引擎将在后续版本支持" },
+      { name: "reazonspeech-nemo", available: false, reason: "该引擎将在后续版本支持" },
     ];
     const engineOptions = asrEngineSelectOptions(engines, null);
     expect(engineOptions).toHaveLength(5);
-    expect(engineOptions.find((item) => item.value === "qwen3-asr")).toMatchObject({ disabled: true });
+    expect(
+      engineOptions.find((item) => item.value === "kotoba-faster-whisper")?.disabled,
+    ).toBeUndefined();
+    for (const engine of ["parakeet", "qwen3-asr", "reazonspeech-nemo"]) {
+      expect(engineOptions.find((item) => item.value === engine)).toMatchObject({
+        disabled: true,
+      });
+    }
 
     const whisperModels = ASR_ENGINE_MODELS["faster-whisper"].map(({ value }) => value);
     const modelOptions = asrModelSelectOptions("faster-whisper", {
@@ -67,7 +77,25 @@ describe("useAsrAvailability", () => {
     expect(modelOptions.map((item) => item.value)).toEqual(whisperModels);
     expect(modelOptions.every((item) => item.disabled !== true)).toBe(true);
 
-    const devices = asrDeviceSelectOptions(engines[0], false, null);
+    const kotobaModel = ASR_ENGINE_MODELS["kotoba-faster-whisper"][0].value;
+    const kotobaOptions = asrModelSelectOptions("kotoba-faster-whisper", {
+      engine: "kotoba-faster-whisper",
+      loading: false,
+      statuses: {
+        [kotobaModel]: status(
+          "kotoba-faster-whisper",
+          kotobaModel,
+          "supportedMissing",
+        ),
+      },
+      errors: {},
+    });
+    expect(kotobaOptions).toEqual([
+      expect.objectContaining({ value: kotobaModel }),
+    ]);
+    expect(kotobaOptions[0].disabled).toBeUndefined();
+
+    const devices = asrDeviceSelectOptions(engines[1], false, null);
     expect(devices.find((item) => item.value === "auto")?.disabled).toBeUndefined();
     expect(devices.find((item) => item.value === "cpu")?.disabled).toBeUndefined();
     expect(devices.find((item) => item.value === "cuda")).toMatchObject({ disabled: true });
