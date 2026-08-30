@@ -6,7 +6,7 @@ This file describes the licensing boundary for Hikaru Sub and the major runtime 
 
 The `LICENSE` file applies only to Hikaru Sub's original source code and is Apache License 2.0. Third-party code, binaries, Python packages, and model weights remain subject to their own licenses and notices.
 
-Windows release packages include the verified `hikaru-asr-windows-x64-cpu-v2` Native runtime and the manifest of approved runtime download sources. They do **not** include FFmpeg, a Python sidecar/interpreter/environment, optional Python engines, or model weights.
+Windows release packages include the verified `hikaru-asr-windows-x64-cpu-v3` Native runtime and the manifest of approved runtime download sources. They do **not** include FFmpeg, a Python sidecar/interpreter/environment, optional Python engines, or model weights.
 
 The Native runtime's machine-readable inventory is shipped at `native-asr/windows-x64/cpu/licenses/THIRD-PARTY-NOTICES.json` together with each required license file. `native-asr/runtime/windows-x64-cpu-lock.json` locks the exact payload, source, hash, license, attribution, and Microsoft runtime terms identity. Any future change to those bytes requires a new closed-world verification and package audit.
 
@@ -30,6 +30,7 @@ This document records the persistent runtime components. A release also needs an
 | [FFmpeg](https://ffmpeg.org/) and ffprobe | The actual binary's license controls. FFmpeg builds enabled with GPL components such as `libx264` are GPL-2.0-or-later. | Hikaru Sub invokes FFmpeg as an independent process. For every managed archive, retain its exact version, SHA-256, license output (`ffmpeg -L`), archive distributor, corresponding source, patches, and build configuration. The configured archive URLs are in `src-tauri/resources/runtime-dependency-sources.json`. |
 | [Systran Faster-Whisper conversions](https://huggingface.co/Systran) for `tiny`, `base`, `small`, `medium`, `large-v2`, and `large-v3` | MIT | Each supported model is downloaded independently on demand and never included in setup or portable packages. The bundled manifest locks its exact canonical repository, immutable revision, four required file sizes/SHA-256 values, attribution, and source URL. |
 | [dropbox-dash/faster-whisper-large-v3-turbo](https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo), revision `0a363e91…` | MIT | Canonical supported turbo conversion; downloaded on demand and governed by the same exact manifest/readiness contract. |
+| [kotoba-tech/kotoba-whisper-v2.0-faster](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.0-faster), revision `f44edd35…` | MIT | Supported Japanese-optimized CTranslate2 model; downloaded on demand. The manifest locks five exact files, including mandatory `preprocessor_config.json`, plus attribution and source URL. |
 
 ## Development and historical Python components not distributed
 
@@ -50,7 +51,7 @@ The repo-root `asr-service/` remains for development, historical engine research
 
 ## Model repositories
 
-Model cards and the license in each exact downloaded revision control use and redistribution. **No model weights are bundled.** The current production manifest enables exactly seven pinned Faster-Whisper revisions: `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo`. Other engine rows remain development metadata for independent follow-up work.
+Model cards and the license in each exact downloaded revision control use and redistribution. **No model weights are bundled.** The current production manifest enables seven pinned Faster-Whisper revisions (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`) and exact Kotoba `kotoba-tech/kotoba-whisper-v2.0-faster`. Qwen3, Parakeet, and ReazonSpeech rows remain deferred development metadata.
 
 | Model repository | License / obligation |
 | --- | --- |

@@ -10,7 +10,7 @@
 
 The sidecar owns its **development-only inference path**: pluggable Python engines, transcription jobs, model download status, ASS write-out when requested, and optional JSONL diagnostics.
 
-Production desktop ASR uses the independent Native CTranslate2 CPU worker with exact manifest readiness for `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo`; `large-v3` remains the frontend default. Tauri owns worker lifecycle and protocol orchestration; React owns UI, ASS editing, and translation.
+Production desktop ASR uses the independent Native CTranslate2 CPU worker with exact manifest readiness for seven Faster-Whisper models (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`) plus `kotoba-faster-whisper / kotoba-tech/kotoba-whisper-v2.0-faster`; `faster-whisper / large-v3` remains the frontend default. Tauri owns worker lifecycle and protocol orchestration; React owns UI, ASS editing, and translation.
 
 The repo-root `asr-service/` remains development and one-cycle rollback evidence. It is not copied to `src-tauri/resources/`, included in NSIS/portable artifacts, or used by the production default route. Do not restore packaged template synchronization as part of ordinary sidecar development.
 

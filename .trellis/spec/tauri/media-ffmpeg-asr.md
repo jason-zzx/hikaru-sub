@@ -75,7 +75,7 @@ Correct: … -vn -af aresample=async=1:first_pts=0 …     → return covered_ms
 
 ### Scope / Trigger
 
-Use the Rust host in `asr_worker.rs` for the production Native ASR route and for reviewed worker compatibility tests through the existing product job contract. Release/default routing, model list/status/download, and inference use the bundled CPU worker with the exact selected path from the seven-row Faster-Whisper manifest. `large-v3` remains the frontend default. `HIKARU_ASR_FAKE_WORKER` remains debug/test-only host injection and never selects the product route.
+Use the Rust host in `asr_worker.rs` for the production Native ASR route and for reviewed worker compatibility tests through the existing product job contract. Release routing, model list/status/download, and inference use the bundled CPU worker with the exact selected path from the eight-row manifest: seven Faster-Whisper models plus exact Kotoba. `faster-whisper / large-v3` remains the frontend default. `HIKARU_ASR_FAKE_WORKER` remains debug/test-only host injection and never selects the product route.
 
 ### Signatures
 
@@ -198,7 +198,7 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 
 - One immutable process-lifetime `AsrRoutePolicy` selects engine list, model status/download/progress, and inference as one family. Never let Native direct download feed legacy Python launch.
 - `AsrState::default` is always `NativeMvp` in debug and Release. A valid debug fake host changes only the injected host executable; there is no persisted route setting or Release environment switch.
-- Native production accepts the `faster-whisper` engine, `auto|cpu`, Japanese source, and no VAD. Actual model support is authoritative in the bundled manifest: `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo`. The route resolves artifact v2 from `resource_dir()/native-asr/windows-x64/cpu` and passes only the selected exact hash-verified model path to `ResolvedNativeLaunch`; `large-v3` remains the frontend default.
+- Native production accepts `faster-whisper|kotoba-faster-whisper`, `auto|cpu`, Japanese source, and no VAD. Actual model support is authoritative in the bundled manifest: seven Faster-Whisper IDs plus exact `kotoba-tech/kotoba-whisper-v2.0-faster`. The route resolves artifact v3 from `resource_dir()/native-asr/windows-x64/cpu` and passes only the selected exact hash-verified model path to `ResolvedNativeLaunch`; `faster-whisper / large-v3` remains the frontend default. Kotoba selects the archived K2 profile and requires non-empty `preprocessor_config.json` plus loaded 128 Mel.
 - Native preflight/runtime/model failures return directly. They never call `ensure_base_url` or silently fall back to Python.
 - Model status keeps compatibility booleans and adds `disposition`, `backend`, `revision`, `origin`, and `reason`. Download progress keeps current polling fields and maps T12 `sourceEndpoint` to compatibility field `hfEndpoint`.
 - Progress/cancel check the Native host first. In Native mode, an unknown job returns the established missing-job error rather than starting the sidecar.
@@ -208,17 +208,17 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 | Condition | Result |
 |---|---|
 | Release/default | Entire command family uses the Native CPU route |
-| Any manifest-backed model ready + CPU/auto | Resolve runtime v2 + that model's exact path; start existing host |
+| Any released manifest-backed Faster-Whisper/Kotoba model ready + CPU/auto | Resolve runtime v3 + that model's exact path; start existing host |
 | Native model missing | Controlled download-required error; release unactivated slot |
 | Post-MVP/unknown model or engine | Explicit unavailable/unsupported result; no fallback |
 | CUDA/Vulkan/non-Japanese/VAD request | Reject before worker launch |
-| Missing/wrong runtime v2 identity or required entry | Controlled runtime error; no sidecar |
+| Missing/wrong runtime v3 identity, ordered engine capability, or required entry | Controlled runtime error; no sidecar |
 | Native progress/cancel unknown job | `转录任务不存在`; no sidecar |
 
 ### 5. Good / Base / Bad Cases
 
 - Good: `NativeMvp` + any exact ready manifest model + CPU -> one host job with unchanged progress/cancel/recovery behavior.
-- Base: normal Release build -> packaged seven-model Faster-Whisper CPU route, with `large-v3` selected by default and no Python dependency.
+- Base: normal Release build -> packaged seven-model Faster-Whisper + exact Kotoba CPU route, with `faster-whisper / large-v3` selected by default and no Python dependency.
 - Bad: model commands use T12 but `start_asr` still enters Python, or a Native preflight error falls through to `ensure_base_url`.
 
 ### 6. Tests Required
@@ -228,7 +228,7 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 - CPU/auto acceptance for every manifest-backed model; engine/device/language/VAD and deferred/unknown model rejection.
 - Native missing-job progress/cancel does not contact the sidecar.
 - Existing host reducer, recovery, crash, cancellation, active-slot, and full Cargo regressions.
-- `pnpm build` for additive TypeScript payload compatibility and `pnpm asr:runtime:verify` for the exact runtime v2 archive.
+- `pnpm build` for additive TypeScript payload compatibility and `pnpm asr:runtime:verify` for the exact runtime v3 archive.
 
 ### 7. Wrong vs Correct
 
@@ -265,8 +265,8 @@ Tracked identities:
 
 ```text
 native-asr/runtime/windows-x64-cpu-lock.json
-  artifact.id = hikaru-asr-windows-x64-cpu-v2
-  candidateConfig.id = selected-cpu-timestamp-no-history-beam1-v2
+  artifact.id = hikaru-asr-windows-x64-cpu-v3
+  candidateConfig.id = released-ct2-cpu-faster-whisper-v2-kotoba-k2-v1
 native-asr/build-inputs/windows-x64-cpu-ct2.zip   # build/link input only
 native-asr/artifacts/windows-x64-cpu.zip          # the only native archive shipped
 ```
@@ -275,9 +275,9 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 
 ### Contracts
 
-- `windows-x64-cpu-lock.json` is the outer authority for artifact/build-input size and SHA-256, source/toolchain identities, Candidate A config, exact payload roles, import allowlists, license components/Rust packages, forbidden capabilities/files, and size budgets.
+- `windows-x64-cpu-lock.json` is the outer authority for artifact/build-input size and SHA-256, source/toolchain identities, the released Faster-Whisper/Kotoba configuration bundle, exact payload roles, import allowlists, license components/Rust packages, forbidden capabilities/files, and size budgets.
 - The final preset sets `HIKARU_ASR_MVP_CPU_RUNTIME=ON`, reproducible-build mode on, and Candidate B/CUDA/CrispASR development flags off. Development-only fake/CrispASR/Parakeet targets are excluded from the default final target graph.
-- Final capability is exactly ordinary `faster-whisper` through CTranslate2 on CPU. `useVad=true` returns `vad_not_built`; GPU requests return `cuda_not_built`; CrispASR, Kotoba, and other non-MVP routes return the controlled route-not-built error. Missing DLLs are not capability control.
+- Final capability is exactly ordered engines `["faster-whisper", "kotoba-faster-whisper"]` through CTranslate2 on CPU. `useVad=true` returns `vad_not_built` at Tauri validation; direct Kotoba worker requests return `kotoba_vad_not_qualified`; GPU requests return `cuda_not_built`; CrispASR and other unreleased routes return a controlled route error. Missing DLLs are not capability control.
 - Runtime verification is closed-world: archive root/path safety, outer hash, manifest/checksum/file closure, source/toolchain/config equality, imports, license inventory, forbidden content, and ASCII/UTF-16 private build paths must all pass before extraction.
 - Resource preparation verifies the ZIP, extracts to a temporary sibling, verifies the tree again, then atomically replaces `src-tauri/resources/native-asr/`. NSIS and portable staging consume that same generated tree.
 - If any runtime payload byte, runtime-manifest field, or target graph changes, rebuild two independent roots to a byte-identical complete ZIP, rerun model-backed installed/portable smoke against the final worker SHA, rebuild NSIS/portable packages, and refresh the handoff. Evidence for an older worker is invalid even if source code is unchanged.
@@ -296,23 +296,23 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 | Manifest source/toolchain/config/capability/import/license data differs from outer lock or payload bytes | Verifier rejects it |
 | Final preset enables a development capability or default-builds a development-only target | CMake configure/check fails; artifact is not releasable |
 | `useVad=true` on bundled CPU worker | Structured `vad_not_built` before model loading |
-| Non-CPU or non-MVP backend/engine request | Structured controlled not-built error; no fallback |
+| Non-CPU or unreleased backend/engine request | Structured controlled route error; no fallback |
 | Prepared runtime differs from tracked ZIP, or NSIS/portable embeds a stale runtime or model manifest | Packaging/evidence gate fails; rebuild and re-audit both packages |
 | Setup `>80 MiB`, portable ZIP `>90 MiB`, unpacked runtime `>250 MiB`, or model count `>0` | Release blocker |
 
 ### Good/Base/Bad Cases
 
-- Good: two independent clean roots produce the same ZIP; shared verifier accepts it; all seven models pass short smoke, `large-v2` passes the `>10` minute gate, existing `large-v3` regressions remain green, and rebuilt packages embed all seven support identities.
+- Good: two independent clean roots produce the same ZIP; shared verifier accepts it; all seven Faster-Whisper models plus exact Kotoba pass short smoke, `large-v2` and Kotoba pass their `>10` minute gates, existing `large-v3` regressions remain green, and rebuilt packages embed all eight support identities.
 - Base: normal frontend/Tauri development and Release use the same packaged Native resource identity; debug fake-worker injection may replace only the host executable in tests.
 - Bad: update the worker/manifest, reuse old smoke or package hashes, or let release packaging rebuild/download a different runtime. The handoff then describes bytes users will not receive.
 
 ### Tests Required
 
 - Verifier mutation tests: outer/file/manifest hash drift, missing/extra/wrong DLL, traversal/absolute paths, forbidden capability/file, private-path leakage, source/toolchain/config mismatch, incomplete/duplicate license inventory, and Microsoft Runtime notice/document identity drift.
-- Final CMake/CTest: protocol core, ordinary CT2 core, CrispASR-route rejection, and non-Whisper-route rejection; final default target graph must not build development-only workers/tests.
+- Final CMake/CTest: protocol core, CT2 core (ordinary + Kotoba K2), CrispASR-route rejection, and release-route contract (Kotoba available/no-VAD + unreleased route rejection); final default target graph must not build development-only workers/tests.
 - Build gate: two independent roots, complete ZIP byte comparison, restricted PATH launch, import closure, and non-system module containment under the artifact root.
-- Model-backed gate against the final worker SHA: all seven short smokes, `large-v2` `>10` minute smoke, `large-v3` regression, installed-like/portable-like representative smokes, UTF-8 JSONL-only output, non-empty ordered positive-duration audio-bounded segments, normal completion, controlled unsupported request, host recovery/active-gate, and cancel within two seconds.
-- Release gate: `pnpm asr:prepare-resource`, full tests/build/Cargo tests, `pnpm release:local`, runtime identity equality plus seven-model identity closure in extracted NSIS and portable output, package sizes, model count zero, forbidden-file count zero, `git diff --check`, and no staged files unless the user explicitly authorizes commit preparation.
+- Model-backed gate against the final worker SHA: seven Faster-Whisper short smokes plus exact Kotoba short smoke, `large-v2` and Kotoba `>10` minute smoke, `large-v3` regression, installed-like/portable-like representative smokes, UTF-8 JSONL-only output, non-empty ordered positive-duration audio-bounded segments, normal completion, controlled unsupported request, host recovery/active-gate, and cancel within two seconds.
+- Release gate: `pnpm asr:prepare-resource`, full tests/build/Cargo tests, `pnpm release:local`, runtime identity equality plus eight-model identity closure in extracted NSIS and portable output, package sizes, model count zero, forbidden-file count zero, `git diff --check`, and no staged files unless the user explicitly authorizes commit preparation.
 
 ### Wrong vs Correct
 
@@ -410,14 +410,16 @@ Bundled authority:
 src-tauri/resources/native-asr-models.json
   schemaVersion = 1
   faster-whisper/{tiny,base,small,medium,large-v2,large-v3,large-v3-turbo}
+  kotoba-faster-whisper/kotoba-tech/kotoba-whisper-v2.0-faster
   each row = canonical repository + immutable 40-char revision + MIT attribution
              + exact model-config/model-weights/tokenizer/vocabulary size/SHA closure
+  Kotoba additionally requires exact preprocessor_config.json size/SHA closure
 ```
 
 ### Contracts
 
-- The bundled manifest is the sole model identity authority. Reject unsupported schemas, duplicate logical/model identities, unsafe segments, malformed hashes, missing roles, Windows reserved/trailing-dot aliases, and ASCII case-colliding identities/paths before network or filesystem mutation.
-- Every ordinary Faster-Whisper row requires exactly four logical roles: `config.json`, `model.bin`, `tokenizer.json`, and one vocabulary file. Systran `tiny/base/small/medium/large-v2` use `vocabulary.txt`; `large-v3` and canonical Dropbox `large-v3-turbo` use `vocabulary.json`. Do not extend Kotoba's `preprocessor_config.json` requirement to ordinary Whisper.
+- The bundled manifest is the sole model identity authority. Reject unsupported schemas, duplicate logical/model identities, unsafe one-segment or exact `owner/name` model IDs, malformed hashes, missing roles, Windows reserved/trailing-dot aliases, and ASCII case-colliding identities/paths before network or filesystem mutation.
+- Every ordinary Faster-Whisper row requires exactly four logical roles: `config.json`, `model.bin`, `tokenizer.json`, and one vocabulary file. Systran `tiny/base/small/medium/large-v2` use `vocabulary.txt`; `large-v3` and canonical Dropbox `large-v3-turbo` use `vocabulary.json`. Exact Kotoba additionally requires non-empty hash-verified `preprocessor_config.json`; do not extend that requirement to ordinary Whisper.
 - Readiness order is exact direct install, then exact immutable HF snapshot. Every required file must match size and SHA-256; readiness hashing and blocking directory verification run through `spawn_blocking` from async callers.
 - The process-owned manager caches only successful exact ready resolutions for the current process. Repeated status and start preflight reuse that immutable identity; missing/corrupt results are not cached, and a verified managed download may seed the cache after publication. A new process always performs fresh exact verification.
 - Direct model paths and required files reject symlinks/reparse points. Legacy HF snapshot/file canonical targets must remain below the canonical managed HF root; legacy snapshots are read-only and never copied, mutated, or deleted by the model manager.
@@ -448,17 +450,17 @@ src-tauri/resources/native-asr-models.json
 
 ### Good / Base / Bad Cases
 
-- Good: any of the seven exact manifest rows → resumable verified staging → immutable direct install → exact resolved path accepted by the packaged CPU worker; a sibling model job remains independent.
-- Base: exact legacy HF snapshot exists → full validation → reuse in place through the production Native route; no copy or Python fallback occurs.
+- Good: any of the eight exact manifest rows → resumable verified staging → immutable direct install → exact resolved path accepted by the packaged CPU worker; a sibling model job remains independent.
+- Base: exact legacy HF snapshot exists, including Kotoba's required preprocessor file → full validation → reuse in place through the production Native route; no copy or Python fallback occurs.
 - Bad: accept `main`, model-name-only directories, same-name framework caches, Windows path aliases, escaped symlinks, or stream directly into the final model directory.
 
 ### Tests Required
 
-- Manifest: exact seven-row four-file closure/license/source plus schema, duplicate, unsafe segment, Windows alias, case-collision, hash, missing-role, correct vocabulary form, and no ordinary preprocessor requirement.
-- Readiness: direct/legacy preference, missing/wrong-size/wrong-hash/wrong-revision/framework-cache failure, direct link rejection, and contained/escaped legacy link behavior.
+- Manifest: exact eight-row closure/license/source plus schema, duplicate, unsafe one-segment/repository-style IDs, Windows alias, case-collision, hash, missing-role, correct vocabulary form, exact Kotoba preprocessor, and no ordinary preprocessor requirement.
+- Readiness: direct/legacy preference, Kotoba missing/corrupt preprocessor rejection, missing/wrong-size/wrong-hash/wrong-revision/framework-cache failure, direct link rejection, and contained/escaped legacy link behavior.
 - Download: fresh, matching resume, ignored range, incompatible range, `416`, oversized partial, interruption preservation, bad hash, complete-stage publication, repair rollback, same-model coalescing, and concurrent different-model job/publication identity isolation.
 - Gates: focused `asr_models` tests including ready-cache reuse/missing non-cache/download seeding, full Cargo tests, `pnpm build`, task validation, implementation `rustfmt`, and `git diff --check`.
-- Real handoff: all seven exact cached models pass short worker smoke; `large-v2` also passes `>10` minute smoke and exact lib-only host success/cancel/reap; existing `large-v3` and installed/portable regressions remain green.
+- Real handoff: all seven Faster-Whisper models plus exact Kotoba pass short worker smoke; `large-v2` and Kotoba also pass `>10` minute smoke, exact lib-only host success/cancel/reap, offline cached rerun, and installed/portable regressions.
 
 ### Wrong vs Correct
 
