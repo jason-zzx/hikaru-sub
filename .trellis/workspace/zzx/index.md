@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 35
-- **Last Active**: 2026-08-29
+- **Total Sessions**: 36
+- **Last Active**: 2026-08-30
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1222 | Active |
+| `journal-1.md` | ~1255 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 36 | 2026-08-30 | Expand Native Faster-Whisper model support | `2623acd` | `dev-crisp-asr` |
 | 35 | 2026-08-29 | Complete Native ASR release cutover | `4c10a38` | `dev-crisp-asr` |
 | 34 | 2026-08-28 | Migrate Native ASR Frontend UX | `10776fe`, `5e787b9` | `dev-crisp-asr` |
 | 33 | 2026-08-28 | Migrate Native ASR Runtime and Settings Backend | `b9123ea`, `34398a4` | `dev-crisp-asr` |
