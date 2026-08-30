@@ -1253,3 +1253,28 @@ Enabled seven exact Faster-Whisper CPU models, added the generic large-v2 timest
 ### Next Steps
 
 - None - task complete
+
+
+## Session 37: Native Kotoba production integration
+<!-- trellis-session: v=2 fp=293a5937ff40b4bd -->
+
+**Date**: 2026-08-31
+**Task**: Native Kotoba production integration
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Integrated exact Native Kotoba Whisper v2.0 into the bundled CPU ASR route, model delivery, Tauri availability and frontend workflow; rebuilt and verified runtime v3, synchronized documentation and specs, simplified redundant test scaffolding, and completed full frontend, Rust, runtime, packaging, and model-backed validation.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bd7f2f4` | feat(asr): Add Native Kotoba production support |
+| `6846458` | docs(asr): Document Native Kotoba production support |
+| `4de2060` | chore(task): Record Native Kotoba integration work |
+| `12369bc` | chore(task): Normalize task metadata line endings |
+
+### Status
+
+[OK] **Completed**
