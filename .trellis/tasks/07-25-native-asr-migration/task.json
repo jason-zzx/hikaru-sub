@@ -2,7 +2,7 @@
   "id": "native-asr-migration",
   "name": "native-asr-migration",
   "title": "Native ASR migration",
-  "description": "Ship the earliest safe Windows x64 Native ASR MVP. Enforced order: T16 complete -> T17 frontend migration -> T18 release cutover -> post-MVP Faster-Whisper model expansion.",
+  "description": "Ship and expand the Windows x64 Native ASR production route. Completed: Native MVP and seven-model Faster-Whisper CPU support. Next: integrate the accepted Kotoba K2 route, exact model delivery, bundled CPU runtime, Tauri routing, and frontend UX; Kotoba quality revision is excluded from this parent.",
   "status": "planning",
   "dev_type": null,
   "scope": null,
@@ -37,17 +37,17 @@
     "08-20-native-asr-whisper-quality-revision",
     "08-20-native-asr-model-manager",
     "08-20-native-asr-qwen3-aligner",
-    "08-20-native-asr-kotoba-quality-revision",
     "08-20-native-asr-cpu-runtime-package",
     "08-25-native-asr-whisper-execution-parity-discovery",
     "08-25-native-asr-release-first-reprioritization",
     "08-26-native-asr-whisper-model-expansion",
     "08-27-native-asr-runtime-settings-backend",
     "08-28-native-asr-frontend-migration",
-    "08-28-native-asr-release-cutover"
+    "08-28-native-asr-release-cutover",
+    "08-30-native-asr-kotoba-integration"
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "T18 is accepted. 08-26-native-asr-whisper-model-expansion is the next executable child once the T18 active task is archived; keep it planning until then.",
+  "notes": "Native MVP and 08-26 Faster-Whisper model expansion are completed. 08-30-native-asr-kotoba-integration is the next executable child. The user removed 08-20-native-asr-kotoba-quality-revision from this parent; integration reuses accepted K2 and has no new quality-revision gate.",
   "meta": {}
 }
