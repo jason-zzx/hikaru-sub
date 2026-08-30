@@ -23,6 +23,14 @@ existing T18 ASR commands and T17 availability UI
 
 No new backend, downloader, command family, frontend registry, Python dependency, or GPU runtime is planned.
 
+## As-built outcome
+
+- The manifest-first architecture remained intact and now contains all seven supported ordinary Faster-Whisper models.
+- A real `large-v2` failure proved one shared worker defect: CT2 can emit one leading timestamp followed by text without a closing timestamp. The generic parser now bounds that segment to the consumed source window; no model-name branch was added.
+- Because worker bytes changed, the runtime was reproducibly frozen as `hikaru-asr-windows-x64-cpu-v2` with candidate `selected-cpu-timestamp-no-history-beam1-v2`.
+- All seven short smokes, the `large-v2` >10-minute gate, Native host success/cancel/reap, large-v3 regressions, installed/portable packaging, and final user manual acceptance passed.
+- Final evidence is in `research/final-trellis-check-report.md`; the remaining workflow boundary is user-authorized commit and finish-work archival.
+
 ## Activation boundary
 
 This design is based on the parent sequence:

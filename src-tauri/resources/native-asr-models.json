@@ -2,6 +2,206 @@
   "schemaVersion": 1,
   "models": [
     {
+      "logicalId": "faster-whisper/tiny",
+      "engine": "faster-whisper",
+      "model": "tiny",
+      "backend": "ctranslate2",
+      "format": "ctranslate2",
+      "repository": "Systran/faster-whisper-tiny",
+      "revision": "d90ca5fe260221311c53c58e660288d3deb8d356",
+      "license": {
+        "spdx": "MIT",
+        "attribution": "Systran conversion of openai/whisper-tiny",
+        "source": "https://huggingface.co/Systran/faster-whisper-tiny/tree/d90ca5fe260221311c53c58e660288d3deb8d356"
+      },
+      "files": [
+        {
+          "role": "model-config",
+          "path": "config.json",
+          "sizeBytes": 2249,
+          "sha256": "a73a28cdfe1c43ccc7202fa333d1f89c202477271407ae9a7f19afa52039cac8"
+        },
+        {
+          "role": "model-weights",
+          "path": "model.bin",
+          "sizeBytes": 75538270,
+          "sha256": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1"
+        },
+        {
+          "role": "tokenizer",
+          "path": "tokenizer.json",
+          "sizeBytes": 2203239,
+          "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+        },
+        {
+          "role": "vocabulary",
+          "path": "vocabulary.txt",
+          "sizeBytes": 459861,
+          "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+        }
+      ]
+    },
+    {
+      "logicalId": "faster-whisper/base",
+      "engine": "faster-whisper",
+      "model": "base",
+      "backend": "ctranslate2",
+      "format": "ctranslate2",
+      "repository": "Systran/faster-whisper-base",
+      "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+      "license": {
+        "spdx": "MIT",
+        "attribution": "Systran conversion of openai/whisper-base",
+        "source": "https://huggingface.co/Systran/faster-whisper-base/tree/ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
+      },
+      "files": [
+        {
+          "role": "model-config",
+          "path": "config.json",
+          "sizeBytes": 2309,
+          "sha256": "56a6d8110d311f19c8f0471e562832c7527f146b567275bfca59fcf7c184da9a"
+        },
+        {
+          "role": "model-weights",
+          "path": "model.bin",
+          "sizeBytes": 145217532,
+          "sha256": "d01c3014881c9c6f3133c182f3d2887eb6ca1c789a7538c5c007196857a0a6a9"
+        },
+        {
+          "role": "tokenizer",
+          "path": "tokenizer.json",
+          "sizeBytes": 2203239,
+          "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+        },
+        {
+          "role": "vocabulary",
+          "path": "vocabulary.txt",
+          "sizeBytes": 459861,
+          "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+        }
+      ]
+    },
+    {
+      "logicalId": "faster-whisper/small",
+      "engine": "faster-whisper",
+      "model": "small",
+      "backend": "ctranslate2",
+      "format": "ctranslate2",
+      "repository": "Systran/faster-whisper-small",
+      "revision": "536b0662742c02347bc0e980a01041f333bce120",
+      "license": {
+        "spdx": "MIT",
+        "attribution": "Systran conversion of openai/whisper-small",
+        "source": "https://huggingface.co/Systran/faster-whisper-small/tree/536b0662742c02347bc0e980a01041f333bce120"
+      },
+      "files": [
+        {
+          "role": "model-config",
+          "path": "config.json",
+          "sizeBytes": 2370,
+          "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828"
+        },
+        {
+          "role": "model-weights",
+          "path": "model.bin",
+          "sizeBytes": 483546902,
+          "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671"
+        },
+        {
+          "role": "tokenizer",
+          "path": "tokenizer.json",
+          "sizeBytes": 2203239,
+          "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+        },
+        {
+          "role": "vocabulary",
+          "path": "vocabulary.txt",
+          "sizeBytes": 459861,
+          "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+        }
+      ]
+    },
+    {
+      "logicalId": "faster-whisper/medium",
+      "engine": "faster-whisper",
+      "model": "medium",
+      "backend": "ctranslate2",
+      "format": "ctranslate2",
+      "repository": "Systran/faster-whisper-medium",
+      "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
+      "license": {
+        "spdx": "MIT",
+        "attribution": "Systran conversion of openai/whisper-medium",
+        "source": "https://huggingface.co/Systran/faster-whisper-medium/tree/08e178d48790749d25932bbc082711ddcfdfbc4f"
+      },
+      "files": [
+        {
+          "role": "model-config",
+          "path": "config.json",
+          "sizeBytes": 2257,
+          "sha256": "3622a2ddc41ec0e0fd4e68c13c6830f03b90c38d89aaad184de02c8c642cf807"
+        },
+        {
+          "role": "model-weights",
+          "path": "model.bin",
+          "sizeBytes": 1527906378,
+          "sha256": "9b45e1009dcc4ab601eff815b61d80e60ce3fd8c74c1a14f4a282258286b51ae"
+        },
+        {
+          "role": "tokenizer",
+          "path": "tokenizer.json",
+          "sizeBytes": 2203239,
+          "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+        },
+        {
+          "role": "vocabulary",
+          "path": "vocabulary.txt",
+          "sizeBytes": 459861,
+          "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+        }
+      ]
+    },
+    {
+      "logicalId": "faster-whisper/large-v2",
+      "engine": "faster-whisper",
+      "model": "large-v2",
+      "backend": "ctranslate2",
+      "format": "ctranslate2",
+      "repository": "Systran/faster-whisper-large-v2",
+      "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+      "license": {
+        "spdx": "MIT",
+        "attribution": "Systran conversion of openai/whisper-large-v2",
+        "source": "https://huggingface.co/Systran/faster-whisper-large-v2/tree/f0fe81560cb8b68660e564f55dd99207059c092e"
+      },
+      "files": [
+        {
+          "role": "model-config",
+          "path": "config.json",
+          "sizeBytes": 2796,
+          "sha256": "d86b7a7664a12559d644aa210a32ce9a7e03913e794b7ea4fb7182de69e273a7"
+        },
+        {
+          "role": "model-weights",
+          "path": "model.bin",
+          "sizeBytes": 3086912962,
+          "sha256": "bf2a9746382e1aa7ffff6b3a0d137ed9edbd9670c3b87e5d35f5e85e70d0333a"
+        },
+        {
+          "role": "tokenizer",
+          "path": "tokenizer.json",
+          "sizeBytes": 2203239,
+          "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+        },
+        {
+          "role": "vocabulary",
+          "path": "vocabulary.txt",
+          "sizeBytes": 459861,
+          "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+        }
+      ]
+    },
+    {
       "logicalId": "faster-whisper/large-v3",
       "engine": "faster-whisper",
       "model": "large-v3",
@@ -32,6 +232,46 @@
           "path": "tokenizer.json",
           "sizeBytes": 2480617,
           "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca"
+        },
+        {
+          "role": "vocabulary",
+          "path": "vocabulary.json",
+          "sizeBytes": 1068114,
+          "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
+        }
+      ]
+    },
+    {
+      "logicalId": "faster-whisper/large-v3-turbo",
+      "engine": "faster-whisper",
+      "model": "large-v3-turbo",
+      "backend": "ctranslate2",
+      "format": "ctranslate2",
+      "repository": "dropbox-dash/faster-whisper-large-v3-turbo",
+      "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+      "license": {
+        "spdx": "MIT",
+        "attribution": "dropbox-dash conversion of openai/whisper-large-v3-turbo",
+        "source": "https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+      },
+      "files": [
+        {
+          "role": "model-config",
+          "path": "config.json",
+          "sizeBytes": 2263,
+          "sha256": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e"
+        },
+        {
+          "role": "model-weights",
+          "path": "model.bin",
+          "sizeBytes": 1617884929,
+          "sha256": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da"
+        },
+        {
+          "role": "tokenizer",
+          "path": "tokenizer.json",
+          "sizeBytes": 2710337,
+          "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd"
         },
         {
           "role": "vocabulary",

@@ -53,7 +53,7 @@ describe("ASR release resource preparation", () => {
     const prepared = prepareAsrResources(root);
 
     expect(prepared.archiveSha256).toBe(
-      "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3",
+      "958eba83b2426a7904296df4d0756b83ec084c646dfec2f48327cf38abf85d75",
     );
     expect(existsSync(join(root, "src-tauri", "resources", "asr-service"))).toBe(
       false,

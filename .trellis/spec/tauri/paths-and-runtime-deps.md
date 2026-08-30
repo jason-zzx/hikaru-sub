@@ -30,7 +30,7 @@ Typical production install-dir layout (see `/AGENTS.md`):
 
 Old `deps/python311` / `deps/asr-service` directories may remain from prior releases but are not production dependency probe, measure, cleanup, or route inputs. Cutover and rollback never delete them automatically.
 
-Native model manifest segments must reject traversal, Windows reserved device names, trailing-dot/space aliases, and ASCII case collisions before joining paths. Direct required files reject symlinks/reparse points; legacy HF symlinks are allowed only when the snapshot and canonical file target stay below the canonical managed Hugging Face root.
+Native model manifest segments must reject traversal, Windows reserved device names, trailing-dot/space aliases, and ASCII case collisions before joining paths. Direct required files reject symlinks/reparse points; legacy HF symlinks are allowed only when the snapshot and canonical file target stay below the canonical managed Hugging Face root. Concurrent model jobs may race while creating shared parent directories: accept only `AlreadyExists`, immediately re-read with `symlink_metadata`, and reject link/reparse-like or non-directory entries before descending.
 
 Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI chooses official vs China mirror (default official). Legacy `auto`/`custom` migrate silently to official. Native model URLs derive from the selected profile and exact bundled manifest; the China profile uses `https://hf-mirror.com`. Historical Python source rows remain rollback metadata only.
 
@@ -38,7 +38,7 @@ Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI choo
 
 Settings entry: **probe only**. Storage sizes: user-triggered measure. Cleanup buttons: only when measured size > 0 and the target is managed.
 
-## Scenario: Native MVP Runtime Dependency Payload (T16)
+## Scenario: Native CPU Runtime Dependency Payload
 
 ### 1. Scope / Trigger
 
@@ -64,8 +64,8 @@ async fn probe_runtime_dependencies(app: AppHandle, asr_state: State<'_, AsrStat
 
 ### 3. Contracts
 
-- Production probe emits FFmpeg, `nativeAsrCpu`, and exact `faster-whisper/large-v3` readiness. It emits no Python 3.11 or ASR venv item.
-- `nativeAsrCpu` resolves from `resource_dir()/native-asr/windows-x64/cpu`, reports `source: "builtIn"`, `managed: false`, and the locked artifact ID. It is never downloadable or cleanable.
+- Production probe emits FFmpeg, `nativeAsrCpu`, and exact `faster-whisper/large-v3` readiness as the default-model dependency summary. Per-model availability for all seven supported Faster-Whisper identities remains owned by `check_asr_model` / `NativeAsrModelManager`; the probe is not a second support registry. It emits no Python 3.11 or ASR venv item.
+- `nativeAsrCpu` resolves from `resource_dir()/native-asr/windows-x64/cpu`, requires artifact `hikaru-asr-windows-x64-cpu-v2`, reports `source: "builtIn"`, `managed: false`, and is never downloadable or cleanable.
 - Exact model readiness comes from the process-owned `NativeAsrModelManager`; do not duplicate size/hash/path validation in `dependencies.rs`.
 - Probe remains status/path/version only. Runtime reads and model hashing use `spawn_blocking`; probe never calls recursive `dir_size`.
 - Explicit storage measurement emits managed FFmpeg when applicable, bounded `deps/models`, `deps/downloads`, and application work cache. It emits no Python/venv or bundled-runtime storage item.
@@ -78,7 +78,7 @@ async fn probe_runtime_dependencies(app: AppHandle, asr_state: State<'_, AsrStat
 |---|---|
 | Valid locked Native runtime resource | `nativeAsrCpu: available`, unmanaged |
 | Missing/wrong runtime identity/capability/required entry | `nativeAsrCpu: missing`; controlled runtime error on Native start |
-| Exact large-v3 direct or contained legacy snapshot | `asrModels: available` with exact path/revision |
+| Exact default large-v3 direct or contained legacy snapshot | `asrModels: available` with exact path/revision; other model statuses stay in the model manager |
 | Missing/wrong model bytes | `asrModels: missing`; no model-name-only readiness |
 | Cleanup `nativeAsrCpu` | Reject before deletion |
 | Cleanup target outside canonical `deps` | Reject |
@@ -95,7 +95,7 @@ async fn probe_runtime_dependencies(app: AppHandle, asr_state: State<'_, AsrStat
 - Installed-like and portable-like resource roots resolve the same locked runtime layout.
 - Missing/wrong artifact identity or capability fails.
 - Probe output contains no Python/venv kinds and no recursive size path.
-- Model dependency item maps exact ready/missing state and source.
+- Default large-v3 dependency item maps exact ready/missing state and source without duplicating the seven-model support registry.
 - Measure/cleanup cover only bounded models/downloads/app cache and preserve current-video cache.
 - Full Cargo tests plus frontend runtime-kind label test/build.
 

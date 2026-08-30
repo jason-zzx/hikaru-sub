@@ -40,10 +40,16 @@ describe("kotoba-faster-whisper constants", () => {
 });
 
 describe("faster-whisper models", () => {
-  it("includes large-v3-turbo without changing the large-v3 default", () => {
-    const values = ASR_ENGINE_MODELS["faster-whisper"].map((m) => m.value);
-    expect(values).toContain("large-v3-turbo");
-    expect(values).toContain("large-v3");
+  it("keeps all seven product models in one registry and large-v3 as default", () => {
+    expect(ASR_ENGINE_MODELS["faster-whisper"].map((model) => model.value)).toEqual([
+      "tiny",
+      "base",
+      "small",
+      "medium",
+      "large-v2",
+      "large-v3",
+      "large-v3-turbo",
+    ]);
     expect(defaultAsrModel("faster-whisper")).toBe("large-v3");
   });
 });

@@ -49,7 +49,7 @@ AI 日语字幕桌面应用：下载 m3u8 视频 → 可选切片 → 本地 ASR
 | 图标 | 业务导航/工具图标统一放 `src/components/layout/NavIcons.tsx`（lucide 风格手写 SVG）；通用 UI 与主题切换可用 `lucide-react`；**禁止用 emoji/字符当图标** |
 | 状态 | Zustand（`src/stores/`） |
 | 字幕格式 | `src/lib/ass/` |
-| ASR | 独立 Native CTranslate2 CPU worker（生产仅 `faster-whisper / large-v3`）；`asr-service/` 为开发/历史回退源码 |
+| ASR | 独立 Native CTranslate2 CPU worker（生产支持 manifest 锁定的 `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo`）；`asr-service/` 为开发/历史回退源码 |
 | 翻译 | OpenAI 兼容 API 适配器（前端） |
 | 音视频 | 系统 FFmpeg 优先；缺失时按需下载受管 FFmpeg |
 
@@ -69,7 +69,7 @@ pnpm asr:setup        # 仅开发/排障历史 Python sidecar 依赖
 
 - 始终使用 `pnpm`，不要用 `npm` 或 `yarn`。
 - 根 `package.json` 是应用版本的唯一人工来源；Tauri 直接读取该文件，Cargo 版本通过 `pnpm version:set <version>` 同步。发布说明写入 `CHANGELOG.md` 中与 tag 完全匹配的版本条目。
-- 生产 ASR 只使用随包提供的 Native CPU runtime 与按需下载的精确 large-v3 模型。Python/Kotoba/Parakeet/Qwen3/Reazon profile 仅供源码开发或历史研究，不能据此宣称产品支持。
+- 生产 ASR 只使用随包提供的 Native CPU runtime 与按需下载的精确 manifest 模型；当前支持 `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo`。Python/Kotoba/Parakeet/Qwen3/Reazon profile 仅供源码开发或历史研究，不能据此宣称产品支持。
 
 ## 测试与验证
 
@@ -113,7 +113,7 @@ scripts/                开发、ASR、发布辅助脚本
 
 - **Tauri Rust**：文件 I/O、FFmpeg/ffprobe、音频波形、视频代理转码、运行时依赖准备、独立 Native ASR worker 生命周期与任务编排、视频会话路径准备、下载、切片与压制任务。
 - **React**：全部 UI、ASS 文本编辑、翻译 API 调用、任务轮询、用户设置交互。
-- **Native worker**：生产 ASR 推理，通过 stdout JSONL protocol v1 与 Tauri 通信；当前仅支持 Faster-Whisper large-v3 CPU，不在 Tauri 进程内执行推理。
+- **Native worker**：生产 ASR 推理，通过 stdout JSONL protocol v1 与 Tauri 通信；当前支持 manifest 锁定的七个 Faster-Whisper 模型与 CPU，不在 Tauri 进程内执行推理。
 - **Python sidecar**：只保留为开发、历史引擎研究和一个稳定发布周期的回退源码，不进入发布包或生产默认路线。
 - **ASS 模块**：`src/lib/ass/` 负责 ASS 解析与序列化；ASS 是唯一字幕数据交换格式，内存模型为 `SubtitleCue`。project store 另缓存运行时 `VideoSession`、活动字幕路径、`assScriptInfo` 与 `assStyles`，保存时完整写回 ASS。
 - 新增 Tauri command 时按固定链路接线：`src-tauri/src/` 实现 → `lib.rs` 注册 → `src/services/tauri.ts` 封装 → 补测试或说明验证理由。若新增/变更插件权限、文件访问范围或 shell 能力，再同步更新 `src-tauri/capabilities/`。
@@ -170,7 +170,7 @@ interface SubtitleCue {
 
 - 发布包捆绑经过闭集校验的 `native-asr/windows-x64/cpu` runtime 与许可证，不捆绑 FFmpeg、Python sidecar/runtime/venv/packages 或模型权重。
 - FFmpeg 解析顺序：用户设置路径 → 系统 `PATH` → 安装目录 `deps/ffmpeg/current` 下的受管 FFmpeg。
-- 生产 ASR 固定走 Native `faster-whisper / large-v3 / auto|cpu`；缺失/损坏 runtime、模型或不支持请求必须受控失败，禁止启动或回退 Python。
+- 生产 ASR 固定走 Native `faster-whisper / manifest 支持模型 / auto|cpu`，新会话默认仍为 `large-v3`；缺失/损坏 runtime、模型或不支持请求必须受控失败，禁止启动或回退 Python。
 - Native 模型直接安装位于 `deps/models/ctranslate2/<engine>/<model>/<revision>`；可只读复用精确 `deps/models/huggingface` snapshot；partial/staging 位于 `deps/downloads/native-asr-models`。旧 `deps/python311` / `deps/asr-service` 不作为生产 probe/measure/cleanup 目标，也不得在切换时自动删除。
 - 设置页进入时只调用 `probe_runtime_dependencies`（状态/路径/版本，不做递归扫盘）；磁盘占用走独立 `measure_runtime_dependency_storage`，由「存储空间 → 计算占用空间」触发。清理按钮只在已计算且占用 > 0、且该项为受管目标时显示；不要把 `dir_size` 重新塞回 probe。「应用缓存」对应安装版 `%LOCALAPPDATA%\com.hikaru.sub\cache` 或 portable `<exe>/cache`（`work_cache_dir`），只统计/清理其下 `workspace`/`transcode`/`preview`/`clip-frames`，并保留当前工作视频相关缓存（包括 `subtitle.recovery.json`）；新增工作缓存也放到该 `cache/` 目录下。旧版直接落在 `com.hikaru.sub\` 根下的同名目录不再纳入统计与清理。`measure_runtime_dependency_storage` 与 `cleanup_runtime_dependency` 须保持 async + `spawn_blocking`（清理受管 `deps/` 前仍可在 async 侧做可写性/提权检查），勿在 async worker 上直接递归扫盘或删目录。
 - Portable 绿色版：exe 同级存在 `.portable` 时，配置落在 `<exe>/data`，工作缓存落在 `<exe>/cache`，WebView2 落在 `<exe>/webview`（启动时设 `WEBVIEW2_USER_DATA_FOLDER`）；判定与解析统一走 `src-tauri/src/app_paths.rs`，不要再直接用 `app.path().app_config_dir()` / `app_cache_dir()` 定位业务数据。安装版与 `tauri dev`（无标记）仍用系统 AppData。不做旧 AppData 迁移。便携目录创建/初始化失败时须弹框提示并退出，且不得在失败后把 `is_portable` 锁成 true。
@@ -179,7 +179,7 @@ interface SubtitleCue {
 - 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，设置页仅可选官方源或中国大陆镜像（默认官方源）。旧配置中的 `auto`/`custom` 加载时静默迁移为官方源。
 - Native 模型下载只从受信 manifest 的 repository/revision/file 与官方/中国大陆 source profile 派生 URL；中国大陆源使用 `https://hf-mirror.com`。不得接受自定义模型 URL，也不得记录 headers、正文或私有路径。
 - 当前生产 Native runtime 不支持 VAD、CUDA、Kotoba、Qwen3、Parakeet 或 ReazonSpeech；这些路线保持可见但不可用，不能通过缺 DLL 或 Python fallback 模拟能力。
-- 修改历史 Python sidecar 时仍须遵循其独立测试与 Kotoba `preprocessor_config.json` 等开发合同，但不得把这些规则扩展为当前 ordinary Faster-Whisper large-v3 的产品 readiness 条件。
+- 修改历史 Python sidecar 时仍须遵循其独立测试与 Kotoba `preprocessor_config.json` 等开发合同，但不得把这些规则扩展为 ordinary Faster-Whisper 的产品 readiness 条件；Systran `tiny/base/small/medium/large-v2` 使用 `vocabulary.txt`，`large-v3/large-v3-turbo` 使用 `vocabulary.json`。
 
 ## 媒体与字幕渲染
 

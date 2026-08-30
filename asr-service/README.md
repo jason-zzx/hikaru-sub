@@ -1,6 +1,6 @@
 # ASR Sidecar（开发与历史回退源码）
 
-此目录保留 Hikaru Sub 旧版 Python ASR sidecar，用于开发、历史引擎研究、诊断和一个稳定发布周期的回退证据。当前桌面生产路线使用随应用提供的独立 Native CTranslate2 CPU worker，仅支持 Faster-Whisper large-v3；发布包不再包含、复制或启动此 Python sidecar。
+此目录保留 Hikaru Sub 旧版 Python ASR sidecar，用于开发、历史引擎研究、诊断和一个稳定发布周期的回退证据。当前桌面生产路线使用随应用提供的独立 Native CTranslate2 CPU worker，支持 manifest 锁定的 Faster-Whisper `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo`；发布包不再包含、复制或启动此 Python sidecar。
 
 以下 HTTP API、Python 引擎和安装说明只适用于源码开发或有意进行的历史路径排障，不代表当前发布版能力。
 

@@ -1677,7 +1677,17 @@ void run_core_tests() {
   check(final_partial.segments[0].end_bounded_to_audio, "WAV end bound flag missing");
 
   expect_timestamp_error({2250, 42, 2300}, tokens, "timestamp_after_audio", 24102);
-  expect_timestamp_error({1000, 42}, tokens, "invalid_generation");
+  const TimestampParseResult single_leading_timestamp = parse_timestamp_tokens(
+      {1000, 42}, tokens, decode, 0, 24102, 24102);
+  check(single_leading_timestamp.segments.size() == 1,
+        "single leading timestamp fallback did not emit one segment");
+  check(single_leading_timestamp.segments[0].segment.start_ms == 0
+            && single_leading_timestamp.segments[0].segment.end_ms == 24102,
+        "single leading timestamp fallback did not use the bounded source window");
+  check(single_leading_timestamp.seek_advance_frames == 2411,
+        "single leading timestamp fallback did not advance the source window");
+  expect_timestamp_error({42, 1000, 43}, tokens, "invalid_generation");
+  expect_timestamp_error({1000, tokens.eot}, tokens, "invalid_generation");
   expect_timestamp_error({1000, 42, 2501}, tokens, "invalid_generation");
 
   std::vector<SegmentEvidence> duplicate_segments{

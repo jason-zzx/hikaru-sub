@@ -5,3 +5,6 @@
 {"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines required frontend tests and build validation for availability UI changes."}
 {"file":".trellis/tasks/08-26-native-asr-whisper-model-expansion/research/planning-evidence.md","reason":"Records the current T12/T13 seams, T16-T18 dependency gate, worker capabilities, frontend reuse, and pinned upstream model research."}
 {"file":".trellis/tasks/archive/2026-08/08-20-native-asr-model-manager/research/implementation-evidence.md","reason":"Provides verified behavior and residual boundaries of the existing exact model manager implementation."}
+{"file": ".trellis/tasks/archive/2026-08/08-27-native-asr-runtime-settings-backend/research/implementation-evidence.md", "reason": "Final T16 Native route, availability, managed model, and runtime/settings contracts."}
+{"file": ".trellis/tasks/archive/2026-08/08-28-native-asr-frontend-migration/research/implementation-evidence.md", "reason": "Final T17 availability hook, model UI, and no-Python-setup frontend contracts."}
+{"file": ".trellis/tasks/archive/2026-08/08-28-native-asr-release-cutover/research/implementation-report.md", "reason": "Accepted T18 production baseline, runtime identity, regression commands, and release qualification."}

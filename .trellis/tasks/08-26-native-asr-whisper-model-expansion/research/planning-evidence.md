@@ -1,12 +1,14 @@
 # Faster-Whisper model expansion planning evidence
 
+> Historical planning snapshot. Current implementation and acceptance status is authoritative in `final-trellis-check-report.md` and `../prd.md`.
+
 ## Dependency state
 
 - The parent roadmap sequence remains `T17 frontend migration -> T18 Native MVP release -> Faster-Whisper model expansion`.
 - T12, T13, T16, and T17 are completed and archived.
-- T18 is accepted and provides the production Native large-v3 CPU baseline; its active task is awaiting finish-work archival.
+- T18 is accepted, archived, and provides the production Native large-v3 CPU baseline.
 
-Conclusion: this task remains planning only until the T18 archive completes, then becomes the next executable child. The model-identity research below remains the non-authoritative planning input for that implementation.
+Conclusion: the activation dependency is satisfied and this task is the next executable child. The model-identity research below remains the non-authoritative planning input for implementation.
 
 ## Existing seams to reuse
 

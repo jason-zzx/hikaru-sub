@@ -1,6 +1,6 @@
 # Expand Native Faster-Whisper models after T18
 
-> **当前状态：等待 T18 归档。** T18 已由用户验收；本任务保持 planning，待 T18 active task 归档后立即成为下一可执行 child。
+> **当前状态：实现、独立检查与人工验收均已通过。** 任务等待用户单独授权提交与 finish-work 归档。
 
 ## Goal
 
@@ -19,7 +19,7 @@
 
 - Priority: P1。
 - Roadmap position: `T18 Native MVP -> Faster-Whisper model expansion -> other post-MVP engines/GPU`。
-- Production implementation/cutover 以 T18 已验收的稳定 large-v3 CPU 路线为基线；当前仅等待 T18 finish-work 归档。
+- Production implementation/cutover 以已验收并归档的 T18 稳定 large-v3 CPU 路线为基线。
 - 本任务完成前，T08R、T11、Parakeet/Reazon 新候选和 T14/T15 默认不抢占其优先级；用户另行明确调整时除外。
 
 ## Authority And Dependencies
@@ -29,19 +29,19 @@
 - 用户 `.asr-benchmark` 仍是质量诊断真值，但 Python quality parity 不作为这些模型的支持门禁。
 - Ordinary Whisper 模型必须读取各自 exact CT2 model 的 `n_mels`，支持官方 80/128 Mel contract，并接受 `vocabulary.txt` 或 `vocabulary.json`；不得套用 Kotoba-only `preprocessor_config.json` readiness。
 
-## Confirmed Current Baseline
+## Confirmed Baseline And Delivered Outcome
 
-- T12 model manager 与 T13 final CPU runtime 已完成并归档；当前 Native model manifest 仍只包含 `large-v3`。
-- T16 runtime/settings 与 T17 frontend migration 已完成并归档；T18 release cutover 已由用户验收，本任务只需等待 T18 active task 完成归档。
-- Rust model manager 已把本任务的六个模型标记为 `postMvpUnavailable`，并已具备多 entry manifest、独立 readiness、断点续传、hash 校验和原子发布能力。
-- 前端 `ASR_ENGINE_MODELS` 已列出全部六个模型，因此本任务不需要新增第二套模型注册表。
-- 已发布 worker 源码按模型读取 `n_mels`，接受 80/128 Mel，并接受 `vocabulary.txt` 或 `vocabulary.json`；ordinary Whisper 不要求 `preprocessor_config.json`。因此默认假设无需修改或重建 worker，真实模型 smoke 才能推翻该假设。
-- Hugging Face 当前可冻结的仓库 revision 已确认：Systran 的 `tiny/base/small/medium/large-v2` 与 canonical `dropbox-dash/faster-whisper-large-v3-turbo`。实现时仍须重新获取每个必需文件的精确 size/SHA-256 并验证许可证来源，不能依赖 floating `main` 或重定向 alias。
+- T12 model manager、T16 runtime/settings、T17 frontend migration 与 T18 release cutover 均已完成并归档。
+- schema-v1 manifest 现包含七个精确 Faster-Whisper identity；六个扩展模型均已从 `postMvpUnavailable` 切换为独立可下载/可运行状态，其他引擎仍保持 deferred。
+- 前端继续复用 `ASR_ENGINE_MODELS`，`large-v3` 保持默认；未新增第二套模型注册表、下载器、command family 或 Python fallback。
+- 真实 `large-v2` 证据推翻了“无需修改 worker”的初始假设：通用 single-leading-timestamp source-window fallback 已加入，未按模型名分支，并冻结为 `hikaru-asr-windows-x64-cpu-v2`。
+- Systran `tiny/base/small/medium/large-v2` 与 `large-v3`、canonical `dropbox-dash/large-v3-turbo` 的全部 28 个必需文件均按 immutable revision、size 和 SHA-256 验证；ordinary Whisper 仍不要求 `preprocessor_config.json`。
+- 所有七模型短音频、`large-v2` 超过 10 分钟音频、host success/cancel/reap、CTest、完整 Rust/frontend/build、runtime/package 和 installed/portable 验证均通过；用户已确认最终人工测试通过。
 
 ## Activation Gate
 
-- T18 已建立并通过稳定 Native large-v3 CPU baseline；在其 active task 归档前，本任务只做规划检查，不启动生产实现。
-- T18 归档后按父任务顺序激活本任务；不得重新吸收或重做 T16/T17/T18 的已交付职责。
+- T18 已建立并通过稳定 Native large-v3 CPU baseline，且已完成归档；激活依赖门槛已满足。
+- 本任务按父任务顺序激活；不得重新吸收或重做 T16/T17/T18 的已交付职责。
 
 ## Requirements
 
@@ -80,15 +80,17 @@
 
 ## Acceptance Criteria
 
-- [ ] T18 已提供稳定的 Native large-v3 CPU production baseline，或用户已明确批准并记录新的父任务执行顺序。
-- [ ] 六个模型均具备精确、非 floating 的 model manifest identity、license 和 atomic readiness 测试。
-- [ ] 六个模型均能通过 released/revised CTranslate2 CPU worker 加载并完成短音频端到端转录。
-- [ ] `large-v2` 通过超过 10 分钟日语音频功能 smoke。
-- [ ] 所有启用模型输出非空、UTF-8 合法、时间有序、正时长且 audio-bounded，无 protocol/text-conservation failure。
-- [ ] large-v3 现有 Native MVP 路线、取消、崩溃、恢复和 installed/portable 行为无回归。
-- [ ] T16/T17 对每个模型提供独立准确的 availability 和下载状态；不存在隐藏模型或 silent Python fallback。
-- [ ] Python parity、GPU qualification 和完整字幕质量矩阵未被重新引入为支持前置条件；已知质量指标被记录为诊断。
-- [ ] 相关 worker CTest、Rust tests、frontend tests、`pnpm build` 和 installed/portable smoke 通过。
+- [x] T18 已提供稳定的 Native large-v3 CPU production baseline。
+- [x] 六个模型均具备精确、非 floating 的 model manifest identity、license 和 atomic readiness 测试。
+- [x] 六个模型均能通过 revised CTranslate2 CPU worker 加载并完成短音频端到端转录。
+- [x] `large-v2` 通过超过 10 分钟日语音频功能 smoke。
+- [x] 所有启用模型输出非空、UTF-8 合法、时间有序、正时长且 audio-bounded，无 protocol/text-conservation failure。
+- [x] large-v3 现有 Native MVP 路线、取消、崩溃、恢复和 installed/portable 行为无回归。
+- [x] T16/T17 对每个模型提供独立准确的 availability 和下载状态；不存在隐藏模型或 silent Python fallback。
+- [x] Python parity、GPU qualification 和完整字幕质量矩阵未被重新引入为支持前置条件；已知质量指标被记录为诊断。
+- [x] 相关 worker CTest、Rust tests、frontend tests、`pnpm build`、installed/portable smoke 与用户人工测试通过。
+
+最终自动化与包体证据见 `research/final-trellis-check-report.md`；用户在本轮明确确认人工测试通过。
 
 ## Out Of Scope
 

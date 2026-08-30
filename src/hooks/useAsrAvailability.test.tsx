@@ -2,6 +2,7 @@
 
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ASR_ENGINE_MODELS } from "../constants/asr";
 import type { AsrModelStatus } from "../types";
 import {
   asrDeviceSelectOptions,
@@ -38,7 +39,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("useAsrAvailability", () => {
-  it("keeps product options visible while disabling deferred models and CUDA", () => {
+  it("keeps all qualified Whisper models enabled while other routes stay deferred", () => {
     const engines = [
       { name: "faster-whisper", available: true, device: "cpu" },
       { name: "qwen3-asr", available: false, reason: "该引擎将在后续版本支持" },
@@ -47,17 +48,24 @@ describe("useAsrAvailability", () => {
     expect(engineOptions).toHaveLength(5);
     expect(engineOptions.find((item) => item.value === "qwen3-asr")).toMatchObject({ disabled: true });
 
+    const whisperModels = ASR_ENGINE_MODELS["faster-whisper"].map(({ value }) => value);
     const modelOptions = asrModelSelectOptions("faster-whisper", {
       engine: "faster-whisper",
       loading: false,
-      statuses: {
-        "large-v3": status("faster-whisper", "large-v3", "supportedMissing"),
-        "large-v3-turbo": status("faster-whisper", "large-v3-turbo", "postMvpUnavailable"),
-      },
+      statuses: Object.fromEntries(
+        whisperModels.map((model) => [
+          model,
+          status(
+            "faster-whisper",
+            model,
+            model === "tiny" ? "ready" : "supportedMissing",
+          ),
+        ]),
+      ),
       errors: {},
     });
-    expect(modelOptions.find((item) => item.value === "large-v3")?.disabled).toBeUndefined();
-    expect(modelOptions.find((item) => item.value === "large-v3-turbo")).toMatchObject({ disabled: true });
+    expect(modelOptions.map((item) => item.value)).toEqual(whisperModels);
+    expect(modelOptions.every((item) => item.disabled !== true)).toBe(true);
 
     const devices = asrDeviceSelectOptions(engines[0], false, null);
     expect(devices.find((item) => item.value === "auto")?.disabled).toBeUndefined();

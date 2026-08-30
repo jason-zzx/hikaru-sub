@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "artifact": {
-    "id": "hikaru-asr-windows-x64-cpu-v1",
+    "id": "hikaru-asr-windows-x64-cpu-v2",
     "path": "native-asr/artifacts/windows-x64-cpu.zip",
     "root": "windows-x64/cpu/",
-    "sizeBytes": 6859911,
-    "sha256": "e84948f668bc0e308ad4d47edb58b9644f0d3c468c9e2071913277416dea7ff3",
-    "sourceDateEpoch": 1780769646
+    "sizeBytes": 6860450,
+    "sha256": "958eba83b2426a7904296df4d0756b83ec084c646dfec2f48327cf38abf85d75",
+    "sourceDateEpoch": 1788048000
   },
   "buildInput": {
     "path": "native-asr/build-inputs/windows-x64-cpu-ct2.zip",
@@ -23,8 +23,8 @@
   "arch": "x64",
   "protocolVersion": 1,
   "candidateConfig": {
-    "id": "selected-cpu-timestamp-no-history-beam1",
-    "sha256": "77120c8543e780231d8c65b3868c07f44d685a22a136da56c64e6a6922d4f9e6"
+    "id": "selected-cpu-timestamp-no-history-beam1-v2",
+    "sha256": "41dfef646990d7fc47ae3149f77b631b4a1229566c166abb866f67b2b6cca235"
   },
   "capabilities": {
     "backend": "ctranslate2",

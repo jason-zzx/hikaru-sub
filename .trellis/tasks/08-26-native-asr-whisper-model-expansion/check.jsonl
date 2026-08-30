@@ -5,3 +5,6 @@
 {"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review frontend tests, build, minimal UI changes, and model-default behavior."}
 {"file":".trellis/tasks/08-26-native-asr-whisper-model-expansion/research/planning-evidence.md","reason":"Verify implementation against confirmed codebase seams, dependency state, and canonical upstream identities."}
 {"file":".trellis/tasks/archive/2026-08/08-20-native-asr-model-manager/research/implementation-evidence.md","reason":"Verify no regression in exact readiness, resume, publication, model isolation, or public-command boundaries."}
+{"file": ".trellis/tasks/archive/2026-08/08-27-native-asr-runtime-settings-backend/research/implementation-evidence.md", "reason": "Verify T16 Native routing, model status, managed paths, and no-fallback contracts remain intact."}
+{"file": ".trellis/tasks/archive/2026-08/08-28-native-asr-frontend-migration/research/implementation-evidence.md", "reason": "Verify T17 UI availability, stale-request, default model, and removed Python setup behavior."}
+{"file": ".trellis/tasks/archive/2026-08/08-28-native-asr-release-cutover/research/implementation-report.md", "reason": "Verify the accepted T18 runtime/package/model baseline and exact large-v3 regressions."}

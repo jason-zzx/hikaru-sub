@@ -298,8 +298,8 @@ fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
 }
 
 fn validate_native_mvp_request(args: &StartAsrArgs) -> Result<(), String> {
-    if args.engine != "faster-whisper" || args.model != "large-v3" {
-        return Err("当前 Native MVP 仅支持 faster-whisper/large-v3".into());
+    if args.engine != "faster-whisper" {
+        return Err("当前 Native ASR CPU 路线仅支持 faster-whisper 引擎".into());
     }
     if !matches!(args.device.as_str(), "auto" | "cpu") {
         return Err(format!(
@@ -791,7 +791,7 @@ pub async fn start_asr(
                 return Err("该模型将在后续版本支持".into())
             }
             NativeAsrModelDisposition::Unsupported => {
-                return Err("当前 Native MVP 不支持该引擎或模型".into())
+                return Err("当前 Native ASR CPU 路线不支持该引擎或模型".into())
             }
         };
         let host = packaged_native_host(&app, &state).await?;
@@ -1142,11 +1142,11 @@ mod tests {
     }
 
     #[test]
-    fn native_mvp_request_accepts_auto_cpu_and_rejects_unsupported_routes() {
+    fn native_request_keeps_model_support_authoritative_in_the_manifest() {
         let args = |device: &str, use_vad: bool| StartAsrArgs {
             audio_path: "cache/workspace/abc/audio.wav".into(),
             engine: "faster-whisper".into(),
-            model: "large-v3".into(),
+            model: "manifest-owned-model".into(),
             device: device.into(),
             language: Some("ja".into()),
             output_ass_path: Some("output.ass".into()),
@@ -1163,10 +1163,10 @@ mod tests {
             .contains("vad_not_built"));
 
         let mut unsupported = args("cpu", false);
-        unsupported.model = "large-v3-turbo".into();
+        unsupported.engine = "qwen3-asr".into();
         assert!(validate_native_mvp_request(&unsupported)
             .unwrap_err()
-            .contains("仅支持 faster-whisper/large-v3"));
+            .contains("仅支持 faster-whisper 引擎"));
     }
 
     #[test]
