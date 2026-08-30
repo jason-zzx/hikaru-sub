@@ -297,13 +297,10 @@ fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_native_mvp_request(args: &StartAsrArgs) -> Result<(), String> {
-    if args.engine != "faster-whisper" {
-        return Err("当前 Native ASR CPU 路线仅支持 faster-whisper 引擎".into());
-    }
+fn validate_native_request(args: &StartAsrArgs) -> Result<(), String> {
     if !matches!(args.device.as_str(), "auto" | "cpu") {
         return Err(format!(
-            "当前 Native MVP 不支持设备：{}（仅支持 auto/cpu）",
+            "当前 Native ASR CPU 路线不支持设备：{}（仅支持 auto/cpu）",
             args.device
         ));
     }
@@ -315,7 +312,7 @@ fn validate_native_mvp_request(args: &StartAsrArgs) -> Result<(), String> {
         .as_deref()
         .is_some_and(|language| language != "ja")
     {
-        return Err("当前 Native MVP 仅支持日语源语言".into());
+        return Err("当前 Native ASR CPU 路线仅支持日语源语言".into());
     }
     Ok(())
 }
@@ -722,10 +719,9 @@ pub async fn list_asr_engines(
     state: State<'_, AsrState>,
 ) -> Result<serde_json::Value, String> {
     if state.route_policy.uses_native() {
-        let engines = known_native_asr_engines()
+        let engines = known_native_asr_engines()?
             .into_iter()
-            .map(|name| {
-                let available = name == "faster-whisper";
+            .map(|(name, available)| {
                 serde_json::json!({
                     "name": name,
                     "available": available,
@@ -775,7 +771,7 @@ pub async fn start_asr(
                 .map_err(|error| format!("启动 native ASR 任务失败：{error}"))?;
         }
 
-        validate_native_mvp_request(&args)?;
+        validate_native_request(&args)?;
         let status = state
             .native_models
             .status(&app, &args.engine, &args.model)
@@ -1143,9 +1139,9 @@ mod tests {
 
     #[test]
     fn native_request_keeps_model_support_authoritative_in_the_manifest() {
-        let args = |device: &str, use_vad: bool| StartAsrArgs {
+        let args = |engine: &str, device: &str, use_vad: bool| StartAsrArgs {
             audio_path: "cache/workspace/abc/audio.wav".into(),
-            engine: "faster-whisper".into(),
+            engine: engine.into(),
             model: "manifest-owned-model".into(),
             device: device.into(),
             language: Some("ja".into()),
@@ -1153,20 +1149,19 @@ mod tests {
             use_vad,
             vad_config: None,
         };
-        assert!(validate_native_mvp_request(&args("auto", false)).is_ok());
-        assert!(validate_native_mvp_request(&args("cpu", false)).is_ok());
-        assert!(validate_native_mvp_request(&args("cuda", false))
-            .unwrap_err()
-            .contains("仅支持 auto/cpu"));
-        assert!(validate_native_mvp_request(&args("cpu", true))
-            .unwrap_err()
-            .contains("vad_not_built"));
-
-        let mut unsupported = args("cpu", false);
-        unsupported.engine = "qwen3-asr".into();
-        assert!(validate_native_mvp_request(&unsupported)
-            .unwrap_err()
-            .contains("仅支持 faster-whisper 引擎"));
+        assert!(validate_native_request(&args("faster-whisper", "auto", false)).is_ok());
+        assert!(validate_native_request(&args("kotoba-faster-whisper", "cpu", false)).is_ok());
+        assert!(validate_native_request(&args("qwen3-asr", "cpu", false)).is_ok());
+        assert!(
+            validate_native_request(&args("faster-whisper", "cuda", false))
+                .unwrap_err()
+                .contains("仅支持 auto/cpu")
+        );
+        assert!(
+            validate_native_request(&args("kotoba-faster-whisper", "cpu", true))
+                .unwrap_err()
+                .contains("vad_not_built")
+        );
     }
 
     #[test]

@@ -27,11 +27,7 @@ use tokio::sync::Mutex;
 const MANIFEST_JSON: &str = include_str!("../resources/native-asr-models.json");
 const OFFICIAL_ENDPOINT: &str = "https://huggingface.co";
 const REQUIRED_ROLES: [&str; 4] = ["model-config", "model-weights", "tokenizer", "vocabulary"];
-const POST_MVP_MODELS: [(&str, &str); 4] = [
-    (
-        "kotoba-faster-whisper",
-        "kotoba-tech/kotoba-whisper-v2.0-faster",
-    ),
+const POST_MVP_MODELS: [(&str, &str); 3] = [
     ("parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja"),
     ("qwen3-asr", "Qwen/Qwen3-ASR-1.7B"),
     ("reazonspeech-nemo", "reazon-research/reazonspeech-nemo-v2"),
@@ -419,7 +415,7 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
             validate_text(name, value)?;
         }
         validate_segment("engine", &model.engine)?;
-        validate_segment("model", &model.model)?;
+        validate_model_id(&model.model)?;
         validate_repository(&model.repository)?;
         if model.logical_id != format!("{}/{}", model.engine, model.model) {
             return Err("logicalId 必须与 engine/model 完全一致".into());
@@ -460,6 +456,14 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
             if !roles.contains(role) {
                 return Err(format!("模型缺少必需文件角色：{role}"));
             }
+        }
+        if model.engine == "kotoba-faster-whisper"
+            && !model
+                .files
+                .iter()
+                .any(|file| file.role == "preprocessor" && file.path == "preprocessor_config.json")
+        {
+            return Err("Kotoba 模型缺少 preprocessor_config.json".into());
         }
     }
     Ok(())
@@ -521,6 +525,18 @@ fn is_windows_reserved_name(value: &str) -> bool {
     )
 }
 
+fn validate_model_id(model: &str) -> Result<(), String> {
+    if !model.contains('/') {
+        return validate_segment("model", model);
+    }
+    let parts: Vec<_> = model.split('/').collect();
+    if parts.len() != 2 {
+        return Err("模型 ID 必须是安全名称或 owner/name".into());
+    }
+    validate_segment("model.owner", parts[0])?;
+    validate_segment("model.name", parts[1])
+}
+
 fn validate_repository(repository: &str) -> Result<(), String> {
     let parts: Vec<_> = repository.split('/').collect();
     if parts.len() != 2 {
@@ -568,14 +584,20 @@ fn unavailable_status(engine: &str, model: &str) -> NativeAsrModelStatus {
     }
 }
 
-pub(crate) fn known_native_asr_engines() -> Vec<&'static str> {
-    let mut engines = vec!["faster-whisper"];
-    for (engine, _) in POST_MVP_MODELS {
-        if !engines.contains(&engine) {
-            engines.push(engine);
+pub(crate) fn known_native_asr_engines() -> Result<Vec<(String, bool)>, String> {
+    let manifest = load_manifest()?;
+    let mut engines: Vec<(String, bool)> = Vec::new();
+    for model in manifest.models {
+        if !engines.iter().any(|(engine, _)| engine == &model.engine) {
+            engines.push((model.engine, true));
         }
     }
-    engines
+    for (engine, _) in POST_MVP_MODELS {
+        if !engines.iter().any(|(known, _)| known == engine) {
+            engines.push((engine.to_string(), false));
+        }
+    }
+    Ok(engines)
 }
 
 fn direct_path(roots: &ManagedModelRoots, model: &ManifestModel) -> PathBuf {
@@ -1298,6 +1320,23 @@ mod tests {
         (model, bytes)
     }
 
+    fn complete_kotoba_fixture() -> (ManifestModel, Vec<(&'static str, &'static [u8])>) {
+        let (mut model, mut bytes) = complete_fixture();
+        let preprocessor = ("preprocessor_config.json", b"preprocessor".as_slice());
+        model.files.push(ManifestFile {
+            role: "preprocessor".into(),
+            path: preprocessor.0.into(),
+            size_bytes: preprocessor.1.len() as u64,
+            sha256: hash(preprocessor.1),
+        });
+        model.logical_id = "kotoba-faster-whisper/kotoba-tech/kotoba-whisper-v2.0-faster".into();
+        model.engine = "kotoba-faster-whisper".into();
+        model.model = "kotoba-tech/kotoba-whisper-v2.0-faster".into();
+        model.repository = "kotoba-tech/kotoba-whisper-v2.0-faster".into();
+        bytes.push(preprocessor);
+        (model, bytes)
+    }
+
     fn renamed_fixture(
         mut model: ManifestModel,
         name: &str,
@@ -1323,7 +1362,7 @@ mod tests {
         let manifest: serde_json::Value = serde_json::from_str(MANIFEST_JSON).unwrap();
         assert_eq!(
             hash(&serde_json::to_vec(&manifest).unwrap()),
-            "6dfa42cbaaa0c64bef032980e206019d2510f4215f7df598d88451b59eee67cd"
+            "49a53cc898f66f82bfd946191ee92c13cb2faa06db821068ba5981e39b85694c"
         );
     }
 
@@ -1372,6 +1411,36 @@ mod tests {
             .unwrap()
             .remove(0);
         assert!(parse_manifest(&value.to_string()).is_err());
+        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
+        let kotoba = value["models"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|model| model["engine"] == "kotoba-faster-whisper")
+            .unwrap();
+        kotoba["files"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|file| file["role"] != "preprocessor");
+        assert!(parse_manifest(&value.to_string()).is_err());
+        for unsafe_model in [
+            "owner/name/extra",
+            "owner//name",
+            "owner\\name",
+            "/name",
+            "owner/",
+            "C:/name",
+            "../name",
+            "owner/..",
+            "CON/name",
+            "owner/NUL",
+            "owner/name.",
+        ] {
+            let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
+            value["models"][0]["model"] = unsafe_model.into();
+            value["models"][0]["logicalId"] = format!("faster-whisper/{unsafe_model}").into();
+            assert!(parse_manifest(&value.to_string()).is_err());
+        }
     }
 
     #[test]
@@ -1402,6 +1471,22 @@ mod tests {
                 model.revision
             )
         );
+
+        let manifest = load_manifest().unwrap();
+        let kotoba = find_model(
+            &manifest,
+            "kotoba-faster-whisper",
+            "kotoba-tech/kotoba-whisper-v2.0-faster",
+        )
+        .unwrap();
+        assert!(direct_path(&roots, kotoba).ends_with(format!(
+            "kotoba-faster-whisper/kotoba-tech/kotoba-whisper-v2.0-faster/{}",
+            kotoba.revision
+        )));
+        assert!(download_path(&roots, kotoba).ends_with(format!(
+            "native-asr-models/kotoba-faster-whisper/kotoba-tech/kotoba-whisper-v2.0-faster/{}",
+            kotoba.revision
+        )));
     }
 
     #[test]
@@ -1443,6 +1528,33 @@ mod tests {
         write_model(&direct, &files);
         let resolved = resolve_sync(&roots, &model).unwrap().unwrap();
         assert_eq!(resolved.origin, NativeAsrModelOrigin::DirectInstall);
+    }
+
+    #[test]
+    fn kotoba_readiness_requires_exact_preprocessor_for_direct_and_legacy_paths() {
+        let dir = tempdir().unwrap();
+        let roots = ManagedModelRoots::below(dir.path());
+        let (model, files) = complete_kotoba_fixture();
+        let direct = direct_path(&roots, &model);
+        write_model(&direct, &files);
+        let resolved = resolve_sync(&roots, &model).unwrap().unwrap();
+        assert_eq!(resolved.origin, NativeAsrModelOrigin::DirectInstall);
+
+        fs::remove_file(direct.join("preprocessor_config.json")).unwrap();
+        assert!(resolve_sync(&roots, &model).unwrap().is_none());
+        fs::write(direct.join("preprocessor_config.json"), b"wrongcontent").unwrap();
+        assert!(resolve_sync(&roots, &model).unwrap().is_none());
+
+        fs::remove_dir_all(&direct).unwrap();
+        let legacy = legacy_path(&roots, &model);
+        write_model(&legacy, &files);
+        let resolved = resolve_sync(&roots, &model).unwrap().unwrap();
+        assert_eq!(
+            resolved.origin,
+            NativeAsrModelOrigin::LegacyHuggingFaceSnapshot
+        );
+        fs::remove_file(legacy.join("preprocessor_config.json")).unwrap();
+        assert!(resolve_sync(&roots, &model).unwrap().is_none());
     }
 
     #[tokio::test]
@@ -1590,7 +1702,7 @@ mod tests {
     }
 
     #[test]
-    fn manifest_backed_whisper_models_are_supported_and_other_routes_stay_deferred() {
+    fn manifest_backed_whisper_and_kotoba_are_supported_and_other_routes_stay_deferred() {
         let manifest = load_manifest().unwrap();
         for model in [
             "tiny",
@@ -1603,15 +1715,28 @@ mod tests {
         ] {
             assert!(find_model(&manifest, "faster-whisper", model).is_some());
         }
-        for (engine, model) in [(
+        let kotoba = find_model(
+            &manifest,
             "kotoba-faster-whisper",
             "kotoba-tech/kotoba-whisper-v2.0-faster",
-        )] {
-            assert_eq!(
-                unavailable_status(engine, model).disposition,
-                NativeAsrModelDisposition::PostMvpUnavailable
-            );
+        )
+        .unwrap();
+        assert_eq!(kotoba.files.len(), 5);
+        assert!(kotoba
+            .files
+            .iter()
+            .any(|file| file.role == "preprocessor" && file.path == "preprocessor_config.json"));
+
+        let engines = known_native_asr_engines().unwrap();
+        assert!(engines.contains(&("faster-whisper".into(), true)));
+        assert!(engines.contains(&("kotoba-faster-whisper".into(), true)));
+        for engine in ["parakeet", "qwen3-asr", "reazonspeech-nemo"] {
+            assert!(engines.contains(&(engine.into(), false)));
         }
+        assert_eq!(
+            unavailable_status("qwen3-asr", "Qwen/Qwen3-ASR-1.7B").disposition,
+            NativeAsrModelDisposition::PostMvpUnavailable
+        );
         assert_eq!(
             unavailable_status("other", "thing").disposition,
             NativeAsrModelDisposition::Unsupported

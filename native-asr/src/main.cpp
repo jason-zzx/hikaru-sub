@@ -236,10 +236,10 @@ int run_ctranslate2(const WorkerRequestV1& request) {
   const bool ordinary = request.engine == Engine::FasterWhisper;
   const bool kotoba = request.engine == Engine::KotobaFasterWhisper;
 #ifdef HIKARU_ASR_MVP_CPU_RUNTIME
-  if (!ordinary || request.backend != Backend::CTranslate2) {
+  if ((!ordinary && !kotoba) || request.backend != Backend::CTranslate2) {
     emit_pre_ready_error(
         "route_not_built",
-        "requested native ASR route is not included in the MVP CPU runtime");
+        "requested native ASR route is not included in the production CPU runtime");
     return 2;
   }
 #else

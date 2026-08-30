@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppSettings } from "../../types";
 import { SettingsTranscriptionPanel } from "./SettingsTranscriptionPanel";
@@ -8,6 +9,7 @@ import { SettingsTranscriptionPanel } from "./SettingsTranscriptionPanel";
 const availability = vi.hoisted(() => ({
   engineOptions: [
     { value: "faster-whisper", label: "faster-whisper" },
+    { value: "kotoba-faster-whisper", label: "kotoba-faster-whisper" },
     { value: "qwen3-asr", label: "qwen3（后续版本支持）", disabled: true },
   ],
   modelOptions: [
@@ -37,6 +39,22 @@ const availability = vi.hoisted(() => ({
   unavailableReason: "该引擎将在后续版本支持",
   refresh: vi.fn(async () => undefined),
   refreshSelectedModel: vi.fn(async () => ({ kind: "aborted" as const })),
+}));
+
+vi.mock("../ui/select-adapter", () => ({
+  Select: ({ value, onChange, options }: {
+    value: string;
+    onChange: (value: string) => void;
+    options: Array<{ value: string; label: string; disabled?: boolean }>;
+  }) => (
+    <select value={value} onChange={(event) => onChange(event.target.value)}>
+      {options.map((option) => (
+        <option key={option.value} value={option.value} disabled={option.disabled}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
 }));
 
 vi.mock("../../hooks/useAsrAvailability", () => ({
@@ -79,5 +97,23 @@ describe("SettingsTranscriptionPanel Native availability", () => {
     expect(screen.getAllByText(/后续版本支持/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Python|虚拟环境|配置当前引擎依赖/)).toBeNull();
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it("allows explicitly selecting Kotoba and its exact default model", async () => {
+    const user = userEvent.setup();
+    const update = vi.fn();
+    render(<SettingsTranscriptionPanel settings={settings} update={update} />);
+
+    await user.selectOptions(
+      screen.getAllByRole("combobox")[0],
+      "kotoba-faster-whisper",
+    );
+
+    expect(update).toHaveBeenNthCalledWith(1, "asrEngine", "kotoba-faster-whisper");
+    expect(update).toHaveBeenNthCalledWith(
+      2,
+      "asrModel",
+      "kotoba-tech/kotoba-whisper-v2.0-faster",
+    );
   });
 });

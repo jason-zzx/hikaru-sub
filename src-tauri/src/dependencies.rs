@@ -17,7 +17,7 @@ use tokio::sync::Mutex;
 
 const LOG_TAIL_LIMIT: usize = 200;
 const MANIFEST_JSON: &str = include_str!("../resources/runtime-dependency-sources.json");
-const NATIVE_ASR_CPU_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cpu-v2";
+const NATIVE_ASR_CPU_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cpu-v3";
 const NATIVE_ASR_CPU_RESOURCE_PATH: [&str; 3] = ["native-asr", "windows-x64", "cpu"];
 const NATIVE_ASR_CPU_WORKER: &str = "hikaru-asr-worker.exe";
 const NATIVE_ASR_CPU_REQUIRED_ENTRIES: &[&str] = &[
@@ -794,7 +794,7 @@ fn resolve_native_asr_cpu_runtime_at(
     .map_err(|error| format!("Native ASR CPU 运行时清单无效：{error}"))?;
     let capability_ok = manifest.capabilities.backend == "ctranslate2"
         && manifest.capabilities.device == "cpu"
-        && manifest.capabilities.engines == ["faster-whisper"]
+        && manifest.capabilities.engines == ["faster-whisper", "kotoba-faster-whisper"]
         && !manifest.capabilities.vad
         && !manifest.capabilities.crispasr
         && !manifest.capabilities.cuda
@@ -2118,6 +2118,18 @@ mod tests {
     }
 
     fn write_native_runtime(resource_dir: &Path, artifact_id: &str) -> PathBuf {
+        write_native_runtime_with_engines(
+            resource_dir,
+            artifact_id,
+            &["faster-whisper", "kotoba-faster-whisper"],
+        )
+    }
+
+    fn write_native_runtime_with_engines(
+        resource_dir: &Path,
+        artifact_id: &str,
+        engines: &[&str],
+    ) -> PathBuf {
         let root = NATIVE_ASR_CPU_RESOURCE_PATH
             .iter()
             .fold(resource_dir.to_path_buf(), |path, segment| {
@@ -2143,7 +2155,7 @@ mod tests {
                 "capabilities": {
                     "backend": "ctranslate2",
                     "device": "cpu",
-                    "engines": ["faster-whisper"],
+                    "engines": engines,
                     "vad": false,
                     "crispasr": false,
                     "cuda": false,
@@ -2181,6 +2193,18 @@ mod tests {
         write_native_runtime(&resource_dir, "wrong-artifact");
         let error = resolve_native_asr_cpu_runtime_at(&resource_dir).unwrap_err();
         assert!(error.contains("身份或能力"));
+
+        for engines in [
+            vec!["faster-whisper"],
+            vec!["kotoba-faster-whisper", "faster-whisper"],
+            vec!["faster-whisper", "kotoba-faster-whisper", "qwen3-asr"],
+        ] {
+            let temp = tempfile::tempdir().unwrap();
+            let resource_dir = temp.path().join("resources");
+            write_native_runtime_with_engines(&resource_dir, NATIVE_ASR_CPU_ARTIFACT_ID, &engines);
+            let error = resolve_native_asr_cpu_runtime_at(&resource_dir).unwrap_err();
+            assert!(error.contains("身份或能力"));
+        }
     }
 
     #[test]

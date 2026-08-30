@@ -19,16 +19,19 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../hooks/useAsrAvailability", () => ({
-  useAsrAvailability: () => ({
-    engineOptions: [{ value: "faster-whisper", label: "Faster-Whisper" }],
-    modelOptions: [{ value: "large-v3", label: "large-v3" }],
+  useAsrAvailability: (engine: string, model: string) => ({
+    engineOptions: [
+      { value: "faster-whisper", label: "Faster-Whisper" },
+      { value: "kotoba-faster-whisper", label: "kotoba-faster-whisper" },
+    ],
+    modelOptions: [{ value: model, label: model }],
     deviceOptions: [
       { value: "auto", label: "自动" },
       { value: "cpu", label: "CPU" },
     ],
     selectedModelStatus: {
-      engine: "faster-whisper",
-      model: "large-v3",
+      engine,
+      model,
       available: true,
       downloaded: true,
       disposition: "ready",
@@ -139,7 +142,42 @@ async function renderAndStart() {
   return { user, view };
 }
 
-describe("TranscribeView Native startup cancellation", () => {
+describe("TranscribeView Native ASR flow", () => {
+  it("starts the exact Kotoba Native CPU route through the existing flow", async () => {
+    mocks.getSettings.mockResolvedValue({
+      asrEngine: "kotoba-faster-whisper",
+      asrModel: "kotoba-tech/kotoba-whisper-v2.0-faster",
+      asrDevice: "auto",
+    });
+    mocks.refreshSelectedModel.mockResolvedValue({
+      kind: "ok",
+      status: {
+        engine: "kotoba-faster-whisper",
+        model: "kotoba-tech/kotoba-whisper-v2.0-faster",
+        available: true,
+        downloaded: true,
+        disposition: "ready",
+      },
+    });
+    mocks.startAsr.mockResolvedValue("kotoba-job");
+
+    const { view } = await renderAndStart();
+
+    await waitFor(() =>
+      expect(mocks.startAsr).toHaveBeenCalledWith({
+        audioPath: "C:/cache/workspace/audio.wav",
+        engine: "kotoba-faster-whisper",
+        model: "kotoba-tech/kotoba-whisper-v2.0-faster",
+        device: "auto",
+        language: "ja",
+        outputAssPath: "C:/media/input.transcribed.ass",
+        useVad: false,
+        vadConfig: null,
+      }),
+    );
+    view.unmount();
+  });
+
   it("shows startup progress and preserves the user-cancel reason before jobId exists", async () => {
     let resolveStart!: (jobId: string) => void;
     mocks.startAsr.mockImplementation(
