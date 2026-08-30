@@ -1367,25 +1367,57 @@ TimestampParseResult parse_timestamp_tokens(
     const auto last = std::find_if(token_ids.rbegin(), token_ids.rend(), [&](std::size_t token) {
       return token >= tokens.timestamp_begin;
     });
-    if (first == token_ids.end() || last == token_ids.rend()
-        || &*first == &*last) {
+    if (first == token_ids.end() || last == token_ids.rend()) {
       throw BackendError("invalid_generation", "Generated timestamps do not form a complete pair");
     }
     const std::size_t first_index = static_cast<std::size_t>(first - token_ids.begin());
     const std::size_t last_index = token_ids.size() - 1
         - static_cast<std::size_t>(last - token_ids.rbegin());
-    std::vector<std::size_t> slice(
-        token_ids.begin() + static_cast<std::ptrdiff_t>(first_index),
-        token_ids.begin() + static_cast<std::ptrdiff_t>(last_index + 1));
-    SegmentEvidence segment = parse_slice(
-        slice,
-        tokens,
-        decode,
-        window_offset_ms,
-        audio_duration_ms);
-    parsed.history_tokens = slice;
-    if (has_text(segment.segment.text)) {
-      parsed.segments.push_back(std::move(segment));
+    if (first_index == last_index) {
+      if (first_index != 0 || token_ids.size() < 2) {
+        throw BackendError("invalid_generation", "Generated timestamps do not form a complete pair");
+      }
+      const std::int64_t raw_start = timestamp_ms(
+          token_ids.front(), tokens.timestamp_begin, window_offset_ms);
+      const std::int64_t end = std::min(
+          window_offset_ms + source_window_duration_ms,
+          audio_duration_ms);
+      if (raw_start < window_offset_ms || raw_start >= end) {
+        throw BackendError("timestamp_after_audio", "Generated segment starts after WAV end");
+      }
+      std::vector<std::uint32_t> text_ids;
+      for (std::size_t index = 1; index < token_ids.size(); ++index) {
+        if (token_ids[index] < tokens.timestamp_begin && token_ids[index] != tokens.eot) {
+          text_ids.push_back(static_cast<std::uint32_t>(token_ids[index]));
+        }
+      }
+      if (text_ids.empty()) {
+        throw BackendError("invalid_generation", "Generated timestamp has no text tokens");
+      }
+      SegmentEvidence segment;
+      segment.segment = {raw_start, end, decode(text_ids)};
+      segment.raw_start_ms = raw_start;
+      segment.raw_end_ms = end;
+      segment.timestamp_start_token = token_ids.front();
+      segment.tokens = token_ids;
+      parsed.history_tokens = token_ids;
+      if (has_text(segment.segment.text)) {
+        parsed.segments.push_back(std::move(segment));
+      }
+    } else {
+      std::vector<std::size_t> slice(
+          token_ids.begin() + static_cast<std::ptrdiff_t>(first_index),
+          token_ids.begin() + static_cast<std::ptrdiff_t>(last_index + 1));
+      SegmentEvidence segment = parse_slice(
+          slice,
+          tokens,
+          decode,
+          window_offset_ms,
+          audio_duration_ms);
+      parsed.history_tokens = slice;
+      if (has_text(segment.segment.text)) {
+        parsed.segments.push_back(std::move(segment));
+      }
     }
     parsed.seek_advance_frames = (source_window_duration_ms + 9) / 10;
   }

@@ -1,6 +1,6 @@
 # Native Faster-Whisper model expansion implementation plan
 
-> Status: planning and temporarily parked. T18 is accepted; do not activate this task until the T18 active task is archived. It is the next executable child immediately afterward. Do not commit, push, merge, rebase, reset, or archive without separate user authorization.
+> Status: implementation, independent quality review, package qualification, and user manual acceptance passed. Pending only separately authorized commit and finish-work archival. Do not commit, push, merge, rebase, reset, or archive without separate user authorization.
 
 ## Step 0 - Confirm the production baseline
 
@@ -210,3 +210,5 @@ Planning is ready for later activation when:
 - the dependency gate is explicit and the user has reviewed the plan.
 
 Implementation is complete only when all six models pass exact delivery and functional qualification, T18/`large-v3` has no regression, frontend/backend availability is correct, and all required checks pass.
+
+**Closure:** these conditions are satisfied. `large-v2` required a generic worker fix and runtime v2 rebuild; final automated/package evidence is recorded in `research/final-trellis-check-report.md`, and the user has confirmed final manual testing passed.

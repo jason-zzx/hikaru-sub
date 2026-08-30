@@ -3175,9 +3175,20 @@ mod tests {
                     break snapshot;
                 }
                 if Instant::now() >= deadline {
+                    let trace = host.event_trace(job_id);
+                    let stderr_bytes = fs::metadata(&stderr_log)
+                        .map(|metadata| metadata.len())
+                        .unwrap_or(0);
                     panic!(
-                        "real CT2 worker did not complete: snapshot={snapshot}; stderr={}",
-                        fs::read_to_string(&stderr_log).unwrap_or_default()
+                        "real CT2 worker did not complete: status={} durationMs={} processedMs={} segmentCount={} errorPresent={} reaped={} gateActive={} events={:?} stderrBytes={stderr_bytes}",
+                        snapshot["status"].as_str().unwrap_or("invalid"),
+                        snapshot["durationMs"].as_i64().unwrap_or(-1),
+                        snapshot["processedMs"].as_i64().unwrap_or(-1),
+                        snapshot["segmentCount"].as_u64().unwrap_or(0),
+                        !snapshot["error"].is_null(),
+                        host.is_reaped(job_id),
+                        gate.current().is_some(),
+                        trace.event_kinds,
                     );
                 }
                 std::thread::sleep(Duration::from_millis(50));

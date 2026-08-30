@@ -27,13 +27,7 @@ use tokio::sync::Mutex;
 const MANIFEST_JSON: &str = include_str!("../resources/native-asr-models.json");
 const OFFICIAL_ENDPOINT: &str = "https://huggingface.co";
 const REQUIRED_ROLES: [&str; 4] = ["model-config", "model-weights", "tokenizer", "vocabulary"];
-const POST_MVP_MODELS: [(&str, &str); 10] = [
-    ("faster-whisper", "tiny"),
-    ("faster-whisper", "base"),
-    ("faster-whisper", "small"),
-    ("faster-whisper", "medium"),
-    ("faster-whisper", "large-v2"),
-    ("faster-whisper", "large-v3-turbo"),
+const POST_MVP_MODELS: [(&str, &str); 4] = [
     (
         "kotoba-faster-whisper",
         "kotoba-tech/kotoba-whisper-v2.0-faster",
@@ -307,7 +301,7 @@ impl NativeAsrModelManager {
         let manifest = load_manifest()?;
         let entry = find_model(&manifest, engine, model)
             .cloned()
-            .ok_or_else(|| "当前 Native MVP 不提供该模型".to_string())?;
+            .ok_or_else(|| "当前 Native ASR CPU 路线不提供该模型".to_string())?;
         let settings = load_settings(app).unwrap_or_default();
         let profile = effective_source_profile(&settings)?;
         self.start_download_for_model(
@@ -1202,7 +1196,16 @@ fn ensure_plain_directory(path: &Path) -> Result<(), String> {
             }
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                fs::create_dir(&current).map_err(|error| format!("无法创建受管目录：{error}"))?;
+                if let Err(error) = fs::create_dir(&current) {
+                    if error.kind() != std::io::ErrorKind::AlreadyExists {
+                        return Err(format!("无法创建受管目录：{error}"));
+                    }
+                }
+                let metadata = fs::symlink_metadata(&current)
+                    .map_err(|error| format!("无法检查并发创建的受管目录：{error}"))?;
+                if is_link_like(&metadata) || !metadata.is_dir() {
+                    return Err("并发创建的受管目录类型无效".into());
+                }
             }
             Err(error) => return Err(format!("无法检查受管目录：{error}")),
         }
@@ -1295,6 +1298,19 @@ mod tests {
         (model, bytes)
     }
 
+    fn renamed_fixture(
+        mut model: ManifestModel,
+        name: &str,
+        repository: &str,
+        revision_char: char,
+    ) -> ManifestModel {
+        model.logical_id = format!("faster-whisper/{name}");
+        model.model = name.into();
+        model.repository = repository.into();
+        model.revision = revision_char.to_string().repeat(40);
+        model
+    }
+
     fn write_model(directory: &Path, files: &[(&str, &[u8])]) {
         fs::create_dir_all(directory).unwrap();
         for (path, bytes) in files {
@@ -1303,66 +1319,12 @@ mod tests {
     }
 
     #[test]
-    fn manifest_frozen_identity_and_four_file_closure_are_exact() {
-        let manifest = load_manifest().unwrap();
-        assert_eq!(manifest.models.len(), 1);
-        let model = &manifest.models[0];
-        assert_eq!(model.logical_id, "faster-whisper/large-v3");
-        assert_eq!(model.repository, "Systran/faster-whisper-large-v3");
-        assert_eq!(model.revision, "edaa852ec7e145841d8ffdb056a99866b5f0a478");
-        assert_eq!(model.backend, "ctranslate2");
-        assert_eq!(model.format, "ctranslate2");
-        assert_eq!(model.license.spdx, "MIT");
+    fn manifest_content_is_exactly_frozen() {
+        let manifest: serde_json::Value = serde_json::from_str(MANIFEST_JSON).unwrap();
         assert_eq!(
-            model.license.attribution,
-            "Systran conversion of openai/whisper-large-v3"
+            hash(&serde_json::to_vec(&manifest).unwrap()),
+            "6dfa42cbaaa0c64bef032980e206019d2510f4215f7df598d88451b59eee67cd"
         );
-        assert_eq!(
-            model.license.source,
-            "https://huggingface.co/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478"
-        );
-        let expected = [
-            (
-                "model-config",
-                "config.json",
-                2_394,
-                "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
-            ),
-            (
-                "model-weights",
-                "model.bin",
-                3_087_284_237,
-                "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
-            ),
-            (
-                "tokenizer",
-                "tokenizer.json",
-                2_480_617,
-                "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
-            ),
-            (
-                "vocabulary",
-                "vocabulary.json",
-                1_068_114,
-                "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
-            ),
-        ];
-        assert_eq!(model.files.len(), expected.len());
-        for (file, expected) in model.files.iter().zip(expected) {
-            assert_eq!(
-                (
-                    file.role.as_str(),
-                    file.path.as_str(),
-                    file.size_bytes,
-                    file.sha256.as_str(),
-                ),
-                expected
-            );
-        }
-        assert!(!model
-            .files
-            .iter()
-            .any(|file| file.path == "preprocessor_config.json"));
     }
 
     #[test]
@@ -1628,11 +1590,28 @@ mod tests {
     }
 
     #[test]
-    fn readiness_distinguishes_post_mvp_and_unknown() {
-        assert_eq!(
-            unavailable_status("faster-whisper", "small").disposition,
-            NativeAsrModelDisposition::PostMvpUnavailable
-        );
+    fn manifest_backed_whisper_models_are_supported_and_other_routes_stay_deferred() {
+        let manifest = load_manifest().unwrap();
+        for model in [
+            "tiny",
+            "base",
+            "small",
+            "medium",
+            "large-v2",
+            "large-v3",
+            "large-v3-turbo",
+        ] {
+            assert!(find_model(&manifest, "faster-whisper", model).is_some());
+        }
+        for (engine, model) in [(
+            "kotoba-faster-whisper",
+            "kotoba-tech/kotoba-whisper-v2.0-faster",
+        )] {
+            assert_eq!(
+                unavailable_status(engine, model).disposition,
+                NativeAsrModelDisposition::PostMvpUnavailable
+            );
+        }
         assert_eq!(
             unavailable_status("other", "thing").disposition,
             NativeAsrModelDisposition::Unsupported
@@ -2154,6 +2133,60 @@ mod tests {
         assert!(namespace.join("keep-me").is_dir());
     }
 
+    #[test]
+    fn readiness_and_managed_paths_are_isolated_across_models_and_vocabulary_forms() {
+        let dir = tempdir().unwrap();
+        let roots = ManagedModelRoots::below(dir.path());
+        let (turbo, turbo_files) = complete_fixture();
+        let tiny_files = vec![
+            ("config.json", b"tiny-config".as_slice()),
+            ("model.bin", b"tiny-weights".as_slice()),
+            ("tokenizer.json", b"tiny-tokenizer".as_slice()),
+            ("vocabulary.txt", b"tiny-vocabulary".as_slice()),
+        ];
+        let tiny = renamed_fixture(
+            fixture_model(&[
+                ("model-config", tiny_files[0].0, tiny_files[0].1),
+                ("model-weights", tiny_files[1].0, tiny_files[1].1),
+                ("tokenizer", tiny_files[2].0, tiny_files[2].1),
+                ("vocabulary", tiny_files[3].0, tiny_files[3].1),
+            ]),
+            "tiny",
+            "test/tiny",
+            'b',
+        );
+        let turbo = renamed_fixture(turbo, "large-v3-turbo", "test/turbo", 'c');
+
+        write_model(&direct_path(&roots, &tiny), &tiny_files);
+        write_model(&legacy_path(&roots, &turbo), &turbo_files);
+        assert_eq!(
+            resolve_sync(&roots, &tiny).unwrap().unwrap().origin,
+            NativeAsrModelOrigin::DirectInstall
+        );
+        assert_eq!(
+            resolve_sync(&roots, &turbo).unwrap().unwrap().origin,
+            NativeAsrModelOrigin::LegacyHuggingFaceSnapshot
+        );
+
+        fs::write(direct_path(&roots, &tiny).join("model.bin"), b"broken").unwrap();
+        assert!(resolve_sync(&roots, &tiny).unwrap().is_none());
+        assert!(resolve_sync(&roots, &turbo).unwrap().is_some());
+
+        let manifest = load_manifest().unwrap();
+        let direct_paths: HashSet<_> = manifest
+            .models
+            .iter()
+            .map(|model| direct_path(&roots, model))
+            .collect();
+        let download_paths: HashSet<_> = manifest
+            .models
+            .iter()
+            .map(|model| download_path(&roots, model))
+            .collect();
+        assert_eq!(direct_paths.len(), manifest.models.len());
+        assert_eq!(download_paths.len(), manifest.models.len());
+    }
+
     #[tokio::test]
     async fn coalesces_same_model_download_and_retains_terminal_snapshot() {
         let server = MockServer::start_async().await;
@@ -2187,5 +2220,61 @@ mod tests {
             ModelDownloadJobStatus::Completed
         );
         assert_eq!(mocks.iter().map(|mock| mock.hits()).sum::<usize>(), 4);
+    }
+
+    #[tokio::test]
+    async fn different_models_use_independent_download_jobs_and_terminal_identity() {
+        let server = MockServer::start_async().await;
+        let dir = tempdir().unwrap();
+        let roots = ManagedModelRoots::below(dir.path());
+        let (base, files) = complete_fixture();
+        let base = renamed_fixture(base, "base", "test/base", 'b');
+        let (small, _) = complete_fixture();
+        let small = renamed_fixture(small, "small", "test/small", 'c');
+        for model in [&base, &small] {
+            for (path, bytes) in &files {
+                server.mock(|when, then| {
+                    when.method(GET).path(format!(
+                        "/{}/resolve/{}/{}",
+                        model.repository, model.revision, path
+                    ));
+                    then.status(200).body(bytes.to_vec());
+                });
+            }
+        }
+
+        let manager = NativeAsrModelManager::default();
+        let base_id = manager
+            .start_download_for_model(base.clone(), roots.clone(), server.base_url())
+            .await
+            .unwrap();
+        let small_id = manager
+            .start_download_for_model(small.clone(), roots.clone(), server.base_url())
+            .await
+            .unwrap();
+        assert_ne!(base_id, small_id);
+
+        for (model, id) in [(&base, &base_id), (&small, &small_id)] {
+            let snapshot = wait_terminal(&manager, id).await;
+            assert_eq!(
+                (
+                    snapshot.engine.as_str(),
+                    snapshot.model.as_str(),
+                    snapshot.revision.as_str()
+                ),
+                (
+                    "faster-whisper",
+                    model.model.as_str(),
+                    model.revision.as_str()
+                )
+            );
+            assert_eq!(
+                snapshot.status,
+                ModelDownloadJobStatus::Completed,
+                "{:?}",
+                snapshot.error
+            );
+            assert!(direct_path(&roots, model).is_dir());
+        }
     }
 }

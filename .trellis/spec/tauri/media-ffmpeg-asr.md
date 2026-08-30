@@ -71,11 +71,11 @@ Correct: … -vn -af aresample=async=1:first_pts=0 …     → return covered_ms
 | Clip | `clip.rs` | Soft/hard cut; progress polling; optional replace working video is a **frontend** session decision |
 | Burn | `burn.rs` | Hard-sub export via FFmpeg/libass; burn page has no subtitle preview |
 
-## Native ASR Job Host (Production MVP)
+## Native ASR Job Host (Production CPU)
 
 ### Scope / Trigger
 
-Use the Rust host in `asr_worker.rs` for the production Native ASR route and for reviewed worker compatibility tests through the existing product job contract. Release/default routing, model list/status/download, and inference use the bundled CPU worker with the exact managed large-v3 model. `HIKARU_ASR_FAKE_WORKER` remains debug/test-only host injection and never selects the product route.
+Use the Rust host in `asr_worker.rs` for the production Native ASR route and for reviewed worker compatibility tests through the existing product job contract. Release/default routing, model list/status/download, and inference use the bundled CPU worker with the exact selected path from the seven-row Faster-Whisper manifest. `large-v3` remains the frontend default. `HIKARU_ASR_FAKE_WORKER` remains debug/test-only host injection and never selects the product route.
 
 ### Signatures
 
@@ -110,7 +110,7 @@ struct ResolvedNativeLaunch {
 - Bound both `segment` append accumulation and `segmentsReplace` with canonical `maxReplacementSegments`. Embed `native-asr/protocol-v1-limits.json`; do not maintain a handwritten Rust limits copy.
 - Recovery/stderr artifact job IDs must use the host-safe generated character set, not merely the protocol's byte/control-character rules; otherwise separators can escape managed directories.
 - `HIKARU_ASR_FAKE_WORKER` and `HIKARU_ASR_FAKE_SCENARIO` are debug/test-only host-injection inputs. `#[cfg(not(debug_assertions))]` ignores them, while Release/default remains Native and resolves only the packaged runtime.
-- Model-backed worker compatibility tests use required `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH` only inside `asr_worker.rs`'s test module. All three must be set together; optional `HIKARU_ASR_CT2_DEVICE` is exactly `cpu|cuda`, optional `HIKARU_ASR_CT2_ENGINE` is exactly `faster-whisper|kotoba-faster-whisper` (default ordinary), and optional `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH` selects a longer cancellation input. Kotoba tests require the exact immutable Hugging Face snapshot revision directory. CUDA mode additionally requires `HIKARU_ASR_CT2_CPU_WORKER` so the same suite can deterministically prove pre-ready `cuda_not_built` without damaging the machine CUDA environment. The test copies every exercised audio into a temporary managed workspace before `ResolvedNativeLaunch::resolve(...)`. Product/Release code never reads these keys.
+- Model-backed worker compatibility tests use required `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH` only inside `asr_worker.rs`'s test module. All three must be set together; optional `HIKARU_ASR_CT2_DEVICE` is exactly `cpu|cuda`, optional `HIKARU_ASR_CT2_ENGINE` is exactly `faster-whisper|kotoba-faster-whisper` (default ordinary), and optional `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH` selects a longer cancellation input. Kotoba tests require the exact immutable Hugging Face snapshot revision directory. CUDA mode additionally requires `HIKARU_ASR_CT2_CPU_WORKER` so the same suite can deterministically prove pre-ready `cuda_not_built` without damaging the machine CUDA environment. The test copies every exercised audio into a temporary managed workspace before `ResolvedNativeLaunch::resolve(...)`. Product/Release code never reads these keys. Run one real test with `cargo test --lib asr_worker::tests::<name> -- --exact --test-threads=1 --nocapture`; broad name filters can build/enumerate unrelated Tauri targets and make an external harness report a false timeout.
 - Keep the generic CrispASR real-worker input contract (`HIKARU_ASR_CRISPASR_INPUTS`) available for T09/T10 Parakeet/Qwen/Reazon compatibility tests. A task-specific lifecycle matrix must use separate test-only keys rather than replacing or reinterpreting that decoder. Reazon R2 uses `HIKARU_ASR_R2_STEP6_MANIFEST`, `HIKARU_ASR_R2_STEP6_REQUIRED=1`, and `HIKARU_ASR_R2_STEP6_LANE`; the reviewed manifest bytes are source/lock-bound and required mode fails instead of skipping. Each decoder reads only its own keys, and bytes from the generic config cannot satisfy the R2 manifest contract or vice versa.
 
 ### Validation & Error Matrix
@@ -148,7 +148,7 @@ struct ResolvedNativeLaunch {
 - Lifecycle: shared active slot, legacy release/retain branches, cancel/shutdown process-tree cleanup within two seconds, terminal-but-unreaped cleanup, and no orphan parent/child process.
 - Persistence/security: partial recovery after failure/cancel/crash, minimal ASS only after non-empty completion, safe artifact job IDs, canonical path containment, and stderr byte/retention bounds.
 - Compatibility: Release cargo check with malicious debug/test env values, full Rust tests, and `pnpm build` without frontend contract changes.
-- Real worker: with the required three production-worker test env keys set, assert selected-device success/recovery/fallback ASS, structured pre-ready failure/recovery, cancellation with no completed snapshot, managed audio copy, and active-gate release. CUDA mode also sets `HIKARU_ASR_CT2_CPU_WORKER`, `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH`, and `HIKARU_ASR_CT2_DEVICE=cuda`, then asserts `durationMs > 0` before cancellation and `cuda_not_built` from the CPU-only negative. Without the required triple, ordinary test runs skip only when no optional model-backed keys are present.
+- Real worker: with the required three production-worker test env keys set, use exact lib-only Cargo test names and assert selected-device success/recovery/fallback ASS, structured pre-ready failure/recovery, cancellation with no completed snapshot, managed audio copy, and active-gate release. CUDA mode also sets `HIKARU_ASR_CT2_CPU_WORKER`, `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH`, and `HIKARU_ASR_CT2_DEVICE=cuda`, then asserts `durationMs > 0` before cancellation and `cuda_not_built` from the CPU-only negative. Without the required triple, ordinary test runs skip only when no optional model-backed keys are present.
 - CrispASR regression: decode representative generic Parakeet and Qwen `HIKARU_ASR_CRISPASR_INPUTS` configurations after adding any task-local suite. Prove the separate R2 required decoder rejects missing manifest/lane/required state and cross-decoded manifest bytes, binds each lane's command/environment/log digest, and leaves the generic decoder available.
 
 ### Wrong vs Correct
@@ -162,9 +162,12 @@ Correct: preserve first terminal snapshot → terminate/reap PID → release slo
 
 Wrong:   Release/product code reads model-backed env keys, or a CUDA test breaks CUDA_PATH to manufacture an error
 Correct: test module validates the required/optional env set → uses a CPU-only worker for deterministic cuda_not_built → copies audio to temporary workspace → exercises the unchanged host
+
+Wrong:   cargo test production_worker_runs... → broad filter builds unrelated targets → external wrapper reports a false timeout
+Correct: cargo test --lib asr_worker::tests::production_worker_runs... -- --exact --test-threads=1 --nocapture
 ```
 
-## Native ASR Backend Routing (Production MVP)
+## Native ASR Backend Routing (Production CPU)
 
 ### 1. Scope / Trigger
 
@@ -195,7 +198,7 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 
 - One immutable process-lifetime `AsrRoutePolicy` selects engine list, model status/download/progress, and inference as one family. Never let Native direct download feed legacy Python launch.
 - `AsrState::default` is always `NativeMvp` in debug and Release. A valid debug fake host changes only the injected host executable; there is no persisted route setting or Release environment switch.
-- Native MVP accepts exactly `faster-whisper/large-v3`, `auto|cpu`, Japanese source, and no VAD. It resolves the T13 worker from `resource_dir()/native-asr/windows-x64/cpu` and passes only T12's exact hash-verified model path to `ResolvedNativeLaunch`.
+- Native production accepts the `faster-whisper` engine, `auto|cpu`, Japanese source, and no VAD. Actual model support is authoritative in the bundled manifest: `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo`. The route resolves artifact v2 from `resource_dir()/native-asr/windows-x64/cpu` and passes only the selected exact hash-verified model path to `ResolvedNativeLaunch`; `large-v3` remains the frontend default.
 - Native preflight/runtime/model failures return directly. They never call `ensure_base_url` or silently fall back to Python.
 - Model status keeps compatibility booleans and adds `disposition`, `backend`, `revision`, `origin`, and `reason`. Download progress keeps current polling fields and maps T12 `sourceEndpoint` to compatibility field `hfEndpoint`.
 - Progress/cancel check the Native host first. In Native mode, an unknown job returns the established missing-job error rather than starting the sidecar.
@@ -204,28 +207,28 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 
 | Condition | Result |
 |---|---|
-| Release/default | Entire command family uses Native MVP |
-| Native large-v3 ready + CPU/auto | Resolve T13 worker + exact T12 path; start existing host |
+| Release/default | Entire command family uses the Native CPU route |
+| Any manifest-backed model ready + CPU/auto | Resolve runtime v2 + that model's exact path; start existing host |
 | Native model missing | Controlled download-required error; release unactivated slot |
 | Post-MVP/unknown model or engine | Explicit unavailable/unsupported result; no fallback |
 | CUDA/Vulkan/non-Japanese/VAD request | Reject before worker launch |
-| Missing/wrong T13 runtime identity or required entry | Controlled runtime error; no sidecar |
+| Missing/wrong runtime v2 identity or required entry | Controlled runtime error; no sidecar |
 | Native progress/cancel unknown job | `转录任务不存在`; no sidecar |
 
 ### 5. Good / Base / Bad Cases
 
-- Good: `NativeMvp` + exact ready large-v3 + CPU -> one host job with unchanged progress/cancel/recovery behavior.
-- Base: normal Release build -> packaged Native large-v3 CPU route with no Python dependency.
+- Good: `NativeMvp` + any exact ready manifest model + CPU -> one host job with unchanged progress/cancel/recovery behavior.
+- Base: normal Release build -> packaged seven-model Faster-Whisper CPU route, with `large-v3` selected by default and no Python dependency.
 - Bad: model commands use T12 but `start_asr` still enters Python, or a Native preflight error falls through to `ensure_base_url`.
 
 ### 6. Tests Required
 
 - Route-policy/default tests, including Release check with malicious debug env values.
 - All T12 disposition-to-public-payload mappings.
-- CPU/auto acceptance and engine/model/device/language/VAD rejection.
+- CPU/auto acceptance for every manifest-backed model; engine/device/language/VAD and deferred/unknown model rejection.
 - Native missing-job progress/cancel does not contact the sidecar.
 - Existing host reducer, recovery, crash, cancellation, active-slot, and full Cargo regressions.
-- `pnpm build` for additive TypeScript payload compatibility and `pnpm asr:runtime:verify` for the exact T13 archive.
+- `pnpm build` for additive TypeScript payload compatibility and `pnpm asr:runtime:verify` for the exact runtime v2 archive.
 
 ### 7. Wrong vs Correct
 
@@ -262,6 +265,8 @@ Tracked identities:
 
 ```text
 native-asr/runtime/windows-x64-cpu-lock.json
+  artifact.id = hikaru-asr-windows-x64-cpu-v2
+  candidateConfig.id = selected-cpu-timestamp-no-history-beam1-v2
 native-asr/build-inputs/windows-x64-cpu-ct2.zip   # build/link input only
 native-asr/artifacts/windows-x64-cpu.zip          # the only native archive shipped
 ```
@@ -275,7 +280,8 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 - Final capability is exactly ordinary `faster-whisper` through CTranslate2 on CPU. `useVad=true` returns `vad_not_built`; GPU requests return `cuda_not_built`; CrispASR, Kotoba, and other non-MVP routes return the controlled route-not-built error. Missing DLLs are not capability control.
 - Runtime verification is closed-world: archive root/path safety, outer hash, manifest/checksum/file closure, source/toolchain/config equality, imports, license inventory, forbidden content, and ASCII/UTF-16 private build paths must all pass before extraction.
 - Resource preparation verifies the ZIP, extracts to a temporary sibling, verifies the tree again, then atomically replaces `src-tauri/resources/native-asr/`. NSIS and portable staging consume that same generated tree.
-- If any payload byte, manifest field, or target graph changes, rebuild two independent roots to a byte-identical complete ZIP, rerun model-backed installed/portable smoke against the final worker SHA, rebuild NSIS/portable packages, and refresh the handoff. Evidence for an older worker is invalid even if source code is unchanged.
+- If any runtime payload byte, runtime-manifest field, or target graph changes, rebuild two independent roots to a byte-identical complete ZIP, rerun model-backed installed/portable smoke against the final worker SHA, rebuild NSIS/portable packages, and refresh the handoff. Evidence for an older worker is invalid even if source code is unchanged.
+- A change to `src-tauri/resources/native-asr-models.json` also invalidates application package evidence even when runtime bytes are unchanged. Rerun `pnpm release:local`, extract/audit NSIS, and inspect the portable executable/ZIP for all current immutable model identities; do not reuse a package built from an older support manifest.
 - The package includes no model weights, Python sidecar/runtime/venv/packages, ORT/Silero VAD, CrispASR, CUDA/Vulkan runtime, PDB, or development/test executable. Resource preparation deletes stale `src-tauri/resources/asr-service` before bundling.
 - Bundled VC145 DLLs come unmodified from VS18 `VC/Redist`, are excluded from Hikaru Sub's Apache-2.0 project license, and are governed by the official **Microsoft Visual C++ V14 Redistributable and Runtime 2026** terms. Package the unchanged official DOCX locally, lock its immutable URL/size/SHA-256, record `https://aka.ms/vs/18/redistribution`, and preserve Microsoft's `BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS` statement; do not substitute the VS2022 terms or invent a custom EULA.
 
@@ -291,12 +297,12 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 | Final preset enables a development capability or default-builds a development-only target | CMake configure/check fails; artifact is not releasable |
 | `useVad=true` on bundled CPU worker | Structured `vad_not_built` before model loading |
 | Non-CPU or non-MVP backend/engine request | Structured controlled not-built error; no fallback |
-| Prepared runtime differs from tracked ZIP, or portable embeds a stale manifest | Packaging/evidence gate fails; rebuild packages |
+| Prepared runtime differs from tracked ZIP, or NSIS/portable embeds a stale runtime or model manifest | Packaging/evidence gate fails; rebuild and re-audit both packages |
 | Setup `>80 MiB`, portable ZIP `>90 MiB`, unpacked runtime `>250 MiB`, or model count `>0` | Release blocker |
 
 ### Good/Base/Bad Cases
 
-- Good: two independent clean roots produce the same ZIP; shared verifier accepts it; installed-like and portable-like final bytes pass short and `>10` minute large-v3 smoke; packages embed that manifest identity.
+- Good: two independent clean roots produce the same ZIP; shared verifier accepts it; all seven models pass short smoke, `large-v2` passes the `>10` minute gate, existing `large-v3` regressions remain green, and rebuilt packages embed all seven support identities.
 - Base: normal frontend/Tauri development and Release use the same packaged Native resource identity; debug fake-worker injection may replace only the host executable in tests.
 - Bad: update the worker/manifest, reuse old smoke or package hashes, or let release packaging rebuild/download a different runtime. The handoff then describes bytes users will not receive.
 
@@ -305,8 +311,8 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 - Verifier mutation tests: outer/file/manifest hash drift, missing/extra/wrong DLL, traversal/absolute paths, forbidden capability/file, private-path leakage, source/toolchain/config mismatch, incomplete/duplicate license inventory, and Microsoft Runtime notice/document identity drift.
 - Final CMake/CTest: protocol core, ordinary CT2 core, CrispASR-route rejection, and non-Whisper-route rejection; final default target graph must not build development-only workers/tests.
 - Build gate: two independent roots, complete ZIP byte comparison, restricted PATH launch, import closure, and non-system module containment under the artifact root.
-- Model-backed gate against the final worker SHA: installed-like and portable-like short plus `>10` minute audio; UTF-8 JSONL-only output, non-empty ordered positive-duration audio-bounded segments, normal completion, controlled unsupported request, host recovery/active-gate, and cancel within two seconds.
-- Release gate: `pnpm asr:prepare-resource`, full tests/build/Cargo tests, `pnpm release:local`, manifest equality in portable staging, package sizes, model count zero, `git diff --check`, and no staged files unless the user explicitly authorizes commit preparation.
+- Model-backed gate against the final worker SHA: all seven short smokes, `large-v2` `>10` minute smoke, `large-v3` regression, installed-like/portable-like representative smokes, UTF-8 JSONL-only output, non-empty ordered positive-duration audio-bounded segments, normal completion, controlled unsupported request, host recovery/active-gate, and cancel within two seconds.
+- Release gate: `pnpm asr:prepare-resource`, full tests/build/Cargo tests, `pnpm release:local`, runtime identity equality plus seven-model identity closure in extracted NSIS and portable output, package sizes, model count zero, forbidden-file count zero, `git diff --check`, and no staged files unless the user explicitly authorizes commit preparation.
 
 ### Wrong vs Correct
 
@@ -314,11 +320,70 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 Wrong:   change worker bytes -> keep previous smoke/package evidence -> claim the new artifact passed
 Correct: freeze final worker SHA -> rerun model/host smoke -> rebuild NSIS/portable -> record matching hashes
 
+Wrong:   add a model manifest row -> reuse packages built before that row existed
+Correct: rerun release:local -> extract NSIS + inspect portable output -> prove all current model identities are embedded
+
 Wrong:   omit ORT/VAD files but compile/link Candidate B -> capability fails via missing DLL
 Correct: compile Candidate B out -> useVad=true returns vad_not_built before model loading
 
 Wrong:   release:local runs CMake or consumes a machine-local dependency tree
 Correct: release:local verifies/extracts the tracked final ZIP; only the dedicated build command compiles
+```
+
+## Ordinary Whisper Single-Leading-Timestamp Fallback
+
+### 1. Scope / Trigger
+
+Apply when changing ordinary Faster-Whisper timestamp parsing or source-window seek. Runtime v2 covers a legal CT2 generation shape observed with `large-v2`: one leading timestamp followed by text and no closing timestamp. The rule is generic and must not branch on model identity.
+
+### 2. Signatures
+
+```cpp
+TimestampParseResult parse_timestamp_tokens(
+    const std::vector<std::size_t>& token_ids,
+    const TokenIds& tokens,
+    const DecodeTokens& decode,
+    std::int64_t window_offset_ms,
+    std::int64_t source_window_duration_ms,
+    std::int64_t audio_duration_ms);
+```
+
+### 3. Contracts
+
+- Normal paired/consecutive timestamp parsing remains authoritative.
+- The fallback applies only when the sequence has exactly one timestamp, it is at position zero, and at least one following token is non-timestamp and non-EOT text.
+- Segment start comes from that timestamp; segment end is `min(window_offset_ms + source_window_duration_ms, audio_duration_ms)`. Start must remain inside that positive interval.
+- The parser consumes/advances exactly the source window and preserves the generated token slice for diagnostics/history accounting; production ordinary Whisper still runs history-off.
+- Empty, timestamp-only, late single-timestamp, EOT-only-tail, multi-timestamp malformed, and out-of-range forms remain controlled failures. Do not swallow `invalid_generation` broadly.
+
+### 4. Validation & Error Matrix
+
+| Token shape | Result |
+|---|---|
+| leading timestamp + non-EOT text, no closing timestamp | Emit one source-window-bounded segment; advance the consumed window |
+| sole timestamp not at position zero | `invalid_generation` |
+| leading timestamp with no text or only EOT | `invalid_generation` |
+| start at/after bounded window end | `timestamp_after_audio` |
+| ordinary valid timestamp pair/consecutive timestamps | Existing parser branch; no fallback |
+
+### 5. Good / Base / Bad Cases
+
+- Good: `<|0.00|> Japanese text` for a 24,102 ms final window -> one positive segment ending at 24,102 ms and seek reaches WAV end.
+- Base: ordinary paired timestamps -> unchanged decoded-timestamp behavior.
+- Bad: special-case `large-v2`, invent a closing token, retain previous-text history, or accept any single timestamp regardless of position/text.
+
+### 6. Tests Required
+
+- C++ core: legal fallback, bounded end, positive seek, zero retained production history, non-leading timestamp rejection, timestamp/EOT-only rejection, and out-of-range rejection.
+- Model-backed: exact `large-v2` short and `>10` minute worker smoke, all seven short smokes, and existing `large-v3` regressions.
+- Host: exact lib-only success and cancel/reap tests through `ResolvedNativeLaunch`.
+- Any worker byte change requires runtime v2+ successor identity, CTest, reproducible archive, package rebuild, and installed/portable evidence refresh.
+
+### 7. Wrong vs Correct
+
+```text
+Wrong:   if model == "large-v2" -> fabricate an end timestamp or ignore invalid generation
+Correct: validate one leading timestamp + real text -> bound end to consumed source window -> advance exactly that window
 ```
 
 ## Native ASR Model Delivery
@@ -344,22 +409,23 @@ Bundled authority:
 ```text
 src-tauri/resources/native-asr-models.json
   schemaVersion = 1
-  faster-whisper/large-v3
-  Systran/faster-whisper-large-v3
-  revision edaa852ec7e145841d8ffdb056a99866b5f0a478
+  faster-whisper/{tiny,base,small,medium,large-v2,large-v3,large-v3-turbo}
+  each row = canonical repository + immutable 40-char revision + MIT attribution
+             + exact model-config/model-weights/tokenizer/vocabulary size/SHA closure
 ```
 
 ### Contracts
 
 - The bundled manifest is the sole model identity authority. Reject unsupported schemas, duplicate logical/model identities, unsafe segments, malformed hashes, missing roles, Windows reserved/trailing-dot aliases, and ASCII case-colliding identities/paths before network or filesystem mutation.
-- Ordinary faster-whisper large-v3 requires exactly `config.json`, `model.bin`, `tokenizer.json`, and `vocabulary.json`; do not extend Kotoba's `preprocessor_config.json` requirement to ordinary Whisper.
+- Every ordinary Faster-Whisper row requires exactly four logical roles: `config.json`, `model.bin`, `tokenizer.json`, and one vocabulary file. Systran `tiny/base/small/medium/large-v2` use `vocabulary.txt`; `large-v3` and canonical Dropbox `large-v3-turbo` use `vocabulary.json`. Do not extend Kotoba's `preprocessor_config.json` requirement to ordinary Whisper.
 - Readiness order is exact direct install, then exact immutable HF snapshot. Every required file must match size and SHA-256; readiness hashing and blocking directory verification run through `spawn_blocking` from async callers.
 - The process-owned manager caches only successful exact ready resolutions for the current process. Repeated status and start preflight reuse that immutable identity; missing/corrupt results are not cached, and a verified managed download may seed the cache after publication. A new process always performs fresh exact verification.
 - Direct model paths and required files reject symlinks/reparse points. Legacy HF snapshot/file canonical targets must remain below the canonical managed HF root; legacy snapshots are read-only and never copied, mutated, or deleted by the model manager.
 - Official/China URLs derive only from the validated repository/revision/file row plus the existing runtime source profile. Do not accept custom model URLs or log headers/response bodies.
 - `.part` resume appends only for matching `206 Content-Range`; ignored ranges (`200`), incompatible `206`, `416`, oversized partials, and known-corrupt complete partials restart safely. Useful network-interrupted partials remain resumable.
 - Verify every file and the complete staging tree before renaming into the immutable final revision directory. Preserve a valid final install; move an invalid final only after replacement staging validates, and restore it when publication fails.
-- Same logical-model requests share one active job. Terminal snapshots remain pollable for the process lifetime. Do not hold manager locks across network waits or multi-gigabyte hashing.
+- Same logical-model requests share one active job; different models keep independent IDs, paths, publication state, and terminal identities. Terminal snapshots remain pollable for the process lifetime. Do not hold manager locks across network waits or multi-gigabyte hashing.
+- Concurrent different-model jobs may both create shared parent directories. Accept only `AlreadyExists`, re-read with `symlink_metadata`, and reject symlink/reparse-like or non-directory entries before descending; successful creation must pass the same revalidation.
 - `check_asr_model`, `download_asr_model`, and `get_model_download_progress` use the Native manager under the same process-lifetime route policy as inference; never expose a mixed Native-download/Python-launch product state.
 
 ### Validation & Error Matrix
@@ -376,21 +442,23 @@ src-tauri/resources/native-asr-models.json
 | Hash mismatch after complete transfer | Remove corrupt complete partial; never publish |
 | Valid final exists | Reuse it; never replace or damage it |
 | Same-model request while active | Return the existing active job ID |
+| Different-model jobs create the same parent concurrently | Both may continue only after the existing entry revalidates as a plain directory; state remains isolated |
+| Concurrent collision is a link/reparse-like or non-directory entry | Reject before descent/publication |
 | Known non-MVP model / unknown identity | `postMvpUnavailable` / `unsupported`; no Python or model fallback |
 
 ### Good / Base / Bad Cases
 
-- Good: exact manifest row → resumable verified staging → immutable direct install → exact resolved path accepted by the packaged CPU worker.
+- Good: any of the seven exact manifest rows → resumable verified staging → immutable direct install → exact resolved path accepted by the packaged CPU worker; a sibling model job remains independent.
 - Base: exact legacy HF snapshot exists → full validation → reuse in place through the production Native route; no copy or Python fallback occurs.
 - Bad: accept `main`, model-name-only directories, same-name framework caches, Windows path aliases, escaped symlinks, or stream directly into the final model directory.
 
 ### Tests Required
 
-- Manifest: exact frozen four-file closure/license/source plus schema, duplicate, unsafe segment, Windows alias, case-collision, hash, and missing-role rejection.
+- Manifest: exact seven-row four-file closure/license/source plus schema, duplicate, unsafe segment, Windows alias, case-collision, hash, missing-role, correct vocabulary form, and no ordinary preprocessor requirement.
 - Readiness: direct/legacy preference, missing/wrong-size/wrong-hash/wrong-revision/framework-cache failure, direct link rejection, and contained/escaped legacy link behavior.
-- Download: fresh, matching resume, ignored range, incompatible range, `416`, oversized partial, interruption preservation, bad hash, complete-stage publication, repair rollback, and same-model coalescing.
+- Download: fresh, matching resume, ignored range, incompatible range, `416`, oversized partial, interruption preservation, bad hash, complete-stage publication, repair rollback, same-model coalescing, and concurrent different-model job/publication identity isolation.
 - Gates: focused `asr_models` tests including ready-cache reuse/missing non-cache/download seeding, full Cargo tests, `pnpm build`, task validation, implementation `rustfmt`, and `git diff --check`.
-- Real handoff: exact cached large-v3 path + packaged CPU worker + short audio; long installed/portable release smoke remains owned by T18.
+- Real handoff: all seven exact cached models pass short worker smoke; `large-v2` also passes `>10` minute smoke and exact lib-only host success/cancel/reap; existing `large-v3` and installed/portable regressions remain green.
 
 ### Wrong vs Correct
 

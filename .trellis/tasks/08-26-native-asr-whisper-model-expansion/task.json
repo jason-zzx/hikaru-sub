@@ -3,7 +3,7 @@
   "name": "native-asr-whisper-model-expansion",
   "title": "Expand Native Faster-Whisper models after T18",
   "description": "Next after the accepted T18 Native MVP release cutover is archived: add large-v2, tiny, base, small, medium, and large-v3-turbo to the released CTranslate2 CPU route.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": "After T18, extend the released Native Faster-Whisper CPU route across exact model delivery, worker qualification, backend availability, and frontend enablement.",
   "package": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": "07-25-native-asr-migration",
   "relatedFiles": [],
-  "notes": "T18 is accepted. Keep this task planning only until the T18 active task is archived; it is the next executable child immediately afterward.",
+  "notes": "Implementation, independent review, package qualification, documentation synchronization, and user manual acceptance passed. Pending separately authorized commit and finish-work archival.",
   "meta": {}
 }

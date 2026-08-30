@@ -17,7 +17,7 @@ They do not include:
 - an ASR virtual environment or Python packages;
 - ASR model weights.
 
-The bundled Native runtime is status-only: it is neither downloaded nor removed through Settings. FFmpeg and the exact Faster-Whisper large-v3 model are prepared separately after user confirmation when missing.
+The bundled Native runtime is status-only: it is neither downloaded nor removed through Settings. FFmpeg and the selected exact Faster-Whisper model are prepared separately after user confirmation when missing. Supported model IDs are `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo`; `large-v3` remains the default.
 
 ## Licenses and third-party components
 
@@ -37,8 +37,8 @@ Hikaru Sub resolves FFmpeg in this order:
 
 The production ASR route does not resolve Python. It resolves:
 
-1. the verified Native worker from the packaged `native-asr/windows-x64/cpu` resource;
-2. an exact ready Faster-Whisper large-v3 model from managed model roots.
+1. the verified `hikaru-asr-windows-x64-cpu-v2` worker from the packaged `native-asr/windows-x64/cpu` resource;
+2. the selected exact ready Faster-Whisper model from the seven-row bundled manifest and managed model roots.
 
 The repo-root Python sidecar and its Python 3.11 setup helpers remain development/historical rollback source for one stable release cycle. They are not production runtime dependencies and are not included in release artifacts.
 
@@ -50,10 +50,10 @@ Large managed dependencies live below the application installation or portable d
 deps/
 ├── ffmpeg/current/
 ├── models/
-│   ├── ctranslate2/faster-whisper/large-v3/<revision>/
-│   └── huggingface/hub/models--Systran--faster-whisper-large-v3/snapshots/<revision>/
+│   ├── ctranslate2/faster-whisper/<model>/<revision>/
+│   └── huggingface/hub/models--<owner>--<repository>/snapshots/<revision>/
 └── downloads/
-    └── native-asr-models/faster-whisper/large-v3/<revision>/
+    └── native-asr-models/faster-whisper/<model>/<revision>/
 ```
 
 The direct CTranslate2 install is immutable after complete verification. An exact legacy Hugging Face snapshot may be reused in place only after every required file matches the bundled manifest. Wrong revisions, framework-only caches, partials, symlink/reparse escapes, and wrong size/hash files are not ready.
@@ -110,12 +110,28 @@ Native model URLs are derived only from the bundled model repository, immutable 
 The production ASR route is the bundled independent Native worker with exactly:
 
 ```text
-faster-whisper / large-v3 / CTranslate2 / auto|cpu / Japanese / no VAD
+faster-whisper / selected manifest model / CTranslate2 / auto|cpu / Japanese / no VAD
 ```
+
+Model support is authoritative in `src-tauri/resources/native-asr-models.json`: `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo`; `large-v3` remains the frontend default.
 
 Settings reports the Native CPU runtime as built-in and unmanaged. Missing or corrupt runtime files indicate an application/package problem and do not trigger a runtime download or Python fallback.
 
-The large-v3 model is checked and downloaded separately. A missing exact model can be downloaded after confirmation with aggregate progress. Other Faster-Whisper models, Kotoba, Qwen3, Parakeet, ReazonSpeech, CUDA/Vulkan, and Native VAD remain unavailable until their independent follow-up tasks qualify them.
+Each selected Faster-Whisper model is checked and downloaded independently. A missing exact model can be downloaded after confirmation with aggregate progress; one model's missing, corrupt, or failed state does not affect the others. Kotoba, Qwen3, Parakeet, ReazonSpeech, CUDA/Vulkan, and Native VAD remain unavailable until their independent follow-up tasks qualify them.
+
+Approximate managed download sizes for the exact four-file closures are:
+
+| Model | Approximate size |
+| --- | ---: |
+| `tiny` | 75 MiB |
+| `base` | 141 MiB |
+| `small` | 464 MiB |
+| `medium` | 1,460 MiB |
+| `large-v2` | 2,947 MiB |
+| `large-v3` | 2,948 MiB |
+| `large-v3-turbo` | 1,547 MiB |
+
+All production models are CPU-only in this release. Relative speed and transcription quality vary by model and audio; Python parity and a full quality matrix are diagnostic rather than support gates.
 
 For development or historical sidecar diagnostics only:
 

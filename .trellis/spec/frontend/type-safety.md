@@ -152,11 +152,11 @@ useAsrAvailability(engine: string, model: string, device: string)
 
 - `ASR_ENGINE_OPTIONS`, `ASR_ENGINE_MODELS`, and `ASR_DEVICE_OPTIONS` are presentation registries only. `listAsrEngines` / `checkAsrModel` decide whether each known option is enabled.
 - One mounted `useAsrAvailability` owner supplies Settings and Transcribe with typed engine/model/device options, selected status, route gate, refresh, and stale-request rejection. `ModelManager` must consume that owner; it must not call `checkAsrModel` through a fallback checker.
-- Load the product model list when the engine changes. A same-engine model selection reuses the loaded status map; check only a selected legacy/unknown model missing from that map. This prevents repeated exact large-v3 readiness scans.
+- Load the product model list when the engine changes. A same-engine model selection reuses the loaded status map; check only a selected legacy/unknown model missing from that map. This prevents repeated exact hashing across the seven manifest-backed Faster-Whisper models.
 - Disabled options remain visible with a concise backend reason. An unavailable persisted value stays displayed and is never silently rewritten; only an explicit user selection changes settings.
 - `ready` and `supportedMissing` are runnable routes; only `supportedMissing` offers model download. Deferred/unsupported identities never show Python setup actions.
 - A Native engine reporting `device: "cpu"` enables `auto` / `cpu` and disables CUDA. Legacy payloads without device metadata remain compatibility input for rollback/tests, but the production route emits Native metadata.
-- Native MVP transcription sends `useVad: false` and `vadConfig: null`; the request schema remains for rollback/future runtime capability work.
+- Native CPU transcription sends `useVad: false` and `vadConfig: null`; the request schema remains for rollback/future runtime capability work.
 - Before Native worker progress has advanced, Transcribe renders indeterminate launch/model-load/first-window progress. After `processedMs > 0`, the existing audio-based percentage remains authoritative.
 - User cancellation is separate from document-guard invalidation and unmount. Cancelling before `startAsr` returns keeps duplicate starts locked as `取消中…`, cancels the late job ID immediately, and reports only `已取消转录`; genuine document changes keep their own stale-result message.
 - Frontend runtime dependencies contain only production-visible kinds. `nativeAsrCpu` is bundled/status-only and has no prepare or cleanup action; missing `asrModels` routes the user to Transcription.
@@ -179,7 +179,7 @@ useAsrAvailability(engine: string, model: string, device: string)
 ### 5. Good / Base / Bad Cases
 
 - Good: one engine change checks its known model list once; selecting an already-loaded model performs no extra readiness scan.
-- Base: an old unavailable setting remains selected with a disabled/reason label until the user chooses large-v3 CPU explicitly.
+- Base: an old unavailable setting remains selected with a disabled/reason label until the user explicitly chooses a supported CPU model; new/default settings still select `large-v3`.
 - Bad: `ModelManager` performs its own `checkAsrModel`, a component hardcodes `large-v3` as the only enabled ID, or unavailable means “install Python”.
 
 ### 6. Tests Required
