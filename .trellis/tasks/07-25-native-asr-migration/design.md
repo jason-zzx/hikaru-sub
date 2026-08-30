@@ -7,7 +7,7 @@
 迁移分为两个阶段：
 
 1. **Native MVP**：只发布 `faster-whisper / large-v3 / CPU`。
-2. **Post-MVP expansion**：首先以 P1 增加其余六个 Faster-Whisper 模型，再处理其他引擎、质量改进和 GPU packs。
+2. **Post-MVP expansion**：七个 Faster-Whisper CPU 模型已完成；下一步复用 accepted Kotoba K2 接入 exact 模型交付、同一 bundled CPU runtime、Tauri 路由和 React UX。Kotoba 字幕质量修订不属于本父任务。
 
 历史质量 evidence 保留，但 Python parity、双 Whisper anchor 和 GPU qualification 不再控制 MVP 发布。
 
@@ -117,7 +117,7 @@ faster-whisper / large-v3
   -> atomic readiness marker
 ```
 
-The manifest format remains multi-entry so post-MVP models can be added without a second downloader design. Only the large-v3 entry is required for the first release. Immediately after T18, `08-26-native-asr-whisper-model-expansion` adds exact entries for `tiny`, `base`, `small`, `medium`, `large-v2` and `large-v3-turbo` as the first post-MVP priority.
+The manifest format remains multi-entry so post-MVP models can be added without a second downloader design. `08-26-native-asr-whisper-model-expansion` has added exact entries for `tiny`, `base`, `small`, `medium`, `large-v2` and `large-v3-turbo`. The next extension adds the exact Kotoba repository/revision/file identities plus its Kotoba-only non-empty `preprocessor_config.json` readiness contract while preserving the existing seven Faster-Whisper entries.
 
 Valid existing CT2 snapshots may be reused after exact readiness validation. New writes remain under managed `deps/models/ctranslate2`; `.part` files remain under `deps/downloads`.
 
@@ -176,7 +176,7 @@ T12 + T13
 
 T12 and T13 may run in parallel. T16 starts when their contracts stabilize. T17 follows T16. T18 performs final installed/portable integration, short + >10-minute functional smoke, packaging checks, notices/spec updates and production cutover.
 
-T14/T15 GPU work is explicitly post-MVP and not a dependency of T16/T17/T18. The first task after T18 is the P1 Faster-Whisper model expansion; Kotoba/Qwen/Parakeet/Reazon and GPU work follow it unless the user explicitly reprioritizes.
+T14/T15 GPU work is explicitly post-MVP and not a dependency of T16/T17/T18. The P1 Faster-Whisper model expansion is complete. The next parent child is Native Kotoba K2 production integration on the existing CPU architecture; Kotoba quality revision is excluded. Qwen/Parakeet/Reazon and GPU work remain independent later lanes.
 
 ## Security And Privacy
 
@@ -191,12 +191,13 @@ These requirements remain release blockers regardless of the reduced subtitle-qu
 
 ## Rollout And Rollback
 
-1. T18 enables only large-v3 CPU Native routing.
-2. Other models remain visible/unavailable in the MVP.
-3. Immediately after T18, the P1 Faster-Whisper expansion independently enables `tiny/base/small/medium/large-v2/large-v3-turbo` on the same CT2 CPU architecture.
-4. Python is removed from packaged dependencies but retained in source for one stable release cycle.
-5. A patch rollback can disable one model route or restore prior package inputs without deleting user models, settings, projects or subtitles.
-6. Later engine/GPU routes are enabled independently; their failures cannot revoke any released Faster-Whisper route.
+1. T18 enabled large-v3 CPU Native routing and removed packaged Python dependencies.
+2. The completed Faster-Whisper expansion enabled `tiny/base/small/medium/large-v2/large-v3-turbo` on the same CT2 CPU architecture.
+3. The next rollout enables `kotoba-faster-whisper` with its exact manifest model and accepted K2 profile in the same bundled CPU worker; large-v3 remains the default.
+4. Kotoba quality revision remains outside this parent and does not block route enablement.
+5. Python remains source-level development/rollback evidence only and is not restored as a silent fallback.
+6. A patch rollback can disable the Kotoba route or restore prior package inputs without deleting user models, settings, projects or subtitles.
+7. Later engine/GPU routes are enabled independently; their failures cannot revoke any released Faster-Whisper route.
 
 ## Test Strategy
 
@@ -217,4 +218,4 @@ These requirements remain release blockers regardless of the reduced subtitle-qu
 - **D5:** T13 owns the final MVP runtime artifact; T18 integrates rather than rebuilds it.
 - **D6:** All existing model IDs remain visible, but only large-v3 is runnable in the MVP.
 - **D7:** Post-MVP quality and GPU work is independent and cannot block or revoke the MVP.
-- **D8:** The six remaining Faster-Whisper models form the first post-MVP P1 expansion, ahead of Kotoba, Qwen3, Parakeet, ReazonSpeech and GPU packs.
+- **D8:** The six-model Faster-Whisper expansion is complete; accepted Kotoba K2 production integration is the next P1 increment, while Kotoba quality revision is excluded and Qwen3/Parakeet/ReazonSpeech/GPU packs remain independent later work.

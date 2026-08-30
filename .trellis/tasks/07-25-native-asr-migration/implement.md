@@ -39,13 +39,16 @@ T16 runtime/settings backend [done]
 T17 frontend migration [done]
                          |
                          v
-T18 Native MVP release [accepted; archive before 08-26]
+T18 Native MVP release [done]
                          |
                          v
-08-26 Faster-Whisper model expansion [next after T18 archive]
+08-26 Faster-Whisper model expansion [done]
+                         |
+                         v
+08-30 Native Kotoba K2 integration [next]
 ```
 
-T18 is accepted. Archive this child during finish-work before activating the post-MVP Faster-Whisper expansion; after that archive, `08-26-native-asr-whisper-model-expansion` is the next executable child. Its P1 priority does not authorize parallel activation while T18 remains active.
+The Native MVP and seven-model Faster-Whisper expansion are complete. `08-30-native-asr-kotoba-integration` is the next executable child and owns exact Kotoba model delivery, bundled CPU runtime enablement, Tauri production routing, and frontend UX. Kotoba quality revision is not part of this parent.
 
 ## Critical-Path Children
 
@@ -194,52 +197,52 @@ Rollback: restore previous package inputs/default route without deleting user mo
 
 ## Post-MVP Work
 
-### First Post-MVP P1 - Expand Native Faster-Whisper Model Support
+### Completed Post-MVP P1 - Expand Native Faster-Whisper Model Support
 
-Status: next executable child after the accepted T18 task is archived; keep it planning until that archive completes.
+Status: completed and archived.
 
-Directory: `.trellis/tasks/08-26-native-asr-whisper-model-expansion`
+Directory: `.trellis/tasks/archive/2026-08/08-26-native-asr-whisper-model-expansion`
 
-Roadmap position: immediately after T18 and before all other post-MVP engine/GPU work.
+Result: exact manifest/readiness/download/runtime/frontend support now covers `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo` on the bundled CPU route without Python fallback.
+
+### Next P1 - Integrate Native Kotoba K2
+
+Status: planning; next executable child.
+
+Directory: `.trellis/tasks/08-30-native-asr-kotoba-integration`
 
 Deliverables:
 
-- Add exact manifest/readiness entries for `tiny`, `base`, `small`, `medium`, `large-v2` and `large-v3-turbo`.
-- Reuse the released CTranslate2 CPU worker/runtime by default; validate each model's exact 80/128 Mel and vocabulary contract.
-- Run independent download/load/short-audio functional smoke for all six models and >10-minute Japanese smoke for large-v2.
-- Extend T16/T17 availability and download UI so each passing model becomes selectable independently.
-- Keep quality metrics diagnostic; do not reintroduce Python parity, discovery or GPU qualification as support gates.
-- Preserve large-v3, cancel/crash/recovery and installed/portable behavior.
+- Reuse the archived accepted `kotoba-k2-bounded-stride-overlap5-latest-start-owner-v1` worker algorithm without creating K3.
+- Add the exact `kotoba-tech/kotoba-whisper-v2.0-faster` model manifest/readiness/download contract, including non-empty `preprocessor_config.json`, 128 Mel, exact revision/hashes/license, and valid legacy snapshot reuse.
+- Rebuild the bundled CPU runtime so the same worker supports ordinary Faster-Whisper and Kotoba; keep CUDA/Vulkan/VAD/Python out of the release route.
+- Enable Kotoba in Tauri engine availability, request validation, model lifecycle, start/cancel/crash/recovery and installed/portable behavior.
+- Enable Kotoba selection, model download/progress and transcription in settings and the transcription page while preserving `large-v3` as default.
+- Run short and >10-minute Kotoba CPU functional smoke; subtitle quality metrics remain diagnostic rather than a new gate.
 
-Depends on: completed T18 Native MVP and the released T12/T13/T16/T17 contracts.
+Depends on: archived T08 K2 handoff plus released model manager, CPU runtime, Tauri routing and frontend availability contracts.
 
 Exit criteria:
 
-- all six models pass functional gates and are independently available;
-- large-v3 remains regression-free;
-- no model silently falls back to Python;
-- one model failure cannot disable another released model.
-
-### Later P3 - T08R Kotoba K3 Quality
-
-- Priority P3.
-- Keeps K2 safety mechanics and strict quality goals.
-- Starts after the P1 Faster-Whisper model expansion unless the user explicitly reprioritizes it.
-- Failure cannot block or revoke large-v3 CPU release.
+- Kotoba is independently selectable, downloadable and runnable on the bundled Native CPU route;
+- output is non-empty, UTF-8 valid, ordered, positive-duration and audio-bounded;
+- the seven released Faster-Whisper models remain regression-free;
+- no route silently falls back to Python;
+- Kotoba K3/quality revision remains outside this parent.
 
 ### Later P3 - T11 Qwen3 With ForcedAligner
 
 - Priority P3.
-- Requires a future T12 manifest expansion freezing Qwen + ForcedAligner pair.
-- Starts after the P1 Faster-Whisper model expansion unless explicitly reprioritized.
-- Failure cannot block or revoke large-v3 CPU release.
+- Requires a future manifest expansion freezing the Qwen + ForcedAligner pair.
+- Starts after Kotoba integration unless explicitly reprioritized.
+- Failure cannot block or revoke released Faster-Whisper/Kotoba CPU routes.
 
 ### Other engines
 
 - Parakeet/ReazonSpeech new candidates.
-- Any future Kotoba/Qwen release qualification.
+- Future quality revisions, including Kotoba K3, are independent work outside this parent.
 
-Each receives an independent child and release disposition after the P1 Faster-Whisper model expansion unless explicitly reprioritized.
+Each retained engine route receives an independent child and release disposition unless explicitly reprioritized.
 
 ### T14/T15 - Optional GPU Packs And Qualification
 
@@ -269,5 +272,7 @@ Archive the parent only after:
 - T12, T13, T16, T17 and T18 are independently accepted and archived;
 - T18 enables the large-v3 CPU Native MVP and removes packaged Python dependencies;
 - `08-26-native-asr-whisper-model-expansion` is independently accepted/archived after enabling the six remaining Faster-Whisper models;
+- `08-30-native-asr-kotoba-integration` is independently accepted/archived after enabling exact-model Kotoba K2 on the bundled CPU route and synchronized frontend;
+- Kotoba quality revision remains explicitly outside the parent completion contract;
 - every later engine/GPU lane is explicitly recorded as deferred/non-blocking;
 - final cross-task review and required validations pass.

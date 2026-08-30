@@ -1,0 +1,9 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Defines the React -> Tauri -> Native worker ownership and contract flow for this three-layer feature."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Requires reuse of the existing ASR model/runtime registries, Tauri wrappers, availability hook, and model manager instead of parallel support tables."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Owns the production Native worker lifecycle and ASR routing conventions."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Owns managed dependency paths, portable roots, runtime identity, probe/measure/cleanup, and containment rules."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Defines the typed Tauri command seam that remains unchanged while Kotoba becomes available."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Guides reuse of the existing availability/model lifecycle hooks and avoids duplicated page-owned state."}
+{"file":".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/kotoba-k2-handoff.md","reason":"Authoritative accepted K2 algorithm, model revision, readiness, no-VAD, cache, and downstream integration contract."}
+{"file":".trellis/tasks/archive/2026-08/08-05-native-asr-kotoba-compatibility/research/kotoba-k1-lock.md","reason":"Authoritative exact Kotoba model file sizes, hashes, license, preprocessor, and 128-Mel identities consumed by the production manifest."}
+{"file":".trellis/tasks/archive/2026-08/08-26-native-asr-whisper-model-expansion/research/final-trellis-check-report.md","reason":"Current released seven-model Native CPU model/runtime/frontend contracts that Kotoba integration must preserve."}
