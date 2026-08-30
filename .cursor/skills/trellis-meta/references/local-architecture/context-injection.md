@@ -35,7 +35,7 @@ If the user wants to change "what the AI should do next in a given state," edit 
 Implement and check agents need task context. Trellis has two loading modes:
 
 1. **hook push**: a platform hook injects jsonl-referenced files plus `prd.md`, `design.md` if present, and `implement.md` if present before the agent starts.
-2. **agent pull**: the agent definition instructs the agent to read the active task, jsonl context, and task artifacts after startup.
+2. **agent pull**: the agent definition instructs the agent to read the active task, jsonl context, and task artifacts after startup. DeepSeek Harness uses this mode through child-only `.dsh/skills/trellis-agent-*` role skills; every dispatch prompt begins with the exact `Active task: <path>` line.
 
 In both modes, JSONL files in the task directory are the manifest for spec/research context. Task artifacts are read separately in this order: `prd.md` -> `design.md if present` -> `implement.md if present`.
 
@@ -47,7 +47,7 @@ In both modes, JSONL files in the task directory are the manifest for spec/resea
 {"file": ".trellis/spec/backend/index.md", "reason": "Backend rules"}
 ```
 
-Readers should skip seed rows without a `file` field. When configuring JSONL, the AI should include only spec/research files, not pre-register code files that will be modified.
+Readers should skip rows without a `file` field (e.g. legacy `_example` placeholders). When configuring JSONL, the AI should include only spec/research files, not pre-register code files that will be modified.
 
 ## Active Task And Context Key
 
