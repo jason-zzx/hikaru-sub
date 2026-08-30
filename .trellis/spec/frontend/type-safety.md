@@ -152,7 +152,7 @@ useAsrAvailability(engine: string, model: string, device: string)
 
 - `ASR_ENGINE_OPTIONS`, `ASR_ENGINE_MODELS`, and `ASR_DEVICE_OPTIONS` are presentation registries only. `listAsrEngines` / `checkAsrModel` decide whether each known option is enabled.
 - One mounted `useAsrAvailability` owner supplies Settings and Transcribe with typed engine/model/device options, selected status, route gate, refresh, and stale-request rejection. `ModelManager` must consume that owner; it must not call `checkAsrModel` through a fallback checker.
-- Load the product model list when the engine changes. A same-engine model selection reuses the loaded status map; check only a selected legacy/unknown model missing from that map. This prevents repeated exact hashing across the seven manifest-backed Faster-Whisper models.
+- Load the product model list when the engine changes. A same-engine model selection reuses the loaded status map; check only a selected legacy/unknown model missing from that map. This prevents repeated exact hashing across the seven manifest-backed Faster-Whisper models and exact Kotoba model.
 - Disabled options remain visible with a concise backend reason. An unavailable persisted value stays displayed and is never silently rewritten; only an explicit user selection changes settings.
 - `ready` and `supportedMissing` are runnable routes; only `supportedMissing` offers model download. Deferred/unsupported identities never show Python setup actions.
 - A Native engine reporting `device: "cpu"` enables `auto` / `cpu` and disables CUDA. Legacy payloads without device metadata remain compatibility input for rollback/tests, but the production route emits Native metadata.

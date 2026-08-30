@@ -17,7 +17,7 @@ They do not include:
 - an ASR virtual environment or Python packages;
 - ASR model weights.
 
-The bundled Native runtime is status-only: it is neither downloaded nor removed through Settings. FFmpeg and the selected exact Faster-Whisper model are prepared separately after user confirmation when missing. Supported model IDs are `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo`; `large-v3` remains the default.
+The bundled Native runtime is status-only: it is neither downloaded nor removed through Settings. FFmpeg and the selected exact Faster-Whisper or Kotoba model are prepared separately after user confirmation when missing. Supported routes are seven Faster-Whisper model IDs (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`) plus `kotoba-faster-whisper / kotoba-tech/kotoba-whisper-v2.0-faster`; `faster-whisper / large-v3` remains the default.
 
 ## Licenses and third-party components
 
@@ -37,8 +37,8 @@ Hikaru Sub resolves FFmpeg in this order:
 
 The production ASR route does not resolve Python. It resolves:
 
-1. the verified `hikaru-asr-windows-x64-cpu-v2` worker from the packaged `native-asr/windows-x64/cpu` resource;
-2. the selected exact ready Faster-Whisper model from the seven-row bundled manifest and managed model roots.
+1. the verified `hikaru-asr-windows-x64-cpu-v3` worker from the packaged `native-asr/windows-x64/cpu` resource;
+2. the selected exact ready Faster-Whisper or Kotoba model from the eight-row bundled manifest and managed model roots.
 
 The repo-root Python sidecar and its Python 3.11 setup helpers remain development/historical rollback source for one stable release cycle. They are not production runtime dependencies and are not included in release artifacts.
 
@@ -51,9 +51,11 @@ deps/
 ├── ffmpeg/current/
 ├── models/
 │   ├── ctranslate2/faster-whisper/<model>/<revision>/
+│   ├── ctranslate2/kotoba-faster-whisper/kotoba-tech/kotoba-whisper-v2.0-faster/<revision>/
 │   └── huggingface/hub/models--<owner>--<repository>/snapshots/<revision>/
 └── downloads/
-    └── native-asr-models/faster-whisper/<model>/<revision>/
+    ├── native-asr-models/faster-whisper/<model>/<revision>/
+    └── native-asr-models/kotoba-faster-whisper/kotoba-tech/kotoba-whisper-v2.0-faster/<revision>/
 ```
 
 The direct CTranslate2 install is immutable after complete verification. An exact legacy Hugging Face snapshot may be reused in place only after every required file matches the bundled manifest. Wrong revisions, framework-only caches, partials, symlink/reparse escapes, and wrong size/hash files are not ready.
@@ -110,16 +112,16 @@ Native model URLs are derived only from the bundled model repository, immutable 
 The production ASR route is the bundled independent Native worker with exactly:
 
 ```text
-faster-whisper / selected manifest model / CTranslate2 / auto|cpu / Japanese / no VAD
+faster-whisper|kotoba-faster-whisper / selected manifest model / CTranslate2 / auto|cpu / Japanese / no VAD
 ```
 
-Model support is authoritative in `src-tauri/resources/native-asr-models.json`: `tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, and `large-v3-turbo`; `large-v3` remains the frontend default.
+Model support is authoritative in `src-tauri/resources/native-asr-models.json`: seven Faster-Whisper IDs (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`) and exact Kotoba `kotoba-tech/kotoba-whisper-v2.0-faster`; `faster-whisper / large-v3` remains the frontend default.
 
 Settings reports the Native CPU runtime as built-in and unmanaged. Missing or corrupt runtime files indicate an application/package problem and do not trigger a runtime download or Python fallback.
 
-Each selected Faster-Whisper model is checked and downloaded independently. A missing exact model can be downloaded after confirmation with aggregate progress; one model's missing, corrupt, or failed state does not affect the others. Kotoba, Qwen3, Parakeet, ReazonSpeech, CUDA/Vulkan, and Native VAD remain unavailable until their independent follow-up tasks qualify them.
+Each selected Faster-Whisper or Kotoba model is checked and downloaded independently. A missing exact model can be downloaded after confirmation with aggregate progress; one model's missing, corrupt, or failed state does not affect the others. Kotoba additionally requires exact non-empty `preprocessor_config.json` and a loaded 128-Mel model. Qwen3, Parakeet, ReazonSpeech, CUDA/Vulkan, and Native VAD remain unavailable.
 
-Approximate managed download sizes for the exact four-file closures are:
+Approximate managed download sizes for the exact manifest closures are:
 
 | Model | Approximate size |
 | --- | ---: |
@@ -130,6 +132,7 @@ Approximate managed download sizes for the exact four-file closures are:
 | `large-v2` | 2,947 MiB |
 | `large-v3` | 2,948 MiB |
 | `large-v3-turbo` | 1,547 MiB |
+| `kotoba-tech/kotoba-whisper-v2.0-faster` | 1,446 MiB |
 
 All production models are CPU-only in this release. Relative speed and transcription quality vary by model and audio; Python parity and a full quality matrix are diagnostic rather than support gates.
 
