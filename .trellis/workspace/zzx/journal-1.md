@@ -1220,3 +1220,36 @@ Cut over production ASR to the verified Native large-v3 CPU route, removed packa
 ### Next Steps
 
 - None - task complete
+
+
+## Session 36: Expand Native Faster-Whisper model support
+
+**Date**: 2026-08-30
+**Task**: Expand Native Faster-Whisper model support
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Enabled seven exact Faster-Whisper CPU models, added the generic large-v2 timestamp fallback and runtime v2, verified model/runtime/package/host contracts, synchronized documentation, completed manual acceptance, and reduced duplicate test code by 449 lines.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2623acd` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
