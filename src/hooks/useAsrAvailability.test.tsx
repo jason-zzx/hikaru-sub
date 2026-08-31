@@ -101,6 +101,84 @@ describe("useAsrAvailability", () => {
     expect(devices.find((item) => item.value === "cuda")).toMatchObject({ disabled: true });
   });
 
+  it("uses backend device capabilities and keeps missing CUDA selectable for download", () => {
+    const devices = asrDeviceSelectOptions(
+      {
+        name: "faster-whisper",
+        available: true,
+        device: "cpu",
+        devices: [
+          { device: "cpu", available: true },
+          {
+            device: "cuda",
+            available: false,
+            downloadRequired: true,
+            reason: "CUDA 运行时尚未安装",
+          },
+        ],
+      },
+      false,
+      null,
+    );
+    expect(devices.find((item) => item.value === "auto")?.disabled).toBeUndefined();
+    expect(devices.find((item) => item.value === "cpu")?.disabled).toBeUndefined();
+    expect(devices.find((item) => item.value === "cuda")).toMatchObject({
+      disabled: false,
+      label: expect.stringContaining("CUDA 运行时尚未安装"),
+    });
+  });
+
+  it("returns the freshly prepared CUDA route instead of a stale render closure", async () => {
+    const missing = {
+      name: "faster-whisper",
+      available: true,
+      device: "cpu",
+      devices: [
+        { device: "cpu", available: true },
+        {
+          device: "cuda",
+          available: false,
+          downloadRequired: true,
+          reason: "CUDA 运行时尚未安装",
+        },
+      ],
+    };
+    const ready = {
+      ...missing,
+      devices: [
+        { device: "cpu", available: true },
+        {
+          device: "cuda",
+          available: true,
+          downloadRequired: false,
+          deviceName: "NVIDIA GeForce RTX 3070",
+        },
+      ],
+    };
+    mocks.listAsrEngines
+      .mockResolvedValueOnce([missing])
+      .mockResolvedValueOnce([ready]);
+    mocks.checkAsrModel.mockImplementation((engine: string, model: string) =>
+      Promise.resolve(status(engine, model, "ready")),
+    );
+
+    const { result } = renderHook(() =>
+      useAsrAvailability("faster-whisper", "large-v3", "cuda"),
+    );
+    await waitFor(() => expect(result.current.deviceDownloadRequired).toBe(true));
+
+    let outcome!: Awaited<ReturnType<typeof result.current.refresh>>;
+    await act(async () => {
+      outcome = await result.current.refresh();
+    });
+
+    expect(outcome).toEqual({
+      routeAvailable: true,
+      unavailableReason: null,
+      deviceDownloadRequired: false,
+    });
+  });
+
   it("does not rescan every model when only the selected model changes", async () => {
     mocks.listAsrEngines.mockResolvedValue([
       { name: "faster-whisper", available: true, device: "cpu" },

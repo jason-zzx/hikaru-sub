@@ -108,12 +108,27 @@ export interface AsrSegment {
   text: string;
 }
 
+export type AsrRuntimeDevice = "cpu" | "cuda";
+
+export interface AsrDeviceCapability {
+  device: AsrRuntimeDevice;
+  available: boolean;
+  reason?: string | null;
+  code?: string | null;
+  downloadRequired?: boolean;
+  deviceName?: string | null;
+  computeCapability?: string | null;
+  computeType?: "int8Float32" | "float16" | null;
+  supportEvidence?: "realTested" | "theoretical" | null;
+}
+
 export interface AsrEngineInfo {
   name: string;
   /** 依赖是否就绪（如 faster-whisper 是否已安装） */
   available: boolean;
   backend?: string | null;
   device?: string | null;
+  devices?: AsrDeviceCapability[];
   reason?: string | null;
 }
 
@@ -161,6 +176,11 @@ export interface StartAsrArgs {
   vadConfig?: VadConfig | null;
 }
 
+export interface StartAsrResult {
+  jobId: string;
+  notice?: string;
+}
+
 export type NativeAsrModelDisposition =
   | "supportedMissing"
   | "ready"
@@ -206,6 +226,7 @@ export interface ModelDownloadSnapshot {
 export type RuntimeDependencyKind =
   | "ffmpeg"
   | "nativeAsrCpu"
+  | "nativeAsrCuda"
   | "asrModels"
   | "downloads"
   | "appCache";
@@ -228,6 +249,7 @@ export interface RuntimeDependencyItem {
   managed: boolean;
   /** 缺失时可下载包的预计体积（来自源清单，非磁盘占用）。 */
   expectedDownloadBytes?: number | null;
+  reason?: string | null;
 }
 
 export interface RuntimeDependencyProbe {

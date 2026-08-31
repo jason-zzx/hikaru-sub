@@ -41,6 +41,7 @@ enum class ExecutionDevice {
 
 enum class ExecutionComputeType {
   Int8,
+  Int8Float32,
   Float16,
 };
 
@@ -62,6 +63,9 @@ struct BackendExecutionAttestation {
 
 BackendExecutionConfig cpu_execution_config();
 BackendExecutionConfig cuda_execution_config();
+BackendExecutionConfig cuda_execution_config_for_capability(int major, int minor);
+BackendExecutionAttestation probe_cuda_execution();
+const char* execution_compute_type_name(ExecutionComputeType compute_type);
 
 struct CandidateAConfig {
   std::size_t beam_size = 1;
@@ -351,6 +355,15 @@ class CTranslate2WhisperBackend {
       std::optional<std::filesystem::path> vad_model_path = std::nullopt,
       BackendExecutionConfig execution = {},
       bool require_kotoba_model = false);
+#ifdef HIKARU_ASR_CT2_WITH_CUDA
+  CTranslate2WhisperBackend(
+      const std::filesystem::path& model_path,
+      CandidateAConfig config,
+      std::optional<std::filesystem::path> vad_model_path,
+      BackendExecutionConfig execution,
+      bool require_kotoba_model,
+      BackendExecutionAttestation execution_attestation);
+#endif
   ~CTranslate2WhisperBackend();
 
   CTranslate2WhisperBackend(const CTranslate2WhisperBackend&) = delete;

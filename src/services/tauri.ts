@@ -26,6 +26,7 @@ import type {
   RuntimeDependencySnapshot,
   RuntimeDependencyStorage,
   StartAsrArgs,
+  StartAsrResult,
   StartBurnArgs,
   StartVideoClipArgs,
   StartVideoDownloadArgs,
@@ -211,9 +212,9 @@ export async function listAsrEngines(): Promise<AsrEngineInfo[]> {
   return res.engines;
 }
 
-/** 创建转录任务，返回 jobId。 */
-export async function startAsr(args: StartAsrArgs): Promise<string> {
-  return invoke<string>("start_asr", { args });
+/** 创建转录任务，返回 jobId 与可选的非致命提示。 */
+export async function startAsr(args: StartAsrArgs): Promise<StartAsrResult> {
+  return invoke<StartAsrResult>("start_asr", { args });
 }
 
 /** 查询转录进度；running 阶段可传 includeSegments=false 仅取进度。 */

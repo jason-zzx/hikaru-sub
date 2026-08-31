@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "status": "input-frozen-artifact-qualified-local-publication-pending",
+  "platform": "windows-x64",
+  "arch": "x64",
+  "cuda": {
+    "toolkitVersion": "12.9 Update 1",
+    "releaseLabel": "12.9.1",
+    "releaseDate": "2025-06-05",
+    "nvccVersion": "12.9.86",
+    "redistributableMetadata": {
+      "url": "https://developer.download.nvidia.com/compute/cuda/redist/redistrib_12.9.1.json",
+      "sizeBytes": 54256,
+      "sha256": "8335301010b0023ee1ff61eb11e2600ca62002d76780de4089011ad77e0c7630"
+    },
+    "components": [
+      {
+        "name": "cuda_nvcc",
+        "version": "12.9.86",
+        "usage": "build-only",
+        "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvcc/windows-x86_64/cuda_nvcc-windows-x86_64-12.9.86-archive.zip",
+        "sizeBytes": 126917884,
+        "sha256": "227b109663b5e57d2718bcabb24a4ba0d9d4e52d958e327dc476f7c28691be85"
+      },
+      {
+        "name": "cuda_cudart",
+        "version": "12.9.79",
+        "usage": "build-only-static-runtime",
+        "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cudart/windows-x86_64/cuda_cudart-windows-x86_64-12.9.79-archive.zip",
+        "sizeBytes": 3521238,
+        "sha256": "179e9c43b0735ffe67207b3da556eb5a0c50f3047961882b7657d3b822d34ef8"
+      },
+      {
+        "name": "cuda_cuobjdump",
+        "version": "12.9.82",
+        "usage": "build-audit-only",
+        "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cuobjdump/windows-x86_64/cuda_cuobjdump-windows-x86_64-12.9.82-archive.zip",
+        "sizeBytes": 6219088,
+        "sha256": "1eda43a76a2eac25fce5bdb4b68673b5bda737d54cca5513148c36362ab7c811",
+        "selectedTools": [
+          {
+            "path": "bin/cuobjdump.exe",
+            "sizeBytes": 18290176,
+            "sha256": "d889e38e2b3caa5b04dcaf834ced3dc4eee9e36b7d54a982358a87636e587a3b"
+          }
+        ]
+      },
+      {
+        "name": "libcublas",
+        "version": "12.9.1.4",
+        "usage": "build-and-runtime",
+        "url": "https://developer.download.nvidia.com/compute/cuda/redist/libcublas/windows-x86_64/libcublas-windows-x86_64-12.9.1.4-archive.zip",
+        "sizeBytes": 549755186,
+        "sha256": "d534d98b0b453a98914dbf3adf47d7e84b55037abf02f87466439e1dcef581ed",
+        "selectedFiles": [
+          {
+            "path": "bin/cublas64_12.dll",
+            "sizeBytes": 102518272,
+            "sha256": "90052a83efd1b57a8e3616a6590b335855f81b814a4f16eecb7b5bf6d1b1d4eb"
+          },
+          {
+            "path": "bin/cublasLt64_12.dll",
+            "sizeBytes": 668669952,
+            "sha256": "c3a05ea244c937314afec09f87b91f814c7e27977681f6c67eb51bb06ced3a4a"
+          }
+        ],
+        "selectedLicense": {
+          "path": "LICENSE",
+          "sizeBytes": 67876,
+          "sha256": "72c22161fc1ebf242443d45158a7dd382d68597b00eeb7a7f539be5c6114be33"
+        }
+      },
+      {
+        "name": "libcurand",
+        "version": "10.3.10.19",
+        "usage": "build-only",
+        "url": "https://developer.download.nvidia.com/compute/cuda/redist/libcurand/windows-x86_64/libcurand-windows-x86_64-10.3.10.19-archive.zip",
+        "sizeBytes": 67904600,
+        "sha256": "d0411f0b8c07e90d0fb6e01bfa7a54c9cb80f2ddf67e4ded2d96a50e19aadad6",
+        "runtimeInclusionPolicy": "excluded-unless-final-pe-import-or-loaded-module-audit-requires-it"
+      }
+    ],
+    "license": {
+      "termsUrl": "https://docs.nvidia.com/cuda/archive/12.9.1/eula/index.html",
+      "sourceComponent": "libcublas 12.9.1.4 archive",
+      "path": "LICENSE",
+      "sizeBytes": 67876,
+      "sha256": "72c22161fc1ebf242443d45158a7dd382d68597b00eeb7a7f539be5c6114be33",
+      "projectLicenseExcluded": true
+    },
+    "distribution": {
+      "bundleNvcuda": false,
+      "cudnn": false,
+      "dynamicCudart": false,
+      "bundleCurand": false,
+      "combinedProjectPackRequired": true,
+      "applicationDownloadsNvidiaArchives": false
+    }
+  },
+  "deterministicBuild": {
+    "seedAlgorithm": "sha256-utf8-canonical-identity-first-u32-hex-v1",
+    "canonicalSourcePrefix": "ctranslate2-4.8.0/",
+    "seedManifestPath": "native-asr/runtime/ctranslate2-4.8.0-cuda-seeds.json",
+    "seedManifestSizeBytes": 1798,
+    "seedManifestSha256": "68381bf67d036d6afaa81db2065dd38ac717f6008b6388c5309e4ac3d17b1f64",
+    "sourceCount": 25,
+    "launcherSourcePath": "scripts/native-asr-nvcc-launcher.cpp",
+    "launcherSourceSizeBytes": 16251,
+    "launcherSourceSha256": "4581ad66a865d72d2d28b89d7df6c3a562b58d3dfa024c0bb9147b3ce47a0a8b",
+    "launcherExecutableSizeBytes": 370688,
+    "launcherExecutableSha256": "5e2f63c1aa2ca3e0c68391b5c9dda662054e489411ae92c5a31f10c87543d001",
+    "realNvccSizeBytes": 19385856,
+    "realNvccSha256": "313cc032fb84bb9d53cb967843bc761f1f8959cb3aa924246659fde13afd8f14"
+  },
+  "priorEvidenceComparison": {
+    "authority": "official NVIDIA CUDA 12.9 Update 1 redistributable bytes",
+    "cuda12_8RuntimeBytesSuperseded": true,
+    "licenseAuthority": "selected libcublas archive LICENSE"
+  },
+  "driverPolicy": {
+    "absoluteMinimumWindowsDriver": "528.33",
+    "initialQualifiedMinimumWindowsDriver": "576.57",
+    "systemDriverModule": "nvcuda.dll",
+    "deviceIndex": 0
+  },
+  "architecturePolicy": {
+    "cudaArchList": [
+      "6.1",
+      "7.5",
+      "8.6",
+      "8.9"
+    ],
+    "extraNvccFlags": [
+      "-gencode=arch=compute_120,code=sm_120",
+      "-gencode=arch=compute_120,code=compute_120"
+    ],
+    "requiredSass": [
+      "sm_61",
+      "sm_75",
+      "sm_86",
+      "sm_89",
+      "sm_120"
+    ],
+    "allowedPtx": [
+      "compute_120"
+    ],
+    "computePolicy": [
+      {
+        "computeCapability": "6.1",
+        "computeType": "INT8_FLOAT32",
+        "supportEvidence": "theoretical"
+      },
+      {
+        "computeCapability": "7.5",
+        "computeType": "FLOAT16",
+        "supportEvidence": "theoretical"
+      },
+      {
+        "computeCapability": "8.6",
+        "computeType": "FLOAT16",
+        "supportEvidence": "real-tested-local-final-artifact"
+      },
+      {
+        "computeCapability": "8.9",
+        "computeType": "FLOAT16",
+        "supportEvidence": "theoretical"
+      },
+      {
+        "computeCapability": "12.0",
+        "computeType": "FLOAT16",
+        "supportEvidence": "theoretical"
+      }
+    ]
+  },
+  "budgets": {
+    "maximumDownloadBytes": 734003200,
+    "maximumUnpackedBytes": 1073741824,
+    "bundledInstallerBytes": 0,
+    "bundledModelWeights": 0
+  },
+  "releaseGates": {
+    "legalOwnerReviewRequired": true,
+    "twoCleanByteIdenticalBuildsRequired": true,
+    "fatbinAuditRequired": true,
+    "loadedModuleClosureRequired": true,
+    "finalArtifactIdentityPending": false,
+    "externalPublicationPending": true,
+    "productEnablementAllowed": false
+  }
+}

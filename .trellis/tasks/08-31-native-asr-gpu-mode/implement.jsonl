@@ -1,0 +1,17 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"GPU mode spans React, Tauri runtime management, and the independent Native worker."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing runtime dependency jobs, Native host, model manager, and availability hook rather than duplicating seams."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Owns production Native ASR routing, host lifecycle, CPU runtime lock, model-backed gates, and no-Python-fallback contracts."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Owns executable-adjacent deps layout, probe/measure/cleanup behavior, async blocking, and containment requirements."}
+{"file":".trellis/spec/tauri/async-and-blocking.md","reason":"CUDA pack verification, measurement, cleanup, and process probing must not block async workers."}
+{"file":".trellis/spec/tauri/command-guidelines.md","reason":"Capability and runtime dependency payload changes must remain correctly wired across Rust and frontend types."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Frontend must consume typed backend capability/runtime payloads through existing wrappers."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Device availability and download continuation should remain in existing hook/poller ownership."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Avoid a new store unless existing runtime/model job state cannot represent the pending transcription intent."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"CUDA settings and download UI must reuse shadcn controls and Simplified Chinese copy."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Defines prior CUDA evidence, exact GPU-authoritative qualification, privacy, identity, and publication rules."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/prior-gpu-transcription-evidence.md","reason":"Exact T07/T08/T20 real CUDA execution evidence and limits to reuse."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/production-cuda-gap-map.md","reason":"Current end-to-end CPU-only gaps and minimal production CUDA seams."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/cuda-distribution-and-compatibility.md","reason":"Official NVIDIA distribution, driver, license, runtime closure, and pack-source constraints."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/nvidia-generation-compute-policy.md","reason":"Required GTX10/RTX20-50 architecture targets, compute mapping, fatbin gates, and theoretical support wording."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/cuda-12-9-deterministic-build.md","reason":"Authoritative migration from nondeterministic CUDA 12.8 to CUDA 12.9 Update 1 with per-source NVCC seeds."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/final-cuda-12-9-artifact-qualification.md","reason":"Exact final local ZIP/build/module identities and the sole remaining external-publication gate."}

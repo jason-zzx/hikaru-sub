@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "sha256-utf8-canonical-identity-first-u32-hex-v1",
+  "canonicalSourcePrefix": "ctranslate2-4.8.0/",
+  "sources": [
+    { "path": "src/cuda/primitives.cu", "seed": "0x1ebb9bcd" },
+    { "path": "src/cuda/random.cu", "seed": "0xdaa85471" },
+    { "path": "src/ops/alibi_add_gpu.cu", "seed": "0xaf20a1fc" },
+    { "path": "src/ops/awq/dequantize_gpu.cu", "seed": "0x052b082e" },
+    { "path": "src/ops/awq/gemm_gpu.cu", "seed": "0xf3fe739d" },
+    { "path": "src/ops/awq/gemv_gpu.cu", "seed": "0x0b56e0eb" },
+    { "path": "src/ops/bias_add_gpu.cu", "seed": "0x59078a51" },
+    { "path": "src/ops/concat_split_slide_gpu.cu", "seed": "0xe17007cd" },
+    { "path": "src/ops/conv1d_gpu.cu", "seed": "0x96c8336d" },
+    { "path": "src/ops/dequantize_gpu.cu", "seed": "0x1ed03aff" },
+    { "path": "src/ops/flash_attention_gpu.cu", "seed": "0x8eefbc58" },
+    { "path": "src/ops/gather_gpu.cu", "seed": "0x66d72e47" },
+    { "path": "src/ops/gumbel_max_gpu.cu", "seed": "0xe6259371" },
+    { "path": "src/ops/layer_norm_gpu.cu", "seed": "0x390b5e75" },
+    { "path": "src/ops/mean_gpu.cu", "seed": "0xc5f85f55" },
+    { "path": "src/ops/median_filter_gpu.cu", "seed": "0xda09de12" },
+    { "path": "src/ops/multinomial_gpu.cu", "seed": "0x75feda7b" },
+    { "path": "src/ops/nccl_ops_gpu.cu", "seed": "0xc2bd59f6" },
+    { "path": "src/ops/quantize_gpu.cu", "seed": "0xa1557031" },
+    { "path": "src/ops/rms_norm_gpu.cu", "seed": "0x221d2825" },
+    { "path": "src/ops/rotary_gpu.cu", "seed": "0x310e8eb5" },
+    { "path": "src/ops/softmax_gpu.cu", "seed": "0x5b569f0d" },
+    { "path": "src/ops/tile_gpu.cu", "seed": "0x32919547" },
+    { "path": "src/ops/topk_gpu.cu", "seed": "0xaff2f1a6" },
+    { "path": "src/ops/topp_mask_gpu.cu", "seed": "0xe0f8bbc8" }
+  ]
+}

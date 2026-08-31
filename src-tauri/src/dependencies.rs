@@ -5,7 +5,7 @@ use crate::process::hidden_command;
 use crate::settings::{load_settings, AppSettings, RuntimeDependencySourceMode};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
@@ -17,9 +17,29 @@ use tokio::sync::Mutex;
 
 const LOG_TAIL_LIMIT: usize = 200;
 const MANIFEST_JSON: &str = include_str!("../resources/runtime-dependency-sources.json");
+const NATIVE_ASR_CUDA_LOCK_JSON: &str =
+    include_str!("../../native-asr/runtime/windows-x64-cuda-lock.json");
 const NATIVE_ASR_CPU_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cpu-v3";
 const NATIVE_ASR_CPU_RESOURCE_PATH: [&str; 3] = ["native-asr", "windows-x64", "cpu"];
 const NATIVE_ASR_CPU_WORKER: &str = "hikaru-asr-worker.exe";
+const NATIVE_ASR_CUDA_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cuda-v1";
+const NATIVE_ASR_CUDA_REQUIRED_ENTRIES: &[&str] = &[
+    NATIVE_ASR_CPU_WORKER,
+    "ctranslate2.dll",
+    "hikaru_asr_tokenizer.dll",
+    "cublas64_12.dll",
+    "cublasLt64_12.dll",
+    "msvcp140.dll",
+    "vcomp140.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "cuda-fatbin.json",
+    "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt",
+    "licenses/NVIDIA-CUDA-Runtime.txt",
+    "licenses/THIRD-PARTY-NOTICES.json",
+    "runtime-manifest.json",
+    "SHA256SUMS",
+];
 const NATIVE_ASR_CPU_REQUIRED_ENTRIES: &[&str] = &[
     NATIVE_ASR_CPU_WORKER,
     "ctranslate2.dll",
@@ -41,18 +61,109 @@ pub(crate) struct ResolvedNativeAsrCpuRuntime {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct NativeAsrCpuRuntimeManifest {
+struct NativeAsrCudaProductLock {
+    product_enablement_allowed: bool,
+    publication_gate: NativeAsrCudaPublicationGate,
+    artifact: NativeAsrCudaArtifactLock,
+    #[serde(default)]
+    local_qualification: Option<NativeAsrCudaLocalQualification>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrCudaPublicationGate {
+    external_stable_asset_published: bool,
+    runtime_dependency_source_row_present: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrCudaArtifactLock {
+    id: String,
+    size_bytes: u64,
+    sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrCudaLocalQualification {
+    machine: NativeAsrCudaQualifiedMachine,
+    model_backed_module_closure: NativeAsrCudaQualifiedModelRun,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrCudaQualifiedMachine {
+    device_index: i32,
+    device_name: String,
+    compute_capability: String,
+    compute_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrCudaQualifiedModelRun {
+    ready_device: String,
+    completed: bool,
+    python_or_network_fallback: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ResolvedNativeAsrCudaRuntime {
+    pub root: PathBuf,
+    pub worker: PathBuf,
+    pub artifact_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NativeAsrCudaCapability {
+    pub available: bool,
+    #[serde(default)]
+    pub download_required: bool,
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub device_index: Option<i32>,
+    #[serde(default)]
+    pub device_name: Option<String>,
+    #[serde(default)]
+    pub visible_device_count: Option<i32>,
+    #[serde(default)]
+    pub compute_capability: Option<String>,
+    #[serde(default)]
+    pub compute_type: Option<String>,
+    #[serde(default)]
+    pub driver_version: Option<i32>,
+    #[serde(default)]
+    pub support_evidence: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrRuntimeManifest {
     schema_version: u32,
     artifact_id: String,
     platform: String,
     arch: String,
     protocol_version: u32,
-    capabilities: NativeAsrCpuCapabilities,
+    capabilities: NativeAsrCapabilities,
+    files: Vec<NativeAsrRuntimeFile>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct NativeAsrCpuCapabilities {
+struct NativeAsrRuntimeFile {
+    path: String,
+    size_bytes: u64,
+    sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeAsrCapabilities {
     backend: String,
     device: String,
     engines: Vec<String>,
@@ -68,6 +179,7 @@ struct NativeAsrCpuCapabilities {
 pub enum RuntimeDependencyKind {
     Ffmpeg,
     NativeAsrCpu,
+    NativeAsrCuda,
     Python311,
     AsrVenv,
     AsrModels,
@@ -129,6 +241,8 @@ pub struct RuntimeDependencySourceProfile {
     pub id: RuntimeDependencySourceId,
     pub label: String,
     pub ffmpeg: Option<RuntimeDependencyBinarySource>,
+    #[serde(default)]
+    pub native_asr_cuda: Option<RuntimeDependencyBinarySource>,
     pub python311: Option<RuntimeDependencyBinarySource>,
     pub pip_index_url: Option<String>,
     #[serde(default)]
@@ -165,6 +279,8 @@ pub struct RuntimeDependencyItem {
     pub managed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_download_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -276,6 +392,21 @@ pub struct RuntimeDependencyState {
 }
 
 impl RuntimeDependencyState {
+    async fn has_active_kind(&self, kind: RuntimeDependencyKind) -> bool {
+        self.jobs.lock().await.values().any(|job| {
+            job.lock()
+                .map(|job| {
+                    job.kind == kind
+                        && matches!(
+                            job.status,
+                            RuntimeDependencyJobStatus::Pending
+                                | RuntimeDependencyJobStatus::Running
+                        )
+                })
+                .unwrap_or(true)
+        })
+    }
+
     pub fn shutdown(&self) {
         if let Ok(jobs) = self.jobs.try_lock() {
             for job in jobs.values() {
@@ -378,6 +509,18 @@ pub(crate) fn managed_ctranslate2_model_dir(app: &AppHandle) -> Result<PathBuf, 
 
 pub fn managed_ffmpeg_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(deps_dir(app)?.join("ffmpeg").join("current"))
+}
+
+fn managed_native_asr_cuda_root(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(deps_dir(app)?.join("asr-runtime").join("cuda"))
+}
+
+pub(crate) fn managed_native_asr_cuda_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(managed_native_asr_cuda_root(app)?.join("current"))
+}
+
+fn managed_native_asr_cuda_download_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(downloads_dir(app)?.join("native-asr-cuda"))
 }
 
 pub fn managed_python_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -787,7 +930,7 @@ fn resolve_native_asr_cpu_runtime_at(
             root.display()
         ));
     }
-    let manifest: NativeAsrCpuRuntimeManifest = serde_json::from_slice(
+    let manifest: NativeAsrRuntimeManifest = serde_json::from_slice(
         &fs::read(&manifest_path)
             .map_err(|error| format!("无法读取 Native ASR CPU 运行时清单：{error}"))?,
     )
@@ -824,6 +967,345 @@ pub(crate) fn resolve_native_asr_cpu_runtime(
         .resource_dir()
         .map_err(|error| format!("无法解析应用资源目录：{error}"))?;
     resolve_native_asr_cpu_runtime_at(&resource_dir)
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn parse_runtime_checksums(root: &Path) -> Result<HashMap<String, String>, String> {
+    let text = fs::read_to_string(root.join("SHA256SUMS"))
+        .map_err(|error| format!("无法读取 Native ASR 运行时校验表：{error}"))?;
+    let mut checksums = HashMap::new();
+    for line in text.lines().filter(|line| !line.is_empty()) {
+        let Some((sha256, path)) = line.split_once("  ") else {
+            return Err("Native ASR 运行时校验表格式无效".into());
+        };
+        if !is_sha256(sha256)
+            || checksums
+                .insert(path.to_string(), sha256.to_string())
+                .is_some()
+        {
+            return Err("Native ASR 运行时校验表包含无效或重复条目".into());
+        }
+    }
+    Ok(checksums)
+}
+
+fn safe_runtime_relative_path(path: &str) -> bool {
+    let value = Path::new(path);
+    !value.is_absolute()
+        && value
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+}
+
+fn collect_runtime_files(
+    root: &Path,
+    directory: &Path,
+    files: &mut Vec<String>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(directory)
+        .map_err(|error| format!("无法读取 Native ASR CUDA 运行时目录：{error}"))?
+    {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
+        if is_link_like(&metadata) {
+            return Err(format!(
+                "Native ASR CUDA 运行时禁止链接：{}",
+                path.display()
+            ));
+        }
+        if metadata.is_dir() {
+            collect_runtime_files(root, &path, files)?;
+        } else if metadata.is_file() {
+            let relative = path
+                .strip_prefix(root)
+                .map_err(|error| error.to_string())?
+                .to_string_lossy()
+                .replace('\\', "/");
+            if relative != "runtime-manifest.json" && relative != "SHA256SUMS" {
+                files.push(relative);
+            }
+        } else {
+            return Err(format!(
+                "Native ASR CUDA 运行时包含不支持的条目：{}",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_native_asr_cuda_runtime_at(root: &Path) -> Result<(PathBuf, PathBuf, String), String> {
+    let missing = NATIVE_ASR_CUDA_REQUIRED_ENTRIES
+        .iter()
+        .filter(|entry| !root.join(entry).is_file())
+        .copied()
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(format!(
+            "Native ASR CUDA 运行时不完整（缺少 {}）：{}",
+            missing.join(", "),
+            root.display()
+        ));
+    }
+    let manifest: NativeAsrRuntimeManifest = serde_json::from_slice(
+        &fs::read(root.join("runtime-manifest.json"))
+            .map_err(|error| format!("无法读取 Native ASR CUDA 运行时清单：{error}"))?,
+    )
+    .map_err(|error| format!("Native ASR CUDA 运行时清单无效：{error}"))?;
+    let capability_ok = manifest.capabilities.backend == "ctranslate2"
+        && manifest.capabilities.device == "cuda"
+        && manifest.capabilities.engines == ["faster-whisper", "kotoba-faster-whisper"]
+        && !manifest.capabilities.vad
+        && !manifest.capabilities.crispasr
+        && manifest.capabilities.cuda
+        && !manifest.capabilities.vulkan
+        && !manifest.capabilities.models_bundled;
+    if manifest.schema_version != 1
+        || manifest.artifact_id != NATIVE_ASR_CUDA_ARTIFACT_ID
+        || manifest.platform != "windows-x64"
+        || manifest.arch != "x64"
+        || manifest.protocol_version != 1
+        || !capability_ok
+    {
+        return Err("Native ASR CUDA 运行时身份或能力与发布契约不匹配".into());
+    }
+    let checksums = parse_runtime_checksums(root)?;
+    let manifest_paths = manifest
+        .files
+        .iter()
+        .map(|row| row.path.clone())
+        .collect::<HashSet<_>>();
+    let mut actual_files = Vec::new();
+    collect_runtime_files(root, root, &mut actual_files)?;
+    if manifest.files.len() != checksums.len()
+        || manifest_paths.len() != manifest.files.len()
+        || actual_files.into_iter().collect::<HashSet<_>>() != manifest_paths
+    {
+        return Err("Native ASR CUDA 运行时文件闭集不匹配".into());
+    }
+    for row in &manifest.files {
+        if !safe_runtime_relative_path(&row.path)
+            || checksums.get(&row.path) != Some(&row.sha256)
+            || !is_sha256(&row.sha256)
+        {
+            return Err(format!("Native ASR CUDA 运行时文件条目无效：{}", row.path));
+        }
+        let path = root.join(&row.path);
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("无法检查 Native ASR CUDA 运行时文件：{error}"))?;
+        if is_link_like(&metadata)
+            || !metadata.is_file()
+            || metadata.len() != row.size_bytes
+            || sha256_file(&path)? != row.sha256
+        {
+            return Err(format!("Native ASR CUDA 运行时文件损坏：{}", row.path));
+        }
+    }
+    let worker = root.join(NATIVE_ASR_CPU_WORKER);
+    Ok((root.to_path_buf(), worker, manifest.artifact_id))
+}
+
+fn cuda_restricted_path(root: &Path) -> Result<std::ffi::OsString, String> {
+    let system_root =
+        std::env::var_os("SystemRoot").ok_or_else(|| "无法解析 Windows SystemRoot".to_string())?;
+    std::env::join_paths([
+        root.to_path_buf(),
+        PathBuf::from(system_root).join("System32"),
+    ])
+    .map_err(|error| format!("无法构造 Native ASR CUDA 受限 PATH：{error}"))
+}
+
+fn probe_native_asr_cuda_worker(
+    root: &Path,
+    worker: &Path,
+) -> Result<NativeAsrCudaCapability, String> {
+    let output = hidden_command(worker)
+        .arg("--probe-cuda")
+        .env_remove("CUDA_PATH")
+        .env_remove("CUDA_HOME")
+        .env_remove("CT2_CUDA_ALLOW_FP16")
+        .env("PATH", cuda_restricted_path(root)?)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|error| format!("无法启动 Native ASR CUDA 能力探测：{error}"))?;
+    if output.stdout.len() > 16 * 1024 || output.stderr.len() > 16 * 1024 {
+        return Err("Native ASR CUDA 能力探测输出超过限制".into());
+    }
+    let text = std::str::from_utf8(&output.stdout)
+        .map_err(|_| "Native ASR CUDA 能力探测输出不是 UTF-8".to_string())?;
+    if text.lines().count() != 1 {
+        return Err("Native ASR CUDA 能力探测必须只输出一行 JSON".into());
+    }
+    serde_json::from_str(text.trim())
+        .map_err(|error| format!("Native ASR CUDA 能力探测输出无效：{error}"))
+}
+
+fn native_asr_cuda_product_lock() -> Option<NativeAsrCudaProductLock> {
+    serde_json::from_str(NATIVE_ASR_CUDA_LOCK_JSON).ok()
+}
+
+fn source_matches_cuda_artifact(
+    source: Option<&RuntimeDependencyBinarySource>,
+    artifact: &NativeAsrCudaArtifactLock,
+) -> bool {
+    source.is_some_and(|source| {
+        source.archive == RuntimeDependencyArchive::Zip
+            && source.size_bytes == artifact.size_bytes
+            && source.sha256 == artifact.sha256
+    })
+}
+
+fn native_asr_cuda_product_enabled() -> bool {
+    let Some(lock) = native_asr_cuda_product_lock() else {
+        return false;
+    };
+    if !lock.product_enablement_allowed
+        || !lock.publication_gate.external_stable_asset_published
+        || !lock.publication_gate.runtime_dependency_source_row_present
+        || lock.artifact.id != NATIVE_ASR_CUDA_ARTIFACT_ID
+    {
+        return false;
+    }
+    let Ok(sources) = platform_sources() else {
+        return false;
+    };
+    source_matches_cuda_artifact(sources.official.native_asr_cuda.as_ref(), &lock.artifact)
+        || source_matches_cuda_artifact(sources.china.native_asr_cuda.as_ref(), &lock.artifact)
+}
+
+fn apply_cuda_support_evidence(capability: &mut NativeAsrCudaCapability) {
+    if !capability.available {
+        return;
+    }
+    let Some(qualification) =
+        native_asr_cuda_product_lock().and_then(|lock| lock.local_qualification)
+    else {
+        return;
+    };
+    let machine = qualification.machine;
+    let run = qualification.model_backed_module_closure;
+    if capability.device_index == Some(machine.device_index)
+        && capability.device_name.as_deref() == Some(machine.device_name.as_str())
+        && capability.compute_capability.as_deref() == Some(machine.compute_capability.as_str())
+        && capability.compute_type.as_deref() == Some(machine.compute_type.as_str())
+        && run.ready_device == "cuda"
+        && run.completed
+        && !run.python_or_network_fallback
+    {
+        capability.support_evidence = Some("realTested".into());
+    }
+}
+
+pub(crate) fn native_asr_cuda_capability(app: &AppHandle) -> NativeAsrCudaCapability {
+    if !native_asr_cuda_product_enabled() {
+        return NativeAsrCudaCapability {
+            available: false,
+            download_required: false,
+            code: Some("cuda_artifact_not_qualified".into()),
+            reason: Some("CUDA 运行时尚未完成最终可复现构建与发布资格".into()),
+            device_index: None,
+            device_name: None,
+            visible_device_count: None,
+            compute_capability: None,
+            compute_type: None,
+            driver_version: None,
+            support_evidence: None,
+        };
+    }
+    let root = match managed_native_asr_cuda_dir(app) {
+        Ok(root) => root,
+        Err(error) => {
+            return NativeAsrCudaCapability {
+                available: false,
+                download_required: false,
+                code: Some("cuda_pack_path_failed".into()),
+                reason: Some(error),
+                device_index: None,
+                device_name: None,
+                visible_device_count: None,
+                compute_capability: None,
+                compute_type: None,
+                driver_version: None,
+                support_evidence: None,
+            }
+        }
+    };
+    match verify_native_asr_cuda_runtime_at(&root) {
+        Ok((root, worker, _)) => {
+            let mut capability =
+                probe_native_asr_cuda_worker(&root, &worker).unwrap_or_else(|error| {
+                    NativeAsrCudaCapability {
+                        available: false,
+                        download_required: false,
+                        code: Some("cuda_probe_failed".into()),
+                        reason: Some(error),
+                        device_index: None,
+                        device_name: None,
+                        visible_device_count: None,
+                        compute_capability: None,
+                        compute_type: None,
+                        driver_version: None,
+                        support_evidence: None,
+                    }
+                });
+            apply_cuda_support_evidence(&mut capability);
+            capability
+        }
+        Err(error) => NativeAsrCudaCapability {
+            available: false,
+            download_required: !root.exists(),
+            code: Some(
+                if root.exists() {
+                    "cuda_pack_corrupt"
+                } else {
+                    "cuda_pack_missing"
+                }
+                .into(),
+            ),
+            reason: Some(if root.exists() {
+                format!("CUDA 运行时损坏，请修复：{error}")
+            } else {
+                "CUDA 运行时尚未安装".into()
+            }),
+            device_index: None,
+            device_name: None,
+            visible_device_count: None,
+            compute_capability: None,
+            compute_type: None,
+            driver_version: None,
+            support_evidence: None,
+        },
+    }
+}
+
+pub(crate) fn resolve_native_asr_cuda_runtime(
+    app: &AppHandle,
+) -> Result<ResolvedNativeAsrCudaRuntime, String> {
+    if !native_asr_cuda_product_enabled() {
+        return Err("CUDA 运行时尚未完成最终可复现构建与发布资格".into());
+    }
+    let root = managed_native_asr_cuda_dir(app)?;
+    let (root, worker, artifact_id) = verify_native_asr_cuda_runtime_at(&root)?;
+    let capability = probe_native_asr_cuda_worker(&root, &worker)?;
+    if !capability.available {
+        return Err(capability
+            .reason
+            .clone()
+            .unwrap_or_else(|| "Native ASR CUDA 设备当前不可用".into()));
+    }
+    Ok(ResolvedNativeAsrCudaRuntime {
+        root,
+        worker,
+        artifact_id,
+    })
 }
 
 fn load_source_manifest() -> Result<RuntimeDependencySourceManifest, String> {
@@ -923,6 +1405,14 @@ fn is_cancelled(job: &Arc<StdMutex<RuntimeDependencyJob>>) -> bool {
         .unwrap_or(true)
 }
 
+fn ensure_job_not_cancelled(job: &Arc<StdMutex<RuntimeDependencyJob>>) -> Result<(), String> {
+    if is_cancelled(job) {
+        Err("用户已取消运行时依赖准备".into())
+    } else {
+        Ok(())
+    }
+}
+
 fn update_download_progress(
     job: &Arc<StdMutex<RuntimeDependencyJob>>,
     downloaded: u64,
@@ -973,13 +1463,12 @@ fn sha256_file(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-async fn download_binary_source(
-    app: &AppHandle,
+async fn download_binary_source_to_dir(
+    dir: PathBuf,
     job: &Arc<StdMutex<RuntimeDependencyJob>>,
     source: &RuntimeDependencyBinarySource,
     file_name: &str,
 ) -> Result<PathBuf, String> {
-    let dir = downloads_dir(app)?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let target = dir.join(file_name);
     let partial = dir.join(format!("{file_name}.part"));
@@ -1027,6 +1516,15 @@ async fn download_binary_source(
         ));
     }
     Ok(target)
+}
+
+async fn download_binary_source(
+    app: &AppHandle,
+    job: &Arc<StdMutex<RuntimeDependencyJob>>,
+    source: &RuntimeDependencyBinarySource,
+    file_name: &str,
+) -> Result<PathBuf, String> {
+    download_binary_source_to_dir(downloads_dir(app)?, job, source, file_name).await
 }
 
 fn powershell_quote(path: &Path) -> String {
@@ -1307,6 +1805,126 @@ async fn prepare_ffmpeg(
     Ok(resolved.to_string_lossy().into_owned())
 }
 
+async fn prepare_native_asr_cuda(
+    app: &AppHandle,
+    job: &Arc<StdMutex<RuntimeDependencyJob>>,
+    profile: &RuntimeDependencySourceProfile,
+) -> Result<String, String> {
+    if !native_asr_cuda_product_enabled() {
+        return Err("CUDA 运行时尚未完成最终可复现构建与发布资格".into());
+    }
+    let source = profile
+        .native_asr_cuda
+        .as_ref()
+        .ok_or_else(|| "当前下载源没有 Native ASR CUDA 运行时配置".to_string())?;
+    if source.archive != RuntimeDependencyArchive::Zip {
+        return Err("Native ASR CUDA 运行时必须使用 ZIP 归档".into());
+    }
+    let download_dir = managed_native_asr_cuda_download_dir(app)?;
+    fs::create_dir_all(&download_dir).map_err(|error| error.to_string())?;
+    let archive = download_binary_source_to_dir(
+        download_dir.clone(),
+        job,
+        source,
+        "native-asr-cuda-runtime.zip",
+    )
+    .await?;
+    ensure_job_not_cancelled(job)?;
+    let extract = download_dir.join(format!("extract-{}", unique_suffix()));
+    let payload = extract.join("windows-x64").join("cuda");
+    set_stage(job, "解压并验证 Native ASR CUDA 运行时", Some(0.45));
+    let archive_for_extract = archive.clone();
+    let extract_for_worker = extract.clone();
+    let payload_for_worker = payload.clone();
+    let archive_kind = source.archive;
+    tauri::async_runtime::spawn_blocking(move || {
+        extract_archive(&archive_for_extract, &extract_for_worker, archive_kind)?;
+        verify_native_asr_cuda_runtime_at(&payload_for_worker).map(|_| ())
+    })
+    .await
+    .map_err(|error| format!("解压 Native ASR CUDA 运行时任务失败：{error}"))??;
+    ensure_job_not_cancelled(job)?;
+
+    let target = managed_native_asr_cuda_dir(app)?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| "无法解析 Native ASR CUDA 运行时目录".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let staging = parent.join(format!("current.{}", unique_suffix()));
+    let previous = parent.join(format!("previous.{}", unique_suffix()));
+    fs::rename(&payload, &staging).map_err(|error| {
+        format!(
+            "移动 Native ASR CUDA 暂存目录失败（{} -> {}）：{error}",
+            payload.display(),
+            staging.display()
+        )
+    })?;
+    if let Err(error) = ensure_job_not_cancelled(job) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(error);
+    }
+    set_stage(job, "发布 Native ASR CUDA 运行时", Some(0.90));
+    if target.exists() {
+        fs::rename(&target, &previous)
+            .map_err(|error| format!("保留上一版 Native ASR CUDA 运行时失败：{error}"))?;
+    }
+    if let Err(error) = fs::rename(&staging, &target) {
+        if previous.exists() {
+            let _ = fs::rename(&previous, &target);
+        }
+        return Err(format!("发布 Native ASR CUDA 运行时失败：{error}"));
+    }
+    if previous.exists() {
+        let _ = fs::remove_dir_all(&previous);
+    }
+    set_stage(job, "检测 Native ASR CUDA 设备", Some(0.96));
+    match probe_native_asr_cuda_worker(&target, &target.join(NATIVE_ASR_CPU_WORKER)) {
+        Ok(capability) if capability.available => {
+            if let Ok(mut guard) = job.lock() {
+                push_log(
+                    &mut guard,
+                    format!(
+                        "CUDA 设备已就绪：{} ({})",
+                        capability
+                            .device_name
+                            .as_deref()
+                            .unwrap_or("NVIDIA device 0"),
+                        capability
+                            .compute_capability
+                            .as_deref()
+                            .unwrap_or("unknown CC")
+                    ),
+                );
+            }
+        }
+        Ok(capability) => {
+            if let Ok(mut guard) = job.lock() {
+                push_log(
+                    &mut guard,
+                    format!(
+                        "CUDA pack 已安装，但当前设备不可用：{}",
+                        capability
+                            .reason
+                            .or(capability.code)
+                            .unwrap_or_else(|| "未知原因".into())
+                    ),
+                );
+            }
+        }
+        Err(error) => {
+            if let Ok(mut guard) = job.lock() {
+                push_log(
+                    &mut guard,
+                    format!("CUDA pack 已安装，但能力探测失败：{error}"),
+                );
+            }
+        }
+    }
+    let _ = fs::remove_dir_all(&extract);
+    let _ = fs::remove_file(&archive);
+    Ok(target.to_string_lossy().into_owned())
+}
+
 async fn prepare_python311(
     app: &AppHandle,
     job: &Arc<StdMutex<RuntimeDependencyJob>>,
@@ -1468,6 +2086,7 @@ async fn run_prepare_job(
         RuntimeDependencyKind::NativeAsrCpu => {
             Err("内置 Native ASR CPU 运行时不可下载或准备".into())
         }
+        RuntimeDependencyKind::NativeAsrCuda => prepare_native_asr_cuda(&app, &job, &profile).await,
         RuntimeDependencyKind::Python311 => prepare_python311(&app, &job, &profile).await,
         RuntimeDependencyKind::AsrVenv => Err("ASR 引擎依赖由 ASR 一键配置流程准备".into()),
         RuntimeDependencyKind::AsrModels => Err("ASR 模型由模型管理器按具体引擎和模型下载".into()),
@@ -1586,6 +2205,7 @@ fn cleanup_target_for_kind(
     match kind {
         RuntimeDependencyKind::Ffmpeg => managed_ffmpeg_dir(app),
         RuntimeDependencyKind::NativeAsrCpu => Err("内置 Native ASR CPU 运行时不可清理".into()),
+        RuntimeDependencyKind::NativeAsrCuda => managed_native_asr_cuda_dir(app),
         RuntimeDependencyKind::Python311 => managed_python_dir(app),
         RuntimeDependencyKind::AsrVenv => {
             let settings = load_settings(app).unwrap_or_default();
@@ -1801,6 +2421,7 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         version: ffmpeg_version,
         managed,
         expected_download_bytes: ffmpeg_expected,
+        reason: None,
     });
 
     let runtime_root = app.path().resource_dir().ok().map(|path| {
@@ -1825,6 +2446,51 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         version: runtime.ok().map(|value| value.artifact_id),
         managed: false,
         expected_download_bytes: None,
+        reason: None,
+    });
+
+    let cuda_root = managed_native_asr_cuda_dir(app)?;
+    let cuda_verified = verify_native_asr_cuda_runtime_at(&cuda_root);
+    let (cuda_status, cuda_version, cuda_reason) = if !native_asr_cuda_product_enabled() {
+        (
+            RuntimeDependencyStatus::Missing,
+            None,
+            Some("CUDA 运行时尚未完成最终可复现构建与发布资格".into()),
+        )
+    } else {
+        match cuda_verified {
+            Ok((root, worker, artifact_id)) => match probe_native_asr_cuda_worker(&root, &worker) {
+                Ok(capability) if capability.available => {
+                    (RuntimeDependencyStatus::Available, Some(artifact_id), None)
+                }
+                Ok(capability) => (
+                    RuntimeDependencyStatus::Available,
+                    Some(artifact_id),
+                    capability.reason.or(capability.code),
+                ),
+                Err(error) => (
+                    RuntimeDependencyStatus::Available,
+                    Some(artifact_id),
+                    Some(error),
+                ),
+            },
+            Err(error) => (RuntimeDependencyStatus::Missing, None, Some(error)),
+        }
+    };
+    items.push(RuntimeDependencyItem {
+        kind: RuntimeDependencyKind::NativeAsrCuda,
+        status: cuda_status,
+        path: Some(cuda_root.to_string_lossy().into_owned()),
+        source: Some("managed".into()),
+        version: cuda_version,
+        managed: true,
+        expected_download_bytes: source_profile
+            .as_ref()
+            .and_then(|profile| profile.native_asr_cuda.as_ref())
+            .map(|source| source.size_bytes)
+            .filter(|_| native_asr_cuda_product_enabled())
+            .filter(|_| cuda_status != RuntimeDependencyStatus::Available),
+        reason: cuda_reason,
     });
 
     Ok(RuntimeDependencyProbe { items, source_mode })
@@ -1861,6 +2527,7 @@ fn native_model_dependency_item(
         version: status.revision,
         managed: true,
         expected_download_bytes: None,
+        reason: None,
     }
 }
 
@@ -1871,6 +2538,7 @@ fn measure_runtime_dependency_storage_inner(
     let settings = load_settings(app).unwrap_or_default();
     let kinds = [
         RuntimeDependencyKind::Ffmpeg,
+        RuntimeDependencyKind::NativeAsrCuda,
         RuntimeDependencyKind::AsrModels,
         RuntimeDependencyKind::Downloads,
         RuntimeDependencyKind::AppCache,
@@ -1881,7 +2549,8 @@ fn measure_runtime_dependency_storage_inner(
             RuntimeDependencyKind::Ffmpeg => {
                 resolve_ffmpeg_paths(app, &settings).source == ResolvedFfmpegSource::Managed
             }
-            RuntimeDependencyKind::AsrModels
+            RuntimeDependencyKind::NativeAsrCuda
+            | RuntimeDependencyKind::AsrModels
             | RuntimeDependencyKind::Downloads
             | RuntimeDependencyKind::AppCache => true,
             RuntimeDependencyKind::NativeAsrCpu
@@ -1891,9 +2560,15 @@ fn measure_runtime_dependency_storage_inner(
         if kind == RuntimeDependencyKind::Ffmpeg && !managed {
             continue;
         }
-        let target = cleanup_target_for_kind(app, kind)?;
+        let target = if kind == RuntimeDependencyKind::NativeAsrCuda {
+            managed_native_asr_cuda_root(app)?
+        } else {
+            cleanup_target_for_kind(app, kind)?
+        };
         let size_bytes = if kind == RuntimeDependencyKind::AppCache {
             measure_app_cache_size(&target, preserve_video_path)
+        } else if kind == RuntimeDependencyKind::NativeAsrCuda {
+            dir_size(&target) + dir_size(&managed_native_asr_cuda_download_dir(app)?)
         } else {
             dir_size(&target)
         };
@@ -1961,7 +2636,26 @@ pub async fn prepare_runtime_dependency(
         id.clone(),
         args.kind,
     )));
-    state.jobs.lock().await.insert(id.clone(), Arc::clone(&job));
+    {
+        let mut jobs = state.jobs.lock().await;
+        let duplicate_active = jobs.values().any(|existing| {
+            existing
+                .lock()
+                .map(|existing| {
+                    existing.kind == args.kind
+                        && matches!(
+                            existing.status,
+                            RuntimeDependencyJobStatus::Pending
+                                | RuntimeDependencyJobStatus::Running
+                        )
+                })
+                .unwrap_or(true)
+        });
+        if duplicate_active {
+            return Err("同类运行时依赖准备任务正在进行".into());
+        }
+        jobs.insert(id.clone(), Arc::clone(&job));
+    }
 
     tauri::async_runtime::spawn(async move {
         let result = run_prepare_job(app, Arc::clone(&job), args).await;
@@ -2028,10 +2722,20 @@ pub async fn cancel_runtime_dependency(
 #[tauri::command]
 pub async fn cleanup_runtime_dependency(
     app: AppHandle,
+    state: State<'_, RuntimeDependencyState>,
+    asr_state: State<'_, crate::asr::AsrState>,
     args: CleanupRuntimeDependencyArgs,
 ) -> Result<(), String> {
     if args.kind == RuntimeDependencyKind::NativeAsrCpu {
         return Err("内置 Native ASR CPU 运行时不可清理".into());
+    }
+    if args.kind == RuntimeDependencyKind::NativeAsrCuda
+        && (asr_state.has_active_job()
+            || state
+                .has_active_kind(RuntimeDependencyKind::NativeAsrCuda)
+                .await)
+    {
+        return Err("CUDA 转录或 CUDA 运行时任务正在进行，暂不可清理".into());
     }
     if args.kind == RuntimeDependencyKind::AppCache {
         let preserve = args.preserve_video_path;
@@ -2050,6 +2754,13 @@ pub async fn cleanup_runtime_dependency(
     tauri::async_runtime::spawn_blocking(move || {
         let deps = deps_dir(&app)?;
         fs::create_dir_all(&deps).map_err(|e| e.to_string())?;
+        if kind == RuntimeDependencyKind::NativeAsrCuda {
+            safe_remove_runtime_dependency_dir(&managed_native_asr_cuda_root(&app)?, &deps)?;
+            return safe_remove_runtime_dependency_dir(
+                &managed_native_asr_cuda_download_dir(&app)?,
+                &deps,
+            );
+        }
         let target = cleanup_target_for_kind(&app, kind)?;
         safe_remove_runtime_dependency_dir(&target, &deps)
     })
@@ -2161,12 +2872,133 @@ mod tests {
                     "cuda": false,
                     "vulkan": false,
                     "modelsBundled": false
-                }
+                },
+                "files": []
             }))
             .unwrap(),
         )
         .unwrap();
         root
+    }
+
+    fn write_native_cuda_runtime(root: &Path) {
+        fs::create_dir_all(root).unwrap();
+        let mut files = Vec::new();
+        for entry in NATIVE_ASR_CUDA_REQUIRED_ENTRIES
+            .iter()
+            .copied()
+            .filter(|entry| *entry != "runtime-manifest.json" && *entry != "SHA256SUMS")
+        {
+            let path = root.join(entry);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            fs::write(&path, format!("runtime:{entry}")).unwrap();
+            files.push(serde_json::json!({
+                "path": entry.replace('\\', "/"),
+                "sizeBytes": fs::metadata(&path).unwrap().len(),
+                "sha256": sha256_file(&path).unwrap()
+            }));
+        }
+        files.sort_by(|left, right| {
+            left["path"]
+                .as_str()
+                .unwrap()
+                .cmp(right["path"].as_str().unwrap())
+        });
+        let sums = files
+            .iter()
+            .map(|row| {
+                format!(
+                    "{}  {}",
+                    row["sha256"].as_str().unwrap(),
+                    row["path"].as_str().unwrap()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        fs::write(root.join("SHA256SUMS"), format!("{sums}\n")).unwrap();
+        fs::write(
+            root.join("runtime-manifest.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "schemaVersion": 1,
+                "artifactId": NATIVE_ASR_CUDA_ARTIFACT_ID,
+                "platform": "windows-x64",
+                "arch": "x64",
+                "protocolVersion": 1,
+                "capabilities": {
+                    "backend": "ctranslate2",
+                    "device": "cuda",
+                    "engines": ["faster-whisper", "kotoba-faster-whisper"],
+                    "vad": false,
+                    "crispasr": false,
+                    "cuda": true,
+                    "vulkan": false,
+                    "modelsBundled": false
+                },
+                "files": files
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn native_cuda_product_gate_stays_closed_until_publication_and_source_agree() {
+        let lock = native_asr_cuda_product_lock().unwrap();
+        assert!(!lock.product_enablement_allowed);
+        assert!(!lock.publication_gate.external_stable_asset_published);
+        assert!(!lock.publication_gate.runtime_dependency_source_row_present);
+        assert!(!native_asr_cuda_product_enabled());
+        assert!(NATIVE_ASR_CUDA_REQUIRED_ENTRIES
+            .contains(&"licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt"));
+        assert!(!NATIVE_ASR_CUDA_REQUIRED_ENTRIES
+            .contains(&"licenses/NVIDIA-CUDA-Toolkit-12.8-License.txt"));
+    }
+
+    #[test]
+    fn exact_rtx_3070_capability_is_labeled_real_tested_from_the_artifact_lock() {
+        let mut capability = NativeAsrCudaCapability {
+            available: true,
+            download_required: false,
+            code: None,
+            reason: None,
+            device_index: Some(0),
+            device_name: Some("NVIDIA GeForce RTX 3070".into()),
+            visible_device_count: Some(1),
+            compute_capability: Some("8.6".into()),
+            compute_type: Some("float16".into()),
+            driver_version: Some(13020),
+            support_evidence: Some("theoretical".into()),
+        };
+        apply_cuda_support_evidence(&mut capability);
+        assert_eq!(capability.support_evidence.as_deref(), Some("realTested"));
+
+        capability.device_name = Some("NVIDIA GeForce RTX 4070".into());
+        capability.support_evidence = Some("theoretical".into());
+        apply_cuda_support_evidence(&mut capability);
+        assert_eq!(capability.support_evidence.as_deref(), Some("theoretical"));
+    }
+
+    #[test]
+    fn native_cuda_runtime_verifies_exact_closed_tree_and_rejects_tampering() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("current");
+        write_native_cuda_runtime(&root);
+        let verified = verify_native_asr_cuda_runtime_at(&root).unwrap();
+        assert_eq!(verified.0, root);
+        assert_eq!(verified.2, NATIVE_ASR_CUDA_ARTIFACT_ID);
+
+        fs::write(root.join("cublas64_12.dll"), b"tampered").unwrap();
+        assert!(verify_native_asr_cuda_runtime_at(&root)
+            .unwrap_err()
+            .contains("损坏"));
+
+        write_native_cuda_runtime(&root);
+        fs::write(root.join("unexpected.dll"), b"unexpected").unwrap();
+        assert!(verify_native_asr_cuda_runtime_at(&root)
+            .unwrap_err()
+            .contains("闭集"));
     }
 
     #[test]

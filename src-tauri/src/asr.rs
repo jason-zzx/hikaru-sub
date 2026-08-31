@@ -10,14 +10,14 @@ use crate::asr_models::{
 use crate::asr_worker::{native_job_id, ActiveJobGate, NativeAsrHost, ResolvedNativeLaunch};
 use crate::dependencies::{
     effective_asr_service_dir, effective_source_profile, ensure_runtime_deps_writable_or_elevate,
-    managed_asr_service_dir, managed_model_cache_dir, resolve_native_asr_cpu_runtime,
-    work_cache_dir, RuntimeDependencySourceProfile,
+    managed_asr_service_dir, managed_model_cache_dir, native_asr_cuda_capability,
+    resolve_native_asr_cpu_runtime, resolve_native_asr_cuda_runtime, work_cache_dir,
+    RuntimeDependencySourceProfile,
 };
 use crate::process::{hidden_command, terminate_process_tree};
 use crate::settings::{load_settings, AppSettings};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-#[cfg(debug_assertions)]
 use std::ffi::OsString;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
@@ -81,7 +81,7 @@ pub struct AsrState {
     active_job: Arc<ActiveJobGate>,
     route_policy: AsrRoutePolicy,
     pub(crate) native_models: NativeAsrModelManager,
-    native_host: StdMutex<Option<NativeAsrHost>>,
+    native_hosts: StdMutex<HashMap<String, NativeAsrHost>>,
     #[cfg(debug_assertions)]
     debug_native_host_injected: bool,
 }
@@ -89,9 +89,13 @@ pub struct AsrState {
 impl Default for AsrState {
     fn default() -> Self {
         let active_job = Arc::new(ActiveJobGate::default());
-        let native_host = debug_native_host(Arc::clone(&active_job));
+        let debug_host = debug_native_host(Arc::clone(&active_job));
         #[cfg(debug_assertions)]
-        let debug_native_host_injected = native_host.is_some();
+        let debug_native_host_injected = debug_host.is_some();
+        let mut native_hosts = HashMap::new();
+        if let Some(host) = debug_host {
+            native_hosts.insert("debug".into(), host);
+        }
         let route_policy = AsrRoutePolicy::NativeMvp;
         Self {
             sidecar: Mutex::new(None),
@@ -100,7 +104,7 @@ impl Default for AsrState {
             active_job,
             route_policy,
             native_models: NativeAsrModelManager::default(),
-            native_host: StdMutex::new(native_host),
+            native_hosts: StdMutex::new(native_hosts),
             #[cfg(debug_assertions)]
             debug_native_host_injected,
         }
@@ -108,24 +112,41 @@ impl Default for AsrState {
 }
 
 impl AsrState {
-    fn native_host(&self) -> Result<Option<NativeAsrHost>, String> {
-        self.native_host
+    pub(crate) fn has_active_job(&self) -> bool {
+        self.active_job.has_active()
+    }
+
+    fn native_host(&self, key: &str) -> Result<Option<NativeAsrHost>, String> {
+        self.native_hosts
             .lock()
-            .map(|host| host.clone())
+            .map(|hosts| hosts.get(key).cloned())
             .map_err(|_| "native ASR host 状态已损坏".to_string())
     }
 
-    fn install_native_host(&self, host: NativeAsrHost) -> Result<NativeAsrHost, String> {
-        let mut current = self
-            .native_host
+    fn all_native_hosts(&self) -> Result<Vec<NativeAsrHost>, String> {
+        self.native_hosts
+            .lock()
+            .map(|hosts| hosts.values().cloned().collect())
+            .map_err(|_| "native ASR host 状态已损坏".to_string())
+    }
+
+    fn install_native_host(
+        &self,
+        key: String,
+        host: NativeAsrHost,
+    ) -> Result<NativeAsrHost, String> {
+        let mut hosts = self
+            .native_hosts
             .lock()
             .map_err(|_| "native ASR host 状态已损坏".to_string())?;
-        Ok(current.get_or_insert(host).clone())
+        Ok(hosts.entry(key).or_insert(host).clone())
     }
 
     pub fn shutdown(&self) {
-        if let Ok(Some(host)) = self.native_host() {
-            host.shutdown();
+        if let Ok(hosts) = self.native_hosts.lock() {
+            for host in hosts.values() {
+                host.shutdown();
+            }
         }
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
@@ -169,19 +190,132 @@ fn debug_native_host(_active_job: Arc<ActiveJobGate>) -> Option<NativeAsrHost> {
     None
 }
 
-async fn packaged_native_host(app: &AppHandle, state: &AsrState) -> Result<NativeAsrHost, String> {
-    if let Some(host) = state.native_host()? {
-        return Ok(host);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RequestedNativeDevice {
+    Auto,
+    Cpu,
+    Cuda,
+}
+
+impl RequestedNativeDevice {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "auto" => Ok(Self::Auto),
+            "cpu" => Ok(Self::Cpu),
+            "cuda" => Ok(Self::Cuda),
+            _ => Err(format!("当前 Native ASR 路线不支持设备：{value}")),
+        }
     }
-    let app = app.clone();
+}
+
+const AUTO_CUDA_FALLBACK_NOTICE: &str = "CUDA 启动前检查未通过，已改用 CPU 转录。";
+
+struct ResolvedNativeExecution {
+    host: NativeAsrHost,
+    device: &'static str,
+    notice: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartAsrResult {
+    job_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    notice: Option<String>,
+}
+
+fn prelaunch_fallback_notice(
+    requested: RequestedNativeDevice,
+    cuda_resolution_failed: bool,
+) -> Option<String> {
+    (requested == RequestedNativeDevice::Auto && cuda_resolution_failed)
+        .then(|| AUTO_CUDA_FALLBACK_NOTICE.to_string())
+}
+
+fn cuda_host_environment(root: &Path) -> Result<Vec<(OsString, OsString)>, String> {
+    let system_root =
+        std::env::var_os("SystemRoot").ok_or_else(|| "无法解析 Windows SystemRoot".to_string())?;
+    let path = std::env::join_paths([
+        root.to_path_buf(),
+        PathBuf::from(system_root).join("System32"),
+    ])
+    .map_err(|error| format!("无法构造 Native ASR CUDA 受限 PATH：{error}"))?;
+    Ok(vec![(OsString::from("PATH"), path)])
+}
+
+async fn resolve_native_execution(
+    app: &AppHandle,
+    state: &AsrState,
+    requested: RequestedNativeDevice,
+) -> Result<ResolvedNativeExecution, String> {
+    let app_for_runtime = app.clone();
+    let cuda = if requested == RequestedNativeDevice::Cpu {
+        None
+    } else {
+        Some(
+            tauri::async_runtime::spawn_blocking(move || {
+                resolve_native_asr_cuda_runtime(&app_for_runtime)
+            })
+            .await
+            .map_err(|error| format!("解析 Native ASR CUDA 运行时失败：{error}"))?,
+        )
+    };
+    let notice = match cuda {
+        Some(Ok(runtime)) => {
+            let key = format!("{}:cuda", runtime.artifact_id);
+            if let Some(host) = state.native_host(&key)? {
+                return Ok(ResolvedNativeExecution {
+                    host,
+                    device: "cuda",
+                    notice: None,
+                });
+            }
+            let host = NativeAsrHost::new_with_environment(
+                runtime.worker,
+                Vec::new(),
+                cuda_host_environment(&runtime.root)?,
+                vec![
+                    OsString::from("CUDA_PATH"),
+                    OsString::from("CUDA_HOME"),
+                    OsString::from("CT2_CUDA_ALLOW_FP16"),
+                ],
+                Arc::clone(&state.active_job),
+            )?;
+            return Ok(ResolvedNativeExecution {
+                host: state.install_native_host(key, host)?,
+                device: "cuda",
+                notice: None,
+            });
+        }
+        Some(Err(error)) if requested == RequestedNativeDevice::Cuda => return Err(error),
+        Some(Err(error)) => {
+            eprintln!("[asr] auto selected CPU before start: {error}");
+            prelaunch_fallback_notice(requested, true)
+        }
+        _ => None,
+    };
+
+    let app_for_runtime = app.clone();
     let active_job = Arc::clone(&state.active_job);
-    let host = tauri::async_runtime::spawn_blocking(move || {
-        let runtime = resolve_native_asr_cpu_runtime(&app)?;
-        NativeAsrHost::new(runtime.worker, Vec::new(), active_job)
+    let runtime = tauri::async_runtime::spawn_blocking(move || {
+        resolve_native_asr_cpu_runtime(&app_for_runtime)
     })
     .await
     .map_err(|error| format!("解析 Native ASR CPU 运行时失败：{error}"))??;
-    state.install_native_host(host)
+    let key = format!("{}:cpu", runtime.artifact_id);
+    if let Some(host) = state.native_host(&key)? {
+        return Ok(ResolvedNativeExecution {
+            host,
+            device: "cpu",
+            notice,
+        });
+    }
+    let host = NativeAsrHost::new(runtime.worker, Vec::new(), active_job)?;
+    Ok(ResolvedNativeExecution {
+        host: state.install_native_host(key, host)?,
+        device: "cpu",
+        notice,
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -298,14 +432,9 @@ fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
 }
 
 fn validate_native_request(args: &StartAsrArgs) -> Result<(), String> {
-    if !matches!(args.device.as_str(), "auto" | "cpu") {
-        return Err(format!(
-            "当前 Native ASR CPU 路线不支持设备：{}（仅支持 auto/cpu）",
-            args.device
-        ));
-    }
+    RequestedNativeDevice::parse(&args.device)?;
     if args.use_vad {
-        return Err("[vad_not_built] 内置 Native ASR CPU 运行时未包含 VAD".into());
+        return Err("[vad_not_built] Native ASR 运行时未包含 VAD".into());
     }
     if args
         .language
@@ -713,21 +842,58 @@ fn try_recover_job_snapshot(
     Ok(snapshot)
 }
 
+fn public_cuda_capability(
+    capability: crate::dependencies::NativeAsrCudaCapability,
+) -> serde_json::Value {
+    let mut value = serde_json::to_value(capability).unwrap_or_else(|_| {
+        serde_json::json!({
+            "available": false,
+            "downloadRequired": false,
+            "code": "cuda_capability_serialization_failed",
+            "reason": "CUDA 能力状态序列化失败"
+        })
+    });
+    if let Some(object) = value.as_object_mut() {
+        object.insert("device".into(), serde_json::Value::String("cuda".into()));
+    }
+    value
+}
+
 #[tauri::command]
 pub async fn list_asr_engines(
     app: AppHandle,
     state: State<'_, AsrState>,
 ) -> Result<serde_json::Value, String> {
     if state.route_policy.uses_native() {
+        let probe_app = app.clone();
+        let (cpu_available, cuda_capability) = tauri::async_runtime::spawn_blocking(move || {
+            (
+                resolve_native_asr_cpu_runtime(&probe_app).is_ok(),
+                native_asr_cuda_capability(&probe_app),
+            )
+        })
+        .await
+        .map_err(|error| format!("探测 Native ASR 运行时失败：{error}"))?;
+        let cuda_capability = public_cuda_capability(cuda_capability);
         let engines = known_native_asr_engines()?
             .into_iter()
-            .map(|(name, available)| {
+            .map(|(name, supported)| {
+                let available = supported && cpu_available;
                 serde_json::json!({
                     "name": name,
                     "available": available,
-                    "backend": available.then_some("ctranslate2"),
+                    "backend": supported.then_some("ctranslate2"),
                     "device": available.then_some("cpu"),
-                    "reason": (!available).then_some("该引擎将在后续版本支持"),
+                    "devices": supported.then(|| serde_json::json!([
+                        {
+                            "device": "cpu",
+                            "available": cpu_available,
+                            "reason": (!cpu_available).then_some("内置 Native ASR CPU 运行时缺失或损坏")
+                        },
+                        cuda_capability.clone()
+                    ])),
+                    "reason": (!supported).then_some("该引擎将在后续版本支持")
+                        .or_else(|| (!cpu_available).then_some("内置 Native ASR CPU 运行时缺失或损坏")),
                 })
             })
             .collect::<Vec<_>>();
@@ -751,14 +917,16 @@ pub async fn start_asr(
     app: AppHandle,
     state: State<'_, AsrState>,
     args: StartAsrArgs,
-) -> Result<String, String> {
+) -> Result<StartAsrResult, String> {
     validate_start_asr_args(&args)?;
     let reservation = state.active_job.reserve()?;
 
     if state.route_policy.uses_native() {
         #[cfg(debug_assertions)]
         if state.debug_native_host_injected {
-            let host = packaged_native_host(&app, &state).await?;
+            let host = state
+                .native_host("debug")?
+                .ok_or_else(|| "debug native ASR host 未安装".to_string())?;
             let cache_root = work_cache_dir(&app)?;
             let job_id = native_job_id();
             let launch = tauri::async_runtime::spawn_blocking(move || {
@@ -766,9 +934,14 @@ pub async fn start_asr(
             })
             .await
             .map_err(|error| format!("解析 native ASR 启动参数失败：{error}"))??;
-            return tauri::async_runtime::spawn_blocking(move || host.start(launch, reservation))
-                .await
-                .map_err(|error| format!("启动 native ASR 任务失败：{error}"))?;
+            let job_id =
+                tauri::async_runtime::spawn_blocking(move || host.start(launch, reservation))
+                    .await
+                    .map_err(|error| format!("启动 native ASR 任务失败：{error}"))??;
+            return Ok(StartAsrResult {
+                job_id,
+                notice: None,
+            });
         }
 
         validate_native_request(&args)?;
@@ -787,10 +960,17 @@ pub async fn start_asr(
                 return Err("该模型将在后续版本支持".into())
             }
             NativeAsrModelDisposition::Unsupported => {
-                return Err("当前 Native ASR CPU 路线不支持该引擎或模型".into())
+                return Err("当前 Native ASR 路线不支持该引擎或模型".into())
             }
         };
-        let host = packaged_native_host(&app, &state).await?;
+        let requested = RequestedNativeDevice::parse(&args.device)?;
+        let execution = resolve_native_execution(&app, &state, requested).await?;
+        let ResolvedNativeExecution {
+            host,
+            device,
+            notice,
+        } = execution;
+        let resolved_device = device.to_string();
         let cache_root = work_cache_dir(&app)?;
         let job_id = native_job_id();
         let launch = tauri::async_runtime::spawn_blocking(move || {
@@ -798,7 +978,7 @@ pub async fn start_asr(
                 job_id,
                 args.engine,
                 vec![("model".into(), model_path)],
-                "cpu".into(),
+                resolved_device,
                 args.language.unwrap_or_else(|| "ja".into()),
                 PathBuf::from(args.audio_path),
                 PathBuf::from(
@@ -812,9 +992,10 @@ pub async fn start_asr(
         })
         .await
         .map_err(|error| format!("解析 native ASR 启动参数失败：{error}"))??;
-        return tauri::async_runtime::spawn_blocking(move || host.start(launch, reservation))
+        let job_id = tauri::async_runtime::spawn_blocking(move || host.start(launch, reservation))
             .await
-            .map_err(|error| format!("启动 native ASR 任务失败：{error}"))?;
+            .map_err(|error| format!("启动 native ASR 任务失败：{error}"))??;
+        return Ok(StartAsrResult { job_id, notice });
     }
 
     let base = ensure_base_url(&app, &state).await?;
@@ -849,7 +1030,10 @@ pub async fn start_asr(
     remember_job_recovery_path(&state, &job_id, &audio_path).await;
     reservation.activate(&job_id)?;
     eprintln!("[asr] start_asr job_id={job_id} base_url={base}");
-    Ok(job_id)
+    Ok(StartAsrResult {
+        job_id,
+        notice: None,
+    })
 }
 
 fn snapshot_is_terminal(snapshot: &serde_json::Value) -> bool {
@@ -877,7 +1061,7 @@ pub async fn get_asr_progress(
     include_segments: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     let seg = include_segments.unwrap_or(true);
-    if let Some(host) = state.native_host()? {
+    for host in state.all_native_hosts()? {
         if let Some(snapshot) = host.snapshot(&job_id, seg)? {
             return Ok(snapshot);
         }
@@ -1029,8 +1213,9 @@ pub async fn cancel_asr(
     job_id: String,
 ) -> Result<(), String> {
     if let Some(host) = state
-        .native_host()?
-        .filter(|host| host.contains_job(&job_id))
+        .all_native_hosts()?
+        .into_iter()
+        .find(|host| host.contains_job(&job_id))
     {
         return tauri::async_runtime::spawn_blocking(move || host.cancel(&job_id))
             .await
@@ -1138,6 +1323,59 @@ mod tests {
     }
 
     #[test]
+    fn public_cuda_capability_always_carries_the_cuda_device_discriminator() {
+        let value = public_cuda_capability(crate::dependencies::NativeAsrCudaCapability {
+            available: false,
+            download_required: true,
+            code: Some("cuda_pack_missing".into()),
+            reason: Some("CUDA 运行时尚未安装".into()),
+            device_index: None,
+            device_name: None,
+            visible_device_count: None,
+            compute_capability: None,
+            compute_type: None,
+            driver_version: None,
+            support_evidence: None,
+        });
+        assert_eq!(value["device"], "cuda");
+        assert_eq!(value["downloadRequired"], true);
+    }
+
+    #[test]
+    fn auto_cuda_prelaunch_failure_projects_one_sanitized_notice() {
+        let notice = prelaunch_fallback_notice(RequestedNativeDevice::Auto, true).unwrap();
+
+        assert_eq!(notice, AUTO_CUDA_FALLBACK_NOTICE);
+        assert!(!notice.contains("C:\\"));
+        assert!(!notice.contains("cuda_pack_missing"));
+    }
+
+    #[test]
+    fn explicit_and_successful_resolution_paths_project_no_notice() {
+        assert!(prelaunch_fallback_notice(RequestedNativeDevice::Auto, false).is_none());
+        assert!(prelaunch_fallback_notice(RequestedNativeDevice::Cpu, true).is_none());
+        assert!(prelaunch_fallback_notice(RequestedNativeDevice::Cuda, true).is_none());
+    }
+
+    #[test]
+    fn start_asr_result_uses_camel_case_and_omits_absent_notice() {
+        let without_notice = serde_json::to_value(StartAsrResult {
+            job_id: "job-cpu".into(),
+            notice: None,
+        })
+        .unwrap();
+        assert_eq!(without_notice, serde_json::json!({ "jobId": "job-cpu" }));
+
+        let with_notice = serde_json::to_value(StartAsrResult {
+            job_id: "job-auto-fallback".into(),
+            notice: Some(AUTO_CUDA_FALLBACK_NOTICE.into()),
+        })
+        .unwrap();
+        assert_eq!(with_notice["jobId"], "job-auto-fallback");
+        assert_eq!(with_notice["notice"], AUTO_CUDA_FALLBACK_NOTICE);
+    }
+
+    #[test]
     fn native_request_keeps_model_support_authoritative_in_the_manifest() {
         let args = |engine: &str, device: &str, use_vad: bool| StartAsrArgs {
             audio_path: "cache/workspace/abc/audio.wav".into(),
@@ -1152,11 +1390,8 @@ mod tests {
         assert!(validate_native_request(&args("faster-whisper", "auto", false)).is_ok());
         assert!(validate_native_request(&args("kotoba-faster-whisper", "cpu", false)).is_ok());
         assert!(validate_native_request(&args("qwen3-asr", "cpu", false)).is_ok());
-        assert!(
-            validate_native_request(&args("faster-whisper", "cuda", false))
-                .unwrap_err()
-                .contains("仅支持 auto/cpu")
-        );
+        assert!(validate_native_request(&args("faster-whisper", "cuda", false)).is_ok());
+        assert!(validate_native_request(&args("faster-whisper", "vulkan", false)).is_err());
         assert!(
             validate_native_request(&args("kotoba-faster-whisper", "cpu", true))
                 .unwrap_err()
@@ -1234,6 +1469,7 @@ mod tests {
             id: crate::dependencies::RuntimeDependencySourceId::China,
             label: "中国大陆镜像".into(),
             ffmpeg: None,
+            native_asr_cuda: None,
             python311: None,
             pip_index_url: None,
             pip_extra_index_urls: Vec::new(),
@@ -1350,7 +1586,7 @@ mod tests {
             active_job: Arc::clone(&active_job),
             route_policy: AsrRoutePolicy::Legacy,
             native_models: NativeAsrModelManager::default(),
-            native_host: StdMutex::new(None),
+            native_hosts: StdMutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
             debug_native_host_injected: false,
         };

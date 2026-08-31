@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import {
+  closeSync,
   existsSync,
   lstatSync,
   mkdtempSync,
   mkdirSync,
+  openSync,
   readFileSync,
+  readSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -80,6 +83,22 @@ export function readRuntimeLock(path = defaultRuntimeLock) {
   ) {
     fail("license inventory lock is missing");
   }
+  if (
+    !Array.isArray(lock.importOwners) ||
+    lock.importOwners.length === 0 ||
+    new Set(lock.importOwners.map((owner) => owner.toLowerCase())).size
+      !== lock.importOwners.length ||
+    lock.importOwners.some(
+      (owner) =>
+        typeof owner !== "string" ||
+        owner.includes("/") ||
+        !lock.requiredFiles?.some(
+          (row) => row.path === owner && (row.role === "worker" || row.role === "runtime"),
+        ),
+    )
+  ) {
+    fail("runtime import owner lock is invalid");
+  }
   const redistributables = Array.isArray(lock.redistributables)
     ? lock.redistributables
     : [];
@@ -93,7 +112,10 @@ export function readRuntimeLock(path = defaultRuntimeLock) {
     lock.requiredFiles?.some((row) => row.role === "microsoft-runtime");
   if (requiresMicrosoftRuntimeContract) {
     const source = lock.sources?.microsoftVisualCppRuntimeLicense;
-    const redistributableFiles = redistributables
+    const microsoftRedistributables = redistributables.filter(
+      (row) => row.owner === undefined || row.owner === "microsoft",
+    );
+    const redistributableFiles = microsoftRedistributables
       .map((row) => row.fileName)
       .sort((left, right) => left.localeCompare(right));
     const expectedRedistributableFiles = [...microsoftRuntimeLicense.files].sort((left, right) =>
@@ -121,7 +143,8 @@ export function readRuntimeLock(path = defaultRuntimeLock) {
       !Number.isSafeInteger(source.sizeBytes) ||
       source.sizeBytes <= 0 ||
       !/^[0-9a-f]{64}$/.test(source.sha256) ||
-      component?.version !== microsoftRuntimeLicense.componentVersion ||
+      component?.version !==
+        (lock.toolchain?.msvcRedistributableVersion ?? microsoftRuntimeLicense.componentVersion) ||
       component?.license !== microsoftRuntimeLicense.licenseName ||
       component?.source !== microsoftRuntimeLicense.termsUrl ||
       component?.redistributionSource !== microsoftRuntimeLicense.redistributionUrl ||
@@ -277,9 +300,6 @@ function parseChecksums(text) {
 }
 
 function assertNoPrivateBuildPath(absolutePath, relativePath) {
-  const bytes = readFileSync(absolutePath);
-  const ascii = bytes.toString("latin1").toLowerCase();
-  const utf16 = bytes.toString("utf16le").toLowerCase();
   const hasPrivatePath = (text) =>
     /[a-z]:\\users\\/.test(text) ||
     text.includes("/users/") ||
@@ -287,8 +307,28 @@ function assertNoPrivateBuildPath(absolutePath, relativePath) {
     text.includes(".trellis/tasks") ||
     text.includes("research\\local") ||
     text.includes("research/local");
-  if (hasPrivatePath(ascii) || hasPrivatePath(utf16)) {
-    fail(`private build path is embedded in runtime payload: ${relativePath}`);
+  const chunkBytes = 8 * 1024 * 1024;
+  const overlapBytes = 2048;
+  const buffer = Buffer.allocUnsafe(chunkBytes + overlapBytes);
+  const descriptor = openSync(absolutePath, "r");
+  let carry = 0;
+  try {
+    for (;;) {
+      const read = readSync(descriptor, buffer, carry, chunkBytes, null);
+      if (read === 0) break;
+      const length = carry + read;
+      const bytes = buffer.subarray(0, length);
+      if (
+        hasPrivatePath(bytes.toString("latin1").toLowerCase()) ||
+        hasPrivatePath(bytes.subarray(0, length - (length % 2)).toString("utf16le").toLowerCase())
+      ) {
+        fail(`private build path is embedded in runtime payload: ${relativePath}`);
+      }
+      carry = Math.min(overlapBytes, length);
+      buffer.copyWithin(0, length - carry, length);
+    }
+  } finally {
+    closeSync(descriptor);
   }
 }
 
@@ -328,6 +368,28 @@ function verifyLicenseInventory(runtimeRoot, lock) {
   for (const required of lock.licenseInventory.requiredRustPackages) {
     if (!inventory.rustPackages.some((pkg) => pkg.name === required)) {
       fail(`required Rust license inventory package is missing: ${required}`);
+    }
+  }
+  const nvidiaSource = lock.sources?.nvidiaCudaLicense;
+  if (nvidiaSource) {
+    const documentPath = join(runtimeRoot, ...nvidiaSource.runtimePath.split("/"));
+    if (
+      !existsSync(documentPath) ||
+      statSync(documentPath).size !== nvidiaSource.sizeBytes ||
+      sha256File(documentPath) !== nvidiaSource.sha256
+    ) {
+      fail("NVIDIA CUDA license document identity mismatch");
+    }
+    const noticePath = join(runtimeRoot, ...nvidiaSource.noticePath.split("/"));
+    const expectedNotice = [
+      nvidiaSource.projectLicenseExclusion,
+      "",
+      `Official CUDA terms: ${nvidiaSource.termsUrl}`,
+      `Redistributable metadata: ${nvidiaSource.redistributableMetadataUrl}`,
+      `Files: ${[...nvidiaSource.files].sort((left, right) => left.localeCompare(right)).join(", ")}`,
+    ].join("\n");
+    if (!existsSync(noticePath) || readFileSync(noticePath, "utf8") !== expectedNotice) {
+      fail("NVIDIA CUDA human-readable notice mismatch");
     }
   }
   const microsoftSource = lock.sources?.microsoftVisualCppRuntimeLicense;
@@ -446,6 +508,17 @@ export function verifyExtractedRuntime(extractedRoot, lock = readRuntimeLock()) 
   if (unpackedBytes > lock.budgets.unpackedRuntimeBytes) {
     fail(`unpacked runtime exceeds budget: ${unpackedBytes}`);
   }
+  if (lock.cudaFatbin) {
+    let fatbin;
+    try {
+      fatbin = JSON.parse(readFileSync(join(runtimeRoot, "cuda-fatbin.json"), "utf8"));
+    } catch {
+      fail("CUDA fatbin attestation is invalid JSON");
+    }
+    if (!sameJson(fatbin, lock.cudaFatbin)) {
+      fail("CUDA fatbin attestation does not match the outer lock");
+    }
+  }
   verifyLicenseInventory(runtimeRoot, lock);
   const bundledDlls = new Set(
     [...manifestRows.keys()]
@@ -453,12 +526,8 @@ export function verifyExtractedRuntime(extractedRoot, lock = readRuntimeLock()) 
       .map((path) => path.toLowerCase()),
   );
   const systemDlls = new Set(lock.systemDllAllowlist.map((name) => name.toLowerCase()));
-  const importOwners = [
-    "hikaru-asr-worker.exe",
-    "ctranslate2.dll",
-    "hikaru_asr_tokenizer.dll",
-  ];
-  if (!manifest.imports || !sameJson(Object.keys(manifest.imports).sort(), importOwners.sort())) {
+  const importOwners = [...lock.importOwners].sort();
+  if (!manifest.imports || !sameJson(Object.keys(manifest.imports).sort(), importOwners)) {
     fail("runtime import closure owners are incomplete");
   }
   for (const [owner, imports] of Object.entries(manifest.imports)) {

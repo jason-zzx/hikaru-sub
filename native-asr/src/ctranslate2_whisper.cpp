@@ -959,10 +959,16 @@ class CudaDriverModule {
 };
 #endif
 
+bool same_execution_config(
+    const BackendExecutionConfig& left,
+    const BackendExecutionConfig& right) {
+  return left.device == right.device
+      && left.compute_type == right.compute_type
+      && left.device_index == right.device_index;
+}
+
 BackendExecutionAttestation validate_execution_config(
     const BackendExecutionConfig& config) {
-  BackendExecutionAttestation attestation;
-  attestation.config = config;
   if (config.device_index != 0) {
     throw BackendError("execution_config_invalid", "CTranslate2 device index must be 0");
   }
@@ -970,62 +976,31 @@ BackendExecutionAttestation validate_execution_config(
     if (config.compute_type != ExecutionComputeType::Int8) {
       throw BackendError("execution_config_invalid", "CPU execution requires INT8");
     }
+    BackendExecutionAttestation attestation;
+    attestation.config = config;
     return attestation;
   }
-  if (config.compute_type != ExecutionComputeType::Float16) {
-    throw BackendError("execution_config_invalid", "CUDA execution requires FLOAT16");
-  }
-#ifndef HIKARU_ASR_CT2_WITH_CUDA
-  throw BackendError("cuda_not_built", "This worker was built without CUDA support");
-#else
-  const CudaDriverModule driver;
-  const auto initialize = driver.symbol<decltype(&cuInit)>("cuInit");
-  const auto get_driver_version = driver.symbol<decltype(&cuDriverGetVersion)>("cuDriverGetVersion");
-  const auto get_device_count = driver.symbol<decltype(&cuDeviceGetCount)>("cuDeviceGetCount");
-  const auto get_device = driver.symbol<decltype(&cuDeviceGet)>("cuDeviceGet");
-  const auto get_device_name = driver.symbol<decltype(&cuDeviceGetName)>("cuDeviceGetName");
-  const auto get_device_attribute = driver.symbol<decltype(&cuDeviceGetAttribute)>("cuDeviceGetAttribute");
-  int driver_device_count = 0;
-  CUdevice device = 0;
-  std::array<char, 256> device_name{};
-  if (initialize(0) != CUDA_SUCCESS
-      || get_driver_version(&attestation.cuda_driver_api_version) != CUDA_SUCCESS
-      || get_device_count(&driver_device_count) != CUDA_SUCCESS) {
-    throw BackendError("cuda_runtime_failed", "CUDA driver initialization failed");
-  }
-  if (driver_device_count <= config.device_index) {
-    throw BackendError("cuda_device_unavailable", "CUDA device 0 is unavailable");
-  }
-  if (get_device(&device, config.device_index) != CUDA_SUCCESS
-      || get_device_name(device_name.data(), static_cast<int>(device_name.size()), device) != CUDA_SUCCESS
-      || get_device_attribute(
-             &attestation.compute_capability_major,
-             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
-             device) != CUDA_SUCCESS
-      || get_device_attribute(
-             &attestation.compute_capability_minor,
-             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
-             device) != CUDA_SUCCESS) {
-    throw BackendError("cuda_runtime_failed", "CUDA device attestation failed");
-  }
-  attestation.device_name = device_name.data();
-  try {
-    attestation.visible_device_count = ctranslate2::get_device_count(ctranslate2::Device::CUDA);
-    attestation.compute_type_supported = attestation.compute_capability_major >= 7
-        && ctranslate2::mayiuse_float16(ctranslate2::Device::CUDA, config.device_index);
-  } catch (const std::exception&) {
-    throw BackendError("cuda_runtime_failed", "CTranslate2 CUDA capability detection failed");
-  }
-  if (attestation.visible_device_count <= config.device_index) {
-    throw BackendError("cuda_device_unavailable", "CTranslate2 cannot access CUDA device 0");
-  }
-  if (!attestation.compute_type_supported) {
+  BackendExecutionAttestation attestation = probe_cuda_execution();
+  if (config.compute_type != attestation.config.compute_type) {
     throw BackendError(
-        "cuda_compute_type_unsupported",
-        "CUDA device 0 does not support FLOAT16");
+        "execution_config_invalid",
+        "CUDA execution compute type does not match device policy");
   }
   return attestation;
-#endif
+}
+
+BackendExecutionAttestation resolve_execution_attestation(
+    const BackendExecutionConfig& config,
+    std::optional<BackendExecutionAttestation> prevalidated) {
+  if (!prevalidated) {
+    return validate_execution_config(config);
+  }
+  if (!same_execution_config(config, prevalidated->config)) {
+    throw BackendError(
+        "execution_config_invalid",
+        "Prevalidated execution attestation does not match the requested config");
+  }
+  return std::move(*prevalidated);
 }
 
 ctranslate2::Device ctranslate2_device(ExecutionDevice device) {
@@ -1035,9 +1010,15 @@ ctranslate2::Device ctranslate2_device(ExecutionDevice device) {
 }
 
 ctranslate2::ComputeType ctranslate2_compute_type(ExecutionComputeType compute_type) {
-  return compute_type == ExecutionComputeType::Float16
-      ? ctranslate2::ComputeType::FLOAT16
-      : ctranslate2::ComputeType::INT8;
+  switch (compute_type) {
+    case ExecutionComputeType::Int8:
+      return ctranslate2::ComputeType::INT8;
+    case ExecutionComputeType::Int8Float32:
+      return ctranslate2::ComputeType::INT8_FLOAT32;
+    case ExecutionComputeType::Float16:
+      return ctranslate2::ComputeType::FLOAT16;
+  }
+  throw BackendError("execution_config_invalid", "Unknown CTranslate2 compute type");
 }
 
 fs::path validated_tokenizer_path(
@@ -1055,6 +1036,93 @@ BackendExecutionConfig cpu_execution_config() {
 
 BackendExecutionConfig cuda_execution_config() {
   return {ExecutionDevice::Cuda, ExecutionComputeType::Float16, 0};
+}
+
+BackendExecutionConfig cuda_execution_config_for_capability(int major, int minor) {
+  if (major == 6 && minor == 1) {
+    return {ExecutionDevice::Cuda, ExecutionComputeType::Int8Float32, 0};
+  }
+  if ((major == 7 && minor == 5)
+      || (major == 8 && (minor == 6 || minor == 9))
+      || (major == 12 && minor == 0)) {
+    return {ExecutionDevice::Cuda, ExecutionComputeType::Float16, 0};
+  }
+  throw BackendError(
+      "cuda_architecture_unsupported",
+      "CUDA device 0 architecture is not supported by this runtime");
+}
+
+const char* execution_compute_type_name(ExecutionComputeType compute_type) {
+  switch (compute_type) {
+    case ExecutionComputeType::Int8:
+      return "int8";
+    case ExecutionComputeType::Int8Float32:
+      return "int8Float32";
+    case ExecutionComputeType::Float16:
+      return "float16";
+  }
+  throw BackendError("execution_config_invalid", "Unknown CTranslate2 compute type");
+}
+
+BackendExecutionAttestation probe_cuda_execution() {
+#ifndef HIKARU_ASR_CT2_WITH_CUDA
+  throw BackendError("cuda_not_built", "This worker was built without CUDA support");
+#else
+  BackendExecutionAttestation attestation;
+  const CudaDriverModule driver;
+  const auto initialize = driver.symbol<decltype(&cuInit)>("cuInit");
+  const auto get_driver_version = driver.symbol<decltype(&cuDriverGetVersion)>("cuDriverGetVersion");
+  const auto get_device_count = driver.symbol<decltype(&cuDeviceGetCount)>("cuDeviceGetCount");
+  const auto get_device = driver.symbol<decltype(&cuDeviceGet)>("cuDeviceGet");
+  const auto get_device_name = driver.symbol<decltype(&cuDeviceGetName)>("cuDeviceGetName");
+  const auto get_device_attribute = driver.symbol<decltype(&cuDeviceGetAttribute)>("cuDeviceGetAttribute");
+  int driver_device_count = 0;
+  CUdevice device = 0;
+  std::array<char, 256> device_name{};
+  if (initialize(0) != CUDA_SUCCESS
+      || get_driver_version(&attestation.cuda_driver_api_version) != CUDA_SUCCESS
+      || get_device_count(&driver_device_count) != CUDA_SUCCESS) {
+    throw BackendError("cuda_runtime_failed", "CUDA driver initialization failed");
+  }
+  if (driver_device_count <= 0) {
+    throw BackendError("cuda_device_unavailable", "CUDA device 0 is unavailable");
+  }
+  if (get_device(&device, 0) != CUDA_SUCCESS
+      || get_device_name(device_name.data(), static_cast<int>(device_name.size()), device) != CUDA_SUCCESS
+      || get_device_attribute(
+             &attestation.compute_capability_major,
+             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
+             device) != CUDA_SUCCESS
+      || get_device_attribute(
+             &attestation.compute_capability_minor,
+             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+             device) != CUDA_SUCCESS) {
+    throw BackendError("cuda_runtime_failed", "CUDA device attestation failed");
+  }
+  attestation.device_name = device_name.data();
+  attestation.config = cuda_execution_config_for_capability(
+      attestation.compute_capability_major,
+      attestation.compute_capability_minor);
+  try {
+    attestation.visible_device_count = ctranslate2::get_device_count(ctranslate2::Device::CUDA);
+    attestation.compute_type_supported =
+        attestation.config.compute_type == ExecutionComputeType::Int8Float32
+        ? ctranslate2::mayiuse_int8(ctranslate2::Device::CUDA, 0)
+        : ctranslate2::mayiuse_float16(ctranslate2::Device::CUDA, 0);
+  } catch (const std::exception&) {
+    throw BackendError("cuda_runtime_failed", "CTranslate2 CUDA capability detection failed");
+  }
+  if (attestation.visible_device_count <= 0) {
+    throw BackendError("cuda_device_unavailable", "CTranslate2 cannot access CUDA device 0");
+  }
+  if (!attestation.compute_type_supported) {
+    throw BackendError(
+        "cuda_compute_type_unsupported",
+        std::string("CUDA device 0 does not support ")
+            + execution_compute_type_name(attestation.config.compute_type));
+  }
+  return attestation;
+#endif
 }
 
 CandidateAConfig kotoba_config() {
@@ -1650,8 +1718,9 @@ class CTranslate2WhisperBackend::Impl {
       CandidateAConfig config,
       std::optional<fs::path> vad_model_path,
       BackendExecutionConfig execution,
-      bool require_kotoba_model)
-      : attestation(validate_execution_config(execution)),
+      bool require_kotoba_model,
+      std::optional<BackendExecutionAttestation> execution_attestation)
+      : attestation(resolve_execution_attestation(execution, std::move(execution_attestation))),
         tokenizer(validated_tokenizer_path(model_path, require_kotoba_model)),
         config(std::move(config)),
         vad_model_path(std::move(vad_model_path)) {
@@ -1763,7 +1832,25 @@ CTranslate2WhisperBackend::CTranslate2WhisperBackend(
           std::move(config),
           std::move(vad_model_path),
           execution,
-          require_kotoba_model)) {}
+          require_kotoba_model,
+          std::nullopt)) {}
+
+#ifdef HIKARU_ASR_CT2_WITH_CUDA
+CTranslate2WhisperBackend::CTranslate2WhisperBackend(
+    const fs::path& model_path,
+    CandidateAConfig config,
+    std::optional<fs::path> vad_model_path,
+    BackendExecutionConfig execution,
+    bool require_kotoba_model,
+    BackendExecutionAttestation execution_attestation)
+    : impl_(std::make_unique<Impl>(
+          model_path,
+          std::move(config),
+          std::move(vad_model_path),
+          execution,
+          require_kotoba_model,
+          std::move(execution_attestation))) {}
+#endif
 
 CTranslate2WhisperBackend::~CTranslate2WhisperBackend() = default;
 

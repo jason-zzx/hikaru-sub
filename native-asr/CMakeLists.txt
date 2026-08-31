@@ -103,10 +103,23 @@ option(
   HIKARU_ASR_MVP_CPU_RUNTIME
   "Restrict the final CPU worker to released CTranslate2 CPU routes"
   OFF)
+option(
+  HIKARU_ASR_CUDA_RUNTIME
+  "Build the optional release CUDA worker/runtime"
+  OFF)
 set(HIKARU_ASR_CRISPASR_RUNTIME_FILE "" CACHE FILEPATH "Locked CrispASR development runtime")
 set(HIKARU_ASR_CRISPASR_RUNTIME_SIZE "" CACHE STRING "Locked CrispASR development runtime size")
 set(HIKARU_ASR_CRISPASR_RUNTIME_SHA256 "" CACHE STRING "Locked CrispASR development runtime SHA-256")
 set(HIKARU_ASR_CT2_SOURCE_DIR "" CACHE PATH "Pinned CTranslate2 4.8.0 source")
+set(HIKARU_ASR_CUDA_TOOLKIT_ROOT "" CACHE PATH "Pinned CUDA 12.9 Update 1 toolkit overlay root")
+set(HIKARU_ASR_REAL_NVCC "" CACHE FILEPATH "Pinned CUDA 12.9 Update 1 real nvcc executable")
+set(HIKARU_ASR_REAL_NVCC_SIZE "" CACHE STRING "Pinned real nvcc size")
+set(HIKARU_ASR_REAL_NVCC_SHA256 "" CACHE STRING "Pinned real nvcc SHA-256")
+set(HIKARU_ASR_NVCC_LAUNCHER "" CACHE FILEPATH "Pinned deterministic per-source NVCC launcher")
+set(HIKARU_ASR_NVCC_LAUNCHER_SIZE "" CACHE STRING "Pinned NVCC launcher size")
+set(HIKARU_ASR_NVCC_LAUNCHER_SHA256 "" CACHE STRING "Pinned NVCC launcher SHA-256")
+set(HIKARU_ASR_CUDA_SEED_MANIFEST "" CACHE FILEPATH "Locked CTranslate2 4.8.0 CUDA source seed manifest")
+set(HIKARU_ASR_CUDA_SEED_MANIFEST_SHA256 "" CACHE STRING "Locked CUDA source seed manifest SHA-256")
 set(HIKARU_ASR_CT2_SOURCE_REVISION "" CACHE STRING "Pinned CTranslate2 source revision")
 set(HIKARU_ASR_POCKETFFT_SOURCE_DIR "" CACHE PATH "Pinned pocketfft source")
 set(HIKARU_ASR_DNNL_ROOT "" CACHE PATH "Pinned oneDNN 3.1.1 static install")
@@ -133,6 +146,15 @@ set(HIKARU_ASR_ZLIB_SOURCE_DIR "" CACHE PATH "Exact task-local zlib 1.3.1 source
 if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
   message(FATAL_ERROR "T07 CUDA development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
 endif()
+if(HIKARU_ASR_CUDA_RUNTIME AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
+  message(FATAL_ERROR "The release CUDA runtime requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
+endif()
+if(HIKARU_ASR_CUDA_RUNTIME AND HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT)
+  message(FATAL_ERROR "Release CUDA and CUDA development modes are independent")
+endif()
+if(HIKARU_ASR_CUDA_RUNTIME AND HIKARU_ASR_MVP_CPU_RUNTIME)
+  message(FATAL_ERROR "CPU and CUDA release runtimes must be built independently")
+endif()
 if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT AND NOT HIKARU_ASR_BUILD_CT2_WORKER)
   message(FATAL_ERROR "Candidate B development requires HIKARU_ASR_BUILD_CT2_WORKER=ON")
 endif()
@@ -157,14 +179,27 @@ if(HIKARU_ASR_MVP_CPU_RUNTIME
          OR HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT))
   message(FATAL_ERROR "The final MVP CPU runtime cannot enable development capabilities")
 endif()
+if(HIKARU_ASR_CUDA_RUNTIME
+    AND (HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
+         OR HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
+         OR HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY
+         OR HIKARU_ASR_ENABLE_WHISPER_PARITY_BISECT))
+  message(FATAL_ERROR "The release CUDA runtime cannot enable development capabilities")
+endif()
 
 if(MSVC AND HIKARU_ASR_REPRODUCIBLE_BUILD)
+  file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}" HIKARU_ASR_REPRODUCIBLE_BUILD_NATIVE_PATH)
+  file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" HIKARU_ASR_NATIVE_SOURCE_NATIVE_PATH)
   add_compile_options(
     /Brepro
     /experimental:deterministic
-    "/pathmap:${CMAKE_CURRENT_SOURCE_DIR}=native-asr")
+    "/pathmap:${HIKARU_ASR_REPRODUCIBLE_BUILD_NATIVE_PATH}=build"
+    "/pathmap:${HIKARU_ASR_NATIVE_SOURCE_NATIVE_PATH}=native-asr")
   if(HIKARU_ASR_REPRODUCIBLE_PATH_ROOT)
-    add_compile_options("/pathmap:${HIKARU_ASR_REPRODUCIBLE_PATH_ROOT}=source")
+    file(TO_NATIVE_PATH
+      "${HIKARU_ASR_REPRODUCIBLE_PATH_ROOT}"
+      HIKARU_ASR_REPRODUCIBLE_SOURCE_NATIVE_PATH)
+    add_compile_options("/pathmap:${HIKARU_ASR_REPRODUCIBLE_SOURCE_NATIVE_PATH}=source")
   endif()
   add_link_options(/Brepro)
 endif()
@@ -229,7 +264,7 @@ add_executable(hikaru-asr-crispasr-tests tests/crispasr_backend_tests.cpp)
 target_link_libraries(hikaru-asr-crispasr-tests PRIVATE hikaru-asr-crispasr-test-adapter)
 add_executable(hikaru-asr-parakeet-family-policy-tests tests/parakeet_family_policy_tests.cpp)
 target_link_libraries(hikaru-asr-parakeet-family-policy-tests PRIVATE hikaru-asr-parakeet-family-policy)
-if(HIKARU_ASR_MVP_CPU_RUNTIME)
+if(HIKARU_ASR_MVP_CPU_RUNTIME OR HIKARU_ASR_CUDA_RUNTIME)
   set_target_properties(
     hikaru-asr-fake-worker
     hikaru-asr-crispasr
@@ -453,16 +488,171 @@ if(NOT HIKARU_ASR_CT2_PREBUILT_ROOT)
 endif()
 set(WITH_OPENBLAS OFF CACHE BOOL "" FORCE)
 set(WITH_RUY OFF CACHE BOOL "" FORCE)
-if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT)
-  if(NOT DEFINED ENV{CUDA_PATH} OR "$ENV{CUDA_PATH}" STREQUAL "")
-    message(FATAL_ERROR "T07 CUDA development requires the locked CUDA_PATH")
+if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT OR HIKARU_ASR_CUDA_RUNTIME)
+  if(HIKARU_ASR_CUDA_RUNTIME)
+    if(NOT HIKARU_ASR_CUDA_TOOLKIT_ROOT)
+      message(FATAL_ERROR "The release CUDA runtime requires HIKARU_ASR_CUDA_TOOLKIT_ROOT")
+    endif()
+    file(TO_CMAKE_PATH "${HIKARU_ASR_CUDA_TOOLKIT_ROOT}" CUDA_TOOLKIT_ROOT_NORMALIZED)
+    foreach(required_cuda_build_input IN ITEMS
+        HIKARU_ASR_REAL_NVCC
+        HIKARU_ASR_REAL_NVCC_SIZE
+        HIKARU_ASR_REAL_NVCC_SHA256
+        HIKARU_ASR_NVCC_LAUNCHER
+        HIKARU_ASR_NVCC_LAUNCHER_SIZE
+        HIKARU_ASR_NVCC_LAUNCHER_SHA256
+        HIKARU_ASR_CUDA_SEED_MANIFEST
+        HIKARU_ASR_CUDA_SEED_MANIFEST_SHA256)
+      if("${${required_cuda_build_input}}" STREQUAL "")
+        message(FATAL_ERROR "${required_cuda_build_input} is required for the release CUDA runtime")
+      endif()
+    endforeach()
+    file(REAL_PATH "${HIKARU_ASR_REAL_NVCC}" CUDA_REAL_NVCC)
+    file(REAL_PATH "${HIKARU_ASR_NVCC_LAUNCHER}" CUDA_NVCC_LAUNCHER)
+    file(REAL_PATH "${HIKARU_ASR_CUDA_SEED_MANIFEST}" CUDA_SEED_MANIFEST)
+    file(REAL_PATH "${CUDA_TOOLKIT_ROOT_NORMALIZED}" CUDA_TOOLKIT_ROOT_REAL)
+    file(REAL_PATH "${CUDA_TOOLKIT_ROOT_REAL}/bin/nvcc.exe" CUDA_CANONICAL_NVCC)
+    file(REAL_PATH "${CUDA_TOOLKIT_ROOT_REAL}/bin/nvcc-real.exe" CUDA_CANONICAL_REAL_NVCC)
+    if(NOT CUDA_NVCC_LAUNCHER STREQUAL CUDA_CANONICAL_NVCC)
+      message(FATAL_ERROR "The CUDA toolkit overlay bin/nvcc.exe must be the deterministic launcher")
+    endif()
+    if(NOT CUDA_REAL_NVCC STREQUAL CUDA_CANONICAL_REAL_NVCC)
+      message(FATAL_ERROR "The official real nvcc must be locked separately at bin/nvcc-real.exe")
+    endif()
+    require_pinned_file(
+      "${CUDA_REAL_NVCC}"
+      "${HIKARU_ASR_REAL_NVCC_SIZE}"
+      "${HIKARU_ASR_REAL_NVCC_SHA256}"
+      "official real nvcc")
+    require_pinned_file(
+      "${CUDA_NVCC_LAUNCHER}"
+      "${HIKARU_ASR_NVCC_LAUNCHER_SIZE}"
+      "${HIKARU_ASR_NVCC_LAUNCHER_SHA256}"
+      "deterministic NVCC launcher")
+    file(SHA256 "${CUDA_SEED_MANIFEST}" CUDA_SEED_MANIFEST_ACTUAL_SHA256)
+    if(NOT CUDA_SEED_MANIFEST_ACTUAL_SHA256 STREQUAL HIKARU_ASR_CUDA_SEED_MANIFEST_SHA256)
+      message(FATAL_ERROR "CUDA seed manifest identity drifted")
+    endif()
+    execute_process(
+      COMMAND "${CUDA_REAL_NVCC}" --version
+      RESULT_VARIABLE CUDA_NVCC_VERSION_RESULT
+      OUTPUT_VARIABLE CUDA_NVCC_VERSION_OUTPUT
+      ERROR_VARIABLE CUDA_NVCC_VERSION_ERROR)
+    string(CONCAT CUDA_NVCC_VERSION_TEXT "${CUDA_NVCC_VERSION_OUTPUT}" "${CUDA_NVCC_VERSION_ERROR}")
+    if(NOT CUDA_NVCC_VERSION_RESULT EQUAL 0
+        OR NOT CUDA_NVCC_VERSION_TEXT MATCHES "release 12\\.9, V12\\.9\\.86")
+      message(FATAL_ERROR "Expected the pinned CUDA 12.9 Update 1 nvcc 12.9.86")
+    endif()
+    file(READ "${CUDA_SEED_MANIFEST}" CUDA_SEED_JSON)
+    string(JSON CUDA_SEED_SCHEMA GET "${CUDA_SEED_JSON}" schemaVersion)
+    string(JSON CUDA_SEED_ALGORITHM GET "${CUDA_SEED_JSON}" algorithm)
+    string(JSON CUDA_SEED_PREFIX GET "${CUDA_SEED_JSON}" canonicalSourcePrefix)
+    string(JSON CUDA_SEED_COUNT LENGTH "${CUDA_SEED_JSON}" sources)
+    if(NOT CUDA_SEED_SCHEMA EQUAL 1
+        OR NOT CUDA_SEED_ALGORITHM STREQUAL "sha256-utf8-canonical-identity-first-u32-hex-v1"
+        OR NOT CUDA_SEED_PREFIX STREQUAL "ctranslate2-4.8.0/"
+        OR NOT CUDA_SEED_COUNT EQUAL 25)
+      message(FATAL_ERROR "CUDA seed manifest contract drifted")
+    endif()
+    math(EXPR CUDA_SEED_LAST "${CUDA_SEED_COUNT} - 1")
+    set(CUDA_SEED_PATHS "")
+    set(CUDA_SEED_VALUES "")
+    set(CUDA_SEED_PREVIOUS_PATH "")
+    foreach(CUDA_SEED_INDEX RANGE 0 ${CUDA_SEED_LAST})
+      string(JSON CUDA_SEED_PATH GET "${CUDA_SEED_JSON}" sources ${CUDA_SEED_INDEX} path)
+      string(JSON CUDA_SEED_VALUE GET "${CUDA_SEED_JSON}" sources ${CUDA_SEED_INDEX} seed)
+      string(LENGTH "${CUDA_SEED_VALUE}" CUDA_SEED_VALUE_LENGTH)
+      if(CUDA_SEED_PATH MATCHES "(^|/)\\.\\.(/|$)"
+          OR CUDA_SEED_PATH MATCHES "^/"
+          OR CUDA_SEED_PATH MATCHES "\\\\"
+          OR NOT CUDA_SEED_PATH MATCHES "\\.cu$"
+          OR NOT CUDA_SEED_VALUE MATCHES "^0x[0-9a-f]+$"
+          OR NOT CUDA_SEED_VALUE_LENGTH EQUAL 10
+          OR CUDA_SEED_VALUE STREQUAL "0x00000000")
+        message(FATAL_ERROR "Invalid CUDA source seed mapping: ${CUDA_SEED_PATH} ${CUDA_SEED_VALUE}")
+      endif()
+      if(CUDA_SEED_PREVIOUS_PATH AND NOT CUDA_SEED_PREVIOUS_PATH STRLESS CUDA_SEED_PATH)
+        message(FATAL_ERROR "CUDA source seed mappings must be uniquely sorted")
+      endif()
+      if(NOT EXISTS "${CT2_SOURCE_DIR}/${CUDA_SEED_PATH}")
+        message(FATAL_ERROR "Locked CUDA source is missing: ${CUDA_SEED_PATH}")
+      endif()
+      list(FIND CUDA_SEED_VALUES "${CUDA_SEED_VALUE}" CUDA_DUPLICATE_SEED_INDEX)
+      if(NOT CUDA_DUPLICATE_SEED_INDEX EQUAL -1)
+        message(FATAL_ERROR "Duplicate CUDA source seed: ${CUDA_SEED_VALUE}")
+      endif()
+      string(SHA256 CUDA_SEED_DERIVED "${CUDA_SEED_PREFIX}${CUDA_SEED_PATH}")
+      string(SUBSTRING "${CUDA_SEED_DERIVED}" 0 8 CUDA_SEED_DERIVED_PREFIX)
+      if(NOT CUDA_SEED_VALUE STREQUAL "0x${CUDA_SEED_DERIVED_PREFIX}")
+        message(FATAL_ERROR "CUDA source seed does not match the locked derivation: ${CUDA_SEED_PATH}")
+      endif()
+      execute_process(
+        COMMAND "${CUDA_NVCC_LAUNCHER}" --hikaru-seed-for "${CUDA_SEED_PATH}"
+        RESULT_VARIABLE CUDA_LAUNCHER_SEED_RESULT
+        OUTPUT_VARIABLE CUDA_LAUNCHER_SEED_OUTPUT
+        ERROR_VARIABLE CUDA_LAUNCHER_SEED_ERROR
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+      if(NOT CUDA_LAUNCHER_SEED_RESULT EQUAL 0
+          OR NOT CUDA_LAUNCHER_SEED_OUTPUT STREQUAL CUDA_SEED_VALUE)
+        message(FATAL_ERROR "NVCC launcher mapping disagrees for ${CUDA_SEED_PATH}: ${CUDA_LAUNCHER_SEED_ERROR}")
+      endif()
+      list(APPEND CUDA_SEED_PATHS "${CUDA_SEED_PATH}")
+      list(APPEND CUDA_SEED_VALUES "${CUDA_SEED_VALUE}")
+      set(CUDA_SEED_PREVIOUS_PATH "${CUDA_SEED_PATH}")
+    endforeach()
+    file(REAL_PATH "${CT2_SOURCE_DIR}" CUDA_CT2_SOURCE_ROOT)
+    file(REAL_PATH "${CMAKE_BINARY_DIR}" CUDA_REPRODUCIBLE_BUILD_ROOT)
+    file(REAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}" CUDA_NATIVE_ASR_SOURCE_ROOT)
+    file(REAL_PATH "${HIKARU_ASR_REPRODUCIBLE_PATH_ROOT}" CUDA_REPRODUCIBLE_SOURCE_ROOT)
+    file(TO_CMAKE_PATH "${CUDA_CT2_SOURCE_ROOT}" CUDA_CT2_SOURCE_ROOT_CONFIG)
+    file(TO_CMAKE_PATH "${CUDA_REPRODUCIBLE_BUILD_ROOT}" CUDA_REPRODUCIBLE_BUILD_PATH)
+    file(TO_CMAKE_PATH "${CUDA_NATIVE_ASR_SOURCE_ROOT}" CUDA_NATIVE_ASR_SOURCE_PATH)
+    file(TO_CMAKE_PATH "${CUDA_REPRODUCIBLE_SOURCE_ROOT}" CUDA_REPRODUCIBLE_SOURCE_PATH)
+    set(CUDA_NVCC_LAUNCHER_CONFIG "${CUDA_TOOLKIT_ROOT_REAL}/bin/hikaru-nvcc-launcher.cfg")
+    file(WRITE "${CUDA_NVCC_LAUNCHER_CONFIG}"
+      "schemaVersion=2\n"
+      "ct2SourceRoot=${CUDA_CT2_SOURCE_ROOT_CONFIG}\n"
+      "pathmap0Label=build\npathmap0Root=${CUDA_REPRODUCIBLE_BUILD_PATH}\n"
+      "pathmap1Label=native-asr\npathmap1Root=${CUDA_NATIVE_ASR_SOURCE_PATH}\n"
+      "pathmap2Label=source\npathmap2Root=${CUDA_REPRODUCIBLE_SOURCE_PATH}\n")
+    execute_process(
+      COMMAND "${CUDA_NVCC_LAUNCHER}" --hikaru-self-test
+      RESULT_VARIABLE CUDA_LAUNCHER_SELF_TEST_RESULT
+      OUTPUT_VARIABLE CUDA_LAUNCHER_SELF_TEST_OUTPUT
+      ERROR_VARIABLE CUDA_LAUNCHER_SELF_TEST_ERROR
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT CUDA_LAUNCHER_SELF_TEST_RESULT EQUAL 0
+        OR NOT CUDA_LAUNCHER_SELF_TEST_OUTPUT STREQUAL "ok sources=25")
+      message(FATAL_ERROR "NVCC launcher self-test failed: ${CUDA_LAUNCHER_SELF_TEST_ERROR}")
+    endif()
+  else()
+    if(NOT DEFINED ENV{CUDA_PATH} OR "$ENV{CUDA_PATH}" STREQUAL "")
+      message(FATAL_ERROR "T07 CUDA development requires the locked CUDA_PATH")
+    endif()
+    file(TO_CMAKE_PATH "$ENV{CUDA_PATH}" CUDA_TOOLKIT_ROOT_NORMALIZED)
   endif()
-  file(TO_CMAKE_PATH "$ENV{CUDA_PATH}" CUDA_TOOLKIT_ROOT_NORMALIZED)
   set(CUDA_TOOLKIT_ROOT_DIR "${CUDA_TOOLKIT_ROOT_NORMALIZED}" CACHE PATH "" FORCE)
   set(WITH_CUDA ON CACHE BOOL "" FORCE)
   set(CUDA_DYNAMIC_LOADING ON CACHE BOOL "" FORCE)
-  set(CUDA_ARCH_LIST "8.6" CACHE STRING "" FORCE)
-  set(CUDA_NVCC_FLAGS "" CACHE STRING "" FORCE)
+  if(HIKARU_ASR_CUDA_RUNTIME)
+    if(NOT HIKARU_ASR_REPRODUCIBLE_BUILD OR NOT HIKARU_ASR_REPRODUCIBLE_PATH_ROOT)
+      message(FATAL_ERROR "The release CUDA runtime requires reproducible source and build path mapping")
+    endif()
+    set(CUDA_ARCH_LIST "6.1;7.5;8.6;8.9" CACHE STRING "" FORCE)
+    set(CUDA_NVCC_FLAGS
+      "-gencode=arch=compute_120,code=sm_120"
+      "-gencode=arch=compute_120,code=compute_120"
+      "-Xcompiler=/Brepro"
+      "-Xcompiler=/experimental:deterministic"
+      "-Xcompiler=/pathmap:${CUDA_REPRODUCIBLE_BUILD_PATH}=build"
+      "-Xcompiler=/pathmap:${CUDA_NATIVE_ASR_SOURCE_PATH}=native-asr"
+      "-Xcompiler=/pathmap:${CUDA_REPRODUCIBLE_SOURCE_PATH}=source"
+      CACHE STRING "" FORCE)
+    set(CUDA_USE_STATIC_CUDA_RUNTIME ON CACHE BOOL "" FORCE)
+  else()
+    set(CUDA_ARCH_LIST "8.6" CACHE STRING "" FORCE)
+    set(CUDA_NVCC_FLAGS "" CACHE STRING "" FORCE)
+  endif()
 else()
   set(WITH_CUDA OFF CACHE BOOL "" FORCE)
   set(CUDA_DYNAMIC_LOADING OFF CACHE BOOL "" FORCE)
@@ -503,7 +693,65 @@ if(HIKARU_ASR_CT2_PREBUILT_ROOT)
     IMPORTED_IMPLIB "${CT2_PREBUILT_IMPLIB}"
     INTERFACE_INCLUDE_DIRECTORIES "${CT2_SOURCE_DIR}/include")
 else()
-  add_subdirectory("${CT2_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/ctranslate2" EXCLUDE_FROM_ALL)
+  set(CT2_BINARY_DIR "${CMAKE_BINARY_DIR}/ctranslate2")
+  add_subdirectory("${CT2_SOURCE_DIR}" "${CT2_BINARY_DIR}" EXCLUDE_FROM_ALL)
+  if(MSVC AND HIKARU_ASR_REPRODUCIBLE_BUILD AND ENABLE_CPU_DISPATCH)
+    set(CT2_GENERATED_ISA_SOURCES
+      "${CT2_BINARY_DIR}/kernels_avx.cc"
+      "${CT2_BINARY_DIR}/kernels_avx2.cc"
+      "${CT2_BINARY_DIR}/kernels_avx512.cc")
+    set(CT2_STABLE_ISA_SOURCES
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/ctranslate2/kernels_avx.cc"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/ctranslate2/kernels_avx2.cc"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/ctranslate2/kernels_avx512.cc")
+    get_target_property(CT2_TARGET_SOURCES ctranslate2 SOURCES)
+    foreach(CT2_GENERATED_ISA_SOURCE IN LISTS CT2_GENERATED_ISA_SOURCES)
+      set(CT2_GENERATED_ISA_SOURCE_COUNT 0)
+      foreach(CT2_TARGET_SOURCE IN LISTS CT2_TARGET_SOURCES)
+        if(CT2_TARGET_SOURCE STREQUAL CT2_GENERATED_ISA_SOURCE)
+          math(EXPR CT2_GENERATED_ISA_SOURCE_COUNT "${CT2_GENERATED_ISA_SOURCE_COUNT} + 1")
+        endif()
+      endforeach()
+      if(NOT CT2_GENERATED_ISA_SOURCE_COUNT EQUAL 1)
+        message(FATAL_ERROR
+          "Expected exactly one generated CTranslate2 ISA source: ${CT2_GENERATED_ISA_SOURCE}")
+      endif()
+    endforeach()
+    list(REMOVE_ITEM CT2_TARGET_SOURCES ${CT2_GENERATED_ISA_SOURCES})
+    set_property(TARGET ctranslate2 PROPERTY SOURCES "${CT2_TARGET_SOURCES}")
+    target_sources(ctranslate2 PRIVATE ${CT2_STABLE_ISA_SOURCES})
+    set_source_files_properties(
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/ctranslate2/kernels_avx.cc"
+      TARGET_DIRECTORY ctranslate2
+      PROPERTIES COMPILE_FLAGS "/arch:AVX")
+    set_source_files_properties(
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/ctranslate2/kernels_avx2.cc"
+      TARGET_DIRECTORY ctranslate2
+      PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+    set_source_files_properties(
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/ctranslate2/kernels_avx512.cc"
+      TARGET_DIRECTORY ctranslate2
+      PROPERTIES COMPILE_FLAGS "/arch:AVX512")
+    get_target_property(CT2_REPLACED_TARGET_SOURCES ctranslate2 SOURCES)
+    foreach(CT2_GENERATED_ISA_SOURCE IN LISTS CT2_GENERATED_ISA_SOURCES)
+      if(CT2_GENERATED_ISA_SOURCE IN_LIST CT2_REPLACED_TARGET_SOURCES)
+        message(FATAL_ERROR
+          "Generated CTranslate2 ISA source remained in the target: ${CT2_GENERATED_ISA_SOURCE}")
+      endif()
+    endforeach()
+    foreach(CT2_STABLE_ISA_SOURCE IN LISTS CT2_STABLE_ISA_SOURCES)
+      set(CT2_STABLE_ISA_SOURCE_COUNT 0)
+      foreach(CT2_TARGET_SOURCE IN LISTS CT2_REPLACED_TARGET_SOURCES)
+        if(CT2_TARGET_SOURCE STREQUAL CT2_STABLE_ISA_SOURCE)
+          math(EXPR CT2_STABLE_ISA_SOURCE_COUNT "${CT2_STABLE_ISA_SOURCE_COUNT} + 1")
+        endif()
+      endforeach()
+      if(NOT CT2_STABLE_ISA_SOURCE_COUNT EQUAL 1)
+        message(FATAL_ERROR
+          "Stable CTranslate2 ISA wrapper is not unique in the target: ${CT2_STABLE_ISA_SOURCE}")
+      endif()
+    endforeach()
+  endif()
 endif()
 
 find_program(CARGO_EXECUTABLE cargo REQUIRED)
@@ -511,11 +759,44 @@ set(TOKENIZER_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/tokenizer-ffi/Cargo.toml")
 set(TOKENIZER_TARGET_DIR "${CMAKE_BINARY_DIR}/tokenizer")
 set(TOKENIZER_DLL "${TOKENIZER_TARGET_DIR}/release/hikaru_asr_tokenizer.dll")
 set(TOKENIZER_IMPLIB "${TOKENIZER_TARGET_DIR}/release/hikaru_asr_tokenizer.dll.lib")
+set(TOKENIZER_CARGO_ENV
+  "CARGO_TARGET_DIR=${TOKENIZER_TARGET_DIR}"
+  "CARGO_INCREMENTAL=0")
+if(MSVC AND HIKARU_ASR_REPRODUCIBLE_BUILD)
+  if(DEFINED ENV{RUSTFLAGS} AND NOT "$ENV{RUSTFLAGS}" STREQUAL "")
+    message(FATAL_ERROR
+      "Reproducible tokenizer builds cannot safely parse RUSTFLAGS; use CARGO_ENCODED_RUSTFLAGS instead")
+  endif()
+  set(TOKENIZER_RUSTFLAGS
+    "-Clink-arg=/Brepro"
+    "--remap-path-prefix=${CMAKE_BINARY_DIR}=build"
+    "--remap-path-prefix=${CMAKE_CURRENT_SOURCE_DIR}=native-asr")
+  if(HIKARU_ASR_REPRODUCIBLE_PATH_ROOT)
+    list(APPEND TOKENIZER_RUSTFLAGS
+      "--remap-path-prefix=${HIKARU_ASR_REPRODUCIBLE_PATH_ROOT}=source")
+  endif()
+  string(ASCII 31 TOKENIZER_RUSTFLAG_SEPARATOR)
+  string(JOIN "${TOKENIZER_RUSTFLAG_SEPARATOR}"
+    TOKENIZER_ENCODED_RUSTFLAGS ${TOKENIZER_RUSTFLAGS})
+  if(DEFINED ENV{CARGO_ENCODED_RUSTFLAGS}
+      AND NOT "$ENV{CARGO_ENCODED_RUSTFLAGS}" STREQUAL "")
+    string(TOLOWER "$ENV{CARGO_ENCODED_RUSTFLAGS}" TOKENIZER_USER_ENCODED_RUSTFLAGS_LOWER)
+    if("$ENV{CARGO_ENCODED_RUSTFLAGS}" MATCHES ";"
+        OR TOKENIZER_USER_ENCODED_RUSTFLAGS_LOWER MATCHES
+          "(/incremental|/timestamp|/debug:fastlink|-clink-arg=/brepro|--remap-path-prefix=)")
+      message(FATAL_ERROR
+        "CARGO_ENCODED_RUSTFLAGS contains ambiguous or conflicting reproducibility flags")
+    endif()
+    set(TOKENIZER_ENCODED_RUSTFLAGS
+      "$ENV{CARGO_ENCODED_RUSTFLAGS}${TOKENIZER_RUSTFLAG_SEPARATOR}${TOKENIZER_ENCODED_RUSTFLAGS}")
+  endif()
+  list(APPEND TOKENIZER_CARGO_ENV
+    "CARGO_ENCODED_RUSTFLAGS=${TOKENIZER_ENCODED_RUSTFLAGS}")
+endif()
 add_custom_command(
   OUTPUT "${TOKENIZER_DLL}" "${TOKENIZER_IMPLIB}"
   COMMAND "${CMAKE_COMMAND}" -E env
-          "CARGO_TARGET_DIR=${TOKENIZER_TARGET_DIR}"
-          "CARGO_INCREMENTAL=0"
+          ${TOKENIZER_CARGO_ENV}
           "${CARGO_EXECUTABLE}" build --locked --offline --release --manifest-path "${TOKENIZER_MANIFEST}"
   DEPENDS
     "${TOKENIZER_MANIFEST}"
@@ -526,7 +807,7 @@ add_custom_target(hikaru-asr-tokenizer-build DEPENDS "${TOKENIZER_DLL}" "${TOKEN
 
 add_library(hikaru-asr-ctranslate2 STATIC src/ctranslate2_whisper.cpp)
 add_dependencies(hikaru-asr-ctranslate2 hikaru-asr-tokenizer-build)
-if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT)
+if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT OR HIKARU_ASR_CUDA_RUNTIME)
   target_compile_definitions(hikaru-asr-ctranslate2 PUBLIC HIKARU_ASR_CT2_WITH_CUDA=1)
   target_include_directories(hikaru-asr-ctranslate2 PRIVATE "${CUDA_TOOLKIT_ROOT_NORMALIZED}/include")
 endif()
@@ -567,6 +848,9 @@ add_executable(hikaru-asr-worker src/main.cpp)
 target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-ctranslate2)
 if(HIKARU_ASR_MVP_CPU_RUNTIME)
   target_compile_definitions(hikaru-asr-worker PRIVATE HIKARU_ASR_MVP_CPU_RUNTIME=1)
+endif()
+if(HIKARU_ASR_CUDA_RUNTIME)
+  target_compile_definitions(hikaru-asr-worker PRIVATE HIKARU_ASR_CUDA_RUNTIME=1)
 endif()
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   target_compile_definitions(hikaru-asr-worker PRIVATE HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1)
@@ -705,7 +989,7 @@ include(CTest)
 if(BUILD_TESTING)
   add_test(NAME protocol-core COMMAND hikaru-asr-protocol-tests)
   set_tests_properties(protocol-core PROPERTIES TIMEOUT 30)
-  if(NOT HIKARU_ASR_MVP_CPU_RUNTIME)
+  if(NOT HIKARU_ASR_MVP_CPU_RUNTIME AND NOT HIKARU_ASR_CUDA_RUNTIME)
     add_test(NAME fake-worker-contract
              COMMAND hikaru-asr-protocol-tests --fake-contract $<TARGET_FILE:hikaru-asr-fake-worker>)
     add_test(NAME fake-worker-hang
@@ -744,6 +1028,19 @@ if(BUILD_TESTING)
           "${CMAKE_CURRENT_SOURCE_DIR}/tests/assert_mvp_route_disabled.py"
           "$<TARGET_FILE:hikaru-asr-worker>")
       set_tests_properties(release-route-contract PROPERTIES TIMEOUT 30)
+    elseif(HIKARU_ASR_CUDA_RUNTIME)
+      add_test(NAME cuda-nvcc-launcher-config
+        COMMAND "${Python3_EXECUTABLE}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/tests/assert_cuda_nvcc_launcher.py"
+          "${CMAKE_BINARY_DIR}"
+          "${CUDA_NVCC_LAUNCHER}"
+          "${CUDA_REAL_NVCC}"
+          "${CUDA_CT2_SOURCE_ROOT}")
+      add_test(NAME cuda-release-route-contract
+        COMMAND "${Python3_EXECUTABLE}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/tests/assert_cuda_release_route.py"
+          "$<TARGET_FILE:hikaru-asr-worker>")
+      set_tests_properties(cuda-nvcc-launcher-config cuda-release-route-contract PROPERTIES TIMEOUT 30)
     endif()
     set_tests_properties(ctranslate2-whisper-core PROPERTIES TIMEOUT 30)
     if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
