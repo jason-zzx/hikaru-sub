@@ -1,0 +1,15 @@
+{"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Required Rust tests, logging/privacy, and backend quality gate."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Required frontend tests/build, user-visible copy, and minimal-diff checks."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Check production ASR routing, artifact identity, package, model, lifecycle, and no-fallback contracts."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Check managed CUDA containment, probe/measure/cleanup, portable/install roots, and async behavior."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check real GPU evidence identity, privacy, module attestation, theoretical versus qualified claims, and final matrices."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify the complete React → Tauri → worker data flow and error propagation."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/prior-gpu-transcription-evidence.md","reason":"Prevent archived development evidence from being misrepresented as final artifact qualification."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/production-cuda-gap-map.md","reason":"Use the gap inventory to detect missed CPU-only assumptions and release scripts."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/cuda-distribution-and-compatibility.md","reason":"Check exact NVIDIA DLL closure, licenses, driver policy, and managed pack source requirements."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/nvidia-generation-compute-policy.md","reason":"Check architecture/compute mapping, static fatbin evidence, and truthful support labels."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/cuda-12-9-deterministic-build.md","reason":"Check the CUDA 12.9 deterministic compiler identity, per-source seed mapping, and byte-identical artifact gate."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/final-cuda-12-9-artifact-qualification.md","reason":"Check frozen final ZIP/build/runtime identities, local RTX 3070 evidence, and the external publication gate."}
+{"file":".trellis/tasks/08-31-native-asr-gpu-mode/research/final-cuda-12-9-model-matrix.md","reason":"Check all eight final-artifact CUDA model rows, both long gates, native sm_86 execution, and the remaining host-lifecycle evidence boundary."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Check the camelCase structured start_asr result, shared TypeScript type, and typed Tauri wrapper projection."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check the one-time Simplified Chinese auto-fallback notice uses a non-error informational surface and clears with new starts or configuration/session changes."}

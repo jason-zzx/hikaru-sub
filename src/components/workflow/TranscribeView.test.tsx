@@ -159,7 +159,7 @@ describe("TranscribeView Native ASR flow", () => {
         disposition: "ready",
       },
     });
-    mocks.startAsr.mockResolvedValue("kotoba-job");
+    mocks.startAsr.mockResolvedValue({ jobId: "kotoba-job" });
 
     const { view } = await renderAndStart();
 
@@ -175,14 +175,15 @@ describe("TranscribeView Native ASR flow", () => {
         vadConfig: null,
       }),
     );
+    expect(screen.queryByRole("status")).toBeNull();
     view.unmount();
   });
 
   it("shows startup progress and preserves the user-cancel reason before jobId exists", async () => {
-    let resolveStart!: (jobId: string) => void;
+    let resolveStart!: (result: { jobId: string }) => void;
     mocks.startAsr.mockImplementation(
       () =>
-        new Promise<string>((resolve) => {
+        new Promise<{ jobId: string }>((resolve) => {
           resolveStart = resolve;
         }),
     );
@@ -200,7 +201,7 @@ describe("TranscribeView Native ASR flow", () => {
     expect(screen.queryByText("检测模型…")).toBeNull();
 
     await act(async () => {
-      resolveStart("native-job-late");
+      resolveStart({ jobId: "native-job-late" });
     });
 
     await waitFor(() =>
@@ -214,8 +215,41 @@ describe("TranscribeView Native ASR flow", () => {
     expect(screen.queryByText("检测模型…")).toBeNull();
   });
 
+  it("shows an auto CPU fallback notice once and clears it when a new start begins", async () => {
+    const notice = "CUDA 启动前检查未通过，已改用 CPU 转录。";
+    mocks.startAsr.mockResolvedValue({
+      jobId: "native-job-auto-fallback",
+      notice,
+    });
+    const { user } = await renderAndStart();
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe(notice);
+    expect(screen.getAllByText(notice)).toHaveLength(1);
+    expect(screen.queryByText(`启动转录失败：${notice}`)).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "取消转录" }));
+    const start = await screen.findByRole("button", { name: "开始转录" });
+    let resolveNextStart!: (result: { jobId: string }) => void;
+    mocks.startAsr.mockImplementationOnce(
+      () =>
+        new Promise<{ jobId: string }>((resolve) => {
+          resolveNextStart = resolve;
+        }),
+    );
+
+    await user.click(start);
+    await screen.findByText("正在启动 Native ASR…");
+    expect(screen.queryByRole("status")).toBeNull();
+
+    await act(async () => {
+      resolveNextStart({ jobId: "native-job-second-start" });
+    });
+    await user.click(await screen.findByRole("button", { name: "取消转录" }));
+  });
+
   it("keeps the first inference window indeterminate before showing real progress", async () => {
-    mocks.startAsr.mockResolvedValue("native-job-progress");
+    mocks.startAsr.mockResolvedValue({ jobId: "native-job-progress" });
     mocks.getAsrProgress
       .mockResolvedValueOnce({
         id: "native-job-progress",
@@ -263,10 +297,10 @@ describe("TranscribeView Native ASR flow", () => {
   });
 
   it("cancels a late job and releases the global task when the view unmounts", async () => {
-    let resolveStart!: (jobId: string) => void;
+    let resolveStart!: (result: { jobId: string }) => void;
     mocks.startAsr.mockImplementation(
       () =>
-        new Promise<string>((resolve) => {
+        new Promise<{ jobId: string }>((resolve) => {
           resolveStart = resolve;
         }),
     );
@@ -276,7 +310,7 @@ describe("TranscribeView Native ASR flow", () => {
 
     view.unmount();
     await act(async () => {
-      resolveStart("native-job-after-unmount");
+      resolveStart({ jobId: "native-job-after-unmount" });
     });
 
     await waitFor(() =>
@@ -289,7 +323,7 @@ describe("TranscribeView Native ASR flow", () => {
     let rejectStart!: (error: Error) => void;
     mocks.startAsr.mockImplementation(
       () =>
-        new Promise<string>((_resolve, reject) => {
+        new Promise<{ jobId: string }>((_resolve, reject) => {
           rejectStart = reject;
         }),
     );

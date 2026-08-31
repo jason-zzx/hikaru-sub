@@ -99,6 +99,13 @@ impl ActiveJobGate {
         }
     }
 
+    pub(crate) fn has_active(&self) -> bool {
+        self.current
+            .lock()
+            .map(|current| current.is_some())
+            .unwrap_or(true)
+    }
+
     #[cfg(test)]
     pub(crate) fn current(&self) -> Option<String> {
         self.current.lock().ok().and_then(|value| value.clone())
@@ -578,6 +585,8 @@ pub(crate) struct NativeAsrHost {
 struct NativeHostInner {
     executable: PathBuf,
     worker_args: Vec<OsString>,
+    environment: Vec<(OsString, OsString)>,
+    removed_environment: Vec<OsString>,
     limits: ProtocolLimits,
     jobs: Mutex<HashMap<String, Arc<JobRecord>>>,
     active_gate: Arc<ActiveJobGate>,
@@ -587,6 +596,16 @@ impl NativeAsrHost {
     pub(crate) fn new(
         executable: PathBuf,
         worker_args: Vec<OsString>,
+        active_gate: Arc<ActiveJobGate>,
+    ) -> Result<Self, String> {
+        Self::new_with_environment(executable, worker_args, Vec::new(), Vec::new(), active_gate)
+    }
+
+    pub(crate) fn new_with_environment(
+        executable: PathBuf,
+        worker_args: Vec<OsString>,
+        environment: Vec<(OsString, OsString)>,
+        removed_environment: Vec<OsString>,
         active_gate: Arc<ActiveJobGate>,
     ) -> Result<Self, String> {
         let executable = canonical_existing(&executable, "native ASR worker")?;
@@ -600,6 +619,8 @@ impl NativeAsrHost {
             inner: Arc::new(NativeHostInner {
                 executable,
                 worker_args,
+                environment,
+                removed_environment,
                 limits: ProtocolLimits::load()?,
                 jobs: Mutex::new(HashMap::new()),
                 active_gate,
@@ -620,8 +641,12 @@ impl NativeAsrHost {
         }
 
         let mut command = hidden_command(&self.inner.executable);
+        command.args(&self.inner.worker_args);
+        for name in &self.inner.removed_environment {
+            command.env_remove(name);
+        }
+        command.envs(self.inner.environment.iter().cloned());
         command
-            .args(&self.inner.worker_args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());

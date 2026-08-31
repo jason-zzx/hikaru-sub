@@ -95,7 +95,10 @@ export function RuntimeDependenciesPanel({
         <div className="mt-4 divide-y divide-border">
           {(probe?.items ?? []).map((item) => {
             const needsAction = item.status !== "available";
-            const canDownload = needsAction && item.kind === "ffmpeg";
+            const canDownload =
+              needsAction &&
+              (item.kind === "ffmpeg" ||
+                (item.kind === "nativeAsrCuda" && item.expectedDownloadBytes != null));
             const canConfigure = needsAction && item.kind === "asrModels";
             const preparation = preparations[item.kind];
             const progress = preparationProgress(preparation);
@@ -128,6 +131,9 @@ export function RuntimeDependenciesPanel({
                       {item.version}
                     </p>
                   )}
+                  {item.reason && (
+                    <p className="mt-1 text-xs text-warning">{item.reason}</p>
+                  )}
                   {item.kind === "nativeAsrCpu" && (
                     <p
                       className={`mt-1 text-xs ${
@@ -137,6 +143,11 @@ export function RuntimeDependenciesPanel({
                       {item.status === "available"
                         ? "随应用内置，无需单独下载"
                         : "内置 Native ASR CPU 运行时缺失或损坏，请重新安装应用"}
+                    </p>
+                  )}
+                  {item.kind === "nativeAsrCuda" && (
+                    <p className="mt-1 text-xs text-text-muted">
+                      可选受管运行时，不进入安装包；仅使用 NVIDIA 设备 0，模型是否能载入取决于显存。
                     </p>
                   )}
                   {preparation && (

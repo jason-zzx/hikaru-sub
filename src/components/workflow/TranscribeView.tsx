@@ -73,6 +73,7 @@ export function TranscribeView() {
 
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
+  const cudaPreparation = useRuntimeDependencyPreparation("nativeAsrCuda");
 
   // 音轨提取
   const [audioReady, setAudioReady] = useState(false);
@@ -94,6 +95,7 @@ export function TranscribeView() {
   const [cancelling, setCancelling] = useState(false);
   const [job, setJob] = useState<AsrJobSnapshot | null>(null);
   const [asrError, setAsrError] = useState<string | null>(null);
+  const [asrNotice, setAsrNotice] = useState<string | null>(null);
   const [resultCount, setResultCount] = useState<number | null>(null);
   const [savedAssPath, setSavedAssPath] = useState<string | null>(null);
 
@@ -104,6 +106,10 @@ export function TranscribeView() {
   const modelManagerRef = useRef<ModelManagerHandle | null>(null);
   const confirmDownloadBusyRef = useRef(false);
   const availability = useAsrAvailability(engine, model, device);
+
+  useEffect(() => {
+    setAsrNotice(null);
+  }, [session?.videoPath, engine, model, device]);
 
   const refreshFfmpeg = useCallback(async (force = false) => {
     if (force) invalidateFfmpegStatus();
@@ -394,6 +400,7 @@ export function TranscribeView() {
     pollingRef.current = true;
 
     setAsrError(null);
+    setAsrNotice(null);
     setResultCount(null);
     setSavedAssPath(null);
     setJob(null);
@@ -405,7 +412,7 @@ export function TranscribeView() {
       progress: 0,
     });
     try {
-      const jobId = await startAsr({
+      const { jobId, notice } = await startAsr({
         audioPath,
         engine,
         model,
@@ -422,6 +429,7 @@ export function TranscribeView() {
         void cancelAsr(jobId).catch(() => undefined);
         return;
       }
+      setAsrNotice(notice ?? null);
       if (cancelRequestedRef.current || !pollingRef.current) {
         pollingRef.current = false;
         try {
@@ -471,13 +479,14 @@ export function TranscribeView() {
     }
   };
 
-  const handleTranscribe = async () => {
-    if (availabilityPending) {
-      setAsrError("正在检测 Native ASR 可用性，请稍后重试。");
-      return;
-    }
-    if (!availability.routeAvailable) {
-      setAsrError(availability.unavailableReason || "当前转录路线不可用。");
+  const handleTranscribeAfterRuntime = async (
+    refreshed?: Awaited<ReturnType<typeof availability.refresh>>,
+  ) => {
+    const routeAvailable = refreshed?.routeAvailable ?? availability.routeAvailable;
+    const unavailableReason =
+      refreshed?.unavailableReason ?? availability.unavailableReason;
+    if (!routeAvailable) {
+      setAsrError(unavailableReason || "当前转录路线不可用。");
       return;
     }
     if (modelDownloading || transcribing || checkingModel || cancelling) return;
@@ -508,6 +517,21 @@ export function TranscribeView() {
     } finally {
       setCheckingModel(false);
     }
+  };
+
+  const handleTranscribe = async () => {
+    if (availabilityPending) {
+      setAsrError("正在检测 Native ASR 可用性，请稍后重试。");
+      return;
+    }
+    if (device === "cuda" && availability.deviceDownloadRequired) {
+      await cudaPreparation.requestDependency(async () => {
+        const refreshed = await availability.refresh();
+        await handleTranscribeAfterRuntime(refreshed);
+      });
+      return;
+    }
+    await handleTranscribeAfterRuntime();
   };
 
   const handleConfirmDownloadAndTranscribe = async (value: string) => {
@@ -560,7 +584,8 @@ export function TranscribeView() {
     cancelling ||
     modelDownloading ||
     checkingModel ||
-    confirmDownloadOpen;
+    confirmDownloadOpen ||
+    cudaPreparation.open;
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
@@ -663,12 +688,20 @@ export function TranscribeView() {
           </Labeled>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-          <span className={availability.routeAvailable ? "text-success" : "text-warning"}>
+          <span
+            className={
+              availability.routeAvailable && !availability.deviceDownloadRequired
+                ? "text-success"
+                : "text-warning"
+            }
+          >
             {availabilityPending
               ? "正在检测 Native ASR 可用性…"
-              : availability.routeAvailable
-                ? "Native ASR 路线可用"
-                : availability.unavailableReason || "当前转录路线不可用"}
+              : availability.deviceDownloadRequired
+                ? "CUDA 运行时尚未安装，开始转录时可按提示下载"
+                : availability.routeAvailable
+                  ? "Native ASR 路线可用"
+                  : availability.unavailableReason || "当前转录路线不可用"}
           </span>
           <Button
             variant="outline"
@@ -701,6 +734,14 @@ export function TranscribeView() {
         done={resultCount !== null}
         desc="本地推理，时长取决于模型与设备"
       >
+        {asrNotice && (
+          <p
+            role="status"
+            className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-text"
+          >
+            {asrNotice}
+          </p>
+        )}
         {asrError && <p className="text-sm text-danger">{asrError}</p>}
 
         {transcribing && (
@@ -817,6 +858,32 @@ export function TranscribeView() {
         error={ffmpegPreparation.error}
         onConfirm={ffmpegPreparation.confirmPrepare}
         onCancel={() => ffmpegPreparation.setOpen(false)}
+        onChangeSource={() => openSettings("runtime")}
+      />
+
+      <RuntimeDependencyDialog
+        open={cudaPreparation.open}
+        kind="nativeAsrCuda"
+        reason="显式 CUDA 转录需要下载可选的 Native ASR CUDA 运行时。"
+        sizeBytes={cudaPreparation.item?.expectedDownloadBytes ?? 0}
+        targetPath={
+          cudaPreparation.item?.path ?? "安装目录/deps/asr-runtime/cuda/current"
+        }
+        sourceLabel={cudaPreparation.sourceLabel}
+        status={
+          cudaPreparation.snapshot?.status === "running" ||
+          cudaPreparation.snapshot?.status === "pending"
+            ? "running"
+            : cudaPreparation.snapshot?.status === "completed"
+              ? "completed"
+              : cudaPreparation.snapshot?.status === "failed"
+                ? "failed"
+                : "idle"
+        }
+        progressPercent={cudaPreparation.progressPercent}
+        error={cudaPreparation.error}
+        onConfirm={cudaPreparation.confirmPrepare}
+        onCancel={() => cudaPreparation.setOpen(false)}
         onChangeSource={() => openSettings("runtime")}
       />
 

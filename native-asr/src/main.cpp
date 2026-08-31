@@ -16,6 +16,11 @@
 #include <memory>
 #include <optional>
 #include <string>
+#ifdef HIKARU_ASR_CUDA_RUNTIME
+#include <chrono>
+#include <string_view>
+#include <thread>
+#endif
 #include <vector>
 
 #ifdef _WIN32
@@ -235,11 +240,11 @@ fs::path model_path(const WorkerRequestV1& request) {
 int run_ctranslate2(const WorkerRequestV1& request) {
   const bool ordinary = request.engine == Engine::FasterWhisper;
   const bool kotoba = request.engine == Engine::KotobaFasterWhisper;
-#ifdef HIKARU_ASR_MVP_CPU_RUNTIME
+#if defined(HIKARU_ASR_MVP_CPU_RUNTIME) || defined(HIKARU_ASR_CUDA_RUNTIME)
   if ((!ordinary && !kotoba) || request.backend != Backend::CTranslate2) {
     emit_pre_ready_error(
         "route_not_built",
-        "requested native ASR route is not included in the production CPU runtime");
+        "requested native ASR route is not included in this release runtime");
     return 2;
   }
 #else
@@ -247,6 +252,14 @@ int run_ctranslate2(const WorkerRequestV1& request) {
     emit_pre_ready_error(
         "route_not_implemented",
         "requested native ASR route is not implemented by this worker");
+    return 2;
+  }
+#endif
+#ifdef HIKARU_ASR_CUDA_RUNTIME
+  if (request.device != Device::Cuda) {
+    emit_pre_ready_error(
+        "runtime_device_mismatch",
+        "the release CUDA runtime accepts only CUDA requests");
     return 2;
   }
 #endif
@@ -283,18 +296,31 @@ int run_ctranslate2(const WorkerRequestV1& request) {
 #else
     const std::optional<fs::path> vad_model = std::nullopt;
 #endif
-    const whisper::BackendExecutionConfig execution = request.device == Device::Cuda
-        ? whisper::cuda_execution_config()
-        : whisper::cpu_execution_config();
     const whisper::CandidateAConfig config = kotoba
         ? whisper::kotoba_k2_config()
         : whisper::CandidateAConfig{};
+#ifdef HIKARU_ASR_CUDA_RUNTIME
+    whisper::BackendExecutionAttestation execution_attestation =
+        whisper::probe_cuda_execution();
+    const whisper::BackendExecutionConfig execution = execution_attestation.config;
+    whisper::CTranslate2WhisperBackend backend(
+        model,
+        config,
+        vad_model,
+        execution,
+        kotoba,
+        std::move(execution_attestation));
+#else
+    const whisper::BackendExecutionConfig execution = request.device == Device::Cuda
+        ? whisper::cuda_execution_config()
+        : whisper::cpu_execution_config();
     whisper::CTranslate2WhisperBackend backend(
         model,
         config,
         vad_model,
         execution,
         kotoba);
+#endif
     Emitter emitter(request);
 
     EventV1 ready;
@@ -611,6 +637,57 @@ int run_crispasr(const WorkerRequestV1& request) {
 }
 #endif
 
+#ifdef HIKARU_ASR_CUDA_RUNTIME
+void hold_cuda_probe_for_module_audit() {
+  const char* value = std::getenv("HIKARU_ASR_CUDA_PROBE_HOLD_MS");
+  if (value == nullptr || *value == '\0') return;
+  char* end = nullptr;
+  const long hold_ms = std::strtol(value, &end, 10);
+  if (end == value || *end != '\0' || hold_ms < 1 || hold_ms > 2000) return;
+  std::this_thread::sleep_for(std::chrono::milliseconds(hold_ms));
+}
+
+int run_cuda_probe() {
+  try {
+    const whisper::BackendExecutionAttestation attestation = whisper::probe_cuda_execution();
+    std::cout << Json{
+        {"available", true},
+        {"deviceIndex", attestation.config.device_index},
+        {"deviceName", attestation.device_name},
+        {"visibleDeviceCount", attestation.visible_device_count},
+        {"computeCapability",
+         std::to_string(attestation.compute_capability_major) + "."
+             + std::to_string(attestation.compute_capability_minor)},
+        {"computeType", whisper::execution_compute_type_name(attestation.config.compute_type)},
+        {"driverVersion", attestation.cuda_driver_api_version},
+        {"supportEvidence", "theoretical"}}
+                     .dump()
+              << '\n'
+              << std::flush;
+    hold_cuda_probe_for_module_audit();
+    return 0;
+  } catch (const whisper::BackendError& error) {
+    std::cout << Json{
+        {"available", false},
+        {"code", error.code()},
+        {"reason", error.what()}}
+                     .dump()
+              << '\n'
+              << std::flush;
+    return 20;
+  } catch (const std::exception&) {
+    std::cout << Json{
+        {"available", false},
+        {"code", "cuda_runtime_failed"},
+        {"reason", "CUDA capability probe failed"}}
+                     .dump()
+              << '\n'
+              << std::flush;
+    return 20;
+  }
+}
+#endif
+
 int run_worker(const WorkerRequestV1& request) {
   if (request.backend == Backend::CTranslate2) return run_ctranslate2(request);
 #ifdef HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
@@ -624,11 +701,24 @@ int run_worker(const WorkerRequestV1& request) {
 
 }  // namespace
 
+#ifdef HIKARU_ASR_CUDA_RUNTIME
+int main(int argc, char* argv[]) {
+#else
 int main() {
+#endif
 #ifdef _WIN32
   _setmode(_fileno(stdin), _O_BINARY);
   _setmode(_fileno(stdout), _O_BINARY);
   _setmode(_fileno(stderr), _O_BINARY);
+#endif
+#ifdef HIKARU_ASR_CUDA_RUNTIME
+  if (argc == 2 && std::string_view(argv[1]) == "--probe-cuda") {
+    return run_cuda_probe();
+  }
+  if (argc != 1) {
+    std::cerr << "worker_usage_error:unsupported arguments\n";
+    return 2;
+  }
 #endif
   WorkerRequestV1 request;
   if (!read_request(request)) {

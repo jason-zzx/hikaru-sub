@@ -60,6 +60,35 @@
       }
     },
     {
+      "name": "windows-x64-ct2-cuda-release",
+      "displayName": "Windows x64 release Native ASR CUDA runtime",
+      "inherits": "windows-x64-release",
+      "binaryDir": "${sourceParentDir}/.trellis/tasks/08-31-native-asr-gpu-mode/research/local/build/windows-x64-ct2-cuda-release",
+      "cacheVariables": {
+        "HIKARU_ASR_BUILD_CT2_WORKER": "ON",
+        "HIKARU_ASR_CUDA_RUNTIME": "ON",
+        "HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT": "OFF",
+        "HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT": "OFF",
+        "HIKARU_ASR_REPRODUCIBLE_BUILD": "ON",
+        "HIKARU_ASR_REPRODUCIBLE_PATH_ROOT": "${sourceParentDir}",
+        "HIKARU_ASR_CUDA_TOOLKIT_ROOT": "${sourceParentDir}/.cache/native-asr-cuda-runtime/cuda-12.9.1/toolkit",
+        "HIKARU_ASR_REAL_NVCC": "${sourceParentDir}/.cache/native-asr-cuda-runtime/cuda-12.9.1/toolkit/bin/nvcc-real.exe",
+        "HIKARU_ASR_REAL_NVCC_SIZE": "19385856",
+        "HIKARU_ASR_REAL_NVCC_SHA256": "313cc032fb84bb9d53cb967843bc761f1f8959cb3aa924246659fde13afd8f14",
+        "HIKARU_ASR_NVCC_LAUNCHER": "${sourceParentDir}/.cache/native-asr-cuda-runtime/cuda-12.9.1/toolkit/bin/nvcc.exe",
+        "HIKARU_ASR_NVCC_LAUNCHER_SIZE": "370688",
+        "HIKARU_ASR_NVCC_LAUNCHER_SHA256": "5e2f63c1aa2ca3e0c68391b5c9dda662054e489411ae92c5a31f10c87543d001",
+        "HIKARU_ASR_CUDA_SEED_MANIFEST": "${sourceDir}/runtime/ctranslate2-4.8.0-cuda-seeds.json",
+        "HIKARU_ASR_CUDA_SEED_MANIFEST_SHA256": "68381bf67d036d6afaa81db2065dd38ac717f6008b6388c5309e4ac3d17b1f64",
+        "HIKARU_ASR_CT2_SOURCE_DIR": "${sourceDir}/../.cache/native-asr-cuda-runtime/manual/sources/CTranslate2-4.8.0",
+        "HIKARU_ASR_CT2_SOURCE_REVISION": "54a546cec4262f9770d4674a0bfb4ac3c4f05698",
+        "HIKARU_ASR_POCKETFFT_SOURCE_DIR": "${sourceDir}/../.cache/native-asr-cuda-runtime/manual/sources/pocketfft-c90e55b3d529f8efa40ed01a20de22405f45fc65",
+        "HIKARU_ASR_DNNL_ROOT": "${sourceDir}/../.cache/native-asr-cuda-runtime/manual/inputs/onednn-3.1.1",
+        "HIKARU_ASR_DNNL_LIBRARY_SIZE": "385595736",
+        "HIKARU_ASR_DNNL_LIBRARY_SHA256": "9104b04662d354793e593bb1b162740e7047c9ce3aa8c2b532049504d678c005"
+      }
+    },
+    {
       "name": "windows-x64-ct2-cuda-development",
       "displayName": "Windows x64 CTranslate2 CUDA Development",
       "inherits": "windows-x64-ct2-release",
@@ -110,6 +139,10 @@
       "configurePreset": "windows-x64-release"
     },
     {
+      "name": "windows-x64-ct2-cuda-release",
+      "configurePreset": "windows-x64-ct2-cuda-release"
+    },
+    {
       "name": "windows-x64-ct2-cuda-development",
       "configurePreset": "windows-x64-ct2-cuda-development"
     },
@@ -146,6 +179,16 @@
     {
       "name": "windows-x64-release",
       "configurePreset": "windows-x64-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-x64-ct2-cuda-release",
+      "configurePreset": "windows-x64-ct2-cuda-release",
       "output": {
         "outputOnFailure": true
       },

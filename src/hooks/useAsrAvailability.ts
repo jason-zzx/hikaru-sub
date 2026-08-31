@@ -5,7 +5,11 @@ import {
   asrModelOptions,
 } from "../constants/asr";
 import { checkAsrModel, listAsrEngines } from "../services/tauri";
-import type { AsrEngineInfo, AsrModelStatus } from "../types";
+import type {
+  AsrDeviceCapability,
+  AsrEngineInfo,
+  AsrModelStatus,
+} from "../types";
 import type { SelectOption } from "../components/ui/select-adapter";
 
 export type AsrModelRefreshOutcome =
@@ -102,24 +106,50 @@ export function asrModelSelectOptions(
   });
 }
 
+function deviceCapability(
+  engine: AsrEngineInfo | null,
+  device: string,
+): AsrDeviceCapability | null {
+  if (!engine?.available) return null;
+  if (device === "auto") {
+    return engine.devices?.find((item) => item.device === "cpu") ?? {
+      device: "cpu",
+      available: engine.device?.toLowerCase() === "cpu",
+    };
+  }
+  const explicit = engine.devices?.find((item) => item.device === device);
+  if (explicit) return explicit;
+  return {
+    device: device === "cuda" ? "cuda" : "cpu",
+    available: engine.device?.toLowerCase() === device,
+    reason: device === "cuda" ? "后续版本支持" : "当前设备不可用",
+  };
+}
+
 export function asrDeviceSelectOptions(
   engine: AsrEngineInfo | null,
   loading: boolean,
   error: string | null,
 ): SelectOption[] {
-  const nativeCpu = engine?.available && engine.device?.toLowerCase() === "cpu";
   return ASR_DEVICE_OPTIONS.map((option) => {
+    const capability = deviceCapability(engine, option.value);
     const reason = error
       ? "检测失败"
       : loading
         ? "检测中"
         : !engine?.available
           ? engine?.reason?.trim() || "当前引擎不可用"
-          : nativeCpu && option.value === "cuda"
-            ? "后续版本支持"
-            : null;
+          : capability?.available
+            ? null
+            : capability?.downloadRequired
+              ? capability.reason?.trim() || "需下载 CUDA 运行时"
+              : capability?.reason?.trim() || "当前设备不可用";
     return reason
-      ? { ...option, label: optionLabel(option.label, reason), disabled: true }
+      ? {
+          ...option,
+          label: optionLabel(option.label, reason),
+          disabled: !capability?.downloadRequired,
+        }
       : option;
   });
 }
@@ -130,6 +160,45 @@ function modelRouteAvailable(status: AsrModelStatus | null): boolean {
     return status.disposition === "ready" || status.disposition === "supportedMissing";
   }
   return status.available;
+}
+
+export interface AsrAvailabilityRefreshOutcome {
+  routeAvailable: boolean;
+  unavailableReason: string | null;
+  deviceDownloadRequired: boolean;
+}
+
+function projectFreshRoute(
+  selectedEngine: AsrEngineInfo | null,
+  selectedModelStatus: AsrModelStatus | null,
+  selectedModelError: string | null,
+  device: string,
+): AsrAvailabilityRefreshOutcome {
+  const capability = deviceCapability(selectedEngine, device);
+  const deviceAvailable = !!selectedEngine?.available && !!capability?.available;
+  const deviceDownloadRequired =
+    device === "cuda" && !!capability?.downloadRequired;
+  let unavailableReason: string | null = null;
+  if (!selectedEngine?.available) {
+    unavailableReason =
+      selectedEngine?.reason?.trim() || "当前引擎在此版本不可用";
+  } else if (selectedModelError) {
+    unavailableReason = `模型可用性检测失败：${selectedModelError}`;
+  } else if (!modelRouteAvailable(selectedModelStatus)) {
+    unavailableReason =
+      selectedModelStatus?.reason?.trim() || "当前模型在此版本不可用";
+  } else if (!deviceAvailable && !deviceDownloadRequired) {
+    unavailableReason = capability?.reason?.trim() || "当前设备不可用";
+  }
+  return {
+    routeAvailable:
+      !!selectedEngine?.available &&
+      !selectedModelError &&
+      modelRouteAvailable(selectedModelStatus) &&
+      (deviceAvailable || deviceDownloadRequired),
+    unavailableReason,
+    deviceDownloadRequired,
+  };
 }
 
 export function useAsrAvailability(engine: string, model: string, device: string) {
@@ -149,24 +218,29 @@ export function useAsrAvailability(engine: string, model: string, device: string
     errors: {},
   });
 
-  const refreshEngines = useCallback(async () => {
+  const refreshEngines = useCallback(async (): Promise<AsrEngineInfo[] | null> => {
     const requestId = ++engineRequestRef.current;
     setEngineLoading(true);
     setEngineError(null);
     try {
       const next = await listAsrEngines();
-      if (engineRequestRef.current !== requestId) return;
+      if (engineRequestRef.current !== requestId) return null;
       setEngines(next);
+      return next;
     } catch (error) {
-      if (engineRequestRef.current !== requestId) return;
+      if (engineRequestRef.current !== requestId) return null;
       setEngines(null);
       setEngineError(String(error));
+      return null;
     } finally {
       if (engineRequestRef.current === requestId) setEngineLoading(false);
     }
   }, []);
 
-  const refreshModels = useCallback(async (requestedEngine: string, selectedModel: string) => {
+  const refreshModels = useCallback(async (
+    requestedEngine: string,
+    selectedModel: string,
+  ): Promise<ModelAvailabilityState | null> => {
     const requestId = ++modelRequestRef.current;
     const models = asrModelOptions(requestedEngine).map((option) => option.value);
     if (!models.includes(selectedModel)) models.push(selectedModel);
@@ -192,7 +266,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
       modelRequestRef.current !== requestId ||
       activeEngineRef.current !== requestedEngine
     ) {
-      return;
+      return null;
     }
     const statuses: Record<string, AsrModelStatus> = {};
     const errors: Record<string, string> = {};
@@ -200,7 +274,14 @@ export function useAsrAvailability(engine: string, model: string, device: string
       if (result.status) statuses[result.model] = result.status;
       if (result.error) errors[result.model] = result.error;
     }
-    setModelState({ engine: requestedEngine, loading: false, statuses, errors });
+    const nextState = {
+      engine: requestedEngine,
+      loading: false,
+      statuses,
+      errors,
+    };
+    setModelState(nextState);
+    return nextState;
   }, []);
 
   const refreshSelectedModel = useCallback(async (): Promise<AsrModelRefreshOutcome> => {
@@ -292,12 +373,13 @@ export function useAsrAvailability(engine: string, model: string, device: string
     [engineError, engineLoading, selectedEngine],
   );
 
-  const nativeCpu =
-    selectedEngine?.available && selectedEngine.device?.toLowerCase() === "cpu";
+  const selectedDeviceCapability = deviceCapability(selectedEngine, device);
   const deviceAvailable =
     ASR_DEVICE_OPTIONS.some((option) => option.value === device) &&
     !!selectedEngine?.available &&
-    (!nativeCpu || device === "auto" || device === "cpu");
+    !!selectedDeviceCapability?.available;
+  const deviceDownloadRequired =
+    device === "cuda" && !!selectedDeviceCapability?.downloadRequired;
 
   const loading = engineLoading || modelLoading;
   const error = engineError || selectedModelError;
@@ -312,11 +394,39 @@ export function useAsrAvailability(engine: string, model: string, device: string
   } else if (!modelLoading && !modelRouteAvailable(selectedModelStatus)) {
     unavailableReasonText =
       selectedModelStatus?.reason?.trim() || "当前模型在此版本不可用";
-  } else if (!engineLoading && !deviceAvailable) {
-    unavailableReasonText = nativeCpu
-      ? "当前 Native CPU 运行时不支持该设备"
-      : "当前设备不可用";
+  } else if (!engineLoading && !deviceAvailable && !deviceDownloadRequired) {
+    unavailableReasonText =
+      selectedDeviceCapability?.reason?.trim() || "当前设备不可用";
   }
+
+  const refresh = useCallback(async (): Promise<AsrAvailabilityRefreshOutcome> => {
+    const requestedEngine = engine;
+    const requestedModel = model;
+    const [nextEngines, nextModelState] = await Promise.all([
+      refreshEngines(),
+      refreshModels(requestedEngine, requestedModel),
+    ]);
+    if (
+      !nextEngines ||
+      !nextModelState ||
+      activeEngineRef.current !== requestedEngine ||
+      activeModelRef.current !== requestedModel
+    ) {
+      return {
+        routeAvailable: false,
+        unavailableReason: "转录设置已变化，请重新开始。",
+        deviceDownloadRequired: false,
+      };
+    }
+    const nextEngine =
+      nextEngines.find((item) => item.name === requestedEngine) ?? null;
+    return projectFreshRoute(
+      nextEngine,
+      nextModelState.statuses[requestedModel] ?? null,
+      nextModelState.errors[requestedModel] ?? null,
+      device,
+    );
+  }, [device, engine, model, refreshEngines, refreshModels]);
 
   return {
     engines,
@@ -332,14 +442,14 @@ export function useAsrAvailability(engine: string, model: string, device: string
       !error &&
       !!selectedEngine?.available &&
       modelRouteAvailable(selectedModelStatus) &&
-      deviceAvailable,
+      (deviceAvailable || deviceDownloadRequired),
     unavailableReason: unavailableReasonText,
+    selectedDeviceCapability,
+    deviceDownloadRequired,
     engineOptions,
     modelOptions,
     deviceOptions,
-    refresh: async () => {
-      await Promise.all([refreshEngines(), refreshModels(engine, model)]);
-    },
+    refresh,
     refreshSelectedModel,
   };
 }

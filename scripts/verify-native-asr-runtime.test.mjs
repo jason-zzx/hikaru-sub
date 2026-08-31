@@ -267,6 +267,11 @@ function fixture({
       ? microsoftFiles.map((fileName) => ({ fileName }))
       : [],
     requiredFiles,
+    importOwners: [
+      "hikaru-asr-worker.exe",
+      "ctranslate2.dll",
+      "hikaru_asr_tokenizer.dll",
+    ],
     systemDllAllowlist: ["kernel32.dll"],
     forbiddenPathFragments: ["python", "onnxruntime", "silero", "cuda", "crispasr"],
     forbiddenExtensions: [".bin", ".onnx", ".gguf", ".pdb"],
@@ -331,6 +336,14 @@ describe("Native ASR runtime verifier", () => {
     expect(() =>
       verifyRuntimeArchive({ archivePath: importDrift.archive, lockPath: importDrift.lockPath }),
     ).toThrow(/undeclared non-system DLL import/);
+    const ownerDrift = fixture({
+      lockMutation(lock) {
+        lock.importOwners = ["hikaru-asr-worker.exe", "HIKARU-ASR-WORKER.EXE"];
+      },
+    });
+    expect(() =>
+      verifyRuntimeArchive({ archivePath: ownerDrift.archive, lockPath: ownerDrift.lockPath }),
+    ).toThrow(/runtime import owner lock is invalid/);
   }, 20_000);
 
   it("rejects private build paths embedded in payload bytes", () => {

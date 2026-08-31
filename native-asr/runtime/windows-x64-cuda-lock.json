@@ -1,0 +1,591 @@
+{
+  "schemaVersion": 1,
+  "status": "local-artifact-qualified-external-publication-pending",
+  "productEnablementAllowed": false,
+  "publicationGate": {
+    "externalStableAssetPublished": false,
+    "runtimeDependencySourceRowPresent": false,
+    "pending": "Publish the exact immutable combined pack, then add its stable remote source row in a separately reviewed release step."
+  },
+  "artifact": {
+    "id": "hikaru-asr-windows-x64-cuda-v1",
+    "path": ".trellis/tasks/08-31-native-asr-gpu-mode/research/local/artifacts/windows-x64-cuda-final-a.zip",
+    "reproductionPath": ".trellis/tasks/08-31-native-asr-gpu-mode/research/local/artifacts/windows-x64-cuda-final-b.zip",
+    "root": "windows-x64/cuda/",
+    "sizeBytes": 571034856,
+    "sha256": "9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4",
+    "unpackedBytes": 843553473,
+    "byteIdenticalIndependentPackages": true,
+    "sourceDateEpoch": 1788048000
+  },
+  "platform": "windows-x64",
+  "arch": "x64",
+  "protocolVersion": 1,
+  "candidateConfig": {
+    "id": "released-ct2-cuda-desktop5-faster-whisper-v2-kotoba-k2-v1",
+    "sha256": "b806f1f9d924198f9a4ab352d68e1ae0f97d0db530bdf46ec4a4f9855da7770e"
+  },
+  "driverPolicy": {
+    "absoluteMinimumWindowsDriver": "528.33",
+    "initialQualifiedMinimumWindowsDriver": "576.57",
+    "systemDriverModule": "nvcuda.dll",
+    "deviceIndex": 0
+  },
+  "capabilities": {
+    "backend": "ctranslate2",
+    "device": "cuda",
+    "engines": [
+      "faster-whisper",
+      "kotoba-faster-whisper"
+    ],
+    "vad": false,
+    "crispasr": false,
+    "cuda": true,
+    "vulkan": false,
+    "modelsBundled": false
+  },
+  "sources": {
+    "ctranslate2": {
+      "version": "4.8.0",
+      "revision": "54a546cec4262f9770d4674a0bfb4ac3c4f05698",
+      "url": "https://github.com/OpenNMT/CTranslate2/archive/refs/tags/v4.8.0.tar.gz"
+    },
+    "onednn": {
+      "version": "3.1.1",
+      "url": "https://github.com/oneapi-src/oneDNN/archive/refs/tags/v3.1.1.tar.gz",
+      "staticLibrary": {
+        "sizeBytes": 385595736,
+        "sha256": "9104b04662d354793e593bb1b162740e7047c9ce3aa8c2b532049504d678c005"
+      }
+    },
+    "pocketfft": {
+      "revision": "c90e55b3d529f8efa40ed01a20de22405f45fc65",
+      "url": "https://github.com/mreineck/pocketfft/archive/c90e55b3d529f8efa40ed01a20de22405f45fc65.tar.gz",
+      "headerSha256": "3e9a05318d8e3b1446bda1c4617e6a103cdd23599ae0a776a92a6e8800e92fdc"
+    },
+    "tokenizer": {
+      "version": "0.22.1",
+      "cargoLockSizeBytes": 18696,
+      "cargoLockSha256": "6fbcf8227058918337c2b827243d08e13f7aafa72aa7531d25bd6462b4ce79b7"
+    },
+    "nlohmannJson": {
+      "version": "3.11.3",
+      "provenanceSha256": "f04ce243791555affe46a8637f60264805964e0121a651468138a220bf5ba623",
+      "headerSha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6",
+      "licenseSha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+    },
+    "cuda": {
+      "toolkitVersion": "12.9 Update 1",
+      "releaseLabel": "12.9.1",
+      "nvccVersion": "12.9.86",
+      "cudartVersion": "12.9.79",
+      "cuobjdumpVersion": "12.9.82",
+      "libcublasVersion": "12.9.1.4",
+      "libcurandVersion": "10.3.10.19",
+      "redistributableMetadataUrl": "https://developer.download.nvidia.com/compute/cuda/redist/redistrib_12.9.1.json",
+      "redistributableMetadataSizeBytes": 54256,
+      "redistributableMetadataSha256": "8335301010b0023ee1ff61eb11e2600ca62002d76780de4089011ad77e0c7630",
+      "components": [
+        {
+          "name": "cuda_nvcc",
+          "usage": "build-only",
+          "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvcc/windows-x86_64/cuda_nvcc-windows-x86_64-12.9.86-archive.zip",
+          "sizeBytes": 126917884,
+          "sha256": "227b109663b5e57d2718bcabb24a4ba0d9d4e52d958e327dc476f7c28691be85"
+        },
+        {
+          "name": "cuda_cudart",
+          "usage": "build-only-static-runtime",
+          "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cudart/windows-x86_64/cuda_cudart-windows-x86_64-12.9.79-archive.zip",
+          "sizeBytes": 3521238,
+          "sha256": "179e9c43b0735ffe67207b3da556eb5a0c50f3047961882b7657d3b822d34ef8"
+        },
+        {
+          "name": "cuda_cuobjdump",
+          "usage": "build-audit-only",
+          "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cuobjdump/windows-x86_64/cuda_cuobjdump-windows-x86_64-12.9.82-archive.zip",
+          "sizeBytes": 6219088,
+          "sha256": "1eda43a76a2eac25fce5bdb4b68673b5bda737d54cca5513148c36362ab7c811",
+          "toolSizeBytes": 18290176,
+          "toolSha256": "d889e38e2b3caa5b04dcaf834ced3dc4eee9e36b7d54a982358a87636e587a3b"
+        },
+        {
+          "name": "libcublas",
+          "usage": "build-and-runtime",
+          "url": "https://developer.download.nvidia.com/compute/cuda/redist/libcublas/windows-x86_64/libcublas-windows-x86_64-12.9.1.4-archive.zip",
+          "sizeBytes": 549755186,
+          "sha256": "d534d98b0b453a98914dbf3adf47d7e84b55037abf02f87466439e1dcef581ed"
+        },
+        {
+          "name": "libcurand",
+          "usage": "build-only",
+          "url": "https://developer.download.nvidia.com/compute/cuda/redist/libcurand/windows-x86_64/libcurand-windows-x86_64-10.3.10.19-archive.zip",
+          "sizeBytes": 67904600,
+          "sha256": "d0411f0b8c07e90d0fb6e01bfa7a54c9cb80f2ddf67e4ded2d96a50e19aadad6",
+          "runtimeInclusionPolicy": "excluded-unless-final-pe-import-or-loaded-module-audit-requires-it"
+        }
+      ],
+      "dynamicLoading": true,
+      "cudnn": false,
+      "dynamicCudart": false,
+      "runtimeCurand": false,
+      "systemDriverModule": "nvcuda.dll",
+      "deviceIndex": 0
+    },
+    "nvidiaCudaLicense": {
+      "termsUrl": "https://docs.nvidia.com/cuda/archive/12.9.1/eula/index.html",
+      "redistributableMetadataUrl": "https://developer.download.nvidia.com/compute/cuda/redist/redistrib_12.9.1.json",
+      "sourceArchiveUrl": "https://developer.download.nvidia.com/compute/cuda/redist/libcublas/windows-x86_64/libcublas-windows-x86_64-12.9.1.4-archive.zip",
+      "sourceArchivePath": "LICENSE",
+      "runtimePath": "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt",
+      "noticePath": "licenses/NVIDIA-CUDA-Runtime.txt",
+      "sizeBytes": 67876,
+      "sha256": "72c22161fc1ebf242443d45158a7dd382d68597b00eeb7a7f539be5c6114be33",
+      "projectLicenseExclusion": "These NVIDIA CUDA runtime files are excluded from Hikaru Sub's Apache-2.0 project license and are governed by the included NVIDIA CUDA Toolkit terms and third-party notices.",
+      "files": [
+        "cublas64_12.dll",
+        "cublasLt64_12.dll"
+      ]
+    },
+    "microsoftVisualCppRuntimeLicense": {
+      "version": "2026",
+      "termsUrl": "https://visualstudio.microsoft.com/license-terms/vs2026-ga-visualcpp-v14-redist-runtime/",
+      "redistributionUrl": "https://aka.ms/vs/18/redistribution",
+      "url": "https://visualstudio.microsoft.com/wp-content/uploads/2025/10/Visual-C-V14-License-Redistributable_and_Runtime_ENU.docx",
+      "archiveName": "Visual-C-V14-License-Redistributable_and_Runtime-2026-ENU.docx",
+      "runtimePath": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+      "sizeBytes": 39553,
+      "sha256": "08651651a7602fc7c0e2763de0fde1ff9f868df2780597cd1775ee9d6441c783",
+      "acceptance": "BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS. IF YOU DO NOT ACCEPT THEM, DO NOT USE THE SOFTWARE."
+    }
+  },
+  "deterministicBuild": {
+    "seedAlgorithm": "sha256-utf8-canonical-identity-first-u32-hex-v1",
+    "canonicalSourcePrefix": "ctranslate2-4.8.0/",
+    "seedManifestPath": "native-asr/runtime/ctranslate2-4.8.0-cuda-seeds.json",
+    "seedManifestSizeBytes": 1798,
+    "seedManifestSha256": "68381bf67d036d6afaa81db2065dd38ac717f6008b6388c5309e4ac3d17b1f64",
+    "sourceCount": 25,
+    "launcherSourcePath": "scripts/native-asr-nvcc-launcher.cpp",
+    "launcherSourceSizeBytes": 16251,
+    "launcherSourceSha256": "4581ad66a865d72d2d28b89d7df6c3a562b58d3dfa024c0bb9147b3ce47a0a8b",
+    "launcherExecutableSizeBytes": 370688,
+    "launcherExecutableSha256": "5e2f63c1aa2ca3e0c68391b5c9dda662054e489411ae92c5a31f10c87543d001",
+    "realNvccSizeBytes": 19385856,
+    "realNvccSha256": "313cc032fb84bb9d53cb967843bc761f1f8959cb3aa924246659fde13afd8f14",
+    "stableIsaWrapperPolicy": {
+      "generatedSourcesReplaced": [
+        "kernels_avx.cc",
+        "kernels_avx2.cc",
+        "kernels_avx512.cc"
+      ],
+      "trackedRoot": "native-asr/src/ctranslate2",
+      "architectures": [
+        "/arch:AVX",
+        "/arch:AVX2",
+        "/arch:AVX512"
+      ]
+    }
+  },
+  "toolchain": {
+    "visualStudio": "18 Community",
+    "visualStudioVersion": "18.2.0",
+    "msvcCompilerVersion": "19.44.35221",
+    "msvcToolsVersion": "14.44.35207",
+    "msvcRedistributableVersion": "14.44.35112",
+    "windowsSdkVersion": "10.0.26100.0",
+    "cmakeVersion": "4.1.1-msvc1",
+    "ninjaVersion": "1.12.1",
+    "cudaCompilerVersion": "12.9.86",
+    "cudaRuntimeVersion": "12.9.79",
+    "cuobjdumpVersion": "12.9.82",
+    "rustcVersion": "1.96.0",
+    "rustcCommit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+    "cargoVersion": "1.96.0",
+    "nodeVersion": "22.22.0",
+    "powershellVersion": "7.6.5"
+  },
+  "finalBuildIdentity": {
+    "independentRoots": [
+      ".trellis/tasks/08-31-native-asr-gpu-mode/research/local/build/windows-x64-ct2-cuda-final-a",
+      ".trellis/tasks/08-31-native-asr-gpu-mode/research/local/build/windows-x64-ct2-cuda-final-b"
+    ],
+    "byteIdentical": true,
+    "ctranslate2ObjectSet": {
+      "count": 156,
+      "totalBytes": 133579526,
+      "canonicalManifestSha256": "f89590f9cf584281dd3e62d6652b9a2e6ef8aeee12a5c119d4d6966df815dc95"
+    },
+    "outputs": [
+      {
+        "path": "bin/ctranslate2.dll",
+        "sizeBytes": 68624896,
+        "sha256": "d0c3c0041426afcc4f21dcbd56c5af251d63af949599529dd2a1b2a8a36a2a76"
+      },
+      {
+        "path": "ctranslate2/ctranslate2.lib",
+        "sizeBytes": 51321322,
+        "sha256": "fd18883a8fee176d6af504227e80d461c6604eb9e03f3ec2d88a30b9e43f5603"
+      },
+      {
+        "path": "bin/hikaru-asr-worker.exe",
+        "sizeBytes": 504832,
+        "sha256": "3179ab970e42735f3c42dc13267bbaa372e5d50a7404e4f6069372a997081ac6"
+      },
+      {
+        "path": "bin/hikaru_asr_tokenizer.dll",
+        "sizeBytes": 2139136,
+        "sha256": "8971a5d90287e636bc5cbcf33b1c3173fba3f73fb0a91bdbc6aebb6f88ce672b"
+      },
+      {
+        "path": "tokenizer/release/hikaru_asr_tokenizer.dll.lib",
+        "sizeBytes": 45560,
+        "sha256": "b00175ba4698011ca3667cbcb993147d754d1181fa24f8600e04187e5c9d0ab2"
+      }
+    ]
+  },
+  "finalRuntimeIdentity": {
+    "normalizationPolicy": [
+      "Replace the unique oneDNN private diagnostic source prefix with source\\oneDNN-3.1.1 and underscore padding.",
+      "Replace the unique Cargo registry private prefix with cargo\\registry\\src\\index.crates.io and underscore padding."
+    ],
+    "files": [
+      {
+        "path": "hikaru-asr-worker.exe",
+        "sizeBytes": 504832,
+        "sha256": "3179ab970e42735f3c42dc13267bbaa372e5d50a7404e4f6069372a997081ac6"
+      },
+      {
+        "path": "ctranslate2.dll",
+        "sizeBytes": 68624896,
+        "sha256": "550ba82825f747abc0fd00ea7a58cc28993c8b542c3d5a30faf1dee89bafd6cf"
+      },
+      {
+        "path": "hikaru_asr_tokenizer.dll",
+        "sizeBytes": 2139136,
+        "sha256": "587d0518fb0fea58ef3acb72a284b823abfc39de2ee13f5dcda5b6d278c7286c"
+      },
+      {
+        "path": "cublas64_12.dll",
+        "sizeBytes": 102518272,
+        "sha256": "90052a83efd1b57a8e3616a6590b335855f81b814a4f16eecb7b5bf6d1b1d4eb"
+      },
+      {
+        "path": "cublasLt64_12.dll",
+        "sizeBytes": 668669952,
+        "sha256": "c3a05ea244c937314afec09f87b91f814c7e27977681f6c67eb51bb06ced3a4a"
+      },
+      {
+        "path": "runtime-manifest.json",
+        "sizeBytes": 13468,
+        "sha256": "9f2ff545c125c531dcb3d4fa0637edc1170c611daa9d698eb68883b2ba4d7adf"
+      },
+      {
+        "path": "SHA256SUMS",
+        "sizeBytes": 2053,
+        "sha256": "df380e65771a99703a1be77611e0dc0c5543fae77004fd0a55282b613e95814f"
+      },
+      {
+        "path": "cuda-fatbin.json",
+        "sizeBytes": 560,
+        "sha256": "dd3dcceff808ef37394ef100e6329760e2c6dc7ee5d4191b64a4c46778a27780"
+      },
+      {
+        "path": "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt",
+        "sizeBytes": 67876,
+        "sha256": "72c22161fc1ebf242443d45158a7dd382d68597b00eeb7a7f539be5c6114be33"
+      },
+      {
+        "path": "licenses/NVIDIA-CUDA-Runtime.txt",
+        "sizeBytes": 403,
+        "sha256": "0a7bc6c7ac0ef7fdb9e8f87f7eb3e6d181acb16b29e1a808b04a3768f6b11107"
+      },
+      {
+        "path": "licenses/THIRD-PARTY-NOTICES.json",
+        "sizeBytes": 17050,
+        "sha256": "a905d6f29304dba41f8a79036a3526394154af1f25215fdcb06986e2547c987f"
+      }
+    ]
+  },
+  "cudaModules": {
+    "probeRequiredRuntimeRoot": [
+      "hikaru-asr-worker.exe",
+      "ctranslate2.dll",
+      "hikaru_asr_tokenizer.dll",
+      "msvcp140.dll",
+      "vcomp140.dll",
+      "vcruntime140.dll",
+      "vcruntime140_1.dll"
+    ],
+    "probeRequiredSystem": [
+      "nvcuda.dll"
+    ],
+    "modelRequiredRuntimeRoot": [
+      "cublas64_12.dll",
+      "cublaslt64_12.dll"
+    ],
+    "forbidden": [
+      "cudart64_12.dll",
+      "cudnn64_9.dll",
+      "nccl.dll"
+    ]
+  },
+  "localQualification": {
+    "machine": {
+      "deviceIndex": 0,
+      "deviceName": "NVIDIA GeForce RTX 3070",
+      "computeCapability": "8.6",
+      "computeType": "float16",
+      "visibleDeviceCount": 1,
+      "driverApiVersion": 13020
+    },
+    "probe": {
+      "restrictedPath": true,
+      "available": true,
+      "reportedSupportEvidence": "theoretical",
+      "note": "The frozen worker bytes keep the conservative artifact-policy label while the exact local artifact has real RTX 3070 execution evidence. Product metadata remains disabled pending external publication."
+    },
+    "modelBackedModuleClosure": {
+      "engine": "faster-whisper",
+      "model": "large-v3",
+      "audioCase": "short-v1",
+      "readyDevice": "cuda",
+      "completed": true,
+      "runtimeRootRequired": [
+        "cublas64_12.dll",
+        "cublaslt64_12.dll"
+      ],
+      "systemRequired": [
+        "nvcuda.dll"
+      ],
+      "forbiddenAbsent": [
+        "cudart64_12.dll",
+        "cudnn64_9.dll",
+        "curand64_10.dll",
+        "nccl.dll"
+      ],
+      "allObservedModulesContainedByRuntimeOrWindowsRoot": true,
+      "pythonOrNetworkFallback": false
+    },
+    "finalModelMatrix": {
+      "summarySha256": "c89543ccbe2392cdbfdffb5ed5bc5a93dfa0be3cdbf512315211e29af61c82c3",
+      "artifactSha256": "9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4",
+      "shortModelCount": 8,
+      "largeV2LongDurationMs": 4144235,
+      "kotobaLongDurationMs": 4144235,
+      "nativeSm86PtxJitDisabled": true,
+      "allPassed": true
+    }
+  },
+  "cudaFatbin": {
+    "schemaVersion": 1,
+    "tool": "cuobjdump 12.9.82",
+    "toolSizeBytes": 18290176,
+    "toolSha256": "d889e38e2b3caa5b04dcaf834ced3dc4eee9e36b7d54a982358a87636e587a3b",
+    "cudaArchList": [
+      "6.1",
+      "7.5",
+      "8.6",
+      "8.9"
+    ],
+    "extraNvccFlags": [
+      "-gencode=arch=compute_120,code=sm_120",
+      "-gencode=arch=compute_120,code=compute_120"
+    ],
+    "requiredSass": [
+      "sm_120",
+      "sm_61",
+      "sm_75",
+      "sm_86",
+      "sm_89"
+    ],
+    "allowedPtx": [
+      "compute_120"
+    ],
+    "observedPtxLabels": [
+      "sm_120"
+    ]
+  },
+  "licenseInventory": {
+    "components": [
+      {
+        "name": "CTranslate2",
+        "version": "4.8.0",
+        "license": "MIT",
+        "source": "https://github.com/OpenNMT/CTranslate2/archive/refs/tags/v4.8.0.tar.gz"
+      },
+      {
+        "name": "oneDNN",
+        "version": "3.1.1",
+        "license": "Apache-2.0",
+        "source": "https://github.com/oneapi-src/oneDNN/archive/refs/tags/v3.1.1.tar.gz"
+      },
+      {
+        "name": "pocketfft",
+        "version": "c90e55b3d529f8efa40ed01a20de22405f45fc65",
+        "license": "BSD-3-Clause",
+        "source": "https://github.com/mreineck/pocketfft/archive/c90e55b3d529f8efa40ed01a20de22405f45fc65.tar.gz"
+      },
+      {
+        "name": "nlohmann/json",
+        "version": "3.11.3",
+        "license": "MIT",
+        "source": "https://github.com/nlohmann/json"
+      },
+      {
+        "name": "NVIDIA CUDA Runtime",
+        "version": "12.9.79 static",
+        "license": "NVIDIA CUDA Toolkit EULA",
+        "source": "https://docs.nvidia.com/cuda/archive/12.9.1/eula/index.html",
+        "linkage": "static in ctranslate2.dll",
+        "projectLicenseExcluded": true
+      },
+      {
+        "name": "NVIDIA cuBLAS",
+        "version": "12.9.1.4",
+        "license": "NVIDIA CUDA Toolkit EULA and bundled third-party notices",
+        "source": "https://developer.download.nvidia.com/compute/cuda/redist/libcublas/windows-x86_64/libcublas-windows-x86_64-12.9.1.4-archive.zip",
+        "localLicenseFile": "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt",
+        "projectLicenseExcluded": true,
+        "files": [
+          "cublas64_12.dll",
+          "cublasLt64_12.dll"
+        ]
+      },
+      {
+        "name": "Microsoft Visual C++ Redistributable",
+        "version": "14.44.35112",
+        "license": "Microsoft Visual C++ V14 Redistributable and Runtime 2026 terms",
+        "source": "https://visualstudio.microsoft.com/license-terms/vs2026-ga-visualcpp-v14-redist-runtime/",
+        "redistributionSource": "https://aka.ms/vs/18/redistribution",
+        "localLicenseFile": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+        "projectLicenseExcluded": true,
+        "projectLicenseExclusion": "These Microsoft runtime files are excluded from Hikaru Sub's Apache-2.0 project license and are governed by the Microsoft Visual C++ V14 Redistributable and Runtime 2026 terms.",
+        "acceptance": "BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS. IF YOU DO NOT ACCEPT THEM, DO NOT USE THE SOFTWARE.",
+        "files": [
+          "msvcp140.dll",
+          "vcomp140.dll",
+          "vcruntime140.dll",
+          "vcruntime140_1.dll"
+        ]
+      }
+    ],
+    "requiredRustPackages": [
+      "tokenizers",
+      "onig",
+      "onig_sys"
+    ]
+  },
+  "redistributables": [
+    {
+      "fileName": "cublas64_12.dll",
+      "owner": "nvidia",
+      "sizeBytes": 102518272,
+      "sha256": "90052a83efd1b57a8e3616a6590b335855f81b814a4f16eecb7b5bf6d1b1d4eb"
+    },
+    {
+      "fileName": "cublasLt64_12.dll",
+      "owner": "nvidia",
+      "sizeBytes": 668669952,
+      "sha256": "c3a05ea244c937314afec09f87b91f814c7e27977681f6c67eb51bb06ced3a4a"
+    },
+    {
+      "fileName": "msvcp140.dll",
+      "owner": "microsoft",
+      "sizeBytes": 557728,
+      "sha256": "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9"
+    },
+    {
+      "fileName": "vcomp140.dll",
+      "owner": "microsoft",
+      "sizeBytes": 193152,
+      "sha256": "55aba23cdcd6484fbb06f4155b8ca75adfce7a881f10afd0c49457165e677164"
+    },
+    {
+      "fileName": "vcruntime140.dll",
+      "owner": "microsoft",
+      "sizeBytes": 124544,
+      "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066"
+    },
+    {
+      "fileName": "vcruntime140_1.dll",
+      "owner": "microsoft",
+      "sizeBytes": 49792,
+      "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f"
+    }
+  ],
+  "requiredFiles": [
+    { "path": "hikaru-asr-worker.exe", "role": "worker" },
+    { "path": "ctranslate2.dll", "role": "runtime" },
+    { "path": "hikaru_asr_tokenizer.dll", "role": "runtime" },
+    { "path": "cublas64_12.dll", "role": "nvidia-runtime" },
+    { "path": "cublasLt64_12.dll", "role": "nvidia-runtime" },
+    { "path": "msvcp140.dll", "role": "microsoft-runtime" },
+    { "path": "vcomp140.dll", "role": "microsoft-runtime" },
+    { "path": "vcruntime140.dll", "role": "microsoft-runtime" },
+    { "path": "vcruntime140_1.dll", "role": "microsoft-runtime" },
+    { "path": "cuda-fatbin.json", "role": "cuda-attestation" },
+    { "path": "licenses/THIRD-PARTY-NOTICES.json", "role": "license-inventory" },
+    { "path": "licenses/CTranslate2-MIT.txt", "role": "license" },
+    { "path": "licenses/oneDNN-Apache-2.0.txt", "role": "license" },
+    { "path": "licenses/pocketfft-BSD-3-Clause.txt", "role": "license" },
+    { "path": "licenses/nlohmann-json-MIT.txt", "role": "license" },
+    { "path": "licenses/tokenizers-Apache-2.0.txt", "role": "license" },
+    { "path": "licenses/onig-MIT.txt", "role": "license" },
+    { "path": "licenses/onig-sys-MIT.txt", "role": "license" },
+    { "path": "licenses/NVIDIA-CUDA-Runtime.txt", "role": "license" },
+    { "path": "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt", "role": "license" },
+    { "path": "licenses/Microsoft-Visual-Cpp-Runtime.txt", "role": "license" },
+    { "path": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx", "role": "license" }
+  ],
+  "importOwners": [
+    "hikaru-asr-worker.exe",
+    "ctranslate2.dll",
+    "hikaru_asr_tokenizer.dll"
+  ],
+  "systemDllAllowlist": [
+    "bcrypt.dll",
+    "bcryptprimitives.dll",
+    "kernel32.dll",
+    "ntdll.dll",
+    "api-ms-win-core-synch-l1-2-0.dll",
+    "api-ms-win-crt-convert-l1-1-0.dll",
+    "api-ms-win-crt-environment-l1-1-0.dll",
+    "api-ms-win-crt-filesystem-l1-1-0.dll",
+    "api-ms-win-crt-heap-l1-1-0.dll",
+    "api-ms-win-crt-locale-l1-1-0.dll",
+    "api-ms-win-crt-math-l1-1-0.dll",
+    "api-ms-win-crt-runtime-l1-1-0.dll",
+    "api-ms-win-crt-stdio-l1-1-0.dll",
+    "api-ms-win-crt-string-l1-1-0.dll",
+    "api-ms-win-crt-time-l1-1-0.dll"
+  ],
+  "forbiddenPathFragments": [
+    "python",
+    "fastapi",
+    "pytorch",
+    "torch",
+    "nemo",
+    "crispasr",
+    "cudnn",
+    "vulkan",
+    "onnxruntime",
+    "silero"
+  ],
+  "forbiddenExtensions": [
+    ".bin",
+    ".gguf",
+    ".onnx",
+    ".pt",
+    ".pth",
+    ".safetensors",
+    ".pdb"
+  ],
+  "budgets": {
+    "windowsSetupBytes": 83886080,
+    "portableZipBytes": 94371840,
+    "unpackedRuntimeBytes": 1073741824,
+    "bundledModelWeights": 0,
+    "maximumDownloadBytes": 734003200
+  }
+}

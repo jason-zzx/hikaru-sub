@@ -271,6 +271,11 @@
       "role": "license"
     }
   ],
+  "importOwners": [
+    "hikaru-asr-worker.exe",
+    "ctranslate2.dll",
+    "hikaru_asr_tokenizer.dll"
+  ],
   "systemDllAllowlist": [
     "bcrypt.dll",
     "bcryptprimitives.dll",

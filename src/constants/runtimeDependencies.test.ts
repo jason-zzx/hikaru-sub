@@ -11,6 +11,9 @@ describe("runtime dependency constants", () => {
     expect(RUNTIME_DEPENDENCY_LABEL.nativeAsrCpu).toBe(
       "内置 Native ASR CPU 运行时",
     );
+    expect(RUNTIME_DEPENDENCY_LABEL.nativeAsrCuda).toBe(
+      "Native ASR CUDA 运行时",
+    );
     expect(RUNTIME_DEPENDENCY_LABEL.asrModels).toBe("ASR 模型缓存");
   });
 

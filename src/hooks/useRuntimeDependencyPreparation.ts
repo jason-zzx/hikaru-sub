@@ -32,7 +32,10 @@ export function useRuntimeDependencyPreparation(kind: RuntimeDependencyKind) {
     async (afterPrepare?: () => void | Promise<void>) => {
       const next = await refreshProbe();
       const item = next.items.find((entry) => entry.kind === kind);
-      if (item?.status === "available") return true;
+      if (item?.status === "available") {
+        await afterPrepare?.();
+        return true;
+      }
       afterPrepareRef.current = afterPrepare ?? null;
       setSnapshot(null);
       setError(null);

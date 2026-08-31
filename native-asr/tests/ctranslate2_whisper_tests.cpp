@@ -1206,7 +1206,42 @@ void run_core_tests() {
   check(cuda_execution.device == ExecutionDevice::Cuda
             && cuda_execution.compute_type == ExecutionComputeType::Float16
             && cuda_execution.device_index == 0,
-        "CUDA execution mapping drift");
+        "CUDA development execution mapping drift");
+  struct CapabilityCase {
+    int major;
+    int minor;
+    ExecutionComputeType compute_type;
+  };
+  const std::array<CapabilityCase, 5> supported_capabilities{{
+      {6, 1, ExecutionComputeType::Int8Float32},
+      {7, 5, ExecutionComputeType::Float16},
+      {8, 6, ExecutionComputeType::Float16},
+      {8, 9, ExecutionComputeType::Float16},
+      {12, 0, ExecutionComputeType::Float16},
+  }};
+  for (const CapabilityCase& row : supported_capabilities) {
+    const BackendExecutionConfig resolved =
+        cuda_execution_config_for_capability(row.major, row.minor);
+    check(resolved.device == ExecutionDevice::Cuda
+              && resolved.compute_type == row.compute_type
+              && resolved.device_index == 0,
+          "CUDA capability compute mapping drift");
+  }
+  const std::array<std::array<int, 2>, 8> unsupported_capabilities{{
+      {6, 0}, {6, 2}, {7, 0}, {8, 0}, {9, 0}, {12, 1}, {13, 0}, {0, 0},
+  }};
+  for (const auto& row : unsupported_capabilities) {
+    bool rejected = false;
+    try {
+      static_cast<void>(cuda_execution_config_for_capability(row[0], row[1]));
+    } catch (const BackendError& error) {
+      rejected = error.code() == "cuda_architecture_unsupported";
+    }
+    check(rejected, "Unsupported CUDA capability was accepted");
+  }
+  check(std::string(execution_compute_type_name(ExecutionComputeType::Int8Float32))
+            == "int8Float32",
+        "Pascal compute type name drift");
 
   const CandidateAConfig production_defaults;
   check(production_defaults.timestamp_driven_seek, "production seek default drift");
