@@ -96,43 +96,40 @@
 
 ### R8 - Parent/child governance
 
-- Native MVP critical path 仅为 `(T12 + T13) -> T16 -> T17 -> T18`；T12 与 T13 可并行。
+- Native MVP critical path `(T12 + T13) -> T16 -> T17 -> T18` 已完成。
 - `08-26-native-asr-whisper-model-expansion` 已完成并归档，七个 manifest 锁定的 Faster-Whisper CPU 模型均已进入生产路线。
-- `08-30-native-asr-kotoba-integration` 是下一项 P1 child：复用归档 accepted K2 算法，把 Kotoba exact 模型交付、bundled CPU runtime、Tauri 路由和 React UX 接入生产。
-- Kotoba 字幕质量修订不再属于本父任务，也不作为 Kotoba 产品接入门禁；归档 K2 与 legacy-relative quality evidence 保持不变。
-- T11 Qwen3、Parakeet/Reazon revisions 和 T14/T15 GPU packs 继续为后续 non-blocking work。
+- `08-30-native-asr-kotoba-integration` 已完成并归档，exact Kotoba Whisper v2.0 已接入 bundled CPU runtime、Tauri 路由和 React UX。
+- Kotoba 字幕质量修订不属于本父任务；归档 K2 与 legacy-relative quality evidence 保持不变。
+- Qwen3 + ForcedAligner、Parakeet/Reazon revisions、Kotoba K3 和 GPU packs 是独立、non-blocking 的后续任务，不再阻塞本父任务关闭。
 - 不再创建 ordinary Whisper quality-revision、execution-parity 或 discovery task；后续接入均以功能、安全、模型/runtime 完整性和产品流程为硬门禁。
-- 每个 child 必须有明确依赖、验收、验证命令和 rollback point。
-- 父任务在 Kotoba 产品接入独立验收归档、其余 deferred lanes 明确记录后完成。
+- 每个后续任务必须有明确依赖、验收、验证命令和 rollback point。
+- 本父任务的交付和最终集成门禁已经完成。
 
 ## Acceptance Criteria
 
-- [ ] 全新安装在无 Python、pip、PyTorch、NeMo、FastAPI 和 venv 的环境中，可使用已缓存 large-v3 模型完成 Native CPU 转录。
-- [ ] large-v3 模型 identity/download/readiness/hash/atomic-install/legacy-cache/portable-path 测试通过。
-- [ ] 最终 CPU runtime artifact 可复现、可验证、零模型权重，并在 installed/portable layout 通过短音频和 >10 分钟音频功能 smoke。
-- [ ] React command、任务状态、`AsrJobSnapshot`、取消、异常退出和恢复快照合同保持兼容并有自动化覆盖。
-- [ ] Native MVP 输出非空、UTF-8 合法、时间有序、正时长且 audio-bounded；不存在协议或 text-conservation failure。
-- [ ] runtime/settings/backend 不再探测或要求 Python 3.11/venv，probe/measure/cleanup 和 managed-root 边界通过测试。
-- [ ] 前端只将 large-v3 标记为 Native 可用；其他现有模型保持可见并明确暂不可用，无 silent Python fallback。
-- [ ] Candidate A 的已知 CER/S/D/I/gap 限制被记录但不作为 parity gate；历史 `stop-revise` evidence 未修改。
-- [ ] setup、portable 和 unpacked runtime 满足现有体积预算，安装包内模型权重为 0，许可证与 attribution 完整。
-- [ ] `pnpm test`、`pnpm build`、`cargo test --manifest-path src-tauri/Cargo.toml` 和 MVP worker CTest 全部通过。
-- [ ] T18 通过，T12/T13/T16/T17/T18 均独立验收归档，Native MVP 正式发布。
+- [x] 全新安装在无 Python、pip、PyTorch、NeMo、FastAPI 和 venv 的环境中，可使用已缓存 large-v3 模型完成 Native CPU 转录。
+- [x] large-v3 模型 identity/download/readiness/hash/atomic-install/legacy-cache/portable-path 测试通过。
+- [x] 最终 CPU runtime artifact 可复现、可验证、零模型权重，并在 installed/portable layout 通过短音频和 >10 分钟音频功能 smoke。
+- [x] React command、任务状态、`AsrJobSnapshot`、取消、异常退出和恢复快照合同保持兼容并有自动化覆盖。
+- [x] Native MVP 输出非空、UTF-8 合法、时间有序、正时长且 audio-bounded；不存在协议或 text-conservation failure。
+- [x] runtime/settings/backend 不再探测或要求 Python 3.11/venv，probe/measure/cleanup 和 managed-root 边界通过测试。
+- [x] 前端已启用七个 Faster-Whisper 模型与 exact Kotoba Whisper v2.0，且无 silent Python fallback。
+- [x] Candidate A 的已知 CER/S/D/I/gap 限制被记录但不作为 parity gate；历史 `stop-revise` evidence 未修改。
+- [x] setup、portable 和 unpacked runtime 满足现有体积预算，安装包内模型权重为 0，许可证与 attribution 完整。
+- [x] `pnpm test`、`pnpm build`、`cargo test --manifest-path src-tauri/Cargo.toml` 和 MVP worker CTest 全部通过。
+- [x] T18 通过，T12/T13/T16/T17/T18 均独立验收归档，Native MVP 正式发布。
 - [x] Post-MVP P1 Whisper expansion 使 `tiny/base/small/medium/large-v2/large-v3-turbo` 通过独立功能门禁并可用，且 large-v3 无回归。
-- [ ] Kotoba K2 进入同一 bundled Native CPU runtime，exact 模型可下载/校验，Tauri 与前端可选择并完成短音频及 >10 分钟功能 smoke，且无 Python fallback。
-- [ ] Kotoba 质量修订保持父任务范围外；其余 engine/GPU lanes 明确 deferred 后，父任务完成最终集成审查。
+- [x] Kotoba K2 已进入同一 bundled Native CPU runtime，exact 模型可下载/校验，Tauri 与前端可选择并完成短音频及 >10 分钟功能 smoke，且无 Python fallback。
+- [x] Kotoba 质量修订与其余 engine/GPU lanes 已明确为独立、non-blocking 的后续工作。
 
 ## Post-MVP Expansion
 
-以下工作保留但不阻塞首版，按顺序执行：
+本父任务内的 post-MVP P1 扩展已经完成：
 
-1. **P1 Faster-Whisper model expansion（已完成）**：`tiny`、`base`、`small`、`medium`、`large-v2`、`large-v3-turbo` 已进入生产 Native CPU 路线。
-2. **P1 Kotoba 产品接入（下一项）**：复用 accepted K2，将 exact 模型交付、bundled CPU runtime、Tauri 路由和前端下载/选择/转录流程接入项目。
-3. Qwen3 + ForcedAligner 产品化。
-4. Parakeet/ReazonSpeech 新候选。
-5. CUDA/Vulkan runtime packs、设备探测和 GPU qualification。
+1. **Faster-Whisper model expansion（已完成）**：`tiny`、`base`、`small`、`medium`、`large-v2`、`large-v3-turbo` 已进入生产 Native CPU 路线。
+2. **Kotoba 产品接入（已完成）**：exact Kotoba Whisper v2.0 已进入 bundled CPU runtime、Tauri 路由和前端下载/选择/转录流程。
 
-Kotoba K3 或其他字幕质量修订不在本父任务范围内。每条保留路线独立规划、验证和发布；任何失败不得影响已发布的 Faster-Whisper CPU 路线。
+以下路线保留为独立、non-blocking 的后续任务：Qwen3 + ForcedAligner、Kotoba K3 质量修订、Parakeet/ReazonSpeech 新候选，以及 CUDA/Vulkan runtime packs。它们不再属于本父任务的完成条件，任何失败不得影响已发布的 Native CPU 路线。
 
 ## Out of Scope
 
@@ -143,12 +140,10 @@ Kotoba K3 或其他字幕质量修订不在本父任务范围内。每条保留�
 - 将原生推理库直接链接进 Tauri 主进程。
 - 修改归档 benchmark/evidence 或要求 Native 输出与 Python 逐字节一致。
 
-## Planning State
+## Completion State
 
-- Gate 0/1 foundation 已关闭：T01～T10 系列已提供 ground truth、backend feasibility、worker protocol、Rust host、Candidate A 和后续模型实验历史。
-- T06R 已 non-qualified 收口，T06D 已以 `invalid-evidence` 关闭；两者不再触发新的 Whisper 质量任务。
-- T12 model manager、T13 final CPU package、T16 runtime/settings backend、T17 frontend migration、T18 release cutover 与 `08-26-native-asr-whisper-model-expansion` 均已完成并归档。
-- `08-30-native-asr-kotoba-integration` 已创建为下一可执行 P1 child，负责 accepted K2 的生产 CPU/runtime/model/Tauri/frontend 接入。
-- `08-20-native-asr-kotoba-quality-revision` 已从父任务解除关联；本父任务不再等待或验收 Kotoba K3/quality revision。
-- T11 Qwen3、Parakeet/Reazon 和 T14/T15 保持后续 non-blocking/deferred。
-- Production/default 已切换为 Native `faster-whisper / large-v3 / CPU`，七个 Faster-Whisper 模型均可用，且发布包不依赖 Python sidecar。
+- Gate 0/1 foundation、Native MVP、模型管理、CPU runtime、Tauri/设置、前端迁移和 release cutover 均已完成并归档。
+- 七个 Faster-Whisper 模型与 exact Kotoba Whisper v2.0 均已进入生产 Native CPU 路线。
+- 发布包不依赖 Python sidecar，生产默认仍为 `faster-whisper / large-v3 / CPU`。
+- Qwen3 + ForcedAligner、Kotoba K3、Parakeet/Reazon 和 GPU packs 已解除父任务关系或明确为独立 non-blocking 工作。
+- 本父任务完成条件已满足，可以归档。
