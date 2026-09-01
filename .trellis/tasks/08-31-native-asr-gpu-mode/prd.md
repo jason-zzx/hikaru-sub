@@ -6,7 +6,7 @@
 
 ## Background
 
-- 当前生产 ASR 使用随包提供的 Windows x64 Native CTranslate2 CPU runtime，支持七个 Faster-Whisper 模型和 exact `kotoba-tech/kotoba-whisper-v2.0-faster`；生产请求目前仅接受 `auto|cpu`。
+- 当前生产 ASR 使用随包提供的 Windows x64 Native CTranslate2 CPU runtime 与按需下载的独立 CUDA pack，支持七个 Faster-Whisper 模型和 exact `kotoba-tech/kotoba-whisper-v2.0-faster`；生产请求接受 `auto|cpu|cuda`。
 - Protocol v1、C++ worker/backend 和 Rust host 已具有 `cuda` 通道。既有 T07/T08/T20 子任务在 RTX 3070 / SM 8.6 上完成过真实 CUDA device 0 转录、取消、恢复、结构化失败和性能测量。
 - T07 ordinary Faster-Whisper large-v3 GPU warmed median RTF 为 `0.062971`（short-v1）和 `0.077707`（medium-v1 前 120 秒），相对同 binary 的 CPU 路线有显著加速。
 - T08 使用同一 CUDA lane 完成 Kotoba short/medium/long-v2 转录；K2 算法矩阵已被接受为后续实现输入。
@@ -77,25 +77,25 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1: 最终 CUDA worker/runtime 在本机 RTX 3070 上完成真实 `device="cuda"` 转录，`ready.device="cuda"`，并通过完成、取消、恢复、进程清理和 active-slot 回归。
-- [ ] AC2: 最终 CTranslate2 DLL 的 fatbin/构建锁证明包含 `sm_61/sm_75/sm_86/sm_89/sm_120`，策略测试证明 CC 6.1 使用 `INT8_FLOAT32`，CC 7.5/8.6/8.9/12.0 使用 `FLOAT16`，其他 capability fail closed。
-- [ ] AC3: 最终 CUDA artifact 具有独立闭集 lock/manifest、许可证清单、两次干净可复现构建、哈希/导入/动态模块/路径/禁止内容 mutation 验证。
-- [ ] AC4: Tauri 按已确定策略解析 `auto|cpu|cuda`，选择正确 CPU/CUDA runtime；显式 CUDA 不回退，auto 仅在启动前回退，任何路径都永不启动 Python。
-- [ ] AC5: 前端仅在后端报告当前机器 CUDA 可用时启用 CUDA，保留不可用已保存值，并显示可执行的中文原因/恢复动作；缺 pack 时可确认下载并在完成后续跑。
-- [ ] AC6: 全部七个 Faster-Whisper + exact Kotoba 在最终 artifact SHA 上通过短音频矩阵；`large-v2` 与 Kotoba 通过各自超过 10 分钟门禁，输出非空、UTF-8、时间有序、正时长且不越界。
-- [ ] AC7: CPU artifact 的闭集、八模型支持、安装版/portable 路径、模型缓存和离线行为无回归；CUDA pack 损坏或更新失败不影响 CPU 或上一份有效 pack。
-- [ ] AC8: runtime dependency probe/prepare/measure/cleanup、source profile、NSIS/portable staging、CI/release 校验和第三方 notices 与受管 CUDA pack 一致。
-- [ ] AC9: 用户文档明确：RTX 3070 为本任务实测；GTX 10、RTX 20、RTX 40、RTX 50 为基于官方架构、最终编译/fatbin和策略验证的理论兼容；显存是否足够取决于模型与具体 GPU。
-- [ ] AC10: `pnpm test`、`pnpm build`、`cargo test --manifest-path src-tauri/Cargo.toml`、Native CTest/runtime verifier、最终 RTX 3070 model-backed gates 和 `git diff --check` 通过；无 GPU CI 不伪造真实 GPU gate。
+- [x] AC1: 最终 CUDA worker/runtime 在本机 RTX 3070 上完成真实 `device="cuda"` 转录，`ready.device="cuda"`，并通过完成、取消、恢复、进程清理和 active-slot 回归。
+- [x] AC2: 最终 CTranslate2 DLL 的 fatbin/构建锁证明包含 `sm_61/sm_75/sm_86/sm_89/sm_120`，策略测试证明 CC 6.1 使用 `INT8_FLOAT32`，CC 7.5/8.6/8.9/12.0 使用 `FLOAT16`，其他 capability fail closed。
+- [x] AC3: 最终 CUDA artifact 具有独立闭集 lock/manifest、许可证清单、两次干净可复现构建、哈希/导入/动态模块/路径/禁止内容 mutation 验证。
+- [x] AC4: Tauri 按已确定策略解析 `auto|cpu|cuda`，选择正确 CPU/CUDA runtime；显式 CUDA 不回退，auto 仅在启动前回退，任何路径都永不启动 Python。
+- [x] AC5: 前端仅在后端报告当前机器 CUDA 可用时启用 CUDA，保留不可用已保存值，并显示可执行的中文原因/恢复动作；缺 pack 时可确认下载并在完成后续跑。
+- [x] AC6: 全部七个 Faster-Whisper + exact Kotoba 在最终 artifact SHA 上通过短音频矩阵；`large-v2` 与 Kotoba 通过各自超过 10 分钟门禁，输出非空、UTF-8、时间有序、正时长且不越界。
+- [x] AC7: CPU artifact 的闭集、八模型支持、安装版/portable 路径、模型缓存和离线行为无回归；CUDA pack 损坏或更新失败不影响 CPU 或上一份有效 pack。
+- [x] AC8: runtime dependency probe/prepare/measure/cleanup、source profile、NSIS/portable staging、CI/release 校验和第三方 notices 与受管 CUDA pack 一致。
+- [x] AC9: 用户文档明确：RTX 3070 为本任务实测；GTX 10、RTX 20、RTX 40、RTX 50 为基于官方架构、最终编译/fatbin和策略验证的理论兼容；显存是否足够取决于模型与具体 GPU。
+- [x] AC10: `pnpm test`、`pnpm build`、`cargo test --manifest-path src-tauri/Cargo.toml`、Native CTest/runtime verifier、最终 RTX 3070 model-backed gates 和 `git diff --check` 通过；无 GPU CI 不伪造真实 GPU gate。
 
 ## Current local artifact freeze
 
 - CUDA 输入权威已迁移到 CUDA 12.9 Update 1：nvcc 12.9.86、静态 CUDART 12.9.79、cuBLAS 12.9.1.4、cuobjdump 12.9.82，以及仅构建使用的 cuRAND 10.3.10.19。
 - 两个独立 final build root 的 156 个 CTranslate2 object 与全部 runtime binary 字节一致；两个独立完整 ZIP 也字节一致。
 - 最终本地产物固定为 `571,034,856` bytes / SHA-256 `9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4`，unpacked `843,553,473` bytes。
-- 最终本地 artifact 已通过 verifier、fatbin、受限 RTX 3070 probe、large-v3 short smoke 与 module closure。产品仍保持 `productEnablementAllowed=false`。
-- 上述 artifact 已完成全部八模型短矩阵、`large-v2`/Kotoba 长门禁与禁用 PTX JIT 的 `sm_86` 实测；稳定远程 asset/source row 仍是唯一待完成的 artifact-distribution 门禁。
-- 当前 tracked handoff 仍缺少绑定该最终 worker SHA 的 Rust-host 取消/恢复/reap/active-slot 实测记录；在补齐或经明确评审豁免前，不得把“仅剩远程发布”扩大为完整产品启用结论。本任务不提交或发布远程 asset，也不提前增加 source row。
+- 最终 artifact 已通过 verifier、fatbin、受限 RTX 3070 probe、全部八模型短矩阵、`large-v2`/Kotoba 长门禁、禁用 PTX JIT 的 `sm_86` 实测，以及绑定最终 worker SHA 的 Rust-host 完成/取消/恢复/reap/active-slot 门禁。
+- exact ZIP 已发布为 tag/release `native-asr-cuda-v1`：`https://github.com/jason-zzx/hikaru-sub/releases/tag/native-asr-cuda-v1`；官方 asset 为 `https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip`。
+- 官方 GitHub asset 与中国源 `https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip` 均完成公开下载并精确匹配 `571,034,856` bytes / SHA-256 `9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4`；source rows 与产品启用门禁已打开，无剩余任务 gate。
 
 ## Out of Scope
 

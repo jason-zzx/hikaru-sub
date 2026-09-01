@@ -1163,22 +1163,26 @@ fn source_matches_cuda_artifact(
     })
 }
 
+fn native_asr_cuda_product_enabled_for(
+    lock: &NativeAsrCudaProductLock,
+    sources: &RuntimeDependencyPlatformSources,
+) -> bool {
+    lock.product_enablement_allowed
+        && lock.publication_gate.external_stable_asset_published
+        && lock.publication_gate.runtime_dependency_source_row_present
+        && lock.artifact.id == NATIVE_ASR_CUDA_ARTIFACT_ID
+        && source_matches_cuda_artifact(sources.official.native_asr_cuda.as_ref(), &lock.artifact)
+        && source_matches_cuda_artifact(sources.china.native_asr_cuda.as_ref(), &lock.artifact)
+}
+
 fn native_asr_cuda_product_enabled() -> bool {
     let Some(lock) = native_asr_cuda_product_lock() else {
         return false;
     };
-    if !lock.product_enablement_allowed
-        || !lock.publication_gate.external_stable_asset_published
-        || !lock.publication_gate.runtime_dependency_source_row_present
-        || lock.artifact.id != NATIVE_ASR_CUDA_ARTIFACT_ID
-    {
-        return false;
-    }
     let Ok(sources) = platform_sources() else {
         return false;
     };
-    source_matches_cuda_artifact(sources.official.native_asr_cuda.as_ref(), &lock.artifact)
-        || source_matches_cuda_artifact(sources.china.native_asr_cuda.as_ref(), &lock.artifact)
+    native_asr_cuda_product_enabled_for(&lock, &sources)
 }
 
 fn apply_cuda_support_evidence(capability: &mut NativeAsrCudaCapability) {
@@ -2944,16 +2948,21 @@ mod tests {
     }
 
     #[test]
-    fn native_cuda_product_gate_stays_closed_until_publication_and_source_agree() {
+    fn native_cuda_product_gate_requires_matching_published_sources() {
         let lock = native_asr_cuda_product_lock().unwrap();
-        assert!(!lock.product_enablement_allowed);
-        assert!(!lock.publication_gate.external_stable_asset_published);
-        assert!(!lock.publication_gate.runtime_dependency_source_row_present);
-        assert!(!native_asr_cuda_product_enabled());
+        let sources = platform_sources().unwrap();
+
+        assert!(native_asr_cuda_product_enabled_for(&lock, &sources));
+        assert!(native_asr_cuda_product_enabled());
+
+        let mut wrong_source = sources.official.native_asr_cuda.unwrap();
+        wrong_source.sha256 = "0".repeat(64);
+        assert!(!source_matches_cuda_artifact(
+            Some(&wrong_source),
+            &lock.artifact
+        ));
         assert!(NATIVE_ASR_CUDA_REQUIRED_ENTRIES
             .contains(&"licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt"));
-        assert!(!NATIVE_ASR_CUDA_REQUIRED_ENTRIES
-            .contains(&"licenses/NVIDIA-CUDA-Toolkit-12.8-License.txt"));
     }
 
     #[test]

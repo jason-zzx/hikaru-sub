@@ -1,7 +1,7 @@
 # Phase A: CUDA build and distribution input freeze
 
 - Date: 2026-08-31
-- Status: superseded and re-frozen on CUDA 12.9 Update 1; local final artifact qualified, external publication intentionally pending.
+- Status: superseded and re-frozen on CUDA 12.9 Update 1; final artifact qualified and subsequently published as `native-asr-cuda-v1`.
 
 ## Official NVIDIA authorities
 
@@ -45,4 +45,4 @@ URLs and usage roles are frozen in `native-asr/runtime/windows-x64-cuda-inputs.j
 
 ## Publication boundary
 
-The exact local combined artifact may be frozen in the CUDA lock after independent packaging equality. `productEnablementAllowed` remains `false`, and `runtime-dependency-sources.json` intentionally has no CUDA source row until the exact bytes are published at a stable immutable remote URL. No remote asset is published by this task.
+This was the Phase A pre-publication boundary: the exact local combined artifact could be frozen only after independent packaging equality, while `productEnablementAllowed` remained `false` and no CUDA source row existed. The final exact bytes were subsequently published as `native-asr-cuda-v1`, both public source downloads were byte-verified, and the final enablement evidence supersedes this temporary gate state.

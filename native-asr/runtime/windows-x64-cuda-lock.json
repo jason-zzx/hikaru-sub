@@ -1,11 +1,10 @@
 {
   "schemaVersion": 1,
-  "status": "local-artifact-qualified-external-publication-pending",
-  "productEnablementAllowed": false,
+  "status": "published-product-enabled",
+  "productEnablementAllowed": true,
   "publicationGate": {
-    "externalStableAssetPublished": false,
-    "runtimeDependencySourceRowPresent": false,
-    "pending": "Publish the exact immutable combined pack, then add its stable remote source row in a separately reviewed release step."
+    "externalStableAssetPublished": true,
+    "runtimeDependencySourceRowPresent": true
   },
   "artifact": {
     "id": "hikaru-asr-windows-x64-cuda-v1",
@@ -343,7 +342,7 @@
       "restrictedPath": true,
       "available": true,
       "reportedSupportEvidence": "theoretical",
-      "note": "The frozen worker bytes keep the conservative artifact-policy label while the exact local artifact has real RTX 3070 execution evidence. Product metadata remains disabled pending external publication."
+      "note": "The frozen worker bytes keep the conservative artifact-policy label while the exact published artifact has real RTX 3070 execution evidence; GTX 10 and other RTX generations remain theoretical compatibility claims."
     },
     "modelBackedModuleClosure": {
       "engine": "faster-whisper",

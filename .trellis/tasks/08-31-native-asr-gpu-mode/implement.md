@@ -49,7 +49,7 @@
 
 - [x] Add `RuntimeDependencyKind::NativeAsrCuda` / `nativeAsrCuda` across Rust and TypeScript.
 - [x] Add canonical `deps/asr-runtime/cuda/current` and CUDA-specific download staging helpers.
-- [ ] Add exact official/China source-profile entry for the immutable combined pack; intentionally blocked until the exact remote asset is published. China source must be byte-identical or omitted for CUDA.
+- [x] Add exact official/China source-profile entries for the immutable combined pack. Official GitHub and verified China proxy downloads are byte-identical at `571,034,856` bytes / SHA-256 `9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4`.
 - [x] Implement probe as bounded manifest/tree verification plus worker `--probe-cuda`; do not recurse for storage size.
 - [x] Implement prepare/download/progress/cancel/safe extraction/tree verification/atomic publish/repair/rollback using the existing dependency job model.
 - [x] Implement explicit storage measurement and contained cleanup with `spawn_blocking`, covering the CUDA runtime root and CUDA-specific staging.
@@ -84,7 +84,7 @@
 - [x] Ensure `auto` never triggers pack download.
 - [x] Surface one-time auto CPU fallback notice and explicit CUDA errors in Simplified Chinese. `start_asr` now returns `{ jobId, notice? }`; TranscribeView renders the sanitized fallback notice once in a non-error informational surface and clears it for a new start or configuration/session change.
 - [x] Add/update focused hook tests for capability rows, fresh post-prepare continuation, and the already-ready dependency race; existing component/start-payload regressions remain green.
-- [x] Rollback point: keep `productEnablementAllowed=false` and omit the source row without touching CPU/model/settings data.
+- [x] Rollback point (pre-publication): CUDA could remain disabled without touching CPU/model/settings data. Final publication now opens the exact multi-field gate; rollback still disables/removes CUDA metadata independently.
 
 ## Phase G - Final qualification on RTX 3070
 
@@ -102,12 +102,12 @@
 
 - [x] Run two complete release CUDA Native CTest roots (5/5 each); protocol-only/CPU artifact gates also pass under the recorded commands.
 - [x] Run runtime verifier and mutation tests for CUDA (10/10) plus CPU verification.
-- [x] Run `pnpm test` (109 files / 824 tests before this review; targeted regressions added here also pass).
+- [x] Run `pnpm test` (latest full run: 111 files / 831 tests; targeted enablement regressions also pass).
 - [x] Run `pnpm build` (rerun after review fixes).
-- [x] Run `cargo test --manifest-path src-tauri/Cargo.toml` (248 tests before this review; targeted Rust regressions added here also pass).
+- [x] Run `cargo test --manifest-path src-tauri/Cargo.toml` (latest full run: 254 tests; targeted enablement regressions also pass).
 - [x] Run `pnpm release:local` and audit NSIS/portable: CPU runtime present, CUDA runtime absent, eight model identities present, no Python/GPU leakage into bundled resources.
 - [x] Run Trellis validation and `git diff --check` after the final review edits.
-- [x] Keep `AGENTS.md` truthful while product enablement is false; task/design/spec evidence records the gated managed CUDA implementation without claiming it is currently shipped.
+- [x] Keep `AGENTS.md` truthful after enablement: production accepts `auto|cpu|cuda`, the optional CUDA pack remains on-demand and excluded from installer/portable, explicit CUDA never falls back, auto falls back only before launch, and only RTX 3070 is real-tested.
 - [x] Document RTX 3070 as real-tested and GTX 10 / RTX 20 / RTX 40 / RTX 50 as theoretical compatibility with VRAM and driver caveats.
 
 ## Validation commands
@@ -152,7 +152,7 @@ pnpm asr:runtime:smoke:cuda
 - [x] Both independent final ZIPs are byte-identical: `571,034,856` bytes / SHA-256 `9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4`.
 - [x] Verifier, mutation suite, exact architecture audit, restricted RTX 3070 probe, final short model smoke, and loaded-module closure pass.
 - [x] Final lock freezes raw build outputs, normalized runtime files, complete ZIP identity, NVIDIA files/license, toolchain, and local qualification evidence.
-- [ ] **Only pending artifact-distribution gate:** externally publish those exact immutable ZIP bytes at a stable URL, then add the reviewed source row and deliberately reconsider `productEnablementAllowed`. This run must not publish or add the row.
+- [x] Publish the exact immutable ZIP as `native-asr-cuda-v1`, verify fresh public downloads from the official GitHub asset and China proxy against the frozen size/SHA, add both reviewed source rows, and set `productEnablementAllowed=true`. No task gate remains.
 
 ## Completion gate
 

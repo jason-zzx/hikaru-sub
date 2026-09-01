@@ -1,7 +1,7 @@
 # Native ASR GPU mode implementation progress
 
 - Date: 2026-08-31
-- Product CUDA status: intentionally disabled pending publication of the exact immutable remote asset; no runtime-dependency source row is advertised.
+- Product CUDA status: enabled for the exact published `native-asr-cuda-v1` asset; official and China runtime-dependency source rows are frozen to the verified size/SHA.
 
 ## CUDA 12.9 Update 1 authority
 
@@ -89,16 +89,16 @@ Two existing exact host tests passed:
 
 The exact-final-worker completion, cancellation, recovery, reap, active-slot, and offline/local-runtime evidence items are therefore closed without changing the frozen runtime bytes.
 
-## Publication boundary
+## Publication and final enablement
 
-All local deterministic build, packaging, verifier, architecture, probe, module-closure, eight-model functional, and exact-final-worker Rust-host lifecycle/offline gates for this artifact identity are complete. External publication of these exact immutable bytes, followed by the reviewed source-row/product-enablement decision, is the only remaining external distribution gate.
+All deterministic build, packaging, verifier, architecture, probe, module-closure, eight-model functional, exact-final-worker Rust-host lifecycle/offline, and remote-publication gates for this artifact identity are complete.
 
-Until that happens:
-
-- `productEnablementAllowed=false` remains locked;
-- `src-tauri/resources/runtime-dependency-sources.json` receives no CUDA source row;
-- no remote asset is committed or published;
-- CPU production remains independently available and unchanged.
+- tag/release: `native-asr-cuda-v1` / `https://github.com/jason-zzx/hikaru-sub/releases/tag/native-asr-cuda-v1`;
+- official asset: `https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip`;
+- China source: `https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip`;
+- fresh public downloads from both URLs matched `571,034,856` bytes / SHA-256 `9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4`;
+- `productEnablementAllowed=true`, both source rows are present, and the runtime gate requires the enable/publication flags, expected artifact ID, plus ZIP size/SHA agreement between both source rows and the runtime lock; public URL/download verification remains qualification evidence rather than duplicated runtime state;
+- CPU production remains independently available and unchanged; installer/portable continue to exclude the CUDA pack.
 
 ## Quality-role review corrections
 
@@ -106,11 +106,11 @@ The direct Trellis quality review additionally fixed and regression-tested these
 
 - backend `devices` payload now includes the required CUDA device discriminator;
 - the managed runtime verifier expects the locked CUDA 12.9 license filename rather than the superseded 12.8 name;
-- product enablement now requires the lock's enable bit, both publication flags, and an exact size/SHA-matching ZIP source row, so flipping one field cannot open the gate;
+- product enablement uses the runtime lock as the artifact authority and requires its enable bit, both publication flags, the expected artifact ID, and ZIP size/SHA agreement from both source profiles; immutable URLs and completed public-download verification stay in release qualification evidence;
 - exact lock-matching RTX 3070 capability is projected as `realTested`, while every other row remains `theoretical`;
 - explicit-CUDA continuation consumes a fresh availability result instead of a stale React closure, and an already-ready dependency still executes the pending continuation;
 - CUDA preparation extraction/verification runs in `spawn_blocking`, checks cancellation before publication, and rejects concurrent same-kind preparation jobs;
 - CUDA storage measurement/cleanup covers the managed runtime root plus CUDA-specific download staging, while cleanup remains blocked during active CUDA dependency/ASR work;
-- Settings no longer offers a guaranteed-failing CUDA download action while the publication/source gate is closed.
+- Settings exposes CUDA download/repair only through the now-open exact publication/source gate; missing or identity-drifted source metadata still closes the action.
 
-Targeted frontend/Rust regressions, `pnpm build`, CUDA lock validation, `git diff --check`, and Trellis task validation pass after these corrections. The full slow suites were not rerun because the prompt supplied current successful full-suite evidence and the review changes were covered by focused tests.
+Targeted frontend/Rust regressions, CUDA lock validation, `git diff --check`, and Trellis task validation pass after these corrections. The final simplified gate was followed by a fresh full `pnpm test` run (111 files / 831 tests), full Rust run (254 tests), and successful `pnpm release:local`.

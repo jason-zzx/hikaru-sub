@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "input-frozen-artifact-qualified-local-publication-pending",
+  "status": "input-frozen-artifact-published-product-enabled",
   "platform": "windows-x64",
   "arch": "x64",
   "cuda": {
@@ -180,11 +180,12 @@
   },
   "releaseGates": {
     "legalOwnerReviewRequired": true,
+    "legalOwnerReviewCompleted": true,
     "twoCleanByteIdenticalBuildsRequired": true,
     "fatbinAuditRequired": true,
     "loadedModuleClosureRequired": true,
     "finalArtifactIdentityPending": false,
-    "externalPublicationPending": true,
-    "productEnablementAllowed": false
+    "externalPublicationPending": false,
+    "productEnablementAllowed": true
   }
 }

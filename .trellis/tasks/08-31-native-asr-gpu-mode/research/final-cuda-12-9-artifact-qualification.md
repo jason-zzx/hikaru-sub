@@ -2,7 +2,7 @@
 
 - Date: 2026-08-31
 - Scope: local deterministic build, packaging, static architecture audit, restricted RTX 3070 probe, all-eight-model functional matrix, required long gates, native-sm86 proof, loaded-module closure, and exact-final-worker Rust-host lifecycle/offline execution
-- Publication status: not published; product enablement remains false
+- Publication status: published as `native-asr-cuda-v1`; product enablement is true for the exact verified source identity
 
 ## Frozen artifact
 
@@ -77,11 +77,12 @@ Two existing exact lib-only host tests passed against these final bytes:
 
 This closes the exact-final-worker model-backed completion, cancellation, recovery, reap, active-slot, and offline/local-runtime evidence boundary without changing the frozen artifact bytes.
 
-## Remaining gates
+## Remote publication and final gate closure
 
-The exact ZIP has no stable published remote asset. Therefore:
+The exact ZIP is published under tag/release `native-asr-cuda-v1`:
 
-- `productEnablementAllowed=false` remains mandatory;
-- no `nativeAsrCuda` source row is added to `runtime-dependency-sources.json`;
-- no remote asset is published in this task;
-- external publication of these exact bytes, followed by the reviewed source-row/product-enablement decision, is the only remaining external distribution gate.
+- release: `https://github.com/jason-zzx/hikaru-sub/releases/tag/native-asr-cuda-v1`;
+- official asset: `https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip`;
+- China source: `https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip`.
+
+A fresh public GitHub download and a full China-proxy download each matched the frozen artifact exactly: `571,034,856` bytes / SHA-256 `9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4`. Both `nativeAsrCuda` source rows are now present, `productEnablementAllowed=true`, installer/portable exclusion remains unchanged, and no task gate remains.

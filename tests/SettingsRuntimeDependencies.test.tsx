@@ -176,6 +176,36 @@ describe("RuntimeDependenciesPanel", () => {
     expect(screen.getByText(/请重新安装应用/)).toBeTruthy();
   });
 
+  it("hides verbose CUDA verification details while keeping the download action", () => {
+    const verboseReason =
+      "Native ASR CUDA 运行时不完整（缺少 hikaru-asr-worker.exe, ctranslate2.dll）：C:/deps/asr-runtime/cuda/current";
+    render(
+      <RuntimeDependenciesPanel
+        probe={{
+          sourceMode: "official",
+          items: [
+            {
+              kind: "nativeAsrCuda",
+              status: "missing",
+              managed: true,
+              expectedDownloadBytes: 571034856,
+              reason: verboseReason,
+            },
+          ],
+        }}
+        storage={null}
+        onChangeSourceMode={vi.fn()}
+        onMeasureStorage={vi.fn()}
+        onCleanup={vi.fn()}
+        onPrepareDependency={vi.fn()}
+        onConfigureAsr={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(verboseReason)).toBeNull();
+    expect(screen.getByRole("button", { name: "下载" })).toBeTruthy();
+  });
+
   it("shows FFmpeg download progress", () => {
     render(<RuntimeDependenciesPanel probe={{ sourceMode: "china", items: [
       { kind: "ffmpeg", status: "missing", managed: false },

@@ -332,7 +332,7 @@ Use official pinned NVIDIA CUDA 12.9 Update 1 redistributable metadata/component
 
 ### Download artifact
 
-Publish one immutable project-controlled combined CUDA pack. `runtime-dependency-sources.json` points to that pack with exact size/SHA. China source, if present, must serve byte-identical bytes; otherwise CUDA uses official only.
+The immutable combined pack is published at tag/release `native-asr-cuda-v1`. `runtime-dependency-sources.json` points to the exact official GitHub asset and the verified China proxy; both serve byte-identical `571,034,856`-byte content with SHA-256 `9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4`.
 
 ### Licenses
 
@@ -396,7 +396,7 @@ For CC 6.1/7.5/8.9/12.0:
 
 Rollback removes or disables the CUDA source/profile and capability advertisement; CPU runtime, models, settings and commands continue unchanged. Do not delete user models or restore Python.
 
-## 11. Final local artifact freeze and publication gate
+## 11. Final artifact publication and enablement
 
 The reviewed release artifact is now frozen locally on CUDA 12.9 Update 1:
 
@@ -411,7 +411,7 @@ Packaging verifies the raw final build identities first, then performs two fixed
 
 The final local pack passes closed-tree verification, exact SASS/PTX audit, restricted RTX 3070 probe, model-backed CUDA completion, and loaded-module closure. cuRAND stays build-only because `curand64_10.dll` is absent from both PE imports and the completed module sample.
 
-Product enablement remains deliberately separate from local qualification. The lock keeps `productEnablementAllowed=false`; no source profile row is allowed until the exact ZIP bytes are published at a stable immutable remote URL. External publication is the only pending artifact-distribution gate and is explicitly outside this implementation run. The all-eight-model/long/native-sm86 matrix is complete, but an exact-final-worker Rust-host cancellation/recovery/reap/active-slot record is still required before the broader product-enable conclusion is truthful.
+Product enablement is now bound to the exact immutable publication identity. Tag/release `native-asr-cuda-v1` exists at `https://github.com/jason-zzx/hikaru-sub/releases/tag/native-asr-cuda-v1`; the official asset is `https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip`, and the China source is `https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip`. Fresh public downloads from both URLs match the frozen size/SHA exactly, the exact-final-worker Rust-host lifecycle record is complete, and the lock/source multi-field gate now allows production CUDA. The pack remains on-demand and excluded from NSIS/portable payloads.
 
 ## 12. Risks and mitigations
 

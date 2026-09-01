@@ -12,7 +12,7 @@ describe("runtime dependency source manifest", () => {
     const profiles = manifest.platforms["windows-x64"];
 
     for (const profile of [profiles.official, profiles.china]) {
-      for (const key of ["ffmpeg", "python311"] as const) {
+      for (const key of ["ffmpeg", "nativeAsrCuda", "python311"] as const) {
         expect(profile[key].url).toMatch(/^https:\/\//);
         expect(profile[key].sha256).toMatch(/^[a-f0-9]{64}$/);
         expect(profile[key].sizeBytes).toBeGreaterThan(1024 * 1024);
@@ -21,6 +21,25 @@ describe("runtime dependency source manifest", () => {
       expect(profile.python311.archive).toBe("tar.gz");
       expect(profile.python311.url).toContain("python-build-standalone");
       expect(profile.python311.stripPrefix).toBe("python");
+    }
+  });
+
+  it("matches both CUDA sources to the runtime lock", () => {
+    const manifest = JSON.parse(
+      readFileSync("src-tauri/resources/runtime-dependency-sources.json", "utf8"),
+    );
+    const lock = JSON.parse(
+      readFileSync("native-asr/runtime/windows-x64-cuda-lock.json", "utf8"),
+    );
+    const expected = {
+      archive: "zip",
+      sha256: lock.artifact.sha256,
+      sizeBytes: lock.artifact.sizeBytes,
+    };
+
+    const profiles = manifest.platforms["windows-x64"];
+    for (const profile of [profiles.official, profiles.china]) {
+      expect(profile.nativeAsrCuda).toMatchObject(expected);
     }
   });
 

@@ -422,4 +422,4 @@ The implementation subsequently proved the recommendation on exact CUDA 12.9 Upd
 - exact architecture, restricted probe, final large-v3 short smoke, and module closure pass;
 - the traced overlay additionally requires build-only `libcurand 10.3.10.19`; final runtime audit proves `curand64_10.dll` is not deployed or loaded.
 
-The exact final evidence is frozen in `final-cuda-12-9-artifact-qualification.md` and `native-asr/runtime/windows-x64-cuda-lock.json`. The only remaining artifact-distribution gate is external publication of those exact immutable bytes. This remains technical license research, not legal advice; legal-owner review is still required before publication.
+The exact final evidence is frozen in `final-cuda-12-9-artifact-qualification.md` and `native-asr/runtime/windows-x64-cuda-lock.json`. Those exact immutable bytes were subsequently published as `native-asr-cuda-v1`; fresh official GitHub and China-proxy downloads matched the frozen size/SHA, so the artifact-distribution gate is closed. This remains technical license research, not legal advice.

@@ -131,9 +131,10 @@ export function RuntimeDependenciesPanel({
                       {item.version}
                     </p>
                   )}
-                  {item.reason && (
-                    <p className="mt-1 text-xs text-warning">{item.reason}</p>
-                  )}
+                  {item.reason &&
+                    !(item.kind === "nativeAsrCuda" && item.status !== "available") && (
+                      <p className="mt-1 text-xs text-warning">{item.reason}</p>
+                    )}
                   {item.kind === "nativeAsrCpu" && (
                     <p
                       className={`mt-1 text-xs ${
