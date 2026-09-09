@@ -1,0 +1,6 @@
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Verify every child keeps evidence validity, legal timing and truthful failure dispositions."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Verify cross-route runtime, model, lifecycle, path, packaging and no-Python contracts."}
+{"file":".trellis/tasks/09-01-native-asr-remaining-migrations/prd.md","reason":"Verify fixed child order, shared acceptance criteria and explicit release exclusion."}
+{"file":".trellis/tasks/09-01-native-asr-remaining-migrations/design.md","reason":"Verify child boundaries, compatibility and independent rollback remain intact."}
+{"file":".trellis/tasks/09-01-native-asr-remaining-migrations/implement.md","reason":"Verify sequential gates and final parent integration checks are complete."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/evidence/runtime-inventory.json","reason":"Verify the final bundled CPU closure and package-budget claims against the historical exact runtime inventory without treating development bytes as final release authority."}

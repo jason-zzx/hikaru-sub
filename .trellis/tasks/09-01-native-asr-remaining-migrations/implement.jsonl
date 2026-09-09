@@ -1,0 +1,7 @@
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Shared Native ASR evidence, timing, quality and no-synthetic-repair contracts for all children."}
+{"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Shared Tauri Native worker, runtime, model delivery, job lifecycle and packaging contracts."}
+{"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/prd.md","reason":"First child scope and ForcedAligner-derived timing requirements."}
+{"file":".trellis/tasks/09-01-native-asr-parakeet-productization/prd.md","reason":"Second child scope and historical Parakeet blockers."}
+{"file":".trellis/tasks/09-01-native-asr-reazonspeech-productization/prd.md","reason":"Third child scope and historical long-audio blocker."}
+{"file":".trellis/tasks/09-01-native-asr-vad-migration/prd.md","reason":"Final child scope and post-engine VAD boundary."}
+{"file":".trellis/tasks/archive/2026-08/07-25-native-asr-crispasr-poc/research/evidence/runtime-inventory.json","reason":"Historical exact CrispASR CPU archive, DLL closure, model sizes and licenses supporting the bundled-CPU/on-demand-CUDA distribution decision."}

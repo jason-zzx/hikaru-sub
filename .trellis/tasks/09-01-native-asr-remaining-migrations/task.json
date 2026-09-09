@@ -1,0 +1,31 @@
+{
+  "id": "native-asr-remaining-migrations",
+  "name": "native-asr-remaining-migrations",
+  "title": "Complete remaining Native ASR migrations",
+  "description": "Migrate the remaining v0.4.1 ASR catalog to production Native ASR in order: Qwen3 with ForcedAligner, Parakeet, ReazonSpeech NeMo, then Native VAD; release work is explicitly excluded.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "zzx",
+  "assignee": "zzx",
+  "createdAt": "2026-09-01",
+  "completedAt": null,
+  "branch": "dev-crisp-asr",
+  "base_branch": "dev-crisp-asr",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-20-native-asr-qwen3-aligner",
+    "09-01-native-asr-parakeet-productization",
+    "09-01-native-asr-reazonspeech-productization",
+    "09-01-native-asr-vad-migration"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "Qwen full-CLI functionality/delivery and owner CPU/CUDA application runs accepted; CUDA publication review owner-closed, independent review not executed. Qwen remains in_progress for record cleanup and its build-consumed lock prevents archive in this batch. Parakeet, ReazonSpeech and general VAD remain pending; no sibling start or application release authorized.",
+  "meta": {}
+}
