@@ -26,6 +26,6 @@
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Qwen full-CLI functionality/delivery and owner CPU/CUDA application runs accepted; CUDA publication review owner-closed, independent review not executed. Qwen remains in_progress for record cleanup and its build-consumed lock prevents archive in this batch. Parakeet, ReazonSpeech and general VAD remain pending; no sibling start or application release authorized.",
+  "notes": "Qwen full-CLI functionality/delivery and owner CPU/CUDA application runs accepted; CUDA publication review owner-closed, independent review not executed. Cleanup/timeline retirement accepted. Qwen remains in_progress for owner-authorized exact-byte stable build-lock relocation and scratch decoupling, followed by offline checks and independent review before parent-owned archive; no premature completion count. Parakeet, ReazonSpeech and general VAD remain pending; no sibling start or application release authorized.",
   "meta": {}
 }

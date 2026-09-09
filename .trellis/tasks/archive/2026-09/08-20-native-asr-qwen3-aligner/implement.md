@@ -2,9 +2,11 @@
 
 ## 当前结论
 
+**2026-09-09 结项更新：用户明确要求“不复核了，直接归档”。已归档至 `.trellis/tasks/archive/2026-09/08-20-native-asr-qwen3-aligner/`，状态 `completed`。本次迁移独立复核免除且未执行；下文归档前的复核待办不再适用，不记为复核通过。构建锁位于稳定 runtime 路径，历史本地资料随任务保留，未新增 Git 提交或发布。**
+
 功能实现、双设备最终流程、模型/运行时交付与 CUDA Start UI 修复已接受，用户确认应用 CPU/CUDA 均成功。`productEnablementAllowed=true`、`externalStableAssetPublished=true`，当前选择/下载/启动保持启用。**CUDA 依赖发布复核项由用户接受关闭，超时独立代理未执行该次复核；不声称独立通过，不重新复核发布或下载/上传/推理。**
 
-前轮冗余清理及独立复核已完成；用户现已单独批准退休旧 Qwen DEVELOPMENT timeline 整体，任务保持 `in_progress` 执行该最小增量。当前构建仍读 task 内 source/model lock，不能直接移动归档。其他模型/通用 VAD child 待后续独立实施。下列交付表与既有回归是**此前已接受证据，不是本轮重跑**；应用 release、版本、手工安装/卸载仍独立。
+前轮冗余清理、旧 Qwen DEVELOPMENT timeline 退休及独立复核已完成。用户现已授权结项：原字节迁移 source/model lock 至稳定 runtime 路径、解除工具的 task scratch 耦合、离线检查后由父会话独立复核并归档；任务在实际归档前保持 `in_progress`。其他模型/通用 VAD child 待后续独立实施。下列交付表与既有回归是**此前已接受证据，不是本轮重跑**；应用 release、版本、手工安装/卸载仍独立。
 
 ## 已完成交付
 
@@ -65,7 +67,7 @@ CUDA 资产 `hikaru-asr-crispasr-windows-x64-cuda-v1.zip` 位于既有 `native-a
 
 ## 必要证据锚点与隐私
 
-- 固定构建输入：`research/upstream-engineering-baseline-lock.json`、`research/upstream-rebuild-sources.json`；推荐入口/量化/单位依据：`research/upstream-rebuild-research.md`。获取时点 flags 不改标。
+- 固定构建输入：`native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json`（原 task lock 精确迁移）；历史来源清单：`research/upstream-rebuild-sources.json`；推荐入口/量化/单位依据：`research/upstream-rebuild-research.md`。获取时点 flags 不改标。
 - 离线 14 组合并影响与原输入 hashes：`research/adjacent-display-merge-offline.md`，保留为历史离线证据而非新模型执行；Python-relative 要求纠正：`research/native-quality-requirement-supersession.md`。
 - ignored-local：`integration-first/{vad-compute-fix,worker-ass/boundary-fix,worker-ass/boundary-recheck,model-delivery,final-delivery,adjacent-display-implementation,repaired-final-delivery}/` 与 `cuda-publication/`、`enable-selection/`、`cuda-start-ui/`。原 medium raw 缺失、修正前 medium/long 失败、首次 CUDA cancel 不完整证据均不抹去/重标。
 - 当前命令/回归在 `native-asr/runtime/full-cli/README.md`、`native-asr/docs/protocol-v1.md`、`.trellis/spec/asr/qwen-cli-output.md` 和现有测试中；不再重复保存各阶段长篇执行日志。
@@ -81,10 +83,26 @@ CUDA 资产 `hikaru-asr-crispasr-windows-x64-cuda-v1.zip` 位于既有 `native-a
 
 前轮命令：`python .trellis/scripts/task.py validate .trellis/tasks/08-20-native-asr-qwen3-aligner`、父/VAD task validate、`git diff --check`，以及外部 bounded manifest/hash/reference 检查。Qwen/父验证通过，长 ASR/media spec 有既有 injection-size 警告，已直接阅读全文；规划中 VAD 因原本空白 implement/check JSONL 验证失败，未改其 manifest/扩大 sibling 规划。首次 diff 检查发现本轮 Python 写入的 CRLF，已仅修正受影响文档并复验通过。Cargo/pnpm/Native/双设备运行沿用上述已接受结果，文档清理不重跑产品。
 
-## 当前授权：旧 Qwen 开发 timeline 整体退休
+## 前轮已接受：旧 Qwen 开发 timeline 整体退休
 
 - [x] 编码前同步本任务与 JSONL；外部保存本轮 dirty-start 及 16 个精确影响文件 before bytes，确认四个待删文件均为 untracked 普通文件（共 2,488 行），无 staged files。
 - [x] 删除四文件及专用 CMake target/link/CTest；DEVELOPMENT 分支和 contract assertion 恢复 HEAD 原有 structured failure，仅移除退休 policy-negative 输入。本轮源码/构建/测试净减 **2,541 行**（四文件 2,488 + main 21 + CMake 13 + contract 19）。
 - [x] 现有 VS 环境/固定本地依赖、两个全新 ignored build 根离线 configure/build 通过；开发 CTest **8/8**，独立 full-CLI CTest **7/7**（含 **65** 个 Qwen synthetic cases）。只编译 worker/无模型回归与 `cargo --locked --offline` tokenizer，不构建上游或发布包，无下载、推理/probe。
 - [x] Qwen/父 task validate、779 个 active nonignored 文本引用扫描、`git diff --check`、before→after 范围/哈希检查通过；生产 main 分支/独立 CMake targets、共享 ABI/sibling 及锁原路径/字节保持，1,355 个其他 nonignored 小文件 SHA 不变、20 个既有资源/ZIP stat 不变，无 staged files。长 spec injection-size 与 MSVC 既有 getenv/pocketfft 警告保留；首次日志打印编码错误不影响已成功 build，随后实际 CTest 通过。
 - [x] 本轮独立复核通过，无阻塞项：workflow `e78aced5-3ace-42fa-a4d2-c9ec9b248428` / child `b30e6a6d-a0df-4c1d-8aab-8a73367b0488`，外部报告 `qwen/timeline-retirement-review.md`。复核者重新离线构建并运行开发 **8/8**、full-CLI **7/7**（含 65 synthetic cases），确认净减 2,541 行及产品路径/锁不变。完整 before/diff、命令与日志在外部同目录，不在仓库另建证据记录。Rust/frontend 未改，不重跑全套；任务仍 `in_progress` 待用户提交/结项指令，无发布/归档/Git authority。
+
+
+## 当前授权：构建锁迁移与归档前检查
+
+- [x] 编码前同步本任务/JSONL；起点 HEAD `22147b69d2164a527d6207e69597510ccc3ba2b6`，唯一 dirty 为 untracked `native-asr/artifacts/crispasr-cuda.zip`（719,774,409 bytes），不接触该包。外部保存 bounded tracked-file hash/stat 清单；不递归下探 local/models/archive/junctions。
+- [x] 原字节移动 lock 到 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json`；before/after 为 10,312 bytes、236 CRLF、SHA-256 `4fd2ffdd79f553005551308d5f7f8cdef3e155dca96feca4c240ee8f57fef28a`。prepare/package/smoke 全部改用此 authority；不重写 flags 或产品锁。
+- [x] `prepare.LOCAL` / smoke 的输出、mutex、身份文件和 executable 改用现有 ignored `native-asr/build/full-cli`；无 task/archive fallback。README 更新可复现路径，历史缓存/证据只保留不迁移。
+- [x] 增加一个 stdlib `path_check.py`：冻结 lock hash、真实 imports/help、repo-root package runpy、临时无 task 树和 prepare containment 的离线回归；只用合成临时文件，不读模型/包/媒体，不调用编译、网络或 CLI。
+- [x] `python -B native-asr/runtime/full-cli/path_check.py` 通过（exact lock、task-absent imports/runpy/help、fresh/outside/traversal/sibling/existing containment、CRLF/同长 byte drift 拒绝）；旧 HEAD 工具在无 task 合成树下按预期红测失败。9 个 full-cli Python 语法检查、Qwen/父 task validate、782 个 bounded active tracked/new 文本引用扫描、active/archive/scratch ignore、`git -c core.whitespace=cr-at-eol diff --check` 及两个新增文件 whitespace 检查通过。815 个范围外小文件 SHA、5 个大文件 stat 保持（CUDA ZIP size/mtime/file-id 不变且仍 untracked），无 staged files。
+- [ ] 独立 reviewer 接受迁移；父会话确认 archive 目标不存在、普通同卷目录与无活动 task 句柄/进程、历史链接/ignored-local 安全。随后才运行 `python .trellis/scripts/task.py archive .trellis/tasks/08-20-native-asr-qwen3-aligner --no-commit --skip-branch-validation`，更新父 AC1 与实际 archive 路径引用。实施代理不归档，不提前标完成。
+
+验证限制：stdlib 检查首次缺少合成树内的共享 protocol limits fixture，补入原 tracked bytes 后通过；无产品修复。尝试 filename-filtered Vitest 仅验证 producer helper 时，框架仍发现 ignored-local 历史 test 副本并因其相对模块缺失失败；未重跑框架，改为只读取 tracked `scripts/verify-crispasr-runtime.test.mjs` 并执行其中原有 embedded Python helper 回归，通过。该意外 discovery 不算 bounded 成功，不声称完整 Vitest 通过；未执行模型/CLI/probe/编译/包装。保留长 spec injection-size 警告，已直接全文读取。
+
+只对确定的归档边界做 `lstat`：task、research/local、archive 与 `archive/2026-09` 均为同 device `2428317520` 的非 reparse 目录，目标尚不存在；新 scratch 根未创建。未枚举 ignored-local 后代，内部链接与活动句柄仍须父会话确认，不声称已验证整个树安全。
+
+归档 helper 会先写 completed/清 session，再 `shutil.move` 整个 task（含 ignored-local）；移动失败可能留下部分状态，不能盲重跑或允许跨卷 copytree 下探媒体/模型。无 `--no-commit` 会自动操作 Git。用户只授权结项而非再次推理/probe/下载/构建/发布，既有模型与发布验收不重跑。

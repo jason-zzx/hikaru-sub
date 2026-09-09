@@ -1,6 +1,6 @@
-{"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/prd.md","reason":"Owner explicitly authorized old Qwen DEVELOPMENT timeline retirement, superseding only its prior retention; no production behavior change, inference/probe/download/upload/release/archive."}
-{"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/design.md","reason":"Retire the custom development timeline unit and restore HEAD structured-failure seam; preserve shared ABI/sibling targets and independent full-CLI production dispatch."}
-{"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/implement.md","reason":"Bounded dirty-start/before-byte preservation, exact four-file retirement and offline model-free native builds/CTest; historical accepted model/publication evidence is not rerun."}
+{"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/prd.md","reason":"Owner authorized exact-byte build-lock relocation and task-independent scratch, offline checks, then independent review before parent-owned archive; no production/release changes."}
+{"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/design.md","reason":"Stable colocated lock and shared native-asr/build/full-cli scratch; preserve repo-root package runpy compatibility and all frozen bytes; no task/archive fallback."}
+{"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/implement.md","reason":"Bounded tracked-text inventory, stdlib offline path/import/help check, syntax/task/ignore/diff validation; no model/probe/build/package/download or worker-owned archive."}
 {"file":".trellis/spec/asr/index.md","reason":"Native production and historical sidecar scope; current Qwen full-CLI contract."}
 {"file":".trellis/spec/asr/quality-guidelines.md","reason":"Current Qwen functional-only exception; retain common safety/privacy and other children absolute-quality requirements. Read the long spec fully from disk, not truncated injection."}
 {"file":".trellis/spec/asr/qwen-cli-output.md","reason":"Preserve accepted whole-byte parsing, adjacent display merge, atomic ASS and regression contract unchanged."}
@@ -10,8 +10,8 @@
 {"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Independent CT2/CrispASR roots and published same-byte CUDA sources; no cross-tree DLL loads or asset cleanup."}
 {"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Scope historical CPU-only/CT2-only artifact rules correctly; preserve protocol, shared host and model delivery. Read the long spec fully from disk."}
 {"file":".trellis/spec/tauri/quality-guidelines.md","reason":"Bounded documentation/deletion verification and truthful omitted/manual/platform checks."}
-{"file":"native-asr/runtime/full-cli/README.md","reason":"Preserve current full-CLI commands/adaptations/toolchain limits; update only obsolete development-timeline retention statements."}
-{"file":"native-asr/docs/protocol-v1.md","reason":"Preserve protocol/role/limit/process/output contracts, shared ABI/sibling tests and generic Qwen structured-failure seam; only retired custom timeline tests are removed."}
-{"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/research/upstream-engineering-baseline-lock.json","reason":"Build-consumed fixed input: preserve exact PATH and BYTES; acquisition flags stay historical, not rewritten to claim verification."}
+{"file":"native-asr/runtime/full-cli/README.md","reason":"Current reproducible stable lock/scratch paths, preserved historical evidence and accepted production/toolchain boundaries."}
+{"file":"native-asr/docs/protocol-v1.md","reason":"Preserve accepted full-CLI product and shared protocol/ABI unchanged."}
+{"file":"native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json","reason":"Relocated exact 10312 bytes, SHA256 4fd2ffdd79f553005551308d5f7f8cdef3e155dca96feca4c240ee8f57fef28a; preserve CRLF and historical flags."}
 {"file":".trellis/tasks/08-20-native-asr-qwen3-aligner/research/adjacent-display-merge-offline.md","reason":"Preserve historical offline 14-group evidence and raw identities; not new inference or current pending state."}
 {"file":"native-asr/runtime/crispasr-product-lock.json","reason":"Preserve exact bytes, enabled/published flags and actual artifact identity; historical status string is not current acceptance authority."}

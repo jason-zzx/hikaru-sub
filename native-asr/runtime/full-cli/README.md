@@ -6,8 +6,10 @@ The owner confirmed CPU and CUDA application runs. Qwen selection/download/start
 and the separate CrispASR CUDA download remain enabled. The owner accepted closure
 of the CUDA-publication review item; the timed-out independent agent **did not
 execute that review**. Dependency publication is not a new application release.
-The separately authorized old Qwen development-timeline retirement uses offline
-model-free worker builds/tests only; no inference, probe, download/upload or packaging.
+The old Qwen development-timeline retirement is accepted. The owner authorized
+exact-byte lock relocation and task-independent scratch paths, with offline checks
+and independent review before parent-owned task archive; no inference, probe,
+download/upload, compilation or packaging is part of this closure.
 
 - Current file/archive authority: `../crispasr-product-lock.json`.
   `productEnablementAllowed=true`, `externalStableAssetPublished=true`; preserve
@@ -30,11 +32,14 @@ model-free worker builds/tests only; no inference, probe, download/upload or pac
   a newly released app or evidence of later installer interaction. Only RTX3070 was
   tested; manual installation/uninstallation and release readiness remain separate.
 
-Task prefix below: `.trellis/tasks/08-20-native-asr-qwen3-aligner`.
-Keep `research/upstream-engineering-baseline-lock.json` at its exact path/bytes:
-`prepare.py`, `package.py`, and `smoke.py` still consume it. Its acquisition-time
-verification flags remain historical, not relabeled. Keep `upstream-rebuild-sources.json`
-and the concise `upstream-rebuild-research.md` source rationale. The unused trimmed
+Stable build/model metadata authority: `upstream-engineering-baseline-lock.json`
+in this directory. `prepare.py`, `package.py`, and `smoke.py` consume this same
+relocated file, independent of any active or archived Trellis task. Its original
+**10,312 bytes**, **236 CRLF lines**, SHA-256
+`4fd2ffdd79f553005551308d5f7f8cdef3e155dca96feca4c240ee8f57fef28a`
+and acquisition-time verification flags are unchanged, not relabeled.
+The historical Qwen task retains `research/upstream-rebuild-sources.json` and
+`research/upstream-rebuild-research.md` as source rationale, not build inputs. The unused trimmed
 target and abandoned experiments are retired. The old Qwen development timeline
 library/table/dedicated tests are also retired as a unit; the generic development
 worker retains its original structured-failure seam. Current full-CLI code/tests,
@@ -74,16 +79,22 @@ These are retained engineering commands, **not cleanup actions or authorization 
 rerun models**. Use an x64 Visual Studio Developer prompt (VS18.2/MSVC14.50.35717,
 SDK10.0.26100, VS CMake/Ninja, installed CUDA12.8 in the accepted environment).
 
-`LOCAL` is the task's ignored `research/local/integration-first/` directory;
-`CACHE` is its existing `research/local/upstream-rebuild-baseline/` archive cache.
-Preparation requires the verified full c2pa archive at the supplied path; missing
-acquisition needs separate scope. Do not modify cache/old accepted build trees.
+Run from the repository root. `LOCAL` is the fixed ignored
+`native-asr/build/full-cli/` scratch root shared by prepare and smoke.
+`CACHE` explicitly names an existing verified directory containing `source.tar.gz`
+and `ggml.tar.gz`; `C2PA_ARCHIVE` names the existing verified full c2pa archive.
+No task discovery, archive-path fallback, cache copying or historical evidence
+migration occurs. Missing acquisition needs separate scope. Existing caches and
+accepted build trees remain untouched; supply their actual paths if reusing them.
 `prepare.py` requires a fresh output under LOCAL. Device build roots cannot be
-reused across devices/pins. The smoke runner is fixed to `LOCAL/<device>/bin/crispasr.exe`;
-do not point it at another package by assumption or execute stale binaries.
+reused across devices/pins. Smoke fixes the executable at
+`LOCAL/<device>/bin/crispasr.exe`, its mutex at `LOCAL/model.lock`, and run outputs
+at `LOCAL/<name>`; do not execute stale binaries or infer another package identity.
 
 ```bat
-python native-asr/runtime/full-cli/prepare.py --cache "%CACHE%" --c2pa-archive "%LOCAL%/c2pa-audio.tar.gz" --output "%LOCAL%/source-new"
+set "LOCAL=%CD%/native-asr/build/full-cli"
+rem Set CACHE and C2PA_ARCHIVE to existing verified inputs; no acquisition here.
+python native-asr/runtime/full-cli/prepare.py --cache "%CACHE%" --c2pa-archive "%C2PA_ARCHIVE%" --output "%LOCAL%/source-new"
 python native-asr/runtime/full-cli/patch.py "%LOCAL%/source-new"
 call native-asr/runtime/full-cli/build.cmd "%LOCAL%/source-new" "%LOCAL%/cpu" cpu
 call native-asr/runtime/full-cli/build.cmd "%LOCAL%/source-new" "%LOCAL%/cuda" cuda "%CUDA_ROOT%"
@@ -93,7 +104,7 @@ python native-asr/runtime/full-cli/smoke.py --device cuda --name cuda-new --cuda
 ```
 
 Run serially and stop on any nonzero exit. Each run name must be new. Models/audio
-may alternatively resolve from ignored `models-verified.json`/`audio-verified.json`;
+may alternatively resolve from ignored `LOCAL/models-verified.json`/`LOCAL/audio-verified.json`;
 all actual hashes are checked. Short input is the authorized mono PCM16/16kHz,
 385637-frame WAV SHA `4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211`.
 No reference ASS is read. `--unicode-paths` exercises Chinese/spaced hardlink paths;
@@ -132,7 +143,7 @@ availability switch. Outside it, ordinary upstream behavior remains.
   then only merges approved zero-duration/decreasing-start groups using existing
   endpoints and ordered text; generic protocol validation remains unchanged.
   See `.trellis/spec/asr/qwen-cli-output.md` and `native-asr/docs/protocol-v1.md`.
-- Smoke uses task mutex/inventory, suspended Job assignment before resume,
+- Smoke uses the shared scratch mutex/process inventory, suspended Job assignment before resume,
   restricted PATH, module/hash checks and bounded private diagnostics. It does
   not infer forward progress from arbitrary stderr or kill normal CPU loading
   after a fixed 120s silence. Product host owns cancellation/recovery/reap;
@@ -141,8 +152,22 @@ availability switch. Outside it, ordinary upstream behavior remains.
   existing 15s/16KiB strict Rust process/JSON boundary. It declares
   `modelExecutionProof=false`; CPU never invokes it and it does not prove ASR graphs.
 
-Necessary ignored evidence stays under `research/local/integration-first/`
+Historical Qwen task evidence remains under its `research/local/integration-first/`
 (`vad-compute-fix`, `worker-ass`, `model-delivery`, `adjacent-display-implementation`,
 `final-delivery`, `repaired-final-delivery`) and sibling `cuda-publication`,
 `enable-selection`, `cuda-start-ui`. Keep original failures/missing raw limitations;
 no raw transcript/token/logit/private path belongs in tracked documentation.
+These historical files are not new scratch inputs; the archive-aware ignore rule
+protects them after task archive as well. Do not migrate or delete them.
+
+Offline relocation regression (stdlib, Windows Python; no model/CLI/compiler):
+
+```bat
+python -B native-asr/runtime/full-cli/path_check.py
+```
+
+This checks the exact lock bytes, shared callers, repository-root package `runpy`
+compatibility, active/archive/scratch ignore rules, and helpers/help/prepare output
+containment in a temporary tree with no Trellis task. It does not requalify runtime
+or package bytes. Future packaging naturally records changed tool fingerprints;
+existing product locks, publication flags and accepted archives stay unchanged.

@@ -8,8 +8,8 @@ import tarfile
 import posixpath
 
 REPO = Path(__file__).resolve().parents[3]
-TASK = REPO / '.trellis/tasks/08-20-native-asr-qwen3-aligner'
-LOCK = TASK / 'research/upstream-engineering-baseline-lock.json'
+LOCAL = REPO / 'native-asr/build/full-cli'
+LOCK = Path(__file__).resolve().with_name('upstream-engineering-baseline-lock.json')
 C2PA = {
     'url': 'https://codeload.github.com/CrispStrobe/c2pa-audio/tar.gz/e40329b83f16f67bb5ddc7bb13ae18de0a9376fc',
     'sizeBytes': 256595,
@@ -61,7 +61,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     destination = args.output.resolve()
-    destination.relative_to((TASK / 'research/local/integration-first').resolve())
+    destination.relative_to(LOCAL.resolve())
     if destination.exists():
         raise ValueError('fresh output directory required')
     subprocess.run(['git', 'check-ignore', '--quiet', str(destination)], cwd=REPO, check=True)

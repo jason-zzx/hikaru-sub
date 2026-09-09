@@ -6,8 +6,10 @@
 
 Functionality/delivery and owner CPU/CUDA application runs are accepted; CUDA
 publication review was owner-closed, not independently executed by the timed-out
-reviewer. The child remains in_progress for cleanup; its build-consumed source/model
-lock prevents archiving in this batch. Other children have not started.
+reviewer. Cleanup/timeline retirement is accepted. The child remains in_progress
+for the newly authorized exact-byte lock relocation and stable scratch decoupling;
+offline checks and independent review precede parent-owned archive. Other children
+have not started.
 
 - [x] Freeze the parent device-coverage decision: Qwen3, Parakeet and ReazonSpeech must each support production CPU and CUDA.
 - [x] Review the new integration-first design and curated context for `08-20-native-asr-qwen3-aligner`; user explicitly instructed 开始实施 and task.py start activated the child.
@@ -19,7 +21,7 @@ lock prevents archiving in this batch. Other children have not started.
 - [x] Establish independent CrispASR CPU/CUDA artifact IDs, locks, verifiers and roots: bundled CPU and managed on-demand CUDA, both isolated from the existing CTranslate2 artifacts and without model weights.
 - [x] Integrate required CPU VAD in Qwen, include its asset in logical progress/readiness, and preserve upstream word-aware alignment/display semantics; only the child-approved adjacent display anomaly merge using existing endpoint envelopes; no other repair or text-duration fallback.
 - [x] Run separate CPU/CUDA short/medium/long functional and lifecycle checks; no reference ASS, quality scoring, Python parity or inherited GPU quality label.
-- [ ] Finish Qwen record cleanup and resolve its build-consumed task-lock location before later archive/Parakeet activation; functionality, delivery and local packaging checks are already accepted. Do not archive or start siblings in this cleanup batch.
+- [ ] Finish the authorized exact-byte Qwen lock relocation to `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json` and scratch decoupling to `native-asr/build/full-cli`; after offline checks and independent review, parent preflights the whole-directory move and archives without commit. Mark complete and update actual archived context paths only after archive succeeds; no automatic sibling activation or repeated qualification.
 
 ### Phase 2 - Parakeet
 

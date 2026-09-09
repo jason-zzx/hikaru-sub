@@ -2,7 +2,7 @@
 
 本文件保留重建时的静态来源结论，不是模型功能验收。用户后续批准完整 CLI、必需 CPU VAD、上游 LIS/插值及最小相邻展示异常合并；当前实现与双设备应用已接受，见 child `prd.md` / `implement.md`。不恢复旧 raw-only、DP、Nagisa/Python parity 或源码裁剪方向。
 
-基线 CrispASR `v0.8.32` / `e2a356146e36bc1cc0410edefb01990448766979`；逐文件 URL/size/SHA 在 `upstream-rebuild-sources.json`。`upstream-engineering-baseline-lock.json` 是仍被构建消费的固定 source/model metadata，保持原路径与字节；其获取时点 flags 不改标为后来的实际验证。
+基线 CrispASR `v0.8.32` / `e2a356146e36bc1cc0410edefb01990448766979`；逐文件 URL/size/SHA 在 `upstream-rebuild-sources.json`。固定 source/model metadata 已按用户结项授权原字节迁至 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json`，不再依赖 task 路径；其获取时点 flags 不改标为后来的实际验证。
 
 | 固定源码依据 | 结论与使用边界 |
 |---|---|

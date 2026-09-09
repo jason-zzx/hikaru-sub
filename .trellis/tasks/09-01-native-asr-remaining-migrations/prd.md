@@ -1,6 +1,6 @@
 # Complete remaining Native ASR migrations
 
-> **Qwen 当前状态**：完整 CLI + 默认 Q4_K pair + 必需 CPU Silero + 上游 LIS/word display（含批准的有界相邻异常合并）已完成双设备功能、交付和本地包装检查，工程复核接受，用户确认应用 CPU/CUDA 成功。选择/下载/启动及独立 CrispASR CUDA 源保持启用；CUDA 发布复核项由用户接受关闭，超时独立代理没有执行该次复核。Qwen child 仅以 `in_progress` 清理废弃记录；构建仍读其中 lock，暂不归档。Parakeet/Reazon/通用 VAD 尚待独立实施，不自动开始。Qwen 不适用旧质量矩阵、量化竞赛、CPU 质量继承、raw-only/DP 或源码裁剪要求；其他 child 的绝对质量合同不变。证据与限制见 Qwen `implement.md`。
+> **Qwen 当前状态**：完整 CLI + 默认 Q4_K pair + 必需 CPU Silero + 上游 LIS/word display（含批准的有界相邻异常合并）已完成双设备功能、交付和本地包装检查，工程复核接受，用户确认应用 CPU/CUDA 成功。选择/下载/启动及独立 CrispASR CUDA 源保持启用；CUDA 发布复核项由用户接受关闭，超时独立代理没有执行该次复核。Qwen 清理/开发 timeline 退休已接受；构建锁精确迁移和稳定 scratch 解耦已落盘；用户免除进一步复核后，child 于 2026-09-09 归档至 `.trellis/tasks/archive/2026-09/08-20-native-asr-qwen3-aligner/`，迁移独立复核未执行。Parakeet/Reazon/通用 VAD 尚待独立实施，不自动开始。Qwen 不适用旧质量矩阵、量化竞赛、CPU 质量继承、raw-only/DP 或源码裁剪要求；其他 child 的绝对质量合同不变。证据与限制见 Qwen `implement.md`。
 
 ## Goal
 
@@ -76,7 +76,7 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1: Qwen3-ASR 与 exact ForcedAligner companion 功能迁移已完成；子任务清理/归档待收尾，当前 build 仍引用其 lock，不在本轮归档。
+- [x] AC1: Qwen3-ASR 与 exact ForcedAligner companion 功能迁移及清理已接受，构建锁迁移已落盘；用户明确免除进一步复核后，子任务于 2026-09-09 归档。迁移独立复核未执行，未新增提交或发布。
 - [ ] AC2: Parakeet exact 日语模型完成生产 Native ASR 迁移并归档对应子任务。
 - [ ] AC3: ReazonSpeech NeMo v2 exact 模型完成生产 Native ASR 迁移并归档对应子任务。
 - [ ] AC4: Qwen 必需 CPU VAD 随 AC1 完成，通用 Native VAD 在前三项之后完成迁移，固定 CPU 执行；CPU 与 CUDA ASR 路线均验证 CPU-VAD → ASR 数据流，且不提供 VAD CUDA 路线。

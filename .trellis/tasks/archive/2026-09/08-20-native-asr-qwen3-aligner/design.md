@@ -2,7 +2,7 @@
 
 ## 状态与决策
 
-当前功能已接受，用户确认应用 CPU/CUDA 成功；模型选择/下载/启动与独立 CUDA 下载源保持启用。CUDA 发布复核项是用户接受关闭，非超时独立代理复核通过。当前用户已明确授权将旧 Qwen DEVELOPMENT timeline 连同专用测试/接线整体退休；不变更生产实现或 release 状态。
+当前功能已接受，用户确认应用 CPU/CUDA 成功；模型选择/下载/启动与独立 CUDA 下载源保持启用。CUDA 发布复核项是用户接受关闭，非超时独立代理复核通过。旧 Qwen DEVELOPMENT timeline 退休已接受；当前用户明确授权精确迁移构建锁、解除任务目录耦合、离线复核后由父会话归档，不变更生产实现或 release 状态。
 
 使用 CrispASR v0.8.32 / `e2a356146e36bc1cc0410edefb01990448766979` 的完整 `crispasr-cli` target（输出 `crispasr.exe`）。允许包含未启用 backend/embedded server 源码，但受控应用调用只请求 Qwen 文件转录。文件/依赖/许可证闭集不等于源码裁剪；不恢复低层 session 编排、raw-only/DP 或质量研究。
 
@@ -30,10 +30,11 @@ Rust 持有模型/readiness、任务 gate、进程所有权、终态与恢复；
 | Aligner / `Qwen/Qwen3-ForcedAligner-0.6B` | `cstr/qwen3-forced-aligner-0.6b-GGUF` / `1ec5110602ccab18c878ddebedab0891e290a95c` | `qwen3-forced-aligner-0.6b-q4_k.gguf` |
 | 必需 CPU VAD | `ggml-org/whisper-vad` / `9ffd54a1e1ee413ddf265af9913beaf518d1639b` | `ggml-silero-v6.2.0.bin` |
 
-- `research/upstream-engineering-baseline-lock.json` 仍是 prepare/package/smoke 的固定输入，保持原路径/字节；其中获取时点未验证 flags 不是当前功能状态，不能改标。完整 c2pa archive authority 在 `full-cli/prepare.py`，源码伙伴清单为 `research/upstream-rebuild-sources.json`。
+- prepare/package/smoke 的固定输入迁至 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json`，原 10,312 bytes / SHA-256 `4fd2ffdd79f553005551308d5f7f8cdef3e155dca96feca4c240ee8f57fef28a`（236 CRLF）完全不变；获取时点未验证 flags 不是当前功能状态，不能改标。完整 c2pa archive authority 仍在 `full-cli/prepare.py`，历史源码伙伴清单留在 `research/upstream-rebuild-sources.json`。
+- `prepare.py` 以自身位置解析稳定 lock 和仓库根，共享 `LOCAL = native-asr/build/full-cli` 给 smoke；prepare 输出 containment 与 smoke 的输出、mutex、可选模型/音频 identity 及 executable 都使用这个 ignored 根。package 保留 repo-root `runpy.run_path` 兼容，以自身同目录解析同一 lock，不引入新模块路径要求。无旧 task/archive 路径 fallback；旧缓存/证据不搬迁，新构建输入由显式参数提供。
 - 完整 CPU/CUDA target 使用独立 build 根、现有工具链和上游配置，不加 Qwen-only guards/stubs。只做必要设备/输出/进程安全适配；不改 tokenizer、LIS、窗口或精度。
 - 实际生产文件/archives authority 是 `native-asr/runtime/crispasr-product-lock.json`；当前 enablement/publication 均 true。其历史 pending 状态字符串不替代用户验收，也不因文案清理改 lock 或 package.py。
-- 构建、exact-source 回归及 smoke 命令保留于 `native-asr/runtime/full-cli/README.md`；本轮不执行这些模型/上游构建命令，仅以现有固定本地依赖构建应用 worker 和无模型回归。
+- 构建、exact-source 回归及 smoke 命令保留于 `native-asr/runtime/full-cli/README.md`；本轮只验证 helpers/imports/help、语法和合成路径 containment，不执行模型、probe、编译或包装命令。
 
 ## 设备、安全与结果合同
 
@@ -58,4 +59,4 @@ Rust 持有模型/readiness、任务 gate、进程所有权、终态与恢复；
 
 ## 停止与回滚边界
 
-本轮仅处理明确授权的开发 timeline 调用与专用测试；若需变更生产/共享 ABI、下载依赖或修改范围外源码则停止报告，不重写生产来凑删除数。任务 lock 仍被构建消费，暂不归档。功能回滚须另有范围授权，只作用新路线，不伤 CT2、用户 ASS/模型或恢复 Python；任何更换模型/算法、许可/预算/设备保证的变更须重新决策，不属于文档清理。
+本轮只迁移固定 lock 路径并解除工具的任务目录耦合；若需变更生产/共享 ABI、依赖/模型/包 bytes 或更广实现则停止报告。归档 helper 会先改任务/会话状态，再 `shutil.move` 整个目录（含 ignored-local），不是 tracked-only 移动；父会话须在独立复核后确认目标不存在、同卷普通目录与无活动句柄/任务进程、链接可保持，避免复制回退下探模型/用户媒体。使用 `--no-commit --skip-branch-validation`，不得提前声称已归档。功能回滚须另有范围授权，只作用新路线，不伤 CT2、用户 ASS/模型或恢复 Python；任何更换模型/算法、许可/预算/设备保证的变更须重新决策，不属于文档清理。

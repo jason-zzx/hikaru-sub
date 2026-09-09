@@ -14,10 +14,8 @@ import subprocess
 import time
 import wave
 
-from prepare import REPO, TASK, verify
+from prepare import REPO, LOCAL, LOCK, verify
 from validate import validate, require
-
-LOCAL = TASK / 'research/local/integration-first'
 
 
 def identity(path):
@@ -123,7 +121,7 @@ def main():
             models = ([{'role': role, 'path': str(path.resolve()), **identity(path)}
                        for role, path in zip(['asr', 'aligner', 'vad'], supplied, strict=True)] if all(supplied)
                       else json.loads((LOCAL / 'models-verified.json').read_text()))
-            locked = json.loads((TASK / 'research/upstream-engineering-baseline-lock.json').read_text())['models']
+            locked = json.loads(LOCK.read_text(encoding='utf-8'))['models']
             paths = {}
             for row, lock in zip(models, locked, strict=True):
                 require(row['role'] == lock['role'], 'role_order')
@@ -180,7 +178,7 @@ def main():
                       'path': env['PATH'], 'state': 'starting',
                       'tooling': {file.name: identity(file) for file in Path(__file__).parent.iterdir()
                                   if file.suffix in ('.py', '.h', '.cmd', '.cpp')},
-                      'inputLock': identity(TASK / 'research/upstream-engineering-baseline-lock.json')}
+                      'inputLock': identity(LOCK)}
             owner = out / 'ownership.json'
             owner.write_text(json.dumps(record, indent=2))
             job = Job()

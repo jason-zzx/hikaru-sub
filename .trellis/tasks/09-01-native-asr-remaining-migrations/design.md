@@ -2,7 +2,7 @@
 
 ## Boundary
 
-Qwen 已完成固定完整 CLI、默认 Q4_K pair、必需 CPU VAD、LIS/word display 与批准的相邻展示异常合并；双设备功能/交付工程复核和用户 CPU/CUDA 应用确认已接受。独立 CUDA 包已发布，发布复核项由用户接受关闭（非超时独立代理通过）。Qwen child 仅保留 in_progress 清理，build-consumed task lock 暂不移动/归档。非 Qwen CLI 实现被编译不等于对应模型产品化；Parakeet/Reazon/通用 VAD 待后续独立实施。下文质量/转换竞赛/CPU 继承条款只适用其他 child，不恢复 Qwen raw-only/DP/源码裁剪要求。
+Qwen 已完成固定完整 CLI、默认 Q4_K pair、必需 CPU VAD、LIS/word display 与批准的相邻展示异常合并；双设备功能/交付工程复核和用户 CPU/CUDA 应用确认已接受。独立 CUDA 包已发布，发布复核项由用户接受关闭（非超时独立代理通过）。Qwen 清理已接受；child 保持 in_progress 完成新授权的 build lock 原字节迁至 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json` 和 `native-asr/build/full-cli` scratch 解耦，离线独立复核后才由父会话归档。非 Qwen CLI 实现被编译不等于对应模型产品化；Parakeet/Reazon/通用 VAD 待后续独立实施。下文质量/转换竞赛/CPU 继承条款只适用其他 child，不恢复 Qwen raw-only/DP/源码裁剪要求。
 
 父任务不实现统一的新 backend，也不把不同模型强行塞进 CTranslate2。它只固定顺序和共享生产合同；每个子任务复用现有 Native worker protocol、Rust host、job lifecycle、模型管理和前端可用性流程，并为实际 backend 提供最小必要扩展。
 

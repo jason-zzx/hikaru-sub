@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-**功能交付已接受；任务保持 `in_progress` 执行已明确授权的旧 Qwen 开发 timeline 整体退休。** 用户确认应用内 CPU、CUDA 均成功运行，当前 Qwen 选择、模型下载、转录及独立 CrispASR CUDA 下载保持启用。CUDA 依赖发布复核项由用户接受关闭；此前超时的独立代理没有执行该次复核，不记为独立通过，不再重跑下载、上传或推理。
+**已于 2026-09-09 归档，状态 `completed`。功能交付与旧 Qwen 开发 timeline 退休已接受，构建锁迁移及任务路径解耦已落盘；用户明确要求“不复核了，直接归档”，本次迁移独立复核未执行，不记为通过。归档未自动提交。** 用户确认应用内 CPU、CUDA 均成功运行，当前 Qwen 选择、模型下载、转录及独立 CrispASR CUDA 下载保持启用。CUDA 依赖发布复核项由用户接受关闭；此前超时的独立代理没有执行该次复核，不记为独立通过，不再重跑下载、上传或推理。
 
 采用固定上游完整 CLI，替代废弃的低层 session/raw-only、DP/质量实验及 Qwen-only 源码裁剪方向。Qwen（含必需 CPU VAD）→ Parakeet → ReazonSpeech → 通用 VAD 的顺序不变；其他 child 尚未实现。本任务完成不代表新应用版本发布或所有 GPU 已实测。
 
@@ -42,14 +42,14 @@
 - [x] AC4 / R3：输出/路径/静音/取消重开/recovery/reap 回归通过；用户确认双设备应用运行及当前入口可用。
 - [x] AC5 / R2–R3：独立 runtime 文件/来源/许可/路径和本地包预算检查通过，CT2 保持；CUDA 依赖已发布并接通同字节下载源，发布复核项由用户接受关闭。
 
-## 本轮清理边界
+## 本轮结项边界
 
-- 前轮 267 项冗余记录/实验/未使用裁剪 target 清理已接受。本轮用户单独批准 ponytail 审查唯一建议：整体退休旧 Qwen DEVELOPMENT timeline，覆盖此前保留它的要求，不扩大其他边界。
-- 仅删除 `native-asr/src/qwen_timeline_policy.cpp`、`.hpp`、`qwen_unicode_punctuation_ranges.inc` 及 `native-asr/tests/qwen_timeline_policy_tests.cpp`；同步移除专用 CMake 接线。开发 Qwen 分支回到 HEAD 原有 backend 能力调用后 structured `qwen_timeline_policy_not_implemented` / exit20 合同及对应测试，无字幕输出。
-- 保留共享 backend/fake ABI、Parakeet/Reazon targets、当前 full-cli 生产适配器/回归/协议安全、全部锁原路径/字节、模型/运行时资产与 ignored-local/用户素材；不递归清理缓存或链接目录。
-- `research/upstream-engineering-baseline-lock.json` 的路径和字节不变：当前 prepare/package/smoke 仍消费它，不能归档任务。保留来源清单、简短上游研究、相邻合并影响和需求纠正文档。
-- 编码前仅同步当前任务/manifest 授权。外部保留本轮 dirty-start 清单与精确 before bytes；按本轮增量计数，不把迁移整体回退 HEAD。运行本地固定依赖的无模型 native configure/build/CTest、task validate、active-reference scan 与 diff 检查；不改生产行为、锁/包字节或历史 verification flags。
+- 前轮冗余清理与旧 Qwen DEVELOPMENT timeline 整体退休已接受，不重复实施或验证。共享 backend/fake ABI、sibling targets、full-CLI 生产行为/回归/协议与模型/运行时身份不变。
+- 用户明确授权将 `research/upstream-engineering-baseline-lock.json` 原字节迁至 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json`，仅以此覆盖此前保留原路径/不可归档限制。获取时点 flags 不改标，生产锁与包字节不变。
+- prepare/package/smoke 全部脱离任务目录：固定构建 authority 与 ignored scratch 不依赖活动任务、归档路径或动态任务发现。历史缓存与证据不迁移/删除，后续新输出与历史证据分离；归档后隐私 ignore 仍有效。
+- 仅以 stdlib 小型离线检查、语法、tracked-text 引用清单、task validate 和保留 CRLF 的 diff 检查验证迁移；不重跑已接受的资格/发布/模型验证，不重建源码或包。
+- 迁移代理完成离线检查后交接超时，恢复请求又中止；用户随后明确免除进一步复核。父会话使用 `--no-commit --skip-branch-validation` 完成归档，历史 ignored-local 随目录保留；未执行迁移独立复核。
 
 ## 不在范围内
 
-Qwen 质量/量化竞赛、CER/WER/S/D/I/参考 ASS timing/gap/150–500ms 门槛、Python parity、`inherited-from-gpu`、DP/logit/token/Nagisa 研究、源码裁剪、其他引擎/通用 VAD 实现、新证据平台、推理/probe/下载/上传/重建包、版本/CHANGELOG/应用发布、Git stage/clean/reset/commit/push/merge/history、任务归档。发布准备与未执行的安装/卸载交互由用户独立判断。
+Qwen 质量/量化竞赛、CER/WER/S/D/I/参考 ASS timing/gap/150–500ms 门槛、Python parity、`inherited-from-gpu`、DP/logit/token/Nagisa 研究、源码裁剪、其他引擎/通用 VAD 实现、新证据平台、推理/probe/下载/上传/重建包、版本/CHANGELOG/应用发布、Git stage/clean/reset/commit/push/merge/history、实施代理自行归档。发布准备与未执行的安装/卸载交互由用户独立判断。

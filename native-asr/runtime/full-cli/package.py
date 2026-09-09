@@ -7,6 +7,7 @@ import shutil
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[3]
+LOCK = Path(__file__).resolve().with_name('upstream-engineering-baseline-lock.json')
 
 
 def identity(path):
@@ -90,7 +91,7 @@ def package(args):
                 shutil.copyfile(args.cuda_toolkit/'bin'/name,root/name)
             for name in ('EULA.txt','LICENSE'):
                 copy_notice('NVIDIA-'+name,args.cuda_toolkit/name,'NVIDIA CUDA Toolkit 12.8','NVIDIA CUDA Toolkit EULA','https://docs.nvidia.com/cuda/archive/12.8.0/eula/index.html')
-        model_lock=json.loads((ROOT/'.trellis/tasks/08-20-native-asr-qwen3-aligner/research/upstream-engineering-baseline-lock.json').read_text(encoding='utf-8'))
+        model_lock=json.loads(LOCK.read_text(encoding='utf-8'))
         model_notice={'weightsBundled':False,'converterCommit':None,'conversionProvenance':'Reused published GGUF bytes; publisher did not state converter commit. No conversion performed.',
                       'assets':[{k:r[k] for k in ('logicalModel','repository','revision','file','publicationSizeBytes','publicationSha256','licenseDeclaredByModelCard','modelCard')} for r in model_lock['models']]}
         write_json(licenses/'MODEL-SOURCES.json',model_notice)
