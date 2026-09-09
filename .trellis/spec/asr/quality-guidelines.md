@@ -1,6 +1,30 @@
 # ASR Quality Guidelines
 
-## Verification
+## Current Qwen full-CLI scope
+
+Current Qwen uses the accepted pinned full CLI, exact recommended Q4_K pair,
+mandatory CPU Silero, upstream LIS/interpolation and word-aware display, with the
+approved minimal adjacent display anomaly merge. Its contract is
+[qwen-cli-output.md](./qwen-cli-output.md), the current Qwen child PRD and the
+shared Tauri host/path specs. CPU/CUDA functional delivery and owner application
+runs are accepted; source support is not application release readiness.
+
+Do not apply the retired Qwen raw-only/first-last grouping, DP, custom timing,
+150/500ms reference error, conversion competition, Python-relative quality or
+`inherited-from-gpu` pipeline to current Qwen. Validate complete bytes, same-run
+text conservation, legal final cues/protocol, actual device/runtime identity,
+required CPU VAD, fail-safe ASS, cancellation/recovery/reap, path/privacy/license
+and delivery contracts. CLI silence requires successful CPU VAD, not missing or
+partial output. Graph/device proof is distinct from a model-free CUDA probe.
+
+The absolute-quality qualification scenario below applies to other independently
+scoped Native candidates (including the pending Parakeet/Reazon children), not a
+request to rerun accepted Qwen. The old Qwen development timeline library and its
+dedicated tests are retired. Shared session/backend ABI tests and the generic
+Qwen structured-failure seam remain development compatibility checks; they do
+not select or replace the independent full-CLI product path.
+
+## Historical sidecar verification
 
 ```bash
 cd asr-service
@@ -17,7 +41,7 @@ Representative tests:
 
 When optional engines or models are absent, report that limitation instead of claiming full coverage.
 
-## Standards
+## Historical sidecar standards
 
 - Engines stay behind `AsrEngine` + registry
 - HTTP aliases stay aligned with frontend types
@@ -28,7 +52,7 @@ When optional engines or models are absent, report that limitation instead of cl
 
 ### 1. Scope / Trigger
 
-Use this contract whenever a Python or native ASR candidate is measured for migration feasibility. User-provided `.asr-benchmark` WAV+ASS pairs remain the only text, speech-region, and timeline truth. The authoritative model-level handoff in `.trellis/tasks/archive/2026-08/08-18-native-asr-python-legacy-baseline/research/python-legacy-baseline.json` establishes a scoped subtitle-quality non-regression gate only for complete, identity-bound `python-legacy-cuda-v1` rows; Python output never creates or repairs reference annotations. Future native model qualification uses the user-approved `native-gpu-authoritative-v1` profile: only the frozen GPU candidate runs model-backed quality/performance matrices, and a matching CPU route inherits that disposition without a CPU model-backed rerun.
+Use this contract when a Native ASR candidate outside the current Qwen full-CLI scope is measured for migration feasibility or production qualification. User-provided `.asr-benchmark` WAV+ASS pairs remain the only text, speech-region, and timeline truth. Native qualification uses the absolute `native-ground-truth-absolute-v1` profile. Archived `python-legacy-cuda-v1` rows are historical diagnostics only: they may be displayed separately, but they never define expected output, create or repair reference annotations, or contribute a Native pass/fail decision. Only the frozen GPU candidate runs model-backed quality/performance qualification; a matching CPU route separately completes its required functional/lifecycle matrix and then inherits that exact GPU candidate disposition.
 
 ### 2. Signatures
 
@@ -61,6 +85,8 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 - A token-derived end inside the model range may be bounded to the verified WAV end only when raw evidence retains the original end, final end, token IDs, trace hash, and an explicit bound flag. A segment starting at/after WAV end still fails. Do not use bounding to repair missing speech.
 - Native evidence records immutable model file sizes/SHA-256, input-lock SHA-256, executable SHA-256, environment, and ignored raw/result hashes. Raw transcripts/traces may be written only below the exact canonical task-local ignored root; substring path checks are insufficient.
 - Separate model-backed **discovery**, **candidate acquisition**, and **qualification**. Discovery is ignored-local, `qualificationEligible=false`, records actual loaded model/runtime contracts, and may never be promoted. Expected lazy-loaded modules, model feature shape, or other values observable only after model construction/generation must be learned from discovery before a candidate lock freezes them; do not guess them from sibling files or no-model smoke. Acquisition uses a frozen identity only after discovery has proved the command reaches its intended model boundary. Qualification begins only after a causal candidate already exists.
+- For migrated non-Whisper routes, preserve the exact upstream logical model identity while treating Native conversion format, converter and quantization as candidate artifact identity. Historical GGUF bytes are discovery/acquisition baselines only. A candidate lock must bind upstream repository/revision/files/hashes, converter repository/commit/toolchain/arguments, quantization, output files/sizes/hashes/metadata, licenses/attribution and redistribution authority. Any change creates a new candidate and invalidates both the GPU qualification matrix and the CPU functional matrix.
+- Productize one final Native artifact per logical model, with no user-facing quantization selector. Candidate selection occurs only after each candidate independently passes all mandatory gates. Prefer the strongest subtitle-quality and timing-fidelity evidence, then reviewed upstream/community recommendation, converter/runtime maturity, maintenance, reproducibility, CPU/CUDA stability and licensing/distribution risk. File size is recorded and disclosed but is not a preferred-candidate criterion unless it causes a candidate to fail an explicit download, storage, memory or device gate. Publish a deterministic candidate-selection record rather than an ungrounded claim of “reasonable”.
 - A bounded discovery harness correction budget is append-only evidence state. A successful retry must not reset the prior failure count or delete its sanitized lineage. Before a reviewed correction starts, attest that the prior model process tree is gone; an overlap with the prior attempt invalidates both affected row sets and consumes the next harness failure. When the budget closes or any terminal discovery disposition publishes, persist `status=closed` before publication and reject every later model-backed anchor/crossover command.
 - Any hash compared across Python/C++ or other languages must freeze the exact byte serialization, including field inventory, key order, separators, integer representation, and UTF-8 policy. For timeline evidence, a known vector such as `[{"startMs":0,"endMs":20}]` must hash identically in every implementation; do not mix sorted-key JSON with insertion-order JSON and interpret the resulting hash mismatch as parser divergence.
 - Native ordinary Whisper reads `n_mels` from the loaded CT2 model and supports exactly the official 80- and 128-mel shapes. Every feature producer and precomputed-Mel probe must derive its shape from that exact model identity; a default `FeatureExtractor` size is not authority. Large-v3 snapshots exposing `n_mels == 128` require exact `128 × 3000` inputs, while 80-mel hashes are invalid for that model even when numerically well formed. Ordinary snapshots accept either `vocabulary.txt` or `vocabulary.json`; `preprocessor_config.json` remains Kotoba-only for product readiness, but a pinned ordinary model's feature metadata may corroborate the loaded `n_mels` contract. The native Kotoba profile requires a non-empty preprocessor file plus loaded `n_mels == 128`, uses a maximum 15-second source window with the 30-second model/timestamp range, beam 5, no previous-text history, and timestamp-driven seek. Kotoba `useVad=true` fails before `ready` until a separately reviewed candidate exists.
@@ -69,18 +95,18 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 - One shared native identity validator must cover every completed, failed, derived, and negative record before scoring or publication. It binds manifest/case/audio, lock, executable, required DLLs, route model/aligner, CPU/GPU params, loaded modules, and restricted-PATH policy. Never merge rows from different executable/DLL/lock identities into one evidence set.
 - CrispASR CPU claims require public CPU-forced open params plus actual loaded-module inventory under a restricted PATH; DLL filenames alone do not prove which backend ran.
 - CrispASR callback contexts are reset on every success/error exit before destruction. Result/alignment/session cleanup evidence records created/free/close counts and derives exact-once status from those counts; do not publish a hard-coded boolean.
-- Qwen3 raw CJK character ranges are not subtitle segments. Preserve them, tokenize/group with the exact pinned upstream ranges and source-segment semantics, and accept only legal ForcedAligner-derived grouped segments. For T09 capability evidence only, unchanged raw ranges require only `0 <= start <= end` and have no audio-end upper bound; do not clip or promote them to accepted timing, and publish the maximum tail overrun as a diagnostic risk. Session getter sentinel timing remains explicitly ineligible. A zero-duration final group fails closed; it is not repaired by synthetic expansion.
 - Native top-level segments and nested word timing are separate capabilities. Report both distributions. One broad top-level segment can mathematically hide confirmed gaps but does not prove subtitle-scale segmentation readiness.
 - Controlled failed evidence retains the failing trace and source/model bounds. Validators reject empty placeholder traces, and the benchmark adapter must refuse failed evidence. An externally terminated long run with no atomic token result is process evidence only: write a sanitized record below the exact task-local ignored root that binds the lock, executable/runtime identity, timeout duration, termination source/status, `atomicOutputPresent=false`, `modelMetricsRetained=false`, `processRemaining=false`, and `scoringEligible=false`; freeze that record's SHA-256 in tracked reproduction evidence. Never reconstruct missing model metrics or merge the process record into completed rows.
+- After externally terminating a Native CUDA model call, treat later measurements as recovery-blocked until the same frozen runtime/model/harness completes `short-v1` within the `<=120s` cold-wall gate and a completion marker binds the raw result, stage log and process-reap proof. Bounded runners record case/window stages and enforce a reviewed no-progress deadline; a killed process never yields candidate metrics. Total VRAM observed after model load is the model's working set, not evidence that unrelated applications caused contention. External-contention attribution requires pre-launch and process-resolved evidence plus a controlled comparison; otherwise publish only the observed transient slow path and leave the low-level cause unknown.
 - A sanitized publisher must recompute CER/timeline/gaps from the authoritative manifest/ASS through the shared T01 implementation; it must not trust mutable pre-adapted metric fields. Any inference source/config/binary/DLL/model identity change invalidates affected measurements and requires rerunning them before publication.
 - A historical-evidence reinterpretation lock must freeze the exact candidate inventory and unique path/hash set, including logical model/candidate/mapping identity, prior and independent-gate dispositions, canonical ignored root, publication/source role cardinality, and every tracked/raw artifact hash. Each schema adapter must additionally validate the frozen sample run role/repeat index, engine/backend/device/algorithm, model/companion, worker/runtime/input lock, completed/failed status, and any reviewed failure fingerprint before scoring. A hash-valid file or editable lock label alone is insufficient authority.
 - When an authoritative reference identity changes, inventory every backend and result family that consumed the superseded identity, including completed, failed, diagnostic, derived, and currently inactive routes. Preserve historical artifacts, then publish an identity-bound supersession or an explicit validated-unscored disposition for every authoritative row before any parent/spec/handoff may claim the migration uses the new reference. Correcting only the currently active backend is incomplete.
 - Missing confirmed-speech regions are semantic and gating by default. A region is diagnostic-only when every overlapping reference cue, after NFKC normalization and removal of whitespace, Unicode punctuation/symbols, and `ー` / `〜` / `~`, is exactly 1..6 repeats of one unit from `あ`, `う`, `え`, `お`, `ん`, `うん`, or `うあ`. Excluded regions remain in CER and publish separately; `はい`, laughter, mixed/lexical cues, and unknown forms remain semantic.
 - Every model candidate whose authoritative corpus is short-v1 / medium-v1 / long-v2 must complete all three cases under one frozen inference identity before quality disposition, even when an earlier case fails CER, timeline, semantic-gap, performance, resource, subtitle-size, or protocol-output gates. A quality failure is recorded and the matrix continues. Identity/input/runtime attestation drift, harness corruption, or an incomplete trace makes a row invalid and requires repair plus rerun of the affected case. By contrast, an identity-valid, candidate-caused structured failure with a complete trace—such as deterministic model load/compute rejection or a measured resource-limit failure—is valid failed evidence, counts as that case's attempted matrix row, and yields a non-qualified disposition without authorizing later-case truncation. External termination without atomic output remains unscored and must be rerun. Only the complete matrix may publish `accepted-*-algorithm-input`, `qualified`, `stop-revise`, or `unsupported-for-native-release`. A later candidate requires a newly reviewed identity that addresses the complete observed failure distribution. This full-matrix rule applies to T10 and all later model tasks; it does not retroactively alter archived evidence or require unrelated model identities to run in one combined candidate.
-- Native subtitle-quality qualification is per `logicalModelIdentity × case × comparisonProfile` under `native-gpu-authoritative-v1`: CER and S/D/I, empty text, semantic confirmed-speech gaps, and eligible Qwen3 ForcedAligner median/P95 must each be no worse than the matching `python-legacy-cuda-v1` row. No average, family-only match, cross-model row, missing row, or ineligible timing provenance may authorize release. Historical absolute CER/gap/Qwen limits remain diagnostics rather than the new subtitle-quality release decision.
-- Only an exact, frozen GPU candidate identity acquires model-backed qualification evidence. The matching CPU route does not run CER/S/D/I, RTF, wall, RSS, or model-output qualification samples; after the GPU candidate passes, CPU records `qualificationSource=inherited-from-gpu` with the same logical model and algorithm/config identity. It must leave CPU measurement fields absent and must never copy GPU values into CPU fields. A GPU failure, drift, missing row, or non-qualified pack leaves both GPU and inherited CPU routes non-qualified.
-- Frozen GPU non-quality and structural gates remain absolute: accelerated inference RTF `<=0.5`; short cold wall `<=120s`; peak process RSS `<=6 GiB` for CTranslate2 or `<=12 GiB` for CrispASR; zero invalid/out-of-bounds/negative/reversed/zero-duration timeline segments; valid UTF-8, text conservation, subtitle/protocol legality, complete matrix coverage, and all GPU identity/process/path/privacy/license/cancellation/recovery contracts. No VRAM gate is defined, and Python measurements never relax these gates. CPU compilation, protocol, packaging, path, and non-model smoke tests remain required by their owning tasks, but they do not produce an independent model qualification disposition.
-- Python legacy never establishes expected output, relative performance/resource gates, or missing annotations. Missing, invalid, identity-drifted, or provenance-ineligible baseline evidence yields `baseline-incomplete` or `unscored`, never qualification.
+- Native subtitle-quality qualification is per `logicalModelIdentity × case` under `native-ground-truth-absolute-v1`, scored only against the validated WAV+ASS truth. Every short-v1, medium-v1, and long-v2 case must have CER `<=0.35`, zero empty/corrupt final text, and zero semantic confirmed-speech gaps `>=1500ms`. CER substitutions/deletions/insertions are still recorded for diagnosis, but their individual counts and every delta against Python are non-gating.
+- Only an exact, frozen GPU candidate identity acquires subtitle-quality and performance qualification evidence. After that GPU candidate passes, the matching CPU route must run an identity-bound model-backed functional matrix on short-v1, medium-v1, and long-v2 with the same logical model and algorithm/config identity, validating legal output, completion/structured failure, cancellation, recovery, offline execution, and cleanup. CPU does not publish CER/S/D/I, RTF, wall, RSS, or an independent quality ranking; after its functional matrix passes it records `qualificationSource=inherited-from-gpu`, leaves CPU measurement fields absent, and never copies GPU values into CPU fields. A GPU failure, drift, missing row, non-qualified pack, or incomplete CPU functional matrix leaves both GPU and CPU routes non-qualified.
+- Frozen GPU engineering and structural gates are absolute: accelerated inference RTF `<=0.5`; short cold wall `<=120s`; peak process RSS `<=6 GiB` for CTranslate2 or `<=12 GiB` for CrispASR; zero invalid/out-of-bounds/negative/reversed/zero-duration timeline segments; valid UTF-8; non-empty text-conserving output; subtitle/cue/protocol legality; complete matrix coverage; and all GPU identity/process/path/privacy/license/cancellation/recovery contracts. No VRAM gate is defined.
+- Python legacy output is reported only as a separately labeled historical diagnostic. It never establishes Native expected output, relative quality/performance/resource gates, missing annotations, qualification completeness, or permission to relax an absolute gate. A missing, invalid, identity-drifted, or provenance-ineligible Python row has no effect on Native qualification.
 
 ### 4. Validation & Error Matrix
 
@@ -91,28 +117,29 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 | Inline reference or inferred speech interval | Reject; derive only from the local ASS |
 | Raw result path inside Git tree is not ignored | Refuse to write |
 | Python runner uses the wrong interpreter/cache | Reject as invalid evidence |
-| Qwen3 provenance is synthetic/mixed/unknown/generic engine-native | Record timing as ineligible |
 | Whisper trace uses a shorter source slice than its padded model tensor | Validate tokens against the model range; record both ranges |
 | Token-derived end exceeds verified WAV end but stays inside model range | Preserve raw end and explicitly bound final end to WAV duration |
 | Token-derived start is at/after WAV end | Fail the candidate sample |
 | Raw output path is outside the canonical task-local ignored root | Reject before model/audio access |
 | Input lock, model hashes, executable/DLL identity, CPU params, loaded modules, or PATH policy differs | Reject or classify as a separate evidence set |
 | A discovery lane is supplied as candidate/qualification evidence | Reject promotion; discovery records actual dynamic contracts only |
+| A historical GGUF conversion is promoted because it already has smoke evidence, or converter/quantization/output bytes change without a new candidate identity | Reject promotion; freeze complete upstream-to-conversion provenance and rerun the GPU plus CPU matrices |
+| The smallest passing artifact is selected without quality/community/maturity review, multiple quantizations are exposed as product models, or “most reasonable” has no deterministic selection record | Reject final selection; publish one reviewed artifact based on quality/timing first and the frozen secondary factors |
 | A reviewed discovery correction starts while the prior timed-out model process may still exist | Reject the correction evidence, invalidate overlapping row sets, append the failure lineage, and never reset the correction count |
 | A terminal discovery publication exists but the state is not closed, or a later model command is requested | Persist/require `status=closed` and reject the model command before process launch |
 | Cross-language token/parser/timeline evidence uses different JSON byte ordering or separators | Reject attribution as serialization-invalid; prove a shared known-vector hash before comparing model rows |
 | A candidate lock freezes a model-loaded fact that was never observed by discovery | Reject acquisition readiness; run one bounded unscored discovery instead of creating a lock-version repair chain |
 | Precomputed Whisper Mel shape differs from the exact loaded model `n_mels` | Reject before encode/generate; invalidate that feature authority and do not resize or substitute the tensor in place |
 | Derived or negative record bypasses the shared identity validator | Reject publication even when its status/timeline looks valid |
-| A CPU model-backed qualification row is supplied or GPU metrics are copied into CPU fields | Reject publication; CPU may only carry `qualificationSource=inherited-from-gpu` plus the exact matching GPU candidate reference |
-| Qwen raw character range is zero-duration or ends after audio while remaining non-negative/non-reversed | Retain unchanged as raw provenance only, publish maximum tail overrun, and validate accepted timing only after exact pinned source-segment grouping |
-| Qwen raw character range is negative or reversed | Reject capability evidence |
-| Qwen grouped final segment is zero-duration or session-native/synthetic | Fail closed with zero accepted timeline |
+| A CPU row publishes CER/RTF/resource quality metrics, omits any short/medium/long functional case, or copies GPU metrics into CPU fields | Reject publication; CPU functional rows may record legal output/lifecycle evidence only, then carry `qualificationSource=inherited-from-gpu` plus the exact matching GPU candidate reference |
 | Callback context exits without all registered callbacks reset | Reject lifecycle evidence |
 | Created result/alignment/session count does not match free/close count | Reject exact-once claim |
 | Failed envelope has no complete matching trace | Reject the evidence; do not summarize it as a blocker |
 | Long model process hits an external timeout before atomic raw publication | Write and hash a separate ignored-local sanitized process record with frozen lock/runtime/timeout/termination identity and explicit no-output/no-metrics/no-process/no-scoring flags; do not invent token traces or merge with completed rows |
+| A CUDA model call was externally terminated and the next authoritative case is not `short-v1`, the short sentinel exceeds `120s`, its marker does not bind raw/log/harness identity, or a runner infers external contention from post-load total VRAM | Reject the later row as recovery-invalid; terminate only the task-owned process tree, keep metrics absent, and require a valid frozen-identity short sentinel before continuing |
 | Final CT2 source/config/binary identity differs from measured rows | Invalidate and rerun the affected minimum authoritative cases before publication |
+| A completed Native case has CER `>0.35`, empty/corrupt final text, or any semantic confirmed-speech gap `>=1500ms` | Fail that absolute quality gate, continue the remaining matrix cases, and publish only after the complete matrix |
+| A Python diagnostic row is absent, differs from Native, or has better/worse S/D/I | Keep the Native decision unchanged; report the Python row separately as non-gating historical context |
 | One case fails a mandatory quality gate | Record the failure, continue the same model candidate through the remaining short/medium/long-v2 cases, then publish the complete-matrix disposition |
 | Identity/input/runtime attestation drifts, harness output is corrupt, or the failure trace is incomplete | Invalid evidence; repair and rerun that case before any quality disposition |
 | Frozen identity produces a structured candidate-caused load/compute/resource failure with a complete trace | Count a valid failed row for that case, continue the remaining cases, and publish a non-qualified complete-matrix disposition |
@@ -122,9 +149,9 @@ Use the exact signatures and ABI version from the locked headers; the names abov
 
 ### 5. Good / Base / Bad Cases
 
-- **Good:** a frozen GPU candidate uses the validated manifest identity, one exact lock/binary/DLL/model evidence set, shared recomputed metrics, and the matching model/case `python-legacy-cuda-v1` quality row; every relative field is reported independently while structural, performance, security and evidence gates remain absolute. A matching CPU route records only `inherited-from-gpu` and the source GPU identity, with no fabricated CPU measurements.
-- **Base:** a required Python row or eligible Qwen timing provenance is missing, an engine returns one broad legal segment, or a mandatory GPU long run times out before atomic publication; comparison reports `baseline-incomplete`/`unscored` or the independent structural limitation and does not qualify either GPU or inherited CPU.
-- **Bad:** regenerate reference text from a Python transcript, trust editable adapted metrics without recomputation, use a family/cross-model/missing Python row, average cases to hide one failing metric, use Python performance to waive an absolute gate, stop a model candidate after the first quality failure instead of completing its frozen audio matrix, acquire a CPU model-output row as a qualification substitute, copy GPU metrics into CPU fields, add VAD without a new reviewed identity, treat runtime feasibility or one broad segment as subtitle readiness, publish derived/negative records without identity validation, treat Qwen character ranges as final cues, use a source-slice duration as the model timestamp range, or commit private media/raw results.
+- **Good:** a frozen GPU candidate uses the validated WAV+ASS manifest, one exact lock/binary/DLL/model evidence set, and shared recomputation to pass every `native-ground-truth-absolute-v1` case and engineering gate. Any Python row is shown only in a separately labeled diagnostic section. The matching CPU runtime separately completes short-v1, medium-v1, and long-v2 functional/lifecycle rows, then records `inherited-from-gpu` and the source GPU identity with no fabricated CPU quality/performance measurements.
+- **Base:** a Python diagnostic row is missing but the Native absolute matrix is complete; Native qualification is unaffected. By contrast, ineligible timing provenance, one broad non-subtitle-scale segment, or a mandatory GPU run that lacks atomic output remains a Native structural/evidence limitation and cannot qualify.
+- **Bad:** regenerate reference text from a Python transcript, trust editable adapted metrics without recomputation, require Native to match or beat Python, use Python output or performance to waive an absolute gate, average cases to hide one failing metric, stop a model candidate after the first quality failure instead of completing its frozen audio matrix, skip the CPU short/medium/long functional matrix, promote CPU functional output into an independent quality disposition, copy GPU metrics into CPU fields, add VAD without a new reviewed identity, treat runtime feasibility or one broad segment as subtitle readiness, publish derived/negative records without identity validation, treat Qwen character ranges as final cues, use a source-slice duration as the model timestamp range, or commit private media/raw results.
 
 ### 6. Tests Required
 
@@ -135,7 +162,7 @@ python -m unittest discover -s asr-service/tests -p "test_asr_benchmark.py"
 cd asr-service && python -m unittest discover tests
 ```
 
-Assert ASS fail-closed parsing, exact S/D/I CER counts, timing provenance, per-case coverage union, refresh replacement, deterministic sanitized Markdown, ignored raw outputs, and path/privacy rejection. Historical reinterpretation publishers additionally mutation-test candidate dispositions, ignored roots, publication/source roles, exact unique path/hash counts, sample run roles/repeat indices, backend/device/algorithm/companion identity, completed/failed state, and reviewed failure fingerprints. Gap tests must cover approved punctuation/elongation/repetition forms, `はい`, laughter, mixed lexical cues, multiple overlapping cues, CER retention, and deterministic separate semantic/excluded diagnostics. Native Whisper harnesses additionally assert distinct source/model windows, verified-WAV end bounding with raw provenance, start-after-audio failure, exact model/lock/binary identity, canonical output containment, and complete failed-trace validation.
+Assert ASS fail-closed parsing, exact CER and diagnostic S/D/I counts, `native-ground-truth-absolute-v1` threshold boundaries, Python-diagnostic independence, timing provenance, per-case coverage union, refresh replacement, deterministic sanitized Markdown, ignored raw outputs, and path/privacy rejection. Historical reinterpretation publishers additionally mutation-test candidate dispositions, ignored roots, publication/source roles, exact unique path/hash counts, sample run roles/repeat indices, backend/device/algorithm/companion identity, completed/failed state, and reviewed failure fingerprints. Gap tests must cover approved punctuation/elongation/repetition forms, `はい`, laughter, mixed lexical cues, multiple overlapping cues, CER retention, and deterministic separate semantic/excluded diagnostics. Native Whisper harnesses additionally assert distinct source/model windows, verified-WAV end bounding with raw provenance, start-after-audio failure, exact model/lock/binary identity, canonical output containment, and complete failed-trace validation.
 
 Native CTranslate2 production harnesses additionally assert:
 
@@ -148,27 +175,25 @@ Native CTranslate2 production harnesses additionally assert:
 - Rust-host real-worker success, structured pre-ready failure/recovery and process-tree cancellation through test-only env injection;
 - publisher mutation rejection for model/runtime/config/metrics/timeout identities and byte-identical regenerated output.
 
-Native CrispASR harnesses additionally assert:
+Historical session-based CrispASR development harnesses (not the product full-CLI Qwen worker) additionally assert:
 
 - a default-off shared backend compile gate, exact pinned runtime DLL identity before load, explicit `parakeet|reazonspeech-nemo -> parakeet` and `qwen3-asr -> qwen3` mapping, and no filename-inferred route;
 - exactly progress/segment callback registration with reset before result/alignment/session release on every structured exit; hard cancellation proves process reap only, never in-process destructor counters;
-- Qwen copies source results plus raw ForcedAligner entries but emits zero accepted timed output and stable post-ready `qwen_timeline_policy_not_implemented` until the separately reviewed grouping policy exists;
 - mutation rejection for case/audio/manifest/lock/executable/DLL/model/aligner/CPU params/modules/PATH across completed, failed, derived, and negative records;
-- exact pinned CJK punctuation/mixed-script token counts and source-segment grouping;
-- Qwen session getter timing is ineligible and all accepted timing is ForcedAligner-derived;
 - real missing/corrupt/unloadable/empty/malformed/invalid-audio negatives accept zero timed output;
 - callback reset on success and error, plus created/free/close count-derived exact-once cleanup;
 - short cold + three warm samples, medium/long attempts or complete failed evidence, single final evidence identity, and byte-identical sanitized publication;
+- CUDA timeout recovery: stage/window progress, reviewed no-progress termination, task-owned process-tree reap, zero metrics from killed runs, blocked medium/long before a hash-bound `short-v1 <=120s` sentinel, mutation rejection for stale sentinel/raw/log/harness identity, and no external-application attribution from post-load total VRAM alone;
 - family-scoped development-device results never cross-authorize: T09 published `parakeet-family: development-gpu-ready` from both paired speed samples, while copied-result invalidity is no-result and must never be promoted to GPU unavailable.
 
 ### 7. Wrong vs Correct
 
 ```text
-Wrong: run or synthesize a CPU quality/performance row after the matching GPU candidate passes, or copy GPU values into CPU measurement fields.
-Correct: publish the exact GPU evidence once; bind the CPU route to that candidate with `qualificationSource=inherited-from-gpu` and leave CPU measurement fields absent.
+Wrong: skip real CPU model execution, publish CPU CER/RTF as a second quality disposition, or copy GPU values into CPU measurement fields.
+Correct: publish the exact GPU quality/performance evidence once; run CPU short/medium/long functional and lifecycle evidence separately; then bind CPU to that GPU candidate with `qualificationSource=inherited-from-gpu` and leave CPU quality/performance measurement fields absent.
 
-Wrong: native passes because its family average is near Python, because it borrows another model's row, because Python performance is slow, or because one broad segment covers the whole speech interval.
-Correct: native GPU subtitle quality passes only when every applicable metric is no worse than the same logical model and case under `python-legacy-cuda-v1`; the GPU candidate must also independently pass the frozen structural, performance/resource, identity, protocol, path, cancellation/recovery, privacy and license gates against validated WAV+ASS truth.
+Wrong: pass or fail Native because it matches, beats, or regresses from a legacy Python row, or because Python performance is slow.
+Correct: decide Native only from the validated WAV+ASS truth and every `native-ground-truth-absolute-v1` quality, timing, structural, performance/resource, identity, protocol, path, cancellation/recovery, privacy and license gate; publish Python only as separate non-gating history.
 
 Wrong: after a timed-out discovery attempt, start the reviewed correction immediately, reset the failure count when it returns output, or leave a successful publication state reopenable.
 Correct: prove the old process tree is gone before correction, append every failure permanently, invalidate overlapping evidence, and close the state before any terminal publication so later model commands fail before launch.
@@ -179,8 +204,8 @@ Correct: freeze one exact cross-language byte representation and known-vector SH
 Wrong: after short-v1 fails CER/RTF, stop that model candidate and infer that medium/long-v2 would add no evidence.
 Correct: keep the candidate identity frozen, complete medium-v1 and long-v2, publish the full per-case failure distribution, then activate a new candidate only when it addresses that complete profile.
 
-Wrong: use every Qwen aligner character range as a cue, expand zero-duration ranges, or publish session getter sentinel timing.
-Correct: retain raw ranges, reproduce the exact pinned upstream source grouping, accept only legal ForcedAligner-derived final segments, and fail closed otherwise.
+Wrong: after killing a long CUDA call, continue authoritative cases immediately or blame unrelated applications because total VRAM is nearly full after the model loads.
+Correct: reap only the task-owned process tree, retain an unscored process record, require the same frozen identity to pass a hash-bound `short-v1 <=120s` recovery sentinel, and attribute external contention only from pre-launch/process-resolved controlled evidence.
 
 Wrong: verify only the files and hashes named by an editable historical lock, then trust its candidate disposition, ignored root, sample roles, or companion labels.
 Correct: freeze and validate the complete lock inventory plus adapter-level run/backend/device/model/companion/failure identity before shared-T01 recomputation.
@@ -581,7 +606,7 @@ Correct: restore using the pinned integer sample/half-even 10 ms rule and fail c
 - Publishing native derived/negative evidence outside the same identity validator used for authoritative results
 - Trusting pre-adapted metric JSON instead of recomputing sanitized publication from the authoritative local manifest/ASS
 - Requiring CT2/model inputs for protocol-only builds, using locale-dependent Windows model paths, or extending Kotoba preprocessor readiness to ordinary Whisper
-- Treating raw Qwen character ranges, session sentinel timing, or one giant top-level segment as subtitle-ready output
+- Treating raw character ranges, session sentinel timing, or one giant top-level segment as subtitle-ready output; current Qwen accepts only its fully validated full-CLI display/adjacent-merge contract
 - Hard-coding exact-once cleanup or CPU-backend claims instead of deriving them from counts, params, and loaded modules
 - Stopping a frozen model candidate after one quality gate fails instead of completing short-v1 / medium-v1 / long-v2
 - Using qualification-grade immutable locks for open-ended exploration, guessing model-loaded contracts from no-model tests, or creating successive lock versions instead of running one bounded unscored discovery first

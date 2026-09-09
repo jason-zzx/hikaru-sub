@@ -71,11 +71,11 @@ Correct: … -vn -af aresample=async=1:first_pts=0 …     → return covered_ms
 | Clip | `clip.rs` | Soft/hard cut; progress polling; optional replace working video is a **frontend** session decision |
 | Burn | `burn.rs` | Hard-sub export via FFmpeg/libass; burn page has no subtitle preview |
 
-## Native ASR Job Host (Production CPU)
+## Native ASR Job Host
 
 ### Scope / Trigger
 
-Use the Rust host in `asr_worker.rs` for the production Native ASR route and for reviewed worker compatibility tests through the existing product job contract. Release routing, model list/status/download, and inference use the bundled CPU worker with the exact selected path from the eight-row manifest: seven Faster-Whisper models plus exact Kotoba. `faster-whisper / large-v3` remains the frontend default. `HIKARU_ASR_FAKE_WORKER` remains debug/test-only host injection and never selects the product route.
+Use `asr_worker.rs` for current Native CT2 and Qwen full-CLI routes and reviewed compatibility tests through the same product job contract. CT2 retains eight exact model routes; Qwen adds its exact ASR/aligner pair and mandatory CPU Silero through independent CrispASR CPU/CUDA runtimes. `faster-whisper / large-v3` remains the default. Runtime resolution is backend/artifact/device-specific; no cross-tree DLL loads or Python fallback. `HIKARU_ASR_FAKE_WORKER` remains debug/test-only injection, never a product route selector. Qwen's accepted output/lifecycle extension is specified in `native-asr/docs/protocol-v1.md` and `../asr/qwen-cli-output.md`; historical generic session fixtures below remain compatibility inputs only.
 
 ### Signatures
 
@@ -138,7 +138,7 @@ struct ResolvedNativeLaunch {
 ### Good/Base/Bad Cases
 
 - Good: valid fake-worker success → pending/running, bounded progress/segments, exit 0, recovery writes, then completed becomes visible and the active slot is free. A model-backed CUDA suite selects `cuda`, uses a CUDA-enabled worker for success/cancel, a CPU-only worker for deterministic `cuda_not_built`, and temporary managed audio copies throughout.
-- Base: no debug/test host override → the product resolves the verified packaged Native CPU worker; the required model-backed test triple absent with no optional keys means only those optional real-worker tests skip.
+- Base: no debug/test host override → the product resolves the selected backend's verified CPU/CUDA runtime; the required model-backed test triple absent with no optional keys means only those optional real-worker tests skip.
 - Bad: let product code read model-backed test env keys, partially configure the optional CUDA keys, sabotage the system CUDA environment to force failure, pass authoritative corpus audio directly from an unmanaged root, publish completed before fallback ASS persistence, release the slot after notifying reap, or return early from terminal cancel while a PID remains.
 
 ### Tests Required
@@ -167,11 +167,13 @@ Wrong:   cargo test production_worker_runs... → broad filter builds unrelated 
 Correct: cargo test --lib asr_worker::tests::production_worker_runs... -- --exact --test-threads=1 --nocapture
 ```
 
-## Native ASR Backend Routing (Production CPU)
+## Native ASR Backend Routing
 
 ### 1. Scope / Trigger
 
-Apply this contract when changing the stable ASR engine/model commands, the production Native route, the packaged CPU worker resolution, or the conversion of a T12-ready model path into `ResolvedNativeLaunch`.
+Apply the shared command/route contracts below when changing Native model commands or `ResolvedNativeLaunch`. Current source supports CT2's original eight routes plus exact Qwen through separate CrispASR CPU/CUDA artifacts. Qwen requires model+aligner+CPU Silero; general/other-engine VAD and Parakeet/Reazon remain unavailable. Current explicit CUDA never falls back, CPU never initializes CUDA, and `auto` selects a verified device only before worker launch. Qwen dependency/readiness and published sources are in `paths-and-runtime-deps.md`.
+
+The v3 CPU-only capability statements below describe the **original CT2 CPU artifact**, not a universal application restriction. Its no-VAD/no-CrispASR closure remains strict; current CT2 CUDA and independent CrispASR artifacts do not broaden that verifier.
 
 ### 2. Signatures
 
@@ -198,7 +200,7 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 
 - One immutable process-lifetime `AsrRoutePolicy` selects engine list, model status/download/progress, and inference as one family. Never let Native direct download feed legacy Python launch.
 - `AsrState::default` is always `NativeMvp` in debug and Release. A valid debug fake host changes only the injected host executable; there is no persisted route setting or Release environment switch.
-- Native production accepts `faster-whisper|kotoba-faster-whisper`, `auto|cpu`, Japanese source, and no VAD. Actual model support is authoritative in the bundled manifest: seven Faster-Whisper IDs plus exact `kotoba-tech/kotoba-whisper-v2.0-faster`. The route resolves artifact v3 from `resource_dir()/native-asr/windows-x64/cpu` and passes only the selected exact hash-verified model path to `ResolvedNativeLaunch`; `faster-whisper / large-v3` remains the frontend default. Kotoba selects the archived K2 profile and requires non-empty `preprocessor_config.json` plus loaded 128 Mel.
+- The original CT2 CPU route accepts `faster-whisper|kotoba-faster-whisper`, `auto|cpu`, Japanese source, and no VAD. Actual model support is authoritative in the bundled manifest: seven Faster-Whisper IDs plus exact `kotoba-tech/kotoba-whisper-v2.0-faster`. The route resolves artifact v3 from `resource_dir()/native-asr/windows-x64/cpu` and passes only the selected exact hash-verified model path to `ResolvedNativeLaunch`; `faster-whisper / large-v3` remains the frontend default. Kotoba selects the archived K2 profile and requires non-empty `preprocessor_config.json` plus loaded 128 Mel.
 - Native preflight/runtime/model failures return directly. They never call `ensure_base_url` or silently fall back to Python.
 - Model status keeps compatibility booleans and adds `disposition`, `backend`, `revision`, `origin`, and `reason`. Download progress keeps current polling fields and maps T12 `sourceEndpoint` to compatibility field `hfEndpoint`.
 - Progress/cancel check the Native host first. In Native mode, an unknown job returns the established missing-job error rather than starting the sidecar.
@@ -207,18 +209,18 @@ The existing `start_asr` / `get_asr_progress` / `cancel_asr` signatures and `Asr
 
 | Condition | Result |
 |---|---|
-| Release/default | Entire command family uses the Native CPU route |
+| Release/default | Entire command family uses Native with backend/device-specific verified runtime resolution |
 | Any released manifest-backed Faster-Whisper/Kotoba model ready + CPU/auto | Resolve runtime v3 + that model's exact path; start existing host |
 | Native model missing | Controlled download-required error; release unactivated slot |
 | Post-MVP/unknown model or engine | Explicit unavailable/unsupported result; no fallback |
-| CUDA/Vulkan/non-Japanese/VAD request | Reject before worker launch |
+| CUDA/Vulkan/non-Japanese/VAD request against the original CT2 CPU-only route | Reject before worker launch; this is not the current application device matrix |
 | Missing/wrong runtime v3 identity, ordered engine capability, or required entry | Controlled runtime error; no sidecar |
 | Native progress/cancel unknown job | `转录任务不存在`; no sidecar |
 
 ### 5. Good / Base / Bad Cases
 
 - Good: `NativeMvp` + any exact ready manifest model + CPU -> one host job with unchanged progress/cancel/recovery behavior.
-- Base: normal Release build -> packaged seven-model Faster-Whisper + exact Kotoba CPU route, with `faster-whisper / large-v3` selected by default and no Python dependency.
+- Base: the original CT2 CPU artifact supports seven-model Faster-Whisper + exact Kotoba, with `faster-whisper / large-v3` selected by default and no Python dependency; current Qwen/CUDA selection resolves separate verified artifacts.
 - Bad: model commands use T12 but `start_asr` still enters Python, or a Native preflight error falls through to `ensure_base_url`.
 
 ### 6. Tests Required
@@ -240,11 +242,11 @@ Wrong:   accept model name/path from settings and build a worker request
 Correct: T12 exact readiness -> resolved path -> ResolvedNativeLaunch
 ```
 
-## Bundled Native ASR CPU Runtime
+## Bundled CTranslate2 CPU Runtime (original v3 artifact)
 
 ### Scope / Trigger
 
-Apply this contract whenever changing the Windows x64 bundled Native ASR worker, its binary dependencies, runtime lock/manifest, release resource preparation, NSIS/portable staging, or package evidence. This runtime is the Release/default inference dependency.
+This closed-world contract applies specifically to the original CT2 CPU artifact, its worker/dependencies/lock/manifest, and its part of resource/package preparation. All CPU-only, no-CrispASR/no-VAD and eight-model capability checks below remain mandatory **within that artifact**. They do not forbid the separately verified bundled CrispASR CPU subtree or on-demand CT2/CrispASR CUDA packs. Never mix DLLs, manifests, locks or verification authorities across trees. Full-CLI packaging/source/toolchain limitations live in `native-asr/runtime/full-cli/README.md`.
 
 ### Signatures
 
@@ -268,7 +270,7 @@ native-asr/runtime/windows-x64-cpu-lock.json
   artifact.id = hikaru-asr-windows-x64-cpu-v3
   candidateConfig.id = released-ct2-cpu-faster-whisper-v2-kotoba-k2-v1
 native-asr/build-inputs/windows-x64-cpu-ct2.zip   # build/link input only
-native-asr/artifacts/windows-x64-cpu.zip          # the only native archive shipped
+native-asr/artifacts/windows-x64-cpu.zip          # original CT2 CPU archive only
 ```
 
 The extracted Tauri resource is generated and ignored. End-user packaging never invokes CMake or consumes the build-input ZIP.
@@ -279,10 +281,10 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 - The final preset sets `HIKARU_ASR_MVP_CPU_RUNTIME=ON`, reproducible-build mode on, and Candidate B/CUDA/CrispASR development flags off. Development-only fake/CrispASR/Parakeet targets are excluded from the default final target graph.
 - Final capability is exactly ordered engines `["faster-whisper", "kotoba-faster-whisper"]` through CTranslate2 on CPU. `useVad=true` returns `vad_not_built` at Tauri validation; direct Kotoba worker requests return `kotoba_vad_not_qualified`; GPU requests return `cuda_not_built`; CrispASR and other unreleased routes return a controlled route error. Missing DLLs are not capability control.
 - Runtime verification is closed-world: archive root/path safety, outer hash, manifest/checksum/file closure, source/toolchain/config equality, imports, license inventory, forbidden content, and ASCII/UTF-16 private build paths must all pass before extraction.
-- Resource preparation verifies the ZIP, extracts to a temporary sibling, verifies the tree again, then atomically replaces `src-tauri/resources/native-asr/`. NSIS and portable staging consume that same generated tree.
+- Resource preparation verifies the ZIP, extracts to a temporary sibling and verifies again, then replaces only its own `src-tauri/resources/native-asr/windows-x64/cpu/` subtree. Independent CrispASR CPU preparation owns `windows-x64/crispasr/cpu/`; neither may replace the whole shared `native-asr/` root. NSIS/portable consume both verified CPU subtrees.
 - If any runtime payload byte, runtime-manifest field, or target graph changes, rebuild two independent roots to a byte-identical complete ZIP, rerun model-backed installed/portable smoke against the final worker SHA, rebuild NSIS/portable packages, and refresh the handoff. Evidence for an older worker is invalid even if source code is unchanged.
 - A change to `src-tauri/resources/native-asr-models.json` also invalidates application package evidence even when runtime bytes are unchanged. Rerun `pnpm release:local`, extract/audit NSIS, and inspect the portable executable/ZIP for all current immutable model identities; do not reuse a package built from an older support manifest.
-- The package includes no model weights, Python sidecar/runtime/venv/packages, ORT/Silero VAD, CrispASR, CUDA/Vulkan runtime, PDB, or development/test executable. Resource preparation deletes stale `src-tauri/resources/asr-service` before bundling.
+- The CT2 CPU archive includes no model weights, Python sidecar/runtime/venv/packages, ORT/Silero VAD, CrispASR, CUDA/Vulkan runtime, PDB or development/test executable. The application may bundle the separately verified CrispASR CPU archive (including CPU Silero implementation, never weights). CUDA packs remain on-demand and outside NSIS/portable. Resource preparation removes stale packaged `src-tauri/resources/asr-service`, not user data.
 - Bundled VC145 DLLs come unmodified from VS18 `VC/Redist`, are excluded from Hikaru Sub's Apache-2.0 project license, and are governed by the official **Microsoft Visual C++ V14 Redistributable and Runtime 2026** terms. Package the unchanged official DOCX locally, lock its immutable URL/size/SHA-256, record `https://aka.ms/vs/18/redistribution`, and preserve Microsoft's `BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS` statement; do not substitute the VS2022 terms or invent a custom EULA.
 
 ### Validation & Error Matrix
@@ -390,7 +392,7 @@ Correct: validate one leading timestamp + real text -> bound end to consumed sou
 
 ### Scope / Trigger
 
-Apply this contract when changing the bundled Native ASR model manifest, exact readiness, legacy Hugging Face reuse, direct CT2 installs, resumable download jobs, or stable Tauri command wiring. Production/default model commands use this manager.
+Apply this contract when changing the bundled Native ASR model manifest, exact readiness, legacy Hugging Face reuse, direct CT2 installs, resumable jobs or stable command wiring. Production model commands use this manager. The eight-row and four-file role requirements below are CT2-specific; Qwen adds a separately validated atomic ASR/aligner pair plus mandatory shared CPU Silero, combined progress, repair and readiness as specified in `paths-and-runtime-deps.md`. Do not apply CT2 model files or legacy HF reuse by guess to Qwen.
 
 ### Signatures
 
@@ -456,7 +458,7 @@ src-tauri/resources/native-asr-models.json
 
 ### Tests Required
 
-- Manifest: exact eight-row closure/license/source plus schema, duplicate, unsafe one-segment/repository-style IDs, Windows alias, case-collision, hash, missing-role, correct vocabulary form, exact Kotoba preprocessor, and no ordinary preprocessor requirement.
+- Manifest: exact original eight CT2 rows/closure/license/source remain unchanged alongside Qwen's independently validated roles; test schema, duplicates, unsafe one-segment/repository-style IDs, Windows aliases, case collisions, hashes, missing roles, correct vocabulary, exact Kotoba preprocessor and no ordinary preprocessor requirement.
 - Readiness: direct/legacy preference, Kotoba missing/corrupt preprocessor rejection, missing/wrong-size/wrong-hash/wrong-revision/framework-cache failure, direct link rejection, and contained/escaped legacy link behavior.
 - Download: fresh, matching resume, ignored range, incompatible range, `416`, oversized partial, interruption preservation, bad hash, complete-stage publication, repair rollback, same-model coalescing, and concurrent different-model job/publication identity isolation.
 - Gates: focused `asr_models` tests including ready-cache reuse/missing non-cache/download seeding, full Cargo tests, `pnpm build`, task validation, implementation `rustfmt`, and `git diff --check`.

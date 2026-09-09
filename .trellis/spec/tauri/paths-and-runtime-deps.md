@@ -18,7 +18,7 @@ Work cache children of interest: `workspace/`, `transcode/`, `preview/`, `clip-f
 
 ## Managed Dependencies Layout
 
-Release packages bundle the verified Native ASR CPU runtime and do **not** bundle FFmpeg, a Python sidecar/runtime/venv/packages, or model weights. Resource preparation deletes any stale packaged legacy sidecar before NSIS/portable staging.
+Current packaging bundles independently verified CT2 and CrispASR Native ASR CPU runtimes and does **not** bundle CUDA packs, FFmpeg, a Python sidecar/runtime/venv/packages, or model weights. Resource preparation deletes any stale packaged legacy sidecar before NSIS/portable staging.
 
 Typical production install-dir layout (see `/AGENTS.md`):
 
@@ -42,7 +42,7 @@ Settings entry: **probe only**. Storage sizes: user-triggered measure. Cleanup b
 
 ### 1. Scope / Trigger
 
-Apply when changing `RuntimeDependencyKind`, production dependency probe/storage payloads, Native model storage cleanup, or the bundled CPU runtime status exposed to Settings.
+The original CT2 CPU payload below applies to `nativeAsrCpu`, not every current dependency kind. Apply its storage/probe safety when changing Native dependencies; current CUDA and independent `crispasrCpu`/`crispasrCuda` kinds retain their own roots and authority as described below.
 
 ### 2. Signatures
 
@@ -64,7 +64,7 @@ async fn probe_runtime_dependencies(app: AppHandle, asr_state: State<'_, AsrStat
 
 ### 3. Contracts
 
-- Production probe emits FFmpeg, `nativeAsrCpu`, and exact `faster-whisper/large-v3` readiness as the default-model dependency summary. Per-model availability for seven Faster-Whisper identities plus exact Kotoba remains owned by `check_asr_model` / `NativeAsrModelManager`; the probe is not a second support registry. It emits no Python 3.11 or ASR venv item.
+- Production probe emits FFmpeg, `nativeAsrCpu`, and exact `faster-whisper/large-v3` readiness as the default-model dependency summary. Per-model availability for the original eight CT2 identities and exact Qwen pair + required VAD remains owned by `check_asr_model` / `NativeAsrModelManager`; the probe is not a second support registry. It emits no Python 3.11 or ASR venv item.
 - `nativeAsrCpu` resolves from `resource_dir()/native-asr/windows-x64/cpu`, requires artifact `hikaru-asr-windows-x64-cpu-v3` with exact ordered engines `["faster-whisper", "kotoba-faster-whisper"]`, reports `source: "builtIn"`, `managed: false`, and is never downloadable or cleanable.
 - Exact model readiness comes from the process-owned `NativeAsrModelManager`; do not duplicate size/hash/path validation in `dependencies.rs`.
 - Probe remains status/path/version only. Runtime reads and model hashing use `spawn_blocking`; probe never calls recursive `dir_size`.
@@ -108,6 +108,30 @@ Correct: NativeAsrModelManager exact readiness -> model dependency status
 Wrong:   include bundled native-asr resources in managed storage/cleanup
 Correct: report builtIn unmanaged runtime -> reject cleanup
 ```
+
+## Qwen CrispASR application dependencies
+
+- `native-asr/runtime/crispasr-product-lock.json` enables Qwen application use while
+  external CUDA publication remains a separate download-only condition. Both
+  CPU and CUDA must still pass exact runtime manifest/file closure verification;
+  CUDA additionally passes the bounded model-free compute probe at resolution.
+- CPU root: `resource_dir()/native-asr/windows-x64/crispasr/cpu`; managed CUDA:
+  `<exe>/deps/asr-runtime/crispasr/cuda/current`. Never load CT2 files into this tree.
+  Valid installed CUDA reports available even without published source rows.
+  Missing/invalid CUDA reports missing and offers download only when both bundled
+  `crispasrCuda` source rows and the publication flag match the locked archive.
+  The published asset is `hikaru-asr-crispasr-windows-x64-cuda-v1.zip` on the existing
+  `native-asr-cuda-v1` dependency release: official GitHub plus the same URL prefixed
+  by `https://ghfast.top/`, both with identical size/SHA. Never replace the CT2 asset,
+  infer all-generation GPU qualification from PTX coverage, or disable Qwen CPU.
+  Producer metadata may retain publication only for exact already-uploaded bytes;
+  a changed archive remains unpublished until separately authorized and verified.
+- Exact Qwen pair: `deps/models/crispasr/qwen3-asr/Qwen/Qwen3-ASR-1.7B/<pair-revision>`;
+  required shared CPU Silero: `deps/models/shared/silero/vad/<vad-revision>`.
+  The existing manager owns pair atomic readiness, all hashes, combined progress,
+  repair and offline reuse. VAD missing/corrupt means Qwen is not ready.
+- Resource preparation verifies existing archives and never resets model support
+  metadata. Enabling application selection is not installer/UI/release acceptance.
 
 ## Anti-Patterns
 

@@ -6,6 +6,8 @@ import {
   verifyRuntimeArchive,
 } from "./verify-native-asr-runtime.mjs";
 
+import { verifyCrispasrArchive } from "./verify-crispasr-runtime.mjs";
+
 const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
 
 export function prepareAsrResources(root = defaultRoot) {
@@ -21,11 +23,13 @@ export function prepareAsrResources(root = defaultRoot) {
   rmSync(legacyTarget, { recursive: true, force: true });
 
   const runtimeLock = readRuntimeLock(runtimeLockPath);
-  return verifyRuntimeArchive({
+  const result = verifyRuntimeArchive({
     archivePath: join(root, runtimeLock.artifact.path),
     lockPath: runtimeLockPath,
-    extractTo: nativeRuntimeTarget,
+    extractPayloadTo: join(nativeRuntimeTarget, "windows-x64", "cpu"),
   });
+  verifyCrispasrArchive({ root, device: "cpu", extractTo: join(nativeRuntimeTarget, "windows-x64/crispasr/cpu") });
+  return result;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -854,7 +854,8 @@ if(HIKARU_ASR_CUDA_RUNTIME)
 endif()
 if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
   target_compile_definitions(hikaru-asr-worker PRIVATE HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1)
-  target_link_libraries(hikaru-asr-worker PRIVATE hikaru-asr-crispasr hikaru-asr-parakeet-family-policy)
+  target_link_libraries(hikaru-asr-worker PRIVATE
+    hikaru-asr-crispasr hikaru-asr-parakeet-family-policy)
   add_executable(hikaru-asr-crispasr-contract-worker src/main.cpp)
   set_target_properties(
     hikaru-asr-crispasr-contract-worker PROPERTIES
@@ -869,7 +870,8 @@ if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
     HIKARU_ASR_CRISPASR_WORKER_CONTRACT_TEST=1)
   target_link_libraries(
     hikaru-asr-crispasr-contract-worker
-    PRIVATE hikaru-asr-ctranslate2 hikaru-asr-crispasr-test-adapter hikaru-asr-parakeet-family-policy)
+    PRIVATE hikaru-asr-ctranslate2 hikaru-asr-crispasr-test-adapter
+      hikaru-asr-parakeet-family-policy)
   add_executable(hikaru-asr-crispasr-vad-identity-contract-worker src/main.cpp)
   set_target_properties(
     hikaru-asr-crispasr-vad-identity-contract-worker PROPERTIES
@@ -884,7 +886,8 @@ if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
     PRIVATE HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT=1)
   target_link_libraries(
     hikaru-asr-crispasr-vad-identity-contract-worker
-    PRIVATE hikaru-asr-ctranslate2 hikaru-asr-crispasr hikaru-asr-parakeet-family-policy)
+    PRIVATE hikaru-asr-ctranslate2 hikaru-asr-crispasr
+      hikaru-asr-parakeet-family-policy)
   add_executable(hikaru-asr-crispasr-worker-contract-tests tests/crispasr_worker_contract_tests.cpp)
   target_include_directories(hikaru-asr-crispasr-worker-contract-tests SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
@@ -985,7 +988,63 @@ if(HIKARU_ASR_BUILD_CT2_WORKER)
   endforeach()
 endif()
 
+# Independent application-worker target: full CLI orchestration, no CT2 imports
+# and no historical CrispAsrBackend/session/timeline linkage.
+option(HIKARU_ASR_BUILD_QWEN_CLI_WORKER "Build the full-CLI Qwen application worker" OFF)
+set(HIKARU_QWEN_CLI_FILE "" CACHE FILEPATH "Reviewed full crispasr.exe")
+set(HIKARU_QWEN_CLI_SHA256 "" CACHE STRING "Reviewed full CLI SHA-256")
+set(HIKARU_QWEN_CLI_SIZE "" CACHE STRING "Reviewed full CLI size")
+if(HIKARU_ASR_BUILD_QWEN_CLI_WORKER)
+  if(NOT WIN32 OR HIKARU_ASR_BUILD_CT2_WORKER OR HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
+    message(FATAL_ERROR "Full CLI worker requires its independent Windows runtime root")
+  endif()
+  file(SHA256 "${HIKARU_QWEN_CLI_FILE}" cli_hash)
+  file(SIZE "${HIKARU_QWEN_CLI_FILE}" cli_size)
+  if(NOT cli_hash STREQUAL HIKARU_QWEN_CLI_SHA256 OR NOT cli_size EQUAL HIKARU_QWEN_CLI_SIZE)
+    message(FATAL_ERROR "Full CLI identity drift")
+  endif()
+  file(WRITE "${GENERATED_INCLUDE_DIR}/hikaru_asr/qwen_cli_identity.hpp"
+    "#pragma once
+#include <cstdint>
+namespace hikaru_asr::qwen_cli::identity {
+"
+    "inline constexpr std::uintmax_t size_bytes = ${cli_size};
+"
+    "inline constexpr const char* sha256 = \"${cli_hash}\";
+}
+")
+  add_executable(hikaru-asr-qwen-cli-worker src/main.cpp src/qwen_cli.cpp)
+  target_compile_definitions(hikaru-asr-qwen-cli-worker PRIVATE HIKARU_ASR_QWEN_CLI_WORKER=1)
+  target_link_libraries(hikaru-asr-qwen-cli-worker PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio bcrypt)
+  target_include_directories(hikaru-asr-qwen-cli-worker SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+  target_compile_options(hikaru-asr-qwen-cli-worker PRIVATE /W4 /permissive- /utf-8)
+  add_custom_command(TARGET hikaru-asr-qwen-cli-worker POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${HIKARU_QWEN_CLI_FILE}"
+      "$<TARGET_FILE_DIR:hikaru-asr-qwen-cli-worker>/crispasr.exe")
+endif()
+
 include(CTest)
+if(BUILD_TESTING AND HIKARU_ASR_BUILD_QWEN_CLI_WORKER)
+  add_executable(hikaru-asr-qwen-cli-fixture-worker src/main.cpp src/qwen_cli.cpp)
+  target_compile_definitions(hikaru-asr-qwen-cli-fixture-worker PRIVATE
+    HIKARU_ASR_QWEN_CLI_WORKER=1 HIKARU_QWEN_CLI_FIXTURE=1)
+  target_link_libraries(hikaru-asr-qwen-cli-fixture-worker PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio bcrypt)
+  add_executable(hikaru-asr-fake-qwen-cli tests/fake_qwen_cli.cpp)
+  target_link_libraries(hikaru-asr-fake-qwen-cli PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio)
+  set_target_properties(hikaru-asr-fake-qwen-cli PROPERTIES OUTPUT_NAME crispasr)
+  foreach(target IN ITEMS hikaru-asr-qwen-cli-fixture-worker hikaru-asr-fake-qwen-cli)
+    target_include_directories(${target} SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+    target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+    set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qwen-fixture-bin")
+    foreach(configuration IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+      set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${configuration} "${CMAKE_BINARY_DIR}/qwen-fixture-bin")
+    endforeach()
+  endforeach()
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_test(NAME qwen-cli-worker-contract COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/qwen_cli_contract.py" "$<TARGET_FILE:hikaru-asr-qwen-cli-fixture-worker>")
+  set_tests_properties(qwen-cli-worker-contract PROPERTIES TIMEOUT 90)
+endif()
 if(BUILD_TESTING)
   add_test(NAME protocol-core COMMAND hikaru-asr-protocol-tests)
   set_tests_properties(protocol-core PROPERTIES TIMEOUT 30)
@@ -1002,7 +1061,9 @@ if(BUILD_TESTING)
                      $<TARGET_FILE:hikaru-asr-fake-crispasr-abi-broken>
                      $<TARGET_FILE:hikaru-asr-fake-crispasr-cuda-marker>)
     add_test(NAME parakeet-family-policy COMMAND hikaru-asr-parakeet-family-policy-tests)
-    set_tests_properties(fake-worker-contract crispasr-backend-core parakeet-family-policy PROPERTIES TIMEOUT 30)
+    set_tests_properties(
+      fake-worker-contract crispasr-backend-core parakeet-family-policy
+      PROPERTIES TIMEOUT 30)
     set_tests_properties(fake-worker-hang fake-worker-child-hang PROPERTIES TIMEOUT 15)
   endif()
   if(HIKARU_ASR_BUILD_CT2_WORKER)

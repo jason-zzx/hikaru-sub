@@ -10,33 +10,32 @@ const availability = vi.hoisted(() => ({
   engineOptions: [
     { value: "faster-whisper", label: "faster-whisper" },
     { value: "kotoba-faster-whisper", label: "kotoba-faster-whisper" },
-    { value: "qwen3-asr", label: "qwen3（后续版本支持）", disabled: true },
+    { value: "qwen3-asr", label: "qwen3" },
   ],
   modelOptions: [
     {
       value: "Qwen/Qwen3-ASR-1.7B",
-      label: "Qwen3-ASR-1.7B（后续版本支持）",
-      disabled: true,
+      label: "Qwen3-ASR-1.7B",
     },
   ],
   deviceOptions: [
     { value: "auto", label: "自动" },
     { value: "cpu", label: "CPU" },
-    { value: "cuda", label: "CUDA（后续版本支持）", disabled: true },
+    { value: "cuda", label: "CUDA（下载源尚未发布）", disabled: true },
   ],
   selectedModelStatus: {
     engine: "qwen3-asr",
     model: "Qwen/Qwen3-ASR-1.7B",
-    available: false,
+    available: true,
     downloaded: false,
-    disposition: "postMvpUnavailable" as const,
-    reason: "该模型将在后续版本支持",
+    disposition: "supportedMissing" as const,
+    reason: null,
   },
   selectedModelError: null,
   modelLoading: false,
   loading: false,
   routeAvailable: false,
-  unavailableReason: "该引擎将在后续版本支持",
+  unavailableReason: "下载源尚未发布",
   refresh: vi.fn(async () => undefined),
   refreshSelectedModel: vi.fn(async () => ({ kind: "aborted" as const })),
 }));
@@ -82,7 +81,7 @@ const settings: AppSettings = {
 };
 
 describe("SettingsTranscriptionPanel Native availability", () => {
-  it("keeps unavailable saved values visible without rewriting settings", () => {
+  it("keeps Qwen selectable and a missing saved CUDA visible without rewriting settings", () => {
     const update = vi.fn();
     render(<SettingsTranscriptionPanel settings={settings} update={update} />);
 
@@ -94,8 +93,10 @@ describe("SettingsTranscriptionPanel Native availability", () => {
         expect.stringContaining("CUDA"),
       ]),
     );
-    expect(screen.getAllByText(/后续版本支持/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/下载源尚未发布/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Python|虚拟环境|配置当前引擎依赖/)).toBeNull();
+    expect(screen.getByRole("button", { name: "下载模型" })).toBeTruthy();
+    expect((screen.getByRole("option", { name: "qwen3" }) as HTMLOptionElement).disabled).toBe(false);
     expect(update).not.toHaveBeenCalled();
   });
 

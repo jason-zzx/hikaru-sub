@@ -6,7 +6,7 @@ use crate::asr_worker::native_job_id;
 use crate::dependencies::{
     effective_source_profile, ensure_runtime_deps_writable_or_elevate,
     managed_ctranslate2_model_dir, managed_downloads_dir, managed_model_cache_dir,
-    RuntimeDependencySourceId, RuntimeDependencySourceProfile,
+    managed_models_dir, RuntimeDependencySourceId, RuntimeDependencySourceProfile,
 };
 use crate::settings::load_settings;
 use futures::StreamExt;
@@ -22,14 +22,13 @@ use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 use tauri::AppHandle;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, OwnedRwLockWriteGuard, RwLock};
 
 const MANIFEST_JSON: &str = include_str!("../resources/native-asr-models.json");
 const OFFICIAL_ENDPOINT: &str = "https://huggingface.co";
 const REQUIRED_ROLES: [&str; 4] = ["model-config", "model-weights", "tokenizer", "vocabulary"];
-const POST_MVP_MODELS: [(&str, &str); 3] = [
+const POST_MVP_MODELS: [(&str, &str); 2] = [
     ("parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja"),
-    ("qwen3-asr", "Qwen/Qwen3-ASR-1.7B"),
     ("reazonspeech-nemo", "reazon-research/reazonspeech-nemo-v2"),
 ];
 
@@ -52,6 +51,10 @@ struct ManifestModel {
     revision: String,
     license: ModelLicense,
     files: Vec<ManifestFile>,
+    #[serde(default)]
+    post_mvp_unavailable: bool,
+    #[serde(default)]
+    required_vad: Option<ManifestFile>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
@@ -69,11 +72,23 @@ struct ManifestFile {
     path: String,
     size_bytes: u64,
     sha256: String,
+    #[serde(default)]
+    source: Option<ModelSource>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+struct ModelSource {
+    repository: String,
+    revision: String,
+    license: ModelLicense,
 }
 
 #[derive(Debug, Clone)]
 struct ManagedModelRoots {
     direct: PathBuf,
+    crispasr: PathBuf,
+    shared: PathBuf,
     legacy_huggingface: PathBuf,
     downloads: PathBuf,
 }
@@ -82,6 +97,8 @@ struct ManagedModelRoots {
 struct ReadyCacheKey {
     direct_root: PathBuf,
     legacy_root: PathBuf,
+    crispasr_root: PathBuf,
+    shared_root: PathBuf,
     model: ManifestModel,
 }
 
@@ -90,15 +107,69 @@ impl ReadyCacheKey {
         Self {
             direct_root: roots.direct.clone(),
             legacy_root: roots.legacy_huggingface.clone(),
+            crispasr_root: roots.crispasr.clone(),
+            shared_root: roots.shared.clone(),
             model: model.clone(),
         }
     }
+}
+
+#[cfg(test)]
+pub(crate) async fn resolve_qwen_delivery_test_model(
+    deps: &Path,
+    inputs: &[PathBuf],
+) -> ResolvedNativeAsrModel {
+    let roots = ManagedModelRoots::below(deps);
+    let entry = find_model(
+        &load_manifest().unwrap(),
+        "qwen3-asr",
+        "Qwen/Qwen3-ASR-1.7B",
+    )
+    .unwrap()
+    .clone();
+    assert!(!entry.post_mvp_unavailable);
+    for ((model, file), input) in entry
+        .files
+        .iter()
+        .map(|f| (entry.clone(), f))
+        .chain(
+            entry
+                .required_vad
+                .iter()
+                .map(|f| (vad_model(&entry).unwrap(), f)),
+        )
+        .zip(inputs)
+    {
+        assert_eq!(fs::metadata(input).unwrap().len(), file.size_bytes);
+        assert_eq!(sha256_file(input).unwrap(), file.sha256);
+        let root = direct_path(&roots, &model);
+        fs::create_dir_all(&root).unwrap();
+        fs::hard_link(input, root.join(&file.path)).unwrap();
+    }
+    let manager = NativeAsrModelManager::default();
+    let model = manager
+        .resolve_entry_with_roots(roots.clone(), entry.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        manager
+            .resolve_entry_with_roots(roots, entry)
+            .await
+            .unwrap()
+            .unwrap()
+            .roles,
+        model.roles
+    );
+    model
 }
 
 impl ManagedModelRoots {
     fn from_app(app: &AppHandle) -> Result<Self, String> {
         Ok(Self {
             direct: managed_ctranslate2_model_dir(app)?,
+            crispasr: managed_models_dir(app)?.join("crispasr"),
+            shared: managed_models_dir(app)?.join("shared"),
             legacy_huggingface: managed_model_cache_dir(app)?,
             downloads: managed_downloads_dir(app)?.join("native-asr-models"),
         })
@@ -108,6 +179,8 @@ impl ManagedModelRoots {
     fn below(deps: &Path) -> Self {
         Self {
             direct: deps.join("models").join("ctranslate2"),
+            crispasr: deps.join("models").join("crispasr"),
+            shared: deps.join("models").join("shared"),
             legacy_huggingface: deps.join("models").join("huggingface"),
             downloads: deps.join("downloads").join("native-asr-models"),
         }
@@ -150,6 +223,7 @@ pub(crate) struct ResolvedNativeAsrModel {
     pub backend: String,
     pub revision: String,
     pub path: PathBuf,
+    pub roles: Vec<(String, PathBuf)>,
     pub origin: NativeAsrModelOrigin,
 }
 
@@ -192,9 +266,26 @@ struct ManagerState {
 pub(crate) struct NativeAsrModelManager {
     state: Arc<Mutex<ManagerState>>,
     ready_cache: Arc<StdMutex<HashMap<ReadyCacheKey, ResolvedNativeAsrModel>>>,
+    // Checks/downloads share access; explicit cleanup cannot race a cache seed or publication.
+    storage: Arc<RwLock<()>>,
+    // One shared CPU asset. Serializing only its publication preserves other model jobs.
+    vad_download: Arc<Mutex<()>>,
 }
 
 impl NativeAsrModelManager {
+    pub(crate) fn begin_storage_cleanup(&self) -> Result<OwnedRwLockWriteGuard<()>, String> {
+        let guard = self
+            .storage
+            .clone()
+            .try_write_owned()
+            .map_err(|_| "模型检查或下载正在进行，暂不可清理".to_string())?;
+        self.ready_cache
+            .lock()
+            .map_err(|_| "模型验证缓存已损坏".to_string())?
+            .clear();
+        Ok(guard)
+    }
+
     pub(crate) async fn status(
         &self,
         app: &AppHandle,
@@ -215,6 +306,9 @@ impl NativeAsrModelManager {
         let Some(entry) = find_model(&manifest, engine, model) else {
             return Ok(unavailable_status(engine, model));
         };
+        if entry.post_mvp_unavailable {
+            return Ok(unavailable_status(engine, model));
+        }
         let entry = entry.clone();
         let resolved = self.resolve_entry_with_roots(roots, entry.clone()).await?;
         Ok(NativeAsrModelStatus {
@@ -242,6 +336,9 @@ impl NativeAsrModelManager {
         let Some(entry) = find_model(&manifest, engine, model).cloned() else {
             return Ok(None);
         };
+        if entry.post_mvp_unavailable {
+            return Ok(None);
+        }
         let roots = ManagedModelRoots::from_app(app)?;
         self.resolve_entry_with_roots(roots, entry).await
     }
@@ -251,14 +348,34 @@ impl NativeAsrModelManager {
         roots: ManagedModelRoots,
         entry: ManifestModel,
     ) -> Result<Option<ResolvedNativeAsrModel>, String> {
+        let _storage = self.storage.read().await;
         let key = ReadyCacheKey::new(&roots, &entry);
-        if let Some(resolved) = self
+        let cached = self
             .ready_cache
             .lock()
             .map_err(|_| "Native ASR 模型验证缓存已损坏".to_string())?
             .get(&key)
-            .cloned()
-        {
+            .cloned();
+        if let Some(mut resolved) = cached {
+            // The small required VAD is always hashed, including cache hits. Pair cache
+            // remains process-local like CT2; cleanup holds the exclusive storage lease.
+            let check_roots = roots.clone();
+            let check_entry = entry.clone();
+            let dependency = tauri::async_runtime::spawn_blocking(move || {
+                verified_vad(&check_roots, &check_entry)
+            })
+            .await
+            .map_err(|_| "模型依赖校验任务失败".to_string())??;
+            if let Some(vad) = dependency {
+                resolved.roles.retain(|(role, _)| role != "vad");
+                resolved.roles.push(("vad".into(), vad));
+            } else if entry.required_vad.is_some() {
+                self.ready_cache
+                    .lock()
+                    .map_err(|_| "模型验证缓存已损坏".to_string())?
+                    .remove(&key);
+                return Ok(None);
+            }
             return Ok(Some(resolved));
         }
         let verify_roots = roots.clone();
@@ -293,11 +410,9 @@ impl NativeAsrModelManager {
         engine: &str,
         model: &str,
     ) -> Result<String, String> {
-        ensure_runtime_deps_writable_or_elevate(app)?;
         let manifest = load_manifest()?;
-        let entry = find_model(&manifest, engine, model)
-            .cloned()
-            .ok_or_else(|| "当前 Native ASR CPU 路线不提供该模型".to_string())?;
+        let entry = downloadable_entry(&manifest, engine, model)?.clone();
+        ensure_runtime_deps_writable_or_elevate(app)?;
         let settings = load_settings(app).unwrap_or_default();
         let profile = effective_source_profile(&settings)?;
         self.start_download_for_model(
@@ -315,7 +430,8 @@ impl NativeAsrModelManager {
         endpoint: String,
     ) -> Result<String, String> {
         let logical_id = entry.logical_id.clone();
-        let total_bytes = entry.files.iter().map(|file| file.size_bytes).sum();
+        let storage = self.storage.clone().read_owned().await;
+        let total_bytes = model_total(&entry);
         let mut state = self.state.lock().await;
         if let Some(job_id) = state.active_by_model.get(&logical_id) {
             return Ok(job_id.clone());
@@ -343,11 +459,29 @@ impl NativeAsrModelManager {
         let manager = self.clone();
         let terminal_id = id.clone();
         tauri::async_runtime::spawn(async move {
-            let result = run_download(&entry, &roots, &endpoint, &terminal_id, &job).await;
+            let result = run_download(
+                &entry,
+                &roots,
+                &endpoint,
+                &terminal_id,
+                &job,
+                &manager.vad_download,
+            )
+            .await
+            .and_then(|ready| {
+                manager.remember_ready(&roots, &entry, ready.clone())?;
+                Ok(ready)
+            });
+            let mut state = manager.state.lock().await;
+            if state.active_by_model.get(&logical_id) == Some(&terminal_id) {
+                state.active_by_model.remove(&logical_id);
+            }
+            // Terminal polling must not observe a completed/failed job still owning
+            // its storage lease. State lock prevents a new same-model job until then.
+            drop(storage);
             if let Ok(mut guard) = job.lock() {
                 match result {
                     Ok(ready) => {
-                        let _ = manager.remember_ready(&roots, &entry, ready.clone());
                         guard.snapshot.status = ModelDownloadJobStatus::Completed;
                         guard.snapshot.progress = Some(1.0);
                         guard.snapshot.downloaded_bytes = guard.snapshot.total_bytes;
@@ -359,10 +493,6 @@ impl NativeAsrModelManager {
                         guard.snapshot.error = Some(sanitize_error(&error));
                     }
                 }
-            }
-            let mut state = manager.state.lock().await;
-            if state.active_by_model.get(&logical_id) == Some(&terminal_id) {
-                state.active_by_model.remove(&logical_id);
             }
         });
         Ok(id)
@@ -407,7 +537,6 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
             ("model", model.model.as_str()),
             ("backend", model.backend.as_str()),
             ("format", model.format.as_str()),
-            ("repository", model.repository.as_str()),
             ("license.spdx", model.license.spdx.as_str()),
             ("license.attribution", model.license.attribution.as_str()),
             ("license.source", model.license.source.as_str()),
@@ -416,7 +545,10 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
         }
         validate_segment("engine", &model.engine)?;
         validate_model_id(&model.model)?;
-        validate_repository(&model.repository)?;
+        let qwen = model.backend == "crispasr";
+        if !qwen {
+            validate_repository(&model.repository)?;
+        }
         if model.logical_id != format!("{}/{}", model.engine, model.model) {
             return Err("logicalId 必须与 engine/model 完全一致".into());
         }
@@ -428,9 +560,13 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
         {
             return Err(format!("模型清单包含重复身份：{}", model.logical_id));
         }
-        if !is_lower_hex(&model.revision, 40) {
+        if if qwen {
+            model.revision != pair_revision(&model.files)?
+        } else {
+            !is_lower_hex(&model.revision, 40)
+        } {
             return Err(format!(
-                "模型 revision 必须是 40 位小写提交哈希：{}",
+                "模型 revision 与固定来源身份不匹配：{}",
                 model.logical_id
             ));
         }
@@ -440,21 +576,46 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
         let mut roles = HashSet::new();
         let mut paths = HashSet::new();
         for file in &model.files {
-            validate_text("file.role", &file.role)?;
-            validate_relative_file_path(&file.path)?;
-            if file.size_bytes == 0 {
-                return Err(format!("模型文件大小必须大于 0：{}", file.path));
-            }
-            if !is_lower_hex(&file.sha256, 64) {
-                return Err(format!("模型文件 SHA-256 无效：{}", file.path));
-            }
+            validate_asset(file)?;
             if !roles.insert(file.role.clone()) || !paths.insert(file.path.to_ascii_lowercase()) {
                 return Err(format!("模型文件 role/path 重复：{}", file.path));
             }
         }
-        for role in REQUIRED_ROLES {
-            if !roles.contains(role) {
-                return Err(format!("模型缺少必需文件角色：{role}"));
+        if qwen {
+            if model.engine != "qwen3-asr"
+                || model.model != "Qwen/Qwen3-ASR-1.7B"
+                || model.format != "gguf"
+                || !model.repository.is_empty()
+                || roles != HashSet::from(["model".to_string(), "aligner".to_string()])
+                || model.files.iter().any(|file| {
+                    file.source.is_none()
+                        || file.path
+                            != match file.role.as_str() {
+                                "model" => "qwen3-asr-1.7b-q4_k.gguf",
+                                "aligner" => "qwen3-forced-aligner-0.6b-q4_k.gguf",
+                                _ => "",
+                            }
+                })
+            {
+                return Err("Qwen pair 身份或角色无效".into());
+            }
+            let vad = model.required_vad.as_ref().ok_or("Qwen 缺少必需 CPU VAD")?;
+            validate_asset(vad)?;
+            if vad.role != "vad" || vad.path != "ggml-silero-v6.2.0.bin" || vad.source.is_none() {
+                return Err("Qwen VAD 身份无效".into());
+            }
+        } else {
+            if model.backend != "ctranslate2"
+                || model.format != "ctranslate2"
+                || model.required_vad.is_some()
+                || model.files.iter().any(|file| file.source.is_some())
+            {
+                return Err("CTranslate2 模型身份或依赖无效".into());
+            }
+            for role in REQUIRED_ROLES {
+                if !roles.contains(role) {
+                    return Err(format!("模型缺少必需文件角色：{role}"));
+                }
             }
         }
         if model.engine == "kotoba-faster-whisper"
@@ -469,6 +630,40 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_asset(file: &ManifestFile) -> Result<(), String> {
+    validate_text("file.role", &file.role)?;
+    validate_relative_file_path(&file.path)?;
+    if file.size_bytes == 0 || !is_lower_hex(&file.sha256, 64) {
+        return Err("模型资产大小或哈希无效".into());
+    }
+    if let Some(source) = &file.source {
+        validate_repository(&source.repository)?;
+        if !is_lower_hex(&source.revision, 40) {
+            return Err("模型资产 revision 无效".into());
+        }
+        validate_text("license.spdx", &source.license.spdx)?;
+        validate_text("license.attribution", &source.license.attribution)?;
+        validate_text("license.source", &source.license.source)?;
+    }
+    Ok(())
+}
+
+// Not an upstream commit: this immutable pair identity binds BOTH sources and bytes.
+fn pair_revision(files: &[ManifestFile]) -> Result<String, String> {
+    let mut hash = Sha256::new();
+    let mut ordered: Vec<_> = files.iter().collect();
+    ordered.sort_by_key(|file| &file.role);
+    for file in ordered {
+        validate_asset(file)?;
+        let source = file.source.as_ref().ok_or("pair 文件缺少 source")?;
+        hash.update(format!(
+            "{}\n{}\n{}\n{}\n{}\n{}\n",
+            file.role, source.repository, source.revision, file.path, file.size_bytes, file.sha256
+        ));
+    }
+    Ok(format!("pair-{:x}", hash.finalize()))
+}
+
 fn validate_text(name: &str, value: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.bytes().any(|byte| byte < 0x20 || byte == 0x7f) {
         return Err(format!("模型清单字段无效：{name}"));
@@ -476,7 +671,7 @@ fn validate_text(name: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_segment(name: &str, value: &str) -> Result<(), String> {
+pub(crate) fn validate_segment(name: &str, value: &str) -> Result<(), String> {
     let path = Path::new(value);
     let mut components = path.components();
     if path.is_absolute()
@@ -568,6 +763,18 @@ fn find_model<'a>(
         .find(|entry| entry.engine == engine && entry.model == model)
 }
 
+fn downloadable_entry<'a>(
+    manifest: &'a ModelManifest,
+    engine: &str,
+    model: &str,
+) -> Result<&'a ManifestModel, String> {
+    let entry = find_model(manifest, engine, model).ok_or("当前 Native ASR 路线不提供该模型")?;
+    if entry.post_mvp_unavailable {
+        return Err("该模型将在后续版本支持".into());
+    }
+    Ok(entry)
+}
+
 fn unavailable_status(engine: &str, model: &str) -> NativeAsrModelStatus {
     NativeAsrModelStatus {
         engine: engine.to_string(),
@@ -584,25 +791,36 @@ fn unavailable_status(engine: &str, model: &str) -> NativeAsrModelStatus {
     }
 }
 
-pub(crate) fn known_native_asr_engines() -> Result<Vec<(String, bool)>, String> {
+pub(crate) fn known_native_asr_engines() -> Result<Vec<(String, bool, Option<String>)>, String> {
     let manifest = load_manifest()?;
-    let mut engines: Vec<(String, bool)> = Vec::new();
+    let mut engines = Vec::new();
     for model in manifest.models {
-        if !engines.iter().any(|(engine, _)| engine == &model.engine) {
-            engines.push((model.engine, true));
+        if !engines.iter().any(|(engine, _, _)| engine == &model.engine) {
+            engines.push((
+                model.engine,
+                !model.post_mvp_unavailable,
+                Some(model.backend),
+            ));
         }
     }
     for (engine, _) in POST_MVP_MODELS {
-        if !engines.iter().any(|(known, _)| known == engine) {
-            engines.push((engine.to_string(), false));
+        if !engines.iter().any(|(known, _, _)| known == engine) {
+            engines.push((engine.to_string(), false, None));
         }
     }
     Ok(engines)
 }
 
+fn direct_root<'a>(roots: &'a ManagedModelRoots, model: &ManifestModel) -> &'a Path {
+    match model.backend.as_str() {
+        "crispasr" => &roots.crispasr,
+        "shared" => &roots.shared,
+        _ => &roots.direct,
+    }
+}
+
 fn direct_path(roots: &ManagedModelRoots, model: &ManifestModel) -> PathBuf {
-    roots
-        .direct
+    direct_root(roots, model)
         .join(&model.engine)
         .join(&model.model)
         .join(&model.revision)
@@ -625,17 +843,55 @@ fn download_path(roots: &ManagedModelRoots, model: &ManifestModel) -> PathBuf {
         .join(&model.revision)
 }
 
+fn vad_model(model: &ManifestModel) -> Option<ManifestModel> {
+    let file = model.required_vad.as_ref()?;
+    let source = file.source.as_ref()?;
+    Some(ManifestModel {
+        logical_id: "silero/vad".into(),
+        engine: "silero".into(),
+        model: "vad".into(),
+        backend: "shared".into(),
+        format: "ggml".into(),
+        repository: source.repository.clone(),
+        revision: source.revision.clone(),
+        license: source.license.clone(),
+        files: vec![file.clone()],
+        post_mvp_unavailable: true,
+        required_vad: None,
+    })
+}
+
+fn verified_vad(
+    roots: &ManagedModelRoots,
+    model: &ManifestModel,
+) -> Result<Option<PathBuf>, String> {
+    let Some(vad) = vad_model(model) else {
+        return Ok(None);
+    };
+    let path = direct_path(roots, &vad);
+    Ok(verify_direct_install(&path, &vad, roots)
+        .ok()
+        .map(|_| path.join(&vad.files[0].path)))
+}
+
 fn resolve_sync(
     roots: &ManagedModelRoots,
     model: &ManifestModel,
 ) -> Result<Option<ResolvedNativeAsrModel>, String> {
+    let vad = verified_vad(roots, model)?;
+    if model.required_vad.is_some() && vad.is_none() {
+        return Ok(None);
+    }
     let direct = direct_path(roots, model);
     if verify_direct_install(&direct, model, roots).is_ok() {
-        return Ok(Some(resolved(
-            model,
-            direct,
-            NativeAsrModelOrigin::DirectInstall,
-        )));
+        let mut ready = resolved(model, direct, NativeAsrModelOrigin::DirectInstall);
+        if let Some(vad) = vad {
+            ready.roles.push(("vad".into(), vad));
+        }
+        return Ok(Some(ready));
+    }
+    if model.backend != "ctranslate2" {
+        return Ok(None);
     }
     let legacy = legacy_path(roots, model);
     if verify_directory(&legacy, model, VerificationMode::Legacy, roots).is_ok() {
@@ -653,13 +909,14 @@ fn verify_direct_install(
     model: &ManifestModel,
     roots: &ManagedModelRoots,
 ) -> Result<(), String> {
-    let root_metadata = fs::symlink_metadata(&roots.direct)
+    let direct_root = direct_root(roots, model);
+    verify_plain_ancestors(directory)?;
+    let root_metadata = fs::symlink_metadata(direct_root)
         .map_err(|_| "受管 CTranslate2 根目录不可用".to_string())?;
     if is_link_like(&root_metadata) || !root_metadata.is_dir() {
         return Err("受管 CTranslate2 根目录类型无效".into());
     }
-    let root = roots
-        .direct
+    let root = direct_root
         .canonicalize()
         .map_err(|_| "受管 CTranslate2 根目录不可用".to_string())?;
     let candidate = directory
@@ -668,9 +925,9 @@ fn verify_direct_install(
     if candidate == root || !candidate.starts_with(&root) {
         return Err("CTranslate2 模型目录越出受管根目录".into());
     }
-    let mut current = roots.direct.clone();
+    let mut current = direct_root.to_path_buf();
     let relative = directory
-        .strip_prefix(&roots.direct)
+        .strip_prefix(direct_root)
         .map_err(|_| "CTranslate2 模型路径不受管".to_string())?;
     for component in relative.components() {
         current.push(component);
@@ -692,6 +949,15 @@ fn resolved(
         logical_id: model.logical_id.clone(),
         backend: model.backend.clone(),
         revision: model.revision.clone(),
+        roles: if model.backend == "ctranslate2" {
+            vec![("model".into(), path.clone())]
+        } else {
+            model
+                .files
+                .iter()
+                .map(|file| (file.role.clone(), path.join(&file.path)))
+                .collect()
+        },
         path,
         origin,
     }
@@ -788,7 +1054,10 @@ fn source_endpoint(profile: &RuntimeDependencySourceProfile) -> Result<String, S
 
 fn validate_endpoint(endpoint: &str) -> Result<String, String> {
     let parsed = url::Url::parse(endpoint).map_err(|_| "Hugging Face endpoint 无效".to_string())?;
-    if parsed.scheme() != "https"
+    if !matches!(
+        endpoint.trim_end_matches('/'),
+        OFFICIAL_ENDPOINT | "https://hf-mirror.com"
+    ) || parsed.scheme() != "https"
         || parsed.host_str().is_none()
         || !parsed.username().is_empty()
         || parsed.password().is_some()
@@ -804,10 +1073,22 @@ fn file_url(endpoint: &str, model: &ManifestModel, file: &ManifestFile) -> Strin
     format!(
         "{}/{}/resolve/{}/{}",
         endpoint.trim_end_matches('/'),
-        model.repository,
-        model.revision,
+        file.source
+            .as_ref()
+            .map_or(&model.repository, |source| &source.repository),
+        file.source
+            .as_ref()
+            .map_or(&model.revision, |source| &source.revision),
         file.path
     )
+}
+
+fn model_total(model: &ManifestModel) -> u64 {
+    model.files.iter().map(|file| file.size_bytes).sum::<u64>()
+        + model
+            .required_vad
+            .as_ref()
+            .map_or(0, |file| file.size_bytes)
 }
 
 async fn run_download(
@@ -816,6 +1097,33 @@ async fn run_download(
     endpoint: &str,
     job_id: &str,
     job: &Arc<StdMutex<ModelDownloadJob>>,
+    vad_lock: &Mutex<()>,
+) -> Result<ResolvedNativeAsrModel, String> {
+    // Reuse the exact existing staging/Range/hash/publish path for the pair and
+    // the single shared asset; only the logical completion includes both.
+    let mut pair = model.clone();
+    pair.required_vad = None;
+    run_asset_download(&pair, roots, endpoint, job_id, job, 0).await?;
+    if let Some(vad) = vad_model(model) {
+        let _vad = vad_lock.lock().await;
+        let completed = model.files.iter().map(|file| file.size_bytes).sum();
+        run_asset_download(&vad, roots, endpoint, job_id, job, completed).await?;
+    }
+    let roots = roots.clone();
+    let model = model.clone();
+    tauri::async_runtime::spawn_blocking(move || resolve_sync(&roots, &model))
+        .await
+        .map_err(|_| "模型最终校验任务失败".to_string())??
+        .ok_or_else(|| "模型或必需依赖校验失败".into())
+}
+
+async fn run_asset_download(
+    model: &ManifestModel,
+    roots: &ManagedModelRoots,
+    endpoint: &str,
+    job_id: &str,
+    job: &Arc<StdMutex<ModelDownloadJob>>,
+    progress_base: u64,
 ) -> Result<ResolvedNativeAsrModel, String> {
     let resolve_roots = roots.clone();
     let resolve_model = model.clone();
@@ -824,6 +1132,7 @@ async fn run_download(
             .await
             .map_err(|error| format!("模型校验任务失败：{error}"))??
     {
+        update_progress(job, progress_base + model_total(model), snapshot_total(job));
         return Ok(ready);
     }
 
@@ -845,9 +1154,28 @@ async fn run_download(
             .redirect(reqwest::redirect::Policy::limited(10))
             .build()
             .map_err(|error| format!("无法创建模型下载客户端：{error}"))?;
-        let mut completed = 0_u64;
+        let mut completed = progress_base;
         for file in &model.files {
             let part = parts.join(format!("{}.part", file.path));
+            // Repair can reuse an exact intact role without re-downloading gigabytes.
+            // Never mutate the previous pair; the replacement still verifies as a unit.
+            if model.backend != "ctranslate2" {
+                let source = direct_path(roots, model).join(&file.path);
+                let target = part.clone();
+                let expected = file.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    if verify_file(&source, &expected).is_ok() {
+                        if path_entry_exists(&target) {
+                            verify_plain_ancestors(&target)?;
+                        }
+                        fs::copy(&source, &target)
+                            .map_err(|_| "无法复用已验证模型文件".to_string())?;
+                    }
+                    Ok::<_, String>(())
+                })
+                .await
+                .map_err(|_| "模型修复任务失败".to_string())??;
+            }
             download_file(
                 &client,
                 &file_url(endpoint, model, file),
@@ -874,11 +1202,7 @@ async fn run_download(
             .await
             .map_err(|error| format!("模型 staging 任务失败：{error}"))??;
             completed += file.size_bytes;
-            update_progress(
-                job,
-                completed,
-                model.files.iter().map(|item| item.size_bytes).sum(),
-            );
+            update_progress(job, completed, snapshot_total(job));
         }
 
         let publish_roots = roots.clone();
@@ -1082,8 +1406,10 @@ fn matching_content_range_end(response: &reqwest::Response, start: u64, total: u
 }
 
 fn verify_file(path: &Path, expected: &ManifestFile) -> Result<(), String> {
-    let metadata = fs::metadata(path).map_err(|_| format!("模型文件缺失：{}", expected.path))?;
-    if !metadata.is_file() || metadata.len() != expected.size_bytes {
+    verify_plain_ancestors(path)?;
+    let metadata =
+        fs::symlink_metadata(path).map_err(|_| format!("模型文件缺失：{}", expected.path))?;
+    if is_link_like(&metadata) || !metadata.is_file() || metadata.len() != expected.size_bytes {
         return Err(format!("模型文件大小不匹配：{}", expected.path));
     }
     if sha256_file(path)? != expected.sha256 {
@@ -1099,6 +1425,7 @@ fn publish_stage(
     namespace: &Path,
     job_id: &str,
 ) -> Result<PathBuf, String> {
+    verify_plain_ancestors(stage)?;
     verify_directory(stage, model, VerificationMode::Direct, roots)?;
     let final_path = direct_path(roots, model);
     if verify_direct_install(&final_path, model, roots).is_ok() {
@@ -1199,7 +1526,20 @@ fn prepare_download_stage(parts: &Path, stage: &Path) -> Result<(), String> {
     fs::create_dir(stage).map_err(|error| format!("无法创建模型 staging：{error}"))
 }
 
-fn ensure_plain_directory(path: &Path) -> Result<(), String> {
+pub(crate) fn verify_plain_ancestors(path: &Path) -> Result<(), String> {
+    for ancestor in path.ancestors() {
+        if ancestor.as_os_str().is_empty() {
+            continue;
+        }
+        let metadata = fs::symlink_metadata(ancestor).map_err(|_| "受管路径不可用".to_string())?;
+        if is_link_like(&metadata) {
+            return Err("受管路径不得包含 symlink/reparse point".into());
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn ensure_plain_directory(path: &Path) -> Result<(), String> {
     let mut current = PathBuf::new();
     for component in path.components() {
         if matches!(component, Component::ParentDir | Component::CurDir) {
@@ -1253,18 +1593,15 @@ fn update_progress(job: &Arc<StdMutex<ModelDownloadJob>>, downloaded: u64, total
 }
 
 fn sanitize_error(error: &str) -> String {
-    let compact: String = error
-        .chars()
-        .map(|character| {
-            if character.is_control() {
-                ' '
-            } else {
-                character
-            }
-        })
-        .take(500)
-        .collect();
-    compact.trim().to_string()
+    // reqwest/filesystem errors may contain URLs, credentials or local paths.
+    if error.contains("网络") {
+        "模型下载网络失败，请重试"
+    } else if error.contains("哈希") || error.contains("校验") {
+        "模型文件校验失败，请重试修复"
+    } else {
+        "模型下载或发布失败，请重试"
+    }
+    .into()
 }
 
 #[cfg(test)]
@@ -1273,6 +1610,8 @@ mod tests {
     use httpmock::Method::GET;
     use httpmock::MockServer;
     use tempfile::tempdir;
+
+    include!("asr_models_qwen_tests.rs");
 
     fn hash(bytes: &[u8]) -> String {
         format!("{:x}", Sha256::digest(bytes))
@@ -1292,6 +1631,8 @@ mod tests {
                 attribution: "test conversion".into(),
                 source: "https://example.test/model".into(),
             },
+            post_mvp_unavailable: false,
+            required_vad: None,
             files: files
                 .iter()
                 .map(|(role, path, bytes)| ManifestFile {
@@ -1299,6 +1640,7 @@ mod tests {
                     path: (*path).into(),
                     size_bytes: bytes.len() as u64,
                     sha256: hash(bytes),
+                    source: None,
                 })
                 .collect(),
         }
@@ -1328,6 +1670,7 @@ mod tests {
             path: preprocessor.0.into(),
             size_bytes: preprocessor.1.len() as u64,
             sha256: hash(preprocessor.1),
+            source: None,
         });
         model.logical_id = "kotoba-faster-whisper/kotoba-tech/kotoba-whisper-v2.0-faster".into();
         model.engine = "kotoba-faster-whisper".into();
@@ -1359,7 +1702,11 @@ mod tests {
 
     #[test]
     fn manifest_content_is_exactly_frozen() {
-        let manifest: serde_json::Value = serde_json::from_str(MANIFEST_JSON).unwrap();
+        let mut manifest: serde_json::Value = serde_json::from_str(MANIFEST_JSON).unwrap();
+        manifest["models"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|row| row["backend"] == "ctranslate2");
         assert_eq!(
             hash(&serde_json::to_vec(&manifest).unwrap()),
             "49a53cc898f66f82bfd946191ee92c13cb2faa06db821068ba5981e39b85694c"
@@ -1702,7 +2049,7 @@ mod tests {
     }
 
     #[test]
-    fn manifest_backed_whisper_and_kotoba_are_supported_and_other_routes_stay_deferred() {
+    fn manifest_backed_engines_are_supported_and_unmigrated_routes_stay_deferred() {
         let manifest = load_manifest().unwrap();
         for model in [
             "tiny",
@@ -1728,13 +2075,20 @@ mod tests {
             .any(|file| file.role == "preprocessor" && file.path == "preprocessor_config.json"));
 
         let engines = known_native_asr_engines().unwrap();
-        assert!(engines.contains(&("faster-whisper".into(), true)));
-        assert!(engines.contains(&("kotoba-faster-whisper".into(), true)));
-        for engine in ["parakeet", "qwen3-asr", "reazonspeech-nemo"] {
-            assert!(engines.contains(&(engine.into(), false)));
+        assert!(engines.contains(&("faster-whisper".into(), true, Some("ctranslate2".into()))));
+        assert!(engines.contains(&(
+            "kotoba-faster-whisper".into(),
+            true,
+            Some("ctranslate2".into())
+        )));
+        assert!(engines.contains(&("qwen3-asr".into(), true, Some("crispasr".into()))));
+        for engine in ["parakeet", "reazonspeech-nemo"] {
+            assert!(engines
+                .iter()
+                .any(|(name, enabled, _)| name == engine && !enabled));
         }
         assert_eq!(
-            unavailable_status("qwen3-asr", "Qwen/Qwen3-ASR-1.7B").disposition,
+            unavailable_status("parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja").disposition,
             NativeAsrModelDisposition::PostMvpUnavailable
         );
         assert_eq!(

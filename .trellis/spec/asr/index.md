@@ -1,50 +1,44 @@
-# Legacy ASR Sidecar Development Guidelines
+# ASR Development Guidelines
 
-> Development and historical rollback source for the Python FastAPI ASR service (`asr-service/`).
+> Current Native production contracts and historical Python sidecar development.
 
-**Global hard rules** (git commit policy, product naming, security, runtime dependency / model cache policy): see [`/AGENTS.md`](/AGENTS.md). This layer documents sidecar-local patterns.
+**Global rules** (Git authority, naming, security, runtime/model cache policy): see [`/AGENTS.md`](/AGENTS.md).
 
----
+## Current production scope
 
-## Overview
-
-The sidecar owns its **development-only inference path**: pluggable Python engines, transcription jobs, model download status, ASS write-out when requested, and optional JSONL diagnostics.
-
-Production desktop ASR uses the independent Native CTranslate2 CPU worker with exact manifest readiness for seven Faster-Whisper models (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`) plus `kotoba-faster-whisper / kotoba-tech/kotoba-whisper-v2.0-faster`; `faster-whisper / large-v3` remains the frontend default. Tauri owns worker lifecycle and protocol orchestration; React owns UI, ASS editing, and translation.
-
-The repo-root `asr-service/` remains development and one-cycle rollback evidence. It is not copied to `src-tauri/resources/`, included in NSIS/portable artifacts, or used by the production default route. Do not restore packaged template synchronization as part of ordinary sidecar development.
-
----
+- CTranslate2 supports the original eight routes: seven Faster-Whisper models (`tiny`, `base`, `small`, `medium`, `large-v2`, `large-v3`, `large-v3-turbo`) and exact `kotoba-tech/kotoba-whisper-v2.0-faster`. Default remains `faster-whisper / large-v3`.
+- Independent CrispASR full CLI supports exact `Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`, recommended Q4_K pair, mandatory CPU Silero, upstream LIS/interpolation and word-aware display with the approved adjacent anomaly merge.
+- Both backends use independent bundled CPU and published on-demand CUDA artifacts/roots. Explicit CUDA does not fall back; CPU does not initialize CUDA. Never load DLLs across backend trees.
+- Tauri owns orchestration/lifecycle, Native workers own inference, React owns UI/ASS/translation. Parakeet/Reazon and general/other-engine VAD remain unimplemented. Source support is not a new application release or all-GPU qualification.
+- Qwen uses functional/structural/device/lifecycle validation, not the retired raw-session/DP/timing/Python-relative quality pipeline. Other children retain their own absolute-quality requirements.
 
 ## Guidelines Index
 
 | Guide | Description |
-|-------|-------------|
-| [Directory Structure](./directory-structure.md) | `server.py`, `jobs.py`, `engines/`, `schemas.py`, tests |
-| [Engine Plugins](./engine-plugins.md) | Registry, default vs optional engines, Kotoba cache rules |
-| [API and Jobs](./api-and-jobs.md) | HTTP surface, schemas, snapshots, diagnostics |
-| [Quality Guidelines](./quality-guidelines.md) | `unittest`; optional engine deps |
+|---|---|
+| [Native Qwen CLI Output](./qwen-cli-output.md) | Current full-CLI output/adjacent-merge/strict protocol/host-ASS contract |
+| [Quality Guidelines](./quality-guidelines.md) | Current Qwen scope; other Native absolute qualification; historical sidecar tests |
+| [Directory Structure](./directory-structure.md) | Historical sidecar `server.py`, `jobs.py`, `engines/`, schemas/tests |
+| [Engine Plugins](./engine-plugins.md) | Historical Python registry, optional engines and Kotoba cache |
+| [API and Jobs](./api-and-jobs.md) | Historical sidecar HTTP/snapshots/diagnostics |
 
----
+The repo-root `asr-service/` remains development/rollback source only. It is not
+copied into resources, bundled or invoked as a production fallback. Its optional
+VAD degradation behavior must not override mandatory Native Qwen VAD failure.
 
-## Pre-Development Checklist
+## Verification by scope
 
-- [ ] Confirm the change is inference / job / engine related (not UI or FFmpeg)
-- [ ] Register new engines in `engines/registry.py` and implement `AsrEngine`
-- [ ] Keep HTTP request/response camelCase aliases aligned with frontend types
-- [ ] VAD failures should degrade, not abort transcription when product expects fallback
-
----
-
-## Quality Check Pointers
+For Native changes, read the applicable output, Tauri path/host and frontend
+availability specs and run the affected existing tests. For intentional historical
+sidecar work only:
 
 ```bash
 cd asr-service
 python -m unittest discover tests
 ```
 
-Note when optional engines (Parakeet / Qwen3) are not installed locally.
-
----
+Register sidecar engines through `AsrEngine`/registry and maintain its HTTP aliases;
+these are not instructions to add Python to a Native route. Report absent optional
+dependencies/models and distinguish synthetic checks from real execution.
 
 **Language**: Specs in this tree are written in **English**.

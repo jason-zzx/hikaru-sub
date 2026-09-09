@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "role": "read-only-design-research-not-runtime-or-model-qualification",
+  "repository": "CrispStrobe/CrispASR",
+  "tag": "v0.8.32",
+  "commit": "e2a356146e36bc1cc0410edefb01990448766979",
+  "files": [
+    {
+      "path": "docs/cli.md",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/docs/cli.md",
+      "sizeBytes": 116077,
+      "sha256": "c57a7bcec7db8eee6b8f90162057d5cbf78cab46df668c1503b79f6ca54edf6e"
+    },
+    {
+      "path": "include/crispasr_session.h",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/include/crispasr_session.h",
+      "sizeBytes": 60272,
+      "sha256": "dda81b2953aa2be64e3900d28df8d08aa4ecbfe9cdd5f23433c11383a43410a5"
+    },
+    {
+      "path": "src/crispasr_c_api.cpp",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/src/crispasr_c_api.cpp",
+      "sizeBytes": 511835,
+      "sha256": "11857402eb64c5f382aeef3bb15703088f7a85061fb9da9446470c8c3012848b"
+    },
+    {
+      "path": "src/crispasr_aligner.cpp",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/src/crispasr_aligner.cpp",
+      "sizeBytes": 30300,
+      "sha256": "a57dffcc96744cf9f3570a7f0f606947f9dbb4dbdecc8a1b6dca4d3054448b06"
+    },
+    {
+      "path": "src/crispasr_aligner.h",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/src/crispasr_aligner.h",
+      "sizeBytes": 5297,
+      "sha256": "70c009922cd0e65a84cae3dd5f0437a954b91eb1f754715fa997fd8d36872804"
+    },
+    {
+      "path": "src/qwen3_asr.cpp",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/src/qwen3_asr.cpp",
+      "sizeBytes": 105845,
+      "sha256": "e13c1bb8cfa912decd95521c7e3722f36aa92a5540d163c08a95e6195b0cc162"
+    },
+    {
+      "path": "src/crispasr_model_registry.cpp",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/src/crispasr_model_registry.cpp",
+      "sizeBytes": 119461,
+      "sha256": "fc3c8a64964e777d29e59469c61e46b6f4ae8a7a516ee09f75c2b9a1d1b89dee"
+    },
+    {
+      "path": "examples/cli/crispasr_run.cpp",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/examples/cli/crispasr_run.cpp",
+      "sizeBytes": 275422,
+      "sha256": "3de072963edef1b3e0dfa319cc641d976eb8f985ddfbd80e4b08b4229ad26a4f"
+    },
+    {
+      "path": "examples/cli/crispasr_output.cpp",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/examples/cli/crispasr_output.cpp",
+      "sizeBytes": 49399,
+      "sha256": "4866b7b36f42ec034f59fd87f243f5ff6b19c5b6475367c27cfc570e5ad6a1ed"
+    },
+    {
+      "path": "examples/cli/crispasr_backend_qwen3.cpp",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/examples/cli/crispasr_backend_qwen3.cpp",
+      "sizeBytes": 28364,
+      "sha256": "9fa96f21635fe710f6c39589d17f8f3d846f2c752673c93fc914e7d35056babd"
+    },
+    {
+      "path": "examples/cli/CMakeLists.txt",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/examples/cli/CMakeLists.txt",
+      "sizeBytes": 16776,
+      "sha256": "4f2e161eb8a01e07b27cec153a2eb7c9679aed4f04fce2e16b775438f3b5a449"
+    }
+  ],
+  "modelRuns": 0,
+  "modelDownloads": 0
+}

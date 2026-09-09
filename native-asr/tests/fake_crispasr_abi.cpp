@@ -223,8 +223,8 @@ __declspec(dllexport) crispasr_session_result* crispasr_session_transcribe_lang(
     result->segments.push_back({"invalid", 20, 10});
     result->words.push_back({"invalid", 0, word_end_cs});
   } else if (session->backend == "qwen3") {
-    result->segments.push_back({"qwen-source", -1, -1});
-    result->words.push_back({"qwen-source", -1, -1});
+    result->segments.push_back({"q w", -1, -1});
+    result->words.push_back({"q w", -1, -1});
   } else if (session->model.find("protocol-invalid-text") != std::string::npos) {
     const std::string text(1, '\x01');
     result->segments.push_back({text, 0, final_end_cs});
@@ -402,7 +402,8 @@ __declspec(dllexport) crispasr_align_result* crispasr_align_words_abi(
   if (std::strstr(aligner, "invalid-align")) {
     result->words.push_back({"x", 10, 5});
   } else if (std::strstr(aligner, "tail-unbounded")) {
-    result->words.push_back({"tail", 100, 10000});
+    result->words.push_back({"q", 100, 100});
+    result->words.push_back({"w", 100, 10000});
   } else {
     result->words.push_back({"q", 0, 0});
     result->words.push_back({"w", 0, 100});

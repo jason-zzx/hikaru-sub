@@ -326,6 +326,68 @@
           "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
         }
       ]
+    },
+    {
+      "logicalId": "qwen3-asr/Qwen/Qwen3-ASR-1.7B",
+      "engine": "qwen3-asr",
+      "model": "Qwen/Qwen3-ASR-1.7B",
+      "backend": "crispasr",
+      "format": "gguf",
+      "repository": "",
+      "revision": "pair-76d5fa1290f361aa002fb25f3845ad3b9940063cb2c583e211f153763ba6777c",
+      "license": {
+        "spdx": "Apache-2.0",
+        "attribution": "Qwen/Qwen3-ASR-1.7B; cstr/qwen3-asr-1.7b-GGUF distribution",
+        "source": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/README.md"
+      },
+      "postMvpUnavailable": false,
+      "files": [
+        {
+          "role": "model",
+          "path": "qwen3-asr-1.7b-q4_k.gguf",
+          "sizeBytes": 1490915200,
+          "sha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+          "source": {
+            "repository": "cstr/qwen3-asr-1.7b-GGUF",
+            "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+            "license": {
+              "spdx": "Apache-2.0",
+              "attribution": "Qwen/Qwen3-ASR-1.7B; cstr/qwen3-asr-1.7b-GGUF distribution",
+              "source": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/README.md"
+            }
+          }
+        },
+        {
+          "role": "aligner",
+          "path": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+          "sizeBytes": 529001216,
+          "sha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+          "source": {
+            "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+            "revision": "1ec5110602ccab18c878ddebedab0891e290a95c",
+            "license": {
+              "spdx": "Apache-2.0",
+              "attribution": "Qwen/Qwen3-ForcedAligner-0.6B; cstr/qwen3-forced-aligner-0.6b-GGUF distribution",
+              "source": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/1ec5110602ccab18c878ddebedab0891e290a95c/README.md"
+            }
+          }
+        }
+      ],
+      "requiredVad": {
+        "role": "vad",
+        "path": "ggml-silero-v6.2.0.bin",
+        "sizeBytes": 885098,
+        "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+        "source": {
+          "repository": "ggml-org/whisper-vad",
+          "revision": "9ffd54a1e1ee413ddf265af9913beaf518d1639b",
+          "license": {
+            "spdx": "MIT",
+            "attribution": "Silero VAD v6.2.0; ggml-org/whisper-vad distribution",
+            "source": "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/README.md"
+          }
+        }
+      }
     }
   ]
 }

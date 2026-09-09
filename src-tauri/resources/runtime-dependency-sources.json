@@ -31,7 +31,13 @@
         "pytorchCudaIndexUrl": "https://download.pytorch.org/whl/cu126",
         "pytorchCpuFindLinksUrl": null,
         "pytorchCudaFindLinksUrl": null,
-        "huggingfaceEndpoint": null
+        "huggingfaceEndpoint": null,
+        "crispasrCuda": {
+          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-v1.zip",
+          "archive": "zip",
+          "sha256": "5a8e0272d41341e1759a32765fc4a218135df6626bfec83c80eed2b08379370d",
+          "sizeBytes": 719774409
+        }
       },
       "china": {
         "id": "china",
@@ -63,7 +69,13 @@
         "pytorchCudaIndexUrl": null,
         "pytorchCpuFindLinksUrl": "https://mirrors.aliyun.com/pytorch-wheels/cpu/",
         "pytorchCudaFindLinksUrl": "https://mirrors.aliyun.com/pytorch-wheels/cu126/",
-        "huggingfaceEndpoint": "https://hf-mirror.com"
+        "huggingfaceEndpoint": "https://hf-mirror.com",
+        "crispasrCuda": {
+          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-v1.zip",
+          "archive": "zip",
+          "sha256": "5a8e0272d41341e1759a32765fc4a218135df6626bfec83c80eed2b08379370d",
+          "sizeBytes": 719774409
+        }
       }
     }
   }

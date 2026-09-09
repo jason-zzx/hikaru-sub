@@ -409,7 +409,7 @@ void run_tests(
   {
     CrispAsrBackend backend(config(Engine::Qwen3Asr, audio, model, library, tail_unbounded));
     const Result result = backend.transcribe();
-    check(result.alignment.size() == 1 && result.alignment[0].end_ms == 100000,
+    check(result.alignment.size() == 2 && result.alignment[1].end_ms == 100000,
           "unbounded raw capability tail was modified or rejected");
   }
   check_counts(counters, {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, "Qwen unbounded raw tail");

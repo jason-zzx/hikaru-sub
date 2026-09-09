@@ -12,13 +12,13 @@ Hikaru Sub 是一款面向日语视频的 AI 字幕桌面应用，将视频获�
 
 - **获取视频**：打开本地视频，或下载单路/分离音视频的 m3u8；支持常见加密 VOD、自定义请求头、进度显示和取消。
 - **选取片段**：通过静帧核对起止位置，选择快速软切或精确硬切，并可将结果设为新的工作视频。
-- **本地日语转录**：通过随应用提供的独立 Native worker，在 CPU 上运行 Faster-Whisper `tiny`、`base`、`small`、`medium`、`large-v2`、`large-v3`、`large-v3-turbo`，或日语优化的 Kotoba Whisper v2.0，生成带时间轴的日语 ASS 字幕。
+- **本地日语转录**：当前源码通过独立 Native worker，在 CPU 或 CUDA 上运行七个 Faster-Whisper 模型、日语优化的 Kotoba Whisper v2.0，或 exact Qwen3-ASR-1.7B + ForcedAligner-0.6B（必需 CPU Silero VAD），生成日语 ASS 字幕。源码支持不代表新应用版本已发布。
 - **批量翻译**：调用任意AI提供商接口，结合上下文窗口、自定义提示词和术语表，为字幕补充译文。
 - **字幕编辑**：按物理 ASS 行编辑文本、时间、样式与行内标签，配合视频预览、音频波形和多泳道时间轴；字幕修改共享撤销/重做历史；支持查找替换、条件筛选、字幕质检；未保存保护与异常退出恢复；支持字幕导出。
 - **Aegisub 兼容**：沿用常见 Aegisub 式快捷键与字幕网格工作流，支持与 Aegisub 跨应用复制/剪切/粘贴字幕行，便于与外部工具互通。
 - **双语排版**：在翻译生成时决定形态——支持行内拼接、分离双行与仅保留译文；前两种可调整原文/译文顺序。编辑阶段不再按该设置重排行。
 - **输出成片**：生成硬字幕 MP4，或将 ASS 作为可切换软字幕封装进 MKV。
-- **按需准备依赖**：优先复用系统 FFmpeg，缺失时经确认下载受管副本；Native ASR runtime 随应用提供，所选 Faster-Whisper 或 Kotoba 模型按需下载并按固定 revision、大小和 SHA-256 精确校验。
+- **按需准备依赖**：优先复用系统 FFmpeg，缺失时经确认下载受管副本；CT2 与 CrispASR 的 CPU runtime 独立随包、CUDA pack 独立按需下载，模型按固定 revision、大小和 SHA-256 精确校验；Qwen pair 与必需 VAD 通过一个逻辑下载/readiness 单元交付。
 
 ## 支持功能
 
@@ -46,7 +46,7 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 
 发布包会携带经过校验的 Native ASR CPU runtime，但不会捆绑 FFmpeg、Python sidecar、venv、Python packages 或模型权重。首次触发 FFmpeg 或模型下载时，Hikaru Sub 会显示下载内容、大小、来源和保存位置并请求确认。
 
-使用转录前，确认所选模型已就绪或按提示下载；当前支持 Faster-Whisper `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo` 与 Kotoba `kotoba-tech/kotoba-whisper-v2.0-faster`，设备为 `auto|CPU`，新会话默认仍使用 `faster-whisper / large-v3`。Qwen3、Parakeet、ReazonSpeech、CUDA 和 VAD 仍为后续能力。使用翻译前，需要配置翻译提供商的地址、模型和凭据。
+使用转录前，确认所选模型已就绪或按提示下载。当前源码支持 CT2 的原八条路线：Faster-Whisper `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo` 与 Kotoba `kotoba-tech/kotoba-whisper-v2.0-faster`；另支持 CrispASR 的 exact `Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`，Qwen 固定使用必需 CPU Silero VAD。设备为 `auto|CPU|CUDA`，新会话默认仍为 `faster-whisper / large-v3`。两种 backend 的 CPU 随包、已发布 CUDA 依赖包按需下载且根目录独立；显式 CUDA 失败不回退 CPU，`auto` 只在启动前选设备。Parakeet、ReazonSpeech、其他引擎/通用 VAD 尚未实现；本说明不宣称已发布包含这些源码变更的新应用。CUDA 仅在 RTX 3070 真机验证，架构覆盖不等于所有 GPU 已实测。使用翻译前，需要配置翻译提供商的地址、模型和凭据。
 
 日语 ASR 在本机运行；翻译会把字幕文本发送到用户配置的 API 服务。视频、转录字幕和翻译字幕保存在用户选择的位置或视频同目录，临时音频与代理视频位于应用缓存。
 
@@ -63,7 +63,7 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 | UI | Tailwind CSS 4 + shadcn/ui |
 | 状态 | Zustand |
 | 字幕 | `src/lib/ass` + ASS |
-| ASR | 独立 Native CTranslate2 CPU worker（七个 Faster-Whisper 模型 + exact Kotoba Whisper v2.0） |
+| ASR | 独立 Native worker：CT2 八条原路线 + CrispASR 完整 CLI Qwen pair/必需 CPU Silero；各自 CPU/CUDA runtime |
 | 音视频 | FFmpeg / ffprobe |
 
 ### 环境要求
@@ -73,7 +73,7 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 - Rust stable
 - Python 3.11（仅开发或调试历史 sidecar 源码时需要）
 - FFmpeg（运行完整媒体工作流时需要，也可由应用按需准备）
-- 可选 NVIDIA CUDA（仅后续 Native GPU/引擎开发验证使用，当前发布路线不使用）
+- 可选 NVIDIA GPU/兼容驱动（应用 CUDA 路线使用按需 runtime pack；从源码构建 Native CUDA runtime 才需对应 Toolkit，工具链限制见 `native-asr/runtime/full-cli/README.md`）
 
 始终使用 pnpm 安装项目依赖：
 

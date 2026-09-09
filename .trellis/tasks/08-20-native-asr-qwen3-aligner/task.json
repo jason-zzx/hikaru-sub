@@ -2,12 +2,12 @@
   "id": "native-asr-qwen3-aligner",
   "name": "native-asr-qwen3-aligner",
   "title": "Productize native Qwen3 with ForcedAligner",
-  "description": "Post-MVP: produce legal ForcedAligner-derived Qwen3 subtitle timing without blocking the released large-v3 CPU route.",
-  "status": "planning",
+  "description": "Qwen full-CLI functionality and owner CPU/CUDA application runs accepted; CUDA publication review owner-closed (independent review not executed). Owner-authorized retirement of the old Qwen DEVELOPMENT timeline unit; preserve production behavior and build-consumed task lock.",
+  "status": "in_progress",
   "dev_type": null,
-  "scope": null,
+  "scope": "asr,tauri,frontend",
   "package": null,
-  "priority": "P3",
+  "priority": "P1",
   "creator": "zzx",
   "assignee": "zzx",
   "createdAt": "2026-08-20",
@@ -19,8 +19,39 @@
   "pr_url": null,
   "subtasks": [],
   "children": [],
-  "parent": null,
+  "parent": "09-01-native-asr-remaining-migrations",
   "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "notes": "Current full upstream CLI + exact Q4_K pair + required CPU Silero + LIS/display with approved adjacent anomaly merge. Prior record cleanup accepted. Owner separately authorized retirement of the old Qwen DEVELOPMENT timeline sources/table/test and dedicated wiring, restoring the original structured-failure seam; shared backend/ABI, sibling targets and full-CLI production remain unchanged. No repeated inference, download/upload, application release, Git index/history operations or task archive.",
+  "meta": {
+    "rebuildStatus": "functionality-cleanup-and-development-timeline-retirement-accepted",
+    "allowedNextAction": "await-owner-commit-or-task-closure-instructions-preserve-build-lock-path",
+    "timelineRetirementReview": {
+      "workflow": "e78aced5-3ace-42fa-a4d2-c9ec9b248428",
+      "child": "b30e6a6d-a0df-4c1d-8aab-8a73367b0488",
+      "output": "qwen/timeline-retirement-review.md",
+      "verdict": "accepted-no-blockers"
+    },
+    "cleanupReview": {
+      "workflow": "e39409f2-a76e-41f1-972c-8d39a6dd7862",
+      "child": "14356f1c-dcdb-41e4-b354-9dcc7d1ae40a",
+      "output": "qwen/cleanup-review.md",
+      "verdict": "approved-no-blockers",
+      "parentFollowup": "corrected-one-prose-readme-path"
+    },
+    "cudaPublicationAcceptance": "owner-accepted-and-closed-independent-agent-review-not-executed",
+    "manualApplicationValidation": "owner-confirmed-cpu-and-cuda",
+    "offlineImpactReport": "research/adjacent-display-merge-offline.md",
+    "executionPaused": false,
+    "implementationAuthorized": true,
+    "sourceTrimming": "retired-unused-target-removed-production-full-cli-preserved",
+    "subtitleQualityChecks": "out-of-scope",
+    "legacyExperimentContinuation": "prohibited",
+    "pendingDecisions": [],
+    "lastIndependentReview": {
+      "workflow": "b7bb6298-8652-4cf6-aa6d-dd1f075b58c4",
+      "child": "12c34753-97ce-4847-bc15-c40d1c5e0b7c",
+      "output": "qwen/repaired-final-functional-review.md",
+      "verdict": "bounded-final-local-engineering-accepted-global-section-4-pending"
+    }
+  }
 }

@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "purpose": "upstream engineering baseline metadata only; NOT a runtime artifact, production manifest, readiness or functionality attestation",
+  "source": {
+    "repository": "CrispStrobe/CrispASR",
+    "tag": "v0.8.32",
+    "commit": "e2a356146e36bc1cc0410edefb01990448766979",
+    "archive": {
+      "url": "https://codeload.github.com/CrispStrobe/CrispASR/tar.gz/e2a356146e36bc1cc0410edefb01990448766979",
+      "sizeBytes": 26013693,
+      "sha256": "e1fd613bb6e54ace0f80429fe3393f8e0b2c225bad6d99c730bdabf2736c14f5"
+    },
+    "reviewedSourceFilesMatched": 11,
+    "files": [
+      {
+        "path": "docs/cli.md",
+        "sizeBytes": 116077,
+        "sha256": "c57a7bcec7db8eee6b8f90162057d5cbf78cab46df668c1503b79f6ca54edf6e"
+      },
+      {
+        "path": "include/crispasr_session.h",
+        "sizeBytes": 60272,
+        "sha256": "dda81b2953aa2be64e3900d28df8d08aa4ecbfe9cdd5f23433c11383a43410a5"
+      },
+      {
+        "path": "src/crispasr_c_api.cpp",
+        "sizeBytes": 511835,
+        "sha256": "11857402eb64c5f382aeef3bb15703088f7a85061fb9da9446470c8c3012848b"
+      },
+      {
+        "path": "src/crispasr_aligner.cpp",
+        "sizeBytes": 30300,
+        "sha256": "a57dffcc96744cf9f3570a7f0f606947f9dbb4dbdecc8a1b6dca4d3054448b06"
+      },
+      {
+        "path": "src/crispasr_aligner.h",
+        "sizeBytes": 5297,
+        "sha256": "70c009922cd0e65a84cae3dd5f0437a954b91eb1f754715fa997fd8d36872804"
+      },
+      {
+        "path": "src/qwen3_asr.cpp",
+        "sizeBytes": 105845,
+        "sha256": "e13c1bb8cfa912decd95521c7e3722f36aa92a5540d163c08a95e6195b0cc162"
+      },
+      {
+        "path": "src/crispasr_model_registry.cpp",
+        "sizeBytes": 119461,
+        "sha256": "fc3c8a64964e777d29e59469c61e46b6f4ae8a7a516ee09f75c2b9a1d1b89dee"
+      },
+      {
+        "path": "examples/cli/crispasr_run.cpp",
+        "sizeBytes": 275422,
+        "sha256": "3de072963edef1b3e0dfa319cc641d976eb8f985ddfbd80e4b08b4229ad26a4f"
+      },
+      {
+        "path": "examples/cli/crispasr_output.cpp",
+        "sizeBytes": 49399,
+        "sha256": "4866b7b36f42ec034f59fd87f243f5ff6b19c5b6475367c27cfc570e5ad6a1ed"
+      },
+      {
+        "path": "examples/cli/crispasr_backend_qwen3.cpp",
+        "sizeBytes": 28364,
+        "sha256": "9fa96f21635fe710f6c39589d17f8f3d846f2c752673c93fc914e7d35056babd"
+      },
+      {
+        "path": "examples/cli/CMakeLists.txt",
+        "sizeBytes": 16776,
+        "sha256": "4f2e161eb8a01e07b27cec153a2eb7c9679aed4f04fce2e16b775438f3b5a449"
+      },
+      {
+        "path": "CMakeLists.txt",
+        "sizeBytes": 23807,
+        "sha256": "9130a786ab701b1e5fae3233176abfad59f852d6a4dd1c1f53b5b9443ef61b4a"
+      },
+      {
+        "path": "src/CMakeLists.txt",
+        "sizeBytes": 152499,
+        "sha256": "f82d206a6e700aa3414658a7be8588593d60cf6913f019c773ba2a18cdbf9e6e"
+      },
+      {
+        "path": "examples/cli/cli.cpp",
+        "sizeBytes": 157380,
+        "sha256": "88995128c1ce534c0804a97491f76562ab818d5c8cf4f8dac63d80a016291c5e"
+      },
+      {
+        "path": "examples/cli/crispasr_backend.cpp",
+        "sizeBytes": 40262,
+        "sha256": "cbbfeb5b582d2a34f87b41a31b62342bdaf762408fef1e346cad075b27a343ca"
+      },
+      {
+        "path": "examples/cli/crispasr_vad_cli.cpp",
+        "sizeBytes": 7608,
+        "sha256": "a48e564a19e7c470fa4b76eae53ce3aa4ef84d405b5f4353f0da9a63688a7dd6"
+      },
+      {
+        "path": "src/crispasr_vad.cpp",
+        "sizeBytes": 31332,
+        "sha256": "25d741fa2e087b7defb833889082b3f840514151b5909b43e5327d0c56c73fe9"
+      },
+      {
+        "path": "LICENSE",
+        "sizeBytes": 1078,
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+      }
+    ],
+    "submodules": [
+      {
+        "path": "ggml",
+        "repository": "CrispStrobe/ggml",
+        "commit": "5049ebb8472fdc965eb3fb72c1cb111260726186",
+        "archive": {
+          "url": "https://codeload.github.com/CrispStrobe/ggml/tar.gz/5049ebb8472fdc965eb3fb72c1cb111260726186",
+          "sizeBytes": 3647965,
+          "sha256": "c33508010b82c2362529ed7d5b11c5751aa49829fc579b83b857063ebe23eace"
+        },
+        "license": {
+          "spdx": "MIT",
+          "path": "LICENSE",
+          "sizeBytes": 1078,
+          "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+        }
+      },
+      {
+        "path": "third_party/c2pa-audio",
+        "repository": "CrispStrobe/c2pa-audio",
+        "commit": "e40329b83f16f67bb5ddc7bb13ae18de0a9376fc",
+        "acquisition": "only src/sha256.h fetched for object compile; not full dependency closure",
+        "header": {
+          "path": "src/sha256.h",
+          "sizeBytes": 5707,
+          "sha256": "663326c2d5480938aaab516d808416956e7bb4effe2c8c5f05271421704bee6a"
+        }
+      }
+    ],
+    "gitTreeEvidence": {
+      "sizeBytes": 951551,
+      "sha256": "6f3f2830077b5004e721aa4e4f5aaff2096cda2fe4e29f6c65e0fa7af552b4fe"
+    },
+    "license": {
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2023-2026 The ggml authors",
+      "url": "https://github.com/CrispStrobe/CrispASR/blob/e2a356146e36bc1cc0410edefb01990448766979/LICENSE",
+      "sizeBytes": 1078,
+      "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+    }
+  },
+  "models": [
+    {
+      "role": "asr",
+      "logicalModel": "Qwen/Qwen3-ASR-1.7B",
+      "repository": "cstr/qwen3-asr-1.7b-GGUF",
+      "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+      "file": "qwen3-asr-1.7b-q4_k.gguf",
+      "url": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/qwen3-asr-1.7b-q4_k.gguf",
+      "publicationSizeBytes": 1490915200,
+      "publicationSha256": "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4",
+      "publicationGitBlobId": "37c0f77871f6346820d7b5d51901c4a161ba88a7",
+      "identityAuthority": "Hugging Face API sibling LFS metadata; weight bytes NOT downloaded or verified",
+      "weightsVerified": false,
+      "licenseDeclaredByModelCard": "apache-2.0",
+      "modelCard": {
+        "url": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/README.md",
+        "sizeBytes": 4069,
+        "sha256": "8ecf50524a152125bdfe899ffd13e37da2f5cc8215630f1021bf970086203688"
+      },
+      "apiEvidence": {
+        "url": "https://huggingface.co/api/models/cstr/qwen3-asr-1.7b-GGUF?blobs=true",
+        "sizeBytes": 2344,
+        "sha256": "a4aa6210aab3d9ad965b501caa3630f4a8367f99bdd77100207405c24213fcca"
+      }
+    },
+    {
+      "role": "aligner",
+      "logicalModel": "Qwen/Qwen3-ForcedAligner-0.6B",
+      "repository": "cstr/qwen3-forced-aligner-0.6b-GGUF",
+      "revision": "1ec5110602ccab18c878ddebedab0891e290a95c",
+      "file": "qwen3-forced-aligner-0.6b-q4_k.gguf",
+      "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/1ec5110602ccab18c878ddebedab0891e290a95c/qwen3-forced-aligner-0.6b-q4_k.gguf",
+      "publicationSizeBytes": 529001216,
+      "publicationSha256": "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84",
+      "publicationGitBlobId": "029a6d42f4ffcd62bf99c784247202e7d8e33a93",
+      "identityAuthority": "Hugging Face API sibling LFS metadata; weight bytes NOT downloaded or verified",
+      "weightsVerified": false,
+      "licenseDeclaredByModelCard": "apache-2.0",
+      "modelCard": {
+        "url": "https://huggingface.co/cstr/qwen3-forced-aligner-0.6b-GGUF/resolve/1ec5110602ccab18c878ddebedab0891e290a95c/README.md",
+        "sizeBytes": 8401,
+        "sha256": "2e76739b9f7b2571ec5d5bdf78ba25904795757521bea731d91023b2a19ae556"
+      },
+      "apiEvidence": {
+        "url": "https://huggingface.co/api/models/cstr/qwen3-forced-aligner-0.6b-GGUF?blobs=true",
+        "sizeBytes": 2330,
+        "sha256": "dcb44965ee25b1c396adfe150252a8ceb11e958d7b9259d96b2fca4780f1a24b"
+      }
+    },
+    {
+      "role": "vad",
+      "logicalModel": "Silero VAD v6.2.0",
+      "repository": "ggml-org/whisper-vad",
+      "revision": "9ffd54a1e1ee413ddf265af9913beaf518d1639b",
+      "file": "ggml-silero-v6.2.0.bin",
+      "url": "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v6.2.0.bin",
+      "publicationSizeBytes": 885098,
+      "publicationSha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+      "publicationGitBlobId": "119d1edabf604ecce0c2b7304072ad24462866e0",
+      "identityAuthority": "Hugging Face API sibling LFS metadata; weight bytes NOT downloaded or verified",
+      "weightsVerified": false,
+      "licenseDeclaredByModelCard": "mit",
+      "modelCard": {
+        "url": "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/README.md",
+        "sizeBytes": 182,
+        "sha256": "6c1077880c654e84e103c34d2f7560e058ee62fecd2bc868db0249641c5d247e"
+      },
+      "apiEvidence": {
+        "url": "https://huggingface.co/api/models/ggml-org/whisper-vad?blobs=true",
+        "sizeBytes": 1085,
+        "sha256": "4bb93ae1264f66518af912d3f27d5916c560722a14fb62d9f04d4f41269fb020"
+      }
+    }
+  ],
+  "conversionNotes": {
+    "asr": "Pinned publisher card declares July 2026 rebake: Q4_K model keeps audio encoder at Q8_0; format conversion/quantization only. No independent tensor or conversion reproduction verification.",
+    "aligner": "Pinned publisher card declares Q4_K GGUF conversion of exact Qwen companion. No independent tensor or conversion reproduction verification.",
+    "converterCommit": "not stated in reviewed model cards; not invented"
+  },
+  "redistributionStatus": "Source MIT text verified; model cards declare Apache-2.0 / MIT. Complete model notices and linked-runtime third-party license closure NOT established; no redistributable artifact produced.",
+  "verification": {
+    "dispatcherObjectCompiled": true,
+    "finalLinkAttempted": false,
+    "cpuRuntimeBuilt": false,
+    "cudaRuntimeBuilt": false,
+    "modelDownloads": 0,
+    "modelRuns": 0,
+    "qualityChecks": 0
+  }
+}

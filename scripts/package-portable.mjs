@@ -9,10 +9,7 @@ import {
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import {
-  readRuntimeLock,
-  verifyRuntimeArchive,
-} from "./verify-native-asr-runtime.mjs";
+import { prepareAsrResources } from "./prepare-asr-resource.mjs";
 
 const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -129,13 +126,7 @@ export function packageMetadata(root) {
 }
 
 export function preparePortableNativeRuntime(root = defaultRoot) {
-  const lockPath = join(root, "native-asr", "runtime", "windows-x64-cpu-lock.json");
-  const lock = readRuntimeLock(lockPath);
-  return verifyRuntimeArchive({
-    archivePath: join(root, lock.artifact.path),
-    lockPath,
-    extractTo: join(root, "src-tauri", "resources", "native-asr"),
-  });
+  return prepareAsrResources(root);
 }
 
 export function packagePortable({

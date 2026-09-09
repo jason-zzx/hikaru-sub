@@ -45,6 +45,14 @@ describe("runtime dependency Tauri wrappers", () => {
     });
   });
 
+  it("uses existing registered commands for the independent CrispASR CUDA kind", async () => {
+    vi.mocked(invoke).mockResolvedValue("crispasr-job");
+    await prepareRuntimeDependency({ kind: "crispasrCuda" });
+    expect(invoke).toHaveBeenCalledWith("prepare_runtime_dependency", { args: { kind: "crispasrCuda" } });
+    await cleanupRuntimeDependency("crispasrCuda");
+    expect(invoke).toHaveBeenCalledWith("cleanup_runtime_dependency", { args: { kind: "crispasrCuda", preserveVideoPath: null } });
+  });
+
   it("polls and cancels dependency preparation", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ id: "job-1" });
 

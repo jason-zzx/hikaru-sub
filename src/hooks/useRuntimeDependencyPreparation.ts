@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getRuntimeDependencyProgress,
   prepareRuntimeDependency,
@@ -18,59 +18,124 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function useRuntimeDependencyPreparation(kind: RuntimeDependencyKind) {
   const [probe, setProbe] = useState<RuntimeDependencyProbe | null>(null);
   const [snapshot, setSnapshot] = useState<RuntimeDependencySnapshot | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const afterPrepareRef = useRef<(() => void | Promise<void>) | null>(null);
+  const generationRef = useRef(0);
+  const busyRef = useRef(false);
+
+  const setOpen = useCallback((next: boolean) => {
+    if (!next) {
+      generationRef.current += 1;
+      afterPrepareRef.current = null;
+      busyRef.current = false;
+      setPreparing(false);
+    }
+    setOpenState(next);
+  }, []);
+
+  useEffect(() => {
+    setOpen(false);
+    setProbe(null);
+    setSnapshot(null);
+    setError(null);
+    return () => {
+      generationRef.current += 1;
+      afterPrepareRef.current = null;
+      busyRef.current = false;
+    };
+  }, [kind, setOpen]);
 
   const refreshProbe = useCallback(async () => {
+    const generation = generationRef.current;
     const next = await probeRuntimeDependencies();
-    setProbe(next);
+    if (generation === generationRef.current) setProbe(next);
     return next;
   }, []);
 
   const requestDependency = useCallback(
     async (afterPrepare?: () => void | Promise<void>) => {
-      const next = await refreshProbe();
-      const item = next.items.find((entry) => entry.kind === kind);
-      if (item?.status === "available") {
-        await afterPrepare?.();
-        return true;
-      }
+      if (busyRef.current) return false;
+      busyRef.current = true;
+      const generation = ++generationRef.current;
       afterPrepareRef.current = afterPrepare ?? null;
+      setProbe(null);
       setSnapshot(null);
       setError(null);
-      setOpen(true);
-      return false;
+      // The shared probe can verify other runtimes too; show feedback before awaiting it.
+      setOpenState(true);
+      try {
+        const next = await refreshProbe();
+        if (generation !== generationRef.current) return false;
+        const item = next.items.find((entry) => entry.kind === kind);
+        if (item?.status === "available") {
+          afterPrepareRef.current = null;
+          setOpenState(false);
+          await afterPrepare?.();
+          return true;
+        }
+        if (!item?.expectedDownloadBytes) {
+          setError("当前运行时依赖不可下载，请重新检测可用性。");
+        }
+        return false;
+      } catch {
+        if (generation === generationRef.current) {
+          setError("运行时依赖检测失败，请关闭后重试。");
+        }
+        return false;
+      } finally {
+        if (generation === generationRef.current) busyRef.current = false;
+      }
     },
     [kind, refreshProbe],
   );
 
   const confirmPrepare = useCallback(async () => {
+    if (busyRef.current || !open || !probe?.items.find((entry) => entry.kind === kind)?.expectedDownloadBytes) return false;
+    busyRef.current = true;
+    const generation = generationRef.current;
+    setPreparing(true);
     setError(null);
     setSnapshot(null);
     try {
       const jobId = await prepareRuntimeDependency({ kind });
-      for (;;) {
+      while (generation === generationRef.current) {
         const next = await getRuntimeDependencyProgress(jobId);
+        if (generation !== generationRef.current) return false;
         setSnapshot(next);
         if (next.status === "completed") {
-          setOpen(false);
-          await refreshProbe();
-          await afterPrepareRef.current?.();
+          const refreshed = await refreshProbe();
+          if (generation !== generationRef.current) return false;
+          if (refreshed.items.find((entry) => entry.kind === kind)?.status !== "available") {
+            setError("运行时依赖准备后仍不可用，请重试。");
+            return false;
+          }
+          const afterPrepare = afterPrepareRef.current;
           afterPrepareRef.current = null;
+          setOpenState(false);
+          await afterPrepare?.();
           return true;
         }
         if (next.status === "failed" || next.status === "cancelled") {
-          setError(next.error ?? "运行时依赖准备失败");
+          setError("运行时依赖准备失败，请重试。");
           return false;
         }
         await sleep(POLL_INTERVAL_MS);
       }
-    } catch (e) {
-      setError(`运行时依赖准备失败：${String(e)}`);
       return false;
+    } catch {
+      if (generation === generationRef.current) {
+        setError("运行时依赖准备失败，请重试。");
+      }
+      return false;
+    } finally {
+      if (generation === generationRef.current) {
+        busyRef.current = false;
+        setPreparing(false);
+      }
     }
-  }, [kind, refreshProbe]);
+  }, [kind, open, probe, refreshProbe]);
 
   const item = probe?.items.find((entry) => entry.kind === kind);
   const progressPercent =
@@ -82,6 +147,7 @@ export function useRuntimeDependencyPreparation(kind: RuntimeDependencyKind) {
     error,
     item,
     open,
+    preparing,
     progressPercent,
     probe,
     requestDependency,

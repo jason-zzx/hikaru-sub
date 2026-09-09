@@ -21,7 +21,7 @@ enum class Engine {
 
 enum class Backend { CTranslate2, CrispAsr };
 enum class Device { Cpu, Cuda, Vulkan };
-enum class ModelRole { Model, Aligner };
+enum class ModelRole { Model, Aligner, Vad };
 enum class EventType { Ready, Progress, Segment, SegmentsReplace, Completed, Error };
 
 struct ProtocolError {

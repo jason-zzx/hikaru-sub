@@ -124,6 +124,7 @@ bool parse_device(std::string_view text, Device& value) {
 bool parse_role(std::string_view text, ModelRole& value) {
   if (text == "model") value = ModelRole::Model;
   else if (text == "aligner") value = ModelRole::Aligner;
+  else if (text == "vad") value = ModelRole::Vad;
   else return false;
   return true;
 }
@@ -360,7 +361,7 @@ const char* to_string(Device value) {
 }
 
 const char* to_string(ModelRole value) {
-  return value == ModelRole::Model ? "model" : "aligner";
+  return value == ModelRole::Model ? "model" : value == ModelRole::Aligner ? "aligner" : "vad";
 }
 
 const char* to_string(EventType value) {
@@ -455,7 +456,7 @@ bool parse_request_line(std::string_view line, WorkerRequestV1& request, Protoco
   }
   if (roles.count(ModelRole::Model) == 0) return fail(error, "missing_model_role", "model role is required");
   if (parsed.engine == Engine::Qwen3Asr) {
-    if (roles.count(ModelRole::Aligner) == 0 || roles.size() != 2) {
+    if (roles.count(ModelRole::Aligner) == 0 || roles.size() < 2 || roles.size() > 3) {
       return fail(error, "missing_model_role", "qwen3-asr requires model and aligner roles");
     }
   } else if (roles.size() != 1) {

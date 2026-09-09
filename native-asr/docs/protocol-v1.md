@@ -1,6 +1,6 @@
 # Hikaru Sub Native ASR Worker Protocol v1
 
-Protocol v1 is the process boundary between the future Tauri host and one single-request native ASR worker. T04 provides validation and a deterministic fake worker only; it does not select runtimes, inspect model bytes, download files, or change the production ASR route.
+Protocol v1 is the process boundary between the Tauri host and one single-request Native ASR worker. The original T04 validator/fake-worker scope is retained for compatibility; runtime/model readiness and production route selection belong to the host and model manager, not this wire protocol.
 
 ## Transport
 
@@ -22,19 +22,13 @@ Unknown additive object fields are ignored. Unknown engines, backends, model rol
   "backend": "crispasr",
   "modelPaths": [
     {"role": "model", "path": "C:\\managed\\models\\qwen.gguf"},
-    {"role": "aligner", "path": "C:\\managed\\models\\aligner.gguf"}
+    {"role": "aligner", "path": "C:\\managed\\models\\aligner.gguf"},
+    {"role": "vad", "path": "C:\\managed\\models\\silero.bin"}
   ],
   "audioPath": "C:\\workspace\\audio.wav",
   "device": "cpu",
   "language": "ja",
-  "useVad": true,
-  "vadConfig": {
-    "threshold": 0.5,
-    "minSpeechDurationMs": 500,
-    "minSilenceDurationMs": 300,
-    "speechPadMs": 400,
-    "maxSegmentDurationMs": 25000
-  }
+  "useVad": true
 }
 ```
 
@@ -62,9 +56,20 @@ Protocol path validation is syntax-only. Drive-rooted, UNC, and extended Windows
 | `kotoba-faster-whisper` | `ctranslate2` | `model` | `cpu`, `cuda` |
 | `parakeet` | `crispasr` | `model` | `cpu`, `cuda`, `vulkan` |
 | `reazonspeech-nemo` | `crispasr` | `model` | `cpu`, `cuda`, `vulkan` |
-| `qwen3-asr` | `crispasr` | `model`, `aligner` | `cpu`, `cuda`, `vulkan` |
+| `qwen3-asr` (generic historical protocol) | `crispasr` | `model`, `aligner`; additive `vad` permitted | `cpu`, `cuda`, `vulkan` |
+| `qwen3-asr` (full-CLI application worker) | `crispasr` | `model`, `aligner`, `vad` | `cpu`, `cuda` |
 
-Qwen is rejected before inference if either role is absent. Duplicate, unknown, or route-extra roles are rejected; array order has no meaning.
+Generic historical Qwen fixtures retain their two-role syntax; this is **not** a
+full-CLI readiness contract. The custom timeline unit is retired; the
+DEVELOPMENT Qwen worker keeps the original backend/ForcedAligner capability
+call followed by `qwen_timeline_policy_not_implemented` / exit20, with no segment,
+replacement or completed event; shared ABI and sibling worker tests remain.
+The full-CLI worker rejects a missing explicit `vad`,
+`useVad=false`, any `vadConfig`, or Vulkan before `ready`/inference. It uses the
+pinned upstream default CPU VAD configuration. There is no guessed dependency
+path and no silent VAD disablement. Other routes still accept only `model`, so
+adding a `vad` role does not enable or change CTranslate2 VAD/device semantics.
+Duplicate, unknown, or route-extra roles are rejected; array order has no meaning.
 
 ### VAD ranges
 
@@ -93,7 +98,7 @@ All fields shown below are required for that event. Unknown additive fields are 
 
 | Event | Fields and rules |
 |---|---|
-| `ready` | `backend`, `device`, positive integer `durationMs`. Must be first on a successful route, exact once, and match the request. |
+| `ready` | `backend`, `device`, positive integer `durationMs`. Must be first on a successful route, exact once, and match the request. Full-CLI ready means bridge/audio readiness, **not model loading or graph execution**. |
 | `progress` | Non-negative integer `processedMs`, positive integer `durationMs`. Processed time is non-decreasing and at most duration. Duration exactly matches ready. |
 | `segment` | Integer `startMs`, `endMs`, bounded non-empty `text`. Appends one segment. |
 | `segmentsReplace` | Complete `segments` array. The full candidate is validated before state changes. Empty replacement is legal. |
@@ -227,3 +232,146 @@ native-asr/build/windows-x64-protocol/bin/hikaru-asr-fake-worker.exe
 ```
 
 No binary or build directory is tracked. T12 owns packaged runtime provenance; T17 later attests final model-backed CPU release identities.
+
+
+## Full-CLI Qwen application worker
+
+`HIKARU_ASR_BUILD_QWEN_CLI_WORKER=ON` builds
+`hikaru-asr-qwen-cli-worker` from the existing `main.cpp`/emitter, protocol and
+shared WAV reader plus `qwen_cli.cpp`. It has no CTranslate2 or historical
+`CrispAsrBackend`/Qwen timeline linkage. The option is off by default and rejects
+mixed CT2/development builds. `HIKARU_QWEN_CLI_FILE`, `_SIZE` and `_SHA256` must
+identify the reviewed complete `crispasr.exe`; CMake checks them and the worker
+rechecks the same-root executable with a held read-only handle before launch.
+The worker target itself does not own model-manager readiness, downloads or
+packaging authority. Current production Qwen is enabled through the existing
+manager and independent CrispASR runtime lock; the manager supplies all three
+verified role paths to `ResolvedNativeLaunch::resolve`, with required CPU VAD
+and no custom config. This document specifies the boundary, not release readiness.
+
+### Model-free capability (not inference protocol)
+
+The pinned full CLI additionally accepts the controlled `--hikaru-probe-cuda`
+prelaunch operation. It takes no model/audio path and does not emit worker JSONL.
+Its sole successful stdout document is schemaVersion 1, backend `crispasr`, device
+`cuda`, operation `ggml-add-f32`, nodes 1, otherDeviceNodes 0, resultVerified true,
+modelExecutionProof false. Success requires actual CUDA backend initialization,
+allocation, graph execution and exact readback. It is not ASR/lazy-audio/aligner
+proof; those remain required by the real transcription adapter.
+
+Rust invokes the same-root verified CLI, never CT2's executable or ABI, using a
+suspended process assigned to the existing kill-on-close Job before resume. A
+15-second model-free deadline, 16-KiB pipe bounds, exit-zero requirement, complete
+UTF-8/JSON validation, duplicate/extra-field rejection and descendant reap apply.
+CPU transcription does not run the probe; explicit CUDA never reruns on CPU.
+This capability does not open the separate product/publication gates.
+
+### Private process and result ownership
+
+- The Rust host creates an exclusive `{safe-job-id}-cli` directory under the
+  canonical audio workspace's `asr-jobs` child. The cache root continues to come
+  from `app_paths::work_cache_dir`; no user-selected results directory is added.
+- For the explicit three-role route, the host creates a Windows kill-on-close Job,
+  creates the worker suspended, assigns it before resuming, and uses that owned
+  Job for cancellation/shutdown and descendant reaping. The worker likewise
+  assigns the CLI to a nested kill-on-close Job while suspended. No breakaway or
+  inherited ownership handle is allowed. Killing only the worker still kills
+  its CLI/descendants; the host verifies zero active processes before releasing
+  the existing gate and publishing `reaped`.
+- UTF-8 request paths are converted with strict Windows Unicode APIs. Input and
+  runtime ancestors are opened without delete sharing and reject reparse points.
+  The exclusive results file is created with `CREATE_NEW` and held without delete
+  sharing, so a concurrent symlink/rename cannot redirect the CLI output.
+- CLI argv is fixed file-mode Qwen/ja/default-thread/default-upstream-pipeline
+  options, explicit ASR/aligner/VAD files, and no server/download/auto model.
+  Audio's relative argv is derived from the exact validated canonical request
+  and checked against the owned UTF-16 cwd, not guessed from a basename. This
+  preserves extended/CJK/spaced managed paths despite miniaudio's extended
+  absolute-path limitation; an alternative basename is covered by CTest.
+- Only private stderr and NUL handles cross `CreateProcessW` through an explicit
+  handle allowlist. stdout is discarded; stderr is drained into bounded private
+  line inspection and never forwarded to worker JSONL or ordinary host logs.
+  The environment is a fresh allowlist: concrete device, same-root/System32 PATH,
+  Windows roots and private temporary paths. No shell or inherited loader/model
+  knobs select a program or model.
+- The small reviewed full-CLI audio adaptation returns false on miniaudio failure
+  in validated `HIKARU_QWEN_DEVICE` mode **before** native alternate decoding or
+  FFmpeg/shell fallback. Normal upstream mode is unchanged. Windows child-process
+  restriction was tested but rejected because it caused DLL initialization exit
+  `0xC0000142`; it is not used to replace Job ownership or the source guard.
+- After child exit and whole-tree reaping, result bytes are read from the held
+  file and validated. Rust removes the private work directory on terminal reap;
+  failed/half output and cancellation never write the existing ASS.
+
+### Complete-output acceptance
+
+The parser uses vendored nlohmann, the canonical protocol limits and existing
+protocol event validation/serialization. It rejects duplicate keys at any depth,
+truncation/trailing JSON, BOM/invalid Unicode (including escaped surrogates),
+oversize/count/text limits, wrong scalar types, negative/out-of-audio original
+rows, display fallback, missing or wholly unhelpful word timing, and same-run
+non-whitespace text loss. Source word `t0/t1` remain centiseconds and must agree
+exactly with millisecond offsets.
+
+The Qwen adapter alone merges contiguous display anomalies after validating every
+original member: zero-duration rows join the previous group, or merge forward
+from the beginning until an original positive-duration member arrives; decreasing
+starts merge backward until group starts are nondecreasing. All-zero input fails
+even when distinct zero points span a positive envelope. Positive-duration equal
+starts and ordinary overlaps remain unchanged. Group endpoints are the minimum
+existing start and maximum existing end; original text bytes, including permitted
+whitespace, concatenate in order without a separator. No sorting, deletion,
+clipping, invented timestamps, or word/VAD/LIS changes occur. The complete final
+replacement still passes the unchanged generic positive-duration, text, bounds,
+order, count and serialized-size checks. This bounded display change is not
+alignment-quality, final-device or product acceptance.
+
+Bounded graph markers must attest ASR, aligner and lazy audio on
+the requested concrete device, with positive graph nodes and zero other-device
+nodes; successful CPU VAD is mandatory. CPU must not initialize CUDA.
+
+Success requires CLI exit zero. Only then may one `segmentsReplace` immediately
+precede `completed`. Empty output is legal only with explicit `vadSilence=true`,
+empty source/display arrays and the successful CPU VAD execution marker. Missing
+output/failed VAD is not silence. Stage progress remains indeterminate; no timer,
+arbitrary stderr activity or `ready` is treated as forward model progress.
+The host still requires worker EOF plus exit zero; its completed candidate is
+persisted to recovery and (for non-empty output) fallback ASS under the terminal
+lock before completed becomes visible. Persistence failure commits a safe failed
+terminal rather than claiming completed. First-terminal-wins remains unchanged.
+
+### Tests and local identities
+
+The separate `hikaru-asr-qwen-cli-fixture-worker` target is test-only; its only
+identity bypass accepts the tiny same-root `fake_qwen_cli.cpp` executable. No
+scenario or bypass key exists in product requests/builds. CTest covers 23 normal,
+invalid-output, silence, missing-VAD, extended/CJK/spaced and alternative-basename
+cases in the historical section-2 baseline. The current suite also covers adjacent
+zero/start-reversal merging, exact whitespace/Unicode, unchanged overlaps/equal
+starts, all-zero rejection and invalid members/merged text limits. Rust host tests
+assert the corresponding atomic replacement, exact snapshot/recovery and ASS
+Dialogue rows; failed results still preserve existing ASS.
+Rust host tests use `HIKARU_ASR_QWEN_CLI_FIXTURE_WORKER` only inside the
+existing test module for recovery, ASS preservation/write failure, cancellation,
+shutdown, worker-only crash, real descendants, immediate reopen and reparse
+rejection.
+
+Real host tests use a separate strict `qwen-full-cli-host-v1` input schema via
+`HIKARU_ASR_QWEN_CLI_HOST_INPUTS` and `_REQUIRED=1`, only in the test module. Required
+mode without its own complete setup fails; generic `HIKARU_ASR_CRISPASR_INPUTS`
+retains its historical decoder and cannot authorize this route. Inputs bind all
+worker/runtime files, exact model/aligner/VAD bytes and the short WAV. Audio is
+copied to a temporary managed workspace before the unchanged host consumes it.
+Run exactly:
+
+```text
+cargo test --manifest-path src-tauri/Cargo.toml --lib asr_worker::tests::qwen_cli_real_short_host_ass_roundtrip -- --exact --test-threads=1 --nocapture
+```
+
+The section-2 controlled audio guard produces these CLI identities (not package
+or release authority): CPU 17166848 bytes / SHA-256
+`4c5df7de3420aa6653f1208d10b99b99309bf6f918cd69801a581c4f82e29f17`;
+CUDA 66503168 bytes / SHA-256
+`1be7e85177c105fa24e3985208cb2d3e949df6d0b622ffba97ef0440bc0e4be3`.
+Previous section-1 CLI bytes and failed integration attempts remain private
+historical evidence; they are not relabeled as current worker/ASS success.

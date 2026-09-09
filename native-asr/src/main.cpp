@@ -1,4 +1,8 @@
+#ifndef HIKARU_ASR_QWEN_CLI_WORKER
 #include "ctranslate2_whisper.hpp"
+#else
+#include "qwen_cli.hpp"
+#endif
 #ifdef HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
 #include "crispasr_backend.hpp"
 #include "parakeet_family_policy.hpp"
@@ -104,6 +108,7 @@ bool read_request(WorkerRequestV1& request) {
   return true;
 }
 
+#ifndef HIKARU_ASR_QWEN_CLI_WORKER
 fs::path ctranslate2_compatible_path(const fs::path& path) {
   std::string value = path.u8string();
   if (value.rfind(R"(\\?\UNC\)", 0) == 0) {
@@ -637,6 +642,32 @@ int run_crispasr(const WorkerRequestV1& request) {
 }
 #endif
 
+#endif  // !HIKARU_ASR_QWEN_CLI_WORKER
+
+#ifdef HIKARU_ASR_QWEN_CLI_WORKER
+int run_qwen_cli(const WorkerRequestV1& request) {
+  Emitter emitter(request);
+  std::int64_t duration = 0;
+  try {
+    const auto segments = qwen_cli::transcribe(request, [&](std::int64_t value) {
+      duration = value;
+      EventV1 ready; ready.type = EventType::Ready;
+      ready.backend = request.backend; ready.device = request.device; ready.duration_ms = value;
+      if (!emitter.emit(ready)) throw qwen_cli::Error("protocol_emit_failed");
+    });
+    EventV1 replace; replace.type = EventType::SegmentsReplace; replace.segments = segments;
+    if (!emitter.emit(replace)) throw qwen_cli::Error("protocol_emit_failed");
+    EventV1 completed; completed.type = EventType::Completed;
+    completed.duration_ms = duration; completed.detected_language = "ja";
+    return emitter.emit(completed) ? 0 : 74;
+  } catch (const qwen_cli::Error& error) {
+    return emitter.emit(error_event(error.what(), "Qwen native pipeline failed safely")) ? 20 : 74;
+  } catch (const std::exception&) {
+    return emitter.emit(error_event("qwen_cli_internal_failed", "Qwen native pipeline failed safely")) ? 20 : 74;
+  }
+}
+#endif
+
 #ifdef HIKARU_ASR_CUDA_RUNTIME
 void hold_cuda_probe_for_module_audit() {
   const char* value = std::getenv("HIKARU_ASR_CUDA_PROBE_HOLD_MS");
@@ -689,6 +720,9 @@ int run_cuda_probe() {
 #endif
 
 int run_worker(const WorkerRequestV1& request) {
+#ifdef HIKARU_ASR_QWEN_CLI_WORKER
+  return run_qwen_cli(request);
+#else
   if (request.backend == Backend::CTranslate2) return run_ctranslate2(request);
 #ifdef HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
   if (request.backend == Backend::CrispAsr) return run_crispasr(request);
@@ -697,6 +731,7 @@ int run_worker(const WorkerRequestV1& request) {
       "route_not_implemented",
       "requested native ASR route is not implemented by this worker");
   return 2;
+#endif
 }
 
 }  // namespace

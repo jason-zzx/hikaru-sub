@@ -227,6 +227,8 @@ export type RuntimeDependencyKind =
   | "ffmpeg"
   | "nativeAsrCpu"
   | "nativeAsrCuda"
+  | "crispasrCpu"
+  | "crispasrCuda"
   | "asrModels"
   | "downloads"
   | "appCache";

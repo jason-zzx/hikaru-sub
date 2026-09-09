@@ -27,6 +27,23 @@ describe("ModelManager Native dispositions", () => {
     expect(screen.getByRole("button", { name: "下载模型" })).toBeTruthy();
   });
 
+  it("offers the existing Qwen pair download and shows ready after shared status refresh", () => {
+    const props = {
+      engine: "qwen3-asr", model: "Qwen/Qwen3-ASR-1.7B",
+      checking: false, checkError: null, refreshStatus,
+    };
+    const missing: AsrModelStatus = {
+      ...makeStatus("supportedMissing"), engine: props.engine, model: props.model,
+      backend: "crispasr", revision: "pair-two-frozen-sources",
+    };
+    const { rerender } = render(<ModelManager {...props} status={missing} />);
+    expect(screen.getByRole("button", { name: "下载模型" })).toBeTruthy();
+    rerender(<ModelManager {...props} status={{ ...missing, disposition: "ready", downloaded: true }} />);
+    expect(screen.queryByRole("button", { name: "下载模型" })).toBeNull();
+    expect(screen.getByText("模型已就绪")).toBeTruthy();
+    expect(screen.queryByText(/VAD|量化|Python/)).toBeNull();
+  });
+
   it("renders deferred, unsupported, and failed checks without Python setup copy", () => {
     const { rerender } = render(<ModelManager engine="faster-whisper" model="large-v3-turbo" status={makeStatus("postMvpUnavailable", "后续版本支持") } checking={false} checkError={null} refreshStatus={refreshStatus} />);
     expect(screen.getByText(/后续版本支持/)).toBeTruthy();

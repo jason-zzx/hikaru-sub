@@ -162,6 +162,19 @@ useAsrAvailability(engine: string, model: string, device: string)
 - Frontend runtime dependencies contain only production-visible kinds. `nativeAsrCpu` is bundled/status-only and has no prepare or cleanup action; missing `asrModels` routes the user to Transcription.
 - Components continue using typed wrappers from `src/services/tauri.ts`; no raw invoke, local payload cast, or second support registry.
 
+### Qwen full-CLI application availability
+
+Qwen's exact manifest entry now participates in the same shared owner as CT2:
+`supportedMissing` enables model selection/download, `ready` enables start only
+with a verified runtime. No Qwen allowlist or test switch belongs in the UI.
+Its CPU runtime is independent and bundled; installed verified CUDA is usable
+without an externally published CUDA download source. Missing/invalid CUDA with
+no source reports unavailable and `downloadRequired: false`; this does not disable
+CPU or the pair + required VAD model download. Existing `useVad: false` / null
+frontend requests are intentional: Rust's Qwen qualified launch supplies mandatory
+default CPU VAD with all three verified roles. This is not general VAD UI support.
+Parakeet/Reazon remain deferred. Manual UI and release acceptance are separate.
+
 ### 4. Validation & Error Matrix
 
 | Condition | Required frontend behavior |

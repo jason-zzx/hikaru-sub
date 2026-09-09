@@ -546,6 +546,7 @@ export function verifyRuntimeArchive({
   archivePath,
   lockPath = defaultRuntimeLock,
   extractTo,
+  extractPayloadTo,
 }) {
   const lock = readRuntimeLock(lockPath);
   if (!Number.isSafeInteger(lock.artifact.sizeBytes) || !/^[0-9a-f]{64}$/.test(lock.artifact.sha256)) {
@@ -572,14 +573,15 @@ export function verifyRuntimeArchive({
   try {
     extractZipSafely(archivePath, temporary);
     const result = verifyExtractedRuntime(temporary, lock);
-    if (extractTo) {
-      const destination = resolve(extractTo);
+    if (extractTo || extractPayloadTo) {
+      if (extractTo && extractPayloadTo) fail("choose one extraction destination");
+      const destination = resolve(extractPayloadTo ?? extractTo);
       const staging = `${destination}.tmp-${process.pid}`;
       const backup = `${destination}.backup-${process.pid}`;
       rmSync(staging, { recursive: true, force: true });
       rmSync(backup, { recursive: true, force: true });
       mkdirSync(dirname(staging), { recursive: true });
-      renameSync(temporary, staging);
+      renameSync(extractPayloadTo ? result.runtimeRoot : temporary, staging);
       try {
         if (existsSync(destination)) renameSync(destination, backup);
         renameSync(staging, destination);
@@ -593,7 +595,7 @@ export function verifyRuntimeArchive({
       }
       return {
         ...result,
-        runtimeRoot: join(destination, ...lock.artifact.root.split("/").filter(Boolean)),
+        runtimeRoot: extractPayloadTo ? destination : join(destination, ...lock.artifact.root.split("/").filter(Boolean)),
         archiveSizeBytes: size,
         archiveSha256: sha256,
       };

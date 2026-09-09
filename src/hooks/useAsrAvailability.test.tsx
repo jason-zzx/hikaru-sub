@@ -179,6 +179,41 @@ describe("useAsrAvailability", () => {
     });
   });
 
+  it.each(["supportedMissing", "ready"] as const)("enables Qwen %s on CPU and verified CUDA without inventing a download", async (disposition) => {
+    const cpu = { device: "cpu", available: true };
+    mocks.listAsrEngines.mockResolvedValue([{
+      name: "qwen3-asr", backend: "crispasr", available: true, device: "cpu",
+      devices: [cpu, { device: "cuda", available: false, downloadRequired: false, reason: "下载源尚未发布，可使用 CPU" }],
+    }]);
+    mocks.checkAsrModel.mockResolvedValue({
+      ...status("qwen3-asr", "Qwen/Qwen3-ASR-1.7B", disposition),
+      backend: "crispasr", revision: "pair-two-frozen-sources",
+    });
+    const { result, rerender } = renderHook(
+      ({ device }) => useAsrAvailability("qwen3-asr", "Qwen/Qwen3-ASR-1.7B", device),
+      { initialProps: { device: "cpu" } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.routeAvailable).toBe(true);
+    expect(result.current.engineOptions.find((option) => option.value === "qwen3-asr")?.disabled).toBeFalsy();
+    expect(result.current.modelOptions[0].disabled).toBeFalsy();
+    rerender({ device: "cuda" });
+    expect(result.current.routeAvailable).toBe(false);
+    expect(result.current.deviceDownloadRequired).toBe(false);
+    expect(result.current.deviceOptions.find((option) => option.value === "cuda")?.disabled).toBe(true);
+    expect(result.current.unavailableReason).toContain("下载源尚未发布");
+    mocks.listAsrEngines.mockResolvedValue([{
+      name: "qwen3-asr", backend: "crispasr", available: true, device: "cpu",
+      devices: [cpu, { device: "cuda", available: true, downloadRequired: false }],
+    }]);
+    await act(async () => {
+      expect(await result.current.refresh()).toMatchObject({ routeAvailable: true, deviceDownloadRequired: false });
+    });
+    expect(result.current.routeAvailable).toBe(true);
+    expect(result.current.deviceOptions.find((option) => option.value === "cuda")?.disabled).toBeFalsy();
+    expect(result.current.selectedModelStatus?.model).toBe("Qwen/Qwen3-ASR-1.7B");
+  });
+
   it("does not rescan every model when only the selected model changes", async () => {
     mocks.listAsrEngines.mockResolvedValue([
       { name: "faster-whisper", available: true, device: "cpu" },

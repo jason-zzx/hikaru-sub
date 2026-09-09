@@ -103,6 +103,18 @@ void test_requests() {
   qwen["modelPaths"].push_back(Json{{"role", "model"}, {"path", "C:\\models\\duplicate.bin"}});
   expect_request_error(qwen, "duplicate_model_role");
 
+  Json full_cli = base_request("qwen3-asr", "crispasr");
+  full_cli["modelPaths"].push_back(Json{{"role", "aligner"}, {"path", "C:\\models\\aligner.bin"}});
+  full_cli["modelPaths"].push_back(Json{{"role", "vad"}, {"path", "C:\\models\\silero.bin"}});
+  full_cli["useVad"] = true;
+  WorkerRequestV1 full_request;
+  ProtocolError full_error;
+  check(parse_request(full_cli, full_request, full_error), "additive required VAD role rejected");
+  check(full_request.model_paths.back().role == ModelRole::Vad, "VAD role lost");
+  Json ct2_extra = base_request();
+  ct2_extra["modelPaths"].push_back(full_cli["modelPaths"].back());
+  expect_request_error(ct2_extra, "unexpected_model_role");
+
   Json invalid = base_request();
   invalid["modelPaths"][0]["role"] = "companion";
   expect_request_error(invalid, "unknown_model_role");

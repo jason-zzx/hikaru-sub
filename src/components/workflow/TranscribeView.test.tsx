@@ -10,6 +10,8 @@ import { TranscribeView } from "./TranscribeView";
 
 const mocks = vi.hoisted(() => ({
   cancelAsr: vi.fn(),
+  downloadAsrModel: vi.fn(),
+  getModelDownloadProgress: vi.fn(),
   checkFfmpeg: vi.fn(),
   getAsrProgress: vi.fn(),
   getSettings: vi.fn(),
@@ -23,11 +25,13 @@ vi.mock("../../hooks/useAsrAvailability", () => ({
     engineOptions: [
       { value: "faster-whisper", label: "Faster-Whisper" },
       { value: "kotoba-faster-whisper", label: "kotoba-faster-whisper" },
+      { value: "qwen3-asr", label: "Qwen3" },
     ],
     modelOptions: [{ value: model, label: model }],
     deviceOptions: [
       { value: "auto", label: "自动" },
       { value: "cpu", label: "CPU" },
+      { value: "cuda", label: "CUDA" },
     ],
     selectedModelStatus: {
       engine,
@@ -83,8 +87,8 @@ vi.mock("../../services/tauri", () => ({
   pathExists: (...args: unknown[]) => mocks.pathExists(...args),
   saveAssText: vi.fn(),
   startAsr: (...args: unknown[]) => mocks.startAsr(...args),
-  downloadAsrModel: vi.fn(),
-  getModelDownloadProgress: vi.fn(),
+  downloadAsrModel: (...args: unknown[]) => mocks.downloadAsrModel(...args),
+  getModelDownloadProgress: (...args: unknown[]) => mocks.getModelDownloadProgress(...args),
 }));
 
 beforeEach(() => {
@@ -143,6 +147,28 @@ async function renderAndStart() {
 }
 
 describe("TranscribeView Native ASR flow", () => {
+  it.each(["cpu", "cuda"])("downloads the Qwen pair through ModelManager then starts on %s", async (device) => {
+    const engine = "qwen3-asr", model = "Qwen/Qwen3-ASR-1.7B";
+    mocks.getSettings.mockResolvedValue({ asrEngine: engine, asrModel: model, asrDevice: device });
+    const ready = { engine, model, backend: "crispasr", available: true, downloaded: true, disposition: "ready" };
+    mocks.refreshSelectedModel.mockResolvedValue({ kind: "ok", status: ready });
+    mocks.refreshSelectedModel.mockResolvedValueOnce({ kind: "ok", status: { ...ready, disposition: "supportedMissing", downloaded: false } });
+    mocks.downloadAsrModel.mockResolvedValue("qwen-pair-download");
+    mocks.getModelDownloadProgress.mockResolvedValue({ id: "qwen-pair-download", engine, model, status: "completed", downloadedBytes: 2_020_801_514, totalBytes: 2_020_801_514 });
+    mocks.startAsr.mockResolvedValue({ jobId: "qwen-job" });
+    const { user, view } = await renderAndStart();
+    await user.click(await screen.findByRole("button", { name: "确定" }));
+    await waitFor(() => expect(mocks.startAsr).toHaveBeenCalledWith({
+      audioPath: "C:/cache/workspace/audio.wav", engine, model, device, language: "ja",
+      outputAssPath: "C:/media/input.transcribed.ass", useVad: false, vadConfig: null,
+    }), { timeout: 3000 });
+    // Backend qualified_native_launch supplies required CPU VAD; no new frontend switch.
+    expect(mocks.downloadAsrModel).toHaveBeenCalledExactlyOnceWith(engine, model);
+    expect(mocks.getModelDownloadProgress).toHaveBeenCalledWith("qwen-pair-download");
+    expect(mocks.refreshSelectedModel.mock.calls.length).toBeGreaterThanOrEqual(2);
+    view.unmount();
+  });
+
   it("starts the exact Kotoba Native CPU route through the existing flow", async () => {
     mocks.getSettings.mockResolvedValue({
       asrEngine: "kotoba-faster-whisper",

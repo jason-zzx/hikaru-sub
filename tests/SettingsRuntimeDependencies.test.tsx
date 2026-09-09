@@ -7,6 +7,23 @@ import { RuntimeDependenciesPanel } from "../src/components/workflow/RuntimeDepe
 afterEach(() => cleanup());
 
 describe("RuntimeDependenciesPanel", () => {
+  it("keeps unpublished CrispASR pending and uses its independent prepare kind once supplied", async () => {
+    const prepare = vi.fn();
+    const props = { storage: null, onChangeSourceMode: vi.fn(), onMeasureStorage: vi.fn(), onCleanup: vi.fn(), onPrepareDependency: prepare, onConfigureAsr: vi.fn() };
+    const { rerender } = render(<RuntimeDependenciesPanel {...props} probe={{ sourceMode: "official", items: [
+      { kind: "crispasrCpu", status: "available", managed: false },
+      { kind: "crispasrCuda", status: "needsSetup", managed: true, reason: "外部分发与产品启用待确认" },
+    ] }} />);
+    expect(screen.getByText("内置 CrispASR CPU 运行时")).toBeTruthy();
+    expect(screen.getByText("外部分发与产品启用待确认")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "下载" })).toBeNull();
+    rerender(<RuntimeDependenciesPanel {...props} probe={{ sourceMode: "official", items: [
+      { kind: "crispasrCuda", status: "missing", managed: true, expectedDownloadBytes: 1024 },
+    ] }} />);
+    await userEvent.click(screen.getByRole("button", { name: "下载" }));
+    expect(prepare).toHaveBeenCalledWith("crispasrCuda");
+  });
+
   it("shows source mode without scanning storage sizes", () => {
     render(
       <RuntimeDependenciesPanel

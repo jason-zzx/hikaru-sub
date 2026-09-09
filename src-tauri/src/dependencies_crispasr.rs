@@ -1,0 +1,298 @@
+//! Independent CrispASR file authority and resolution. Installed runtime readiness
+//! is independent of external CUDA download publication.
+use super::*;
+use crate::asr_models::verify_plain_ancestors;
+
+#[path = "dependencies_crispasr_probe.rs"]
+mod cuda_probe;
+
+const LOCK_JSON: &str = include_str!("../../native-asr/runtime/crispasr-product-lock.json");
+const UNAVAILABLE: &str = "[crispasr_runtime_unavailable] CrispASR 运行时缺失、损坏或不受支持";
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProductLock {
+    schema_version: u32,
+    product_enablement_allowed: bool,
+    #[serde(default)]
+    external_stable_asset_published: bool,
+    cpu: Option<ArtifactLock>,
+    cuda: Option<ArtifactLock>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ArtifactLock {
+    artifact_id: String,
+    manifest_sha256: String,
+    files: Vec<NativeAsrRuntimeFile>,
+    #[serde(default)]
+    archive: Option<ArchiveLock>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ArchiveLock {
+    size_bytes: u64,
+    sha256: String,
+    root: String,
+}
+
+fn runtime_root(resources: &Path, deps: &Path, device: &str) -> Result<PathBuf, String> {
+    match device {
+        "cpu" => Ok(resources.join("native-asr/windows-x64/crispasr/cpu")),
+        "cuda" => Ok(deps.join("asr-runtime/crispasr/cuda/current")),
+        _ => Err(UNAVAILABLE.into()),
+    }
+}
+
+fn verify_at(
+    resources: &Path,
+    deps: &Path,
+    device: &str,
+    lock: &ProductLock,
+) -> Result<ResolvedNativeAsrCpuRuntime, String> {
+    if lock.schema_version != 1 || !lock.product_enablement_allowed {
+        return Err(UNAVAILABLE.into());
+    }
+    let artifact = match device {
+        "cpu" => lock.cpu.as_ref(),
+        "cuda" => lock.cuda.as_ref(),
+        _ => None,
+    }
+    .ok_or(UNAVAILABLE)?;
+    let root = runtime_root(resources, deps, device)?;
+    verify_payload(&root, device, artifact)
+}
+
+fn verify_payload(
+    root: &Path,
+    device: &str,
+    artifact: &ArtifactLock,
+) -> Result<ResolvedNativeAsrCpuRuntime, String> {
+    for path in [
+        root,
+        &root.join("runtime-manifest.json"),
+        &root.join("SHA256SUMS"),
+    ] {
+        verify_plain_ancestors(path).map_err(|_| UNAVAILABLE)?;
+    }
+    if !artifact
+        .artifact_id
+        .starts_with(&format!("hikaru-asr-crispasr-windows-x64-{device}-"))
+        || !is_sha256(&artifact.manifest_sha256)
+        || sha256_file(&root.join("runtime-manifest.json")).map_err(|_| UNAVAILABLE)?
+            != artifact.manifest_sha256
+    {
+        return Err(UNAVAILABLE.into());
+    }
+    let manifest: NativeAsrRuntimeManifest = serde_json::from_slice(
+        &fs::read(root.join("runtime-manifest.json")).map_err(|_| UNAVAILABLE)?,
+    )
+    .map_err(|_| UNAVAILABLE)?;
+    let caps = &manifest.capabilities;
+    if manifest.schema_version != 1
+        || manifest.protocol_version != 1
+        || manifest.artifact_id != artifact.artifact_id
+        || manifest.platform != "windows-x64"
+        || manifest.arch != "x64"
+        || caps.backend != "crispasr"
+        || caps.device != device
+        || caps.engines != ["qwen3-asr"]
+        || !caps.vad
+        || !caps.crispasr
+        || caps.cuda != (device == "cuda")
+        || caps.vulkan
+        || caps.models_bundled
+    {
+        return Err(UNAVAILABLE.into());
+    }
+    let checksums = parse_runtime_checksums(&root).map_err(|_| UNAVAILABLE)?;
+    let mut expected = HashSet::new();
+    for row in &artifact.files {
+        if !safe_runtime_relative_path(&row.path)
+            || row.path.contains(['\\', ':'])
+            || row
+                .path
+                .split('/')
+                .any(|part| crate::asr_models::validate_segment("runtime.file", part).is_err())
+            || !expected.insert(row.path.to_ascii_lowercase())
+            || row.size_bytes == 0
+            || !is_sha256(&row.sha256)
+            || checksums.get(&row.path) != Some(&row.sha256)
+            || !manifest.files.iter().any(|file| {
+                file.path == row.path
+                    && file.size_bytes == row.size_bytes
+                    && file.sha256 == row.sha256
+            })
+        {
+            return Err(UNAVAILABLE.into());
+        }
+        let path = root.join(&row.path);
+        verify_plain_ancestors(&path).map_err(|_| UNAVAILABLE)?;
+        let metadata = fs::symlink_metadata(&path).map_err(|_| UNAVAILABLE)?;
+        if !metadata.is_file()
+            || metadata.len() != row.size_bytes
+            || sha256_file(&path).map_err(|_| UNAVAILABLE)? != row.sha256
+        {
+            return Err(UNAVAILABLE.into());
+        }
+    }
+    let mut actual = Vec::new();
+    collect_runtime_files(&root, &root, &mut actual).map_err(|_| UNAVAILABLE)?;
+    if artifact.files.len() != manifest.files.len()
+        || checksums.len() != artifact.files.len()
+        || actual.into_iter().collect::<HashSet<_>>()
+            != artifact
+                .files
+                .iter()
+                .map(|file| file.path.clone())
+                .collect()
+        || !expected.contains("hikaru-asr-worker.exe")
+        || !expected.contains("crispasr.exe")
+        || !expected.contains("licenses/third-party-notices.json")
+    {
+        return Err(UNAVAILABLE.into());
+    }
+    Ok(ResolvedNativeAsrCpuRuntime {
+        worker: root.join("hikaru-asr-worker.exe"),
+        root: root.to_path_buf(),
+        artifact_id: artifact.artifact_id.clone(),
+    })
+}
+
+#[cfg(test)]
+pub(super) fn verify_delivery_test_runtime(
+    root: &Path,
+    device: &str,
+) -> Result<ResolvedNativeAsrCpuRuntime, String> {
+    let lock: ProductLock = serde_json::from_str(LOCK_JSON).map_err(|_| UNAVAILABLE)?;
+    assert!(lock.product_enablement_allowed);
+    let artifact = if device == "cpu" {
+        lock.cpu.as_ref()
+    } else {
+        lock.cuda.as_ref()
+    }
+    .ok_or(UNAVAILABLE)?;
+    let runtime = verify_payload(root, device, artifact)?;
+    if device == "cuda" {
+        cuda_probe::probe(root)?;
+    }
+    Ok(runtime)
+}
+
+pub(super) fn resolve(
+    app: &AppHandle,
+    device: &str,
+) -> Result<ResolvedNativeAsrCpuRuntime, String> {
+    let lock: ProductLock = serde_json::from_str(LOCK_JSON).map_err(|_| UNAVAILABLE)?;
+    let resources = app.path().resource_dir().map_err(|_| UNAVAILABLE)?;
+    let runtime = verify_at(&resources, &deps_dir(app)?, device, &lock)?;
+    if device == "cuda" {
+        cuda_probe::probe(&runtime.root)?;
+    }
+    Ok(runtime)
+}
+
+#[path = "dependencies_crispasr_delivery.rs"]
+mod delivery;
+pub(super) use delivery::{download_dir, items, managed_root, prepare};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+    use tempfile::tempdir;
+
+    fn hash(bytes: &[u8]) -> String {
+        format!("{:x}", Sha256::digest(bytes))
+    }
+
+    // Instance-only synthetic authority; nothing reads an env/IPC override.
+    pub(super) fn fixture(resources: &Path, deps: &Path, device: &str) -> ProductLock {
+        let root = runtime_root(resources, deps, device).unwrap();
+        fs::create_dir_all(root.join("licenses")).unwrap();
+        let mut files = Vec::new();
+        let mut checksums = String::new();
+        for path in [
+            "hikaru-asr-worker.exe",
+            "crispasr.exe",
+            "licenses/THIRD-PARTY-NOTICES.json",
+        ] {
+            let bytes = format!("synthetic {device} {path}");
+            fs::write(root.join(path), &bytes).unwrap();
+            checksums.push_str(&format!("{}  {path}\n", hash(bytes.as_bytes())));
+            files.push(serde_json::json!({"path":path, "sizeBytes":bytes.len(), "sha256":hash(bytes.as_bytes())}));
+        }
+        fs::write(root.join("SHA256SUMS"), checksums).unwrap();
+        let id = format!("hikaru-asr-crispasr-windows-x64-{device}-fixture");
+        let manifest = serde_json::to_vec(&serde_json::json!({
+            "schemaVersion":1, "artifactId":id, "platform":"windows-x64", "arch":"x64", "protocolVersion":1,
+            "capabilities":{"backend":"crispasr","device":device,"engines":["qwen3-asr"],
+                "vad":true,"crispasr":true,"cuda":device=="cuda","vulkan":false,"modelsBundled":false},
+            "files":files
+        })).unwrap();
+        fs::write(root.join("runtime-manifest.json"), &manifest).unwrap();
+        let mut value = serde_json::json!({"schemaVersion":1,"productEnablementAllowed":true,"cpu":null,"cuda":null});
+        value[device] =
+            serde_json::json!({"artifactId":id,"manifestSha256":hash(&manifest),"files":files});
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn enabled_authority_rejects_missing_and_wrong_runtime_bytes() {
+        let dir = tempdir().unwrap();
+        let resources = dir.path().join("resources");
+        let deps = dir.path().join("deps");
+        let lock: ProductLock = serde_json::from_str(LOCK_JSON).unwrap();
+        assert!(lock.product_enablement_allowed);
+        assert!(lock.external_stable_asset_published);
+        assert!(lock.cpu.is_some() && lock.cuda.is_some());
+        for device in ["cpu", "cuda"] {
+            assert!(verify_at(&resources, &deps, device, &lock).is_err());
+            fixture(&resources, &deps, device);
+            assert!(verify_at(&resources, &deps, device, &lock).is_err());
+        }
+    }
+
+    #[test]
+    fn separate_device_roots_exact_artifact_and_file_closure() {
+        for mode in ["installed", "便携 路径"] {
+            for device in ["cpu", "cuda"] {
+                let dir = tempdir().unwrap();
+                let resources = dir.path().join(mode).join("resources");
+                let deps = dir.path().join(mode).join("deps");
+                let lock = fixture(&resources, &deps, device);
+                let runtime = verify_at(&resources, &deps, device, &lock).unwrap();
+                assert_eq!(
+                    runtime.root,
+                    runtime_root(&resources, &deps, device).unwrap()
+                );
+                assert!(verify_at(
+                    &resources,
+                    &deps,
+                    if device == "cpu" { "cuda" } else { "cpu" },
+                    &lock
+                )
+                .is_err());
+                assert!(
+                    verify_at(&resources.join("other"), &deps.join("other"), device, &lock)
+                        .is_err()
+                );
+                fs::write(runtime.root.join("ctranslate2.dll"), b"wrong tree").unwrap();
+                assert!(verify_at(&resources, &deps, device, &lock).is_err());
+                fs::remove_file(runtime.root.join("ctranslate2.dll")).unwrap();
+                fs::write(&runtime.worker, b"corrupt").unwrap();
+                assert!(verify_at(&resources, &deps, device, &lock).is_err());
+                let mut lock = fixture(&resources, &deps, device);
+                let artifact = if device == "cpu" {
+                    lock.cpu.as_mut().unwrap()
+                } else {
+                    lock.cuda.as_mut().unwrap()
+                };
+                artifact.artifact_id = "hikaru-asr-windows-x64-cpu-v3".into();
+                assert!(verify_at(&resources, &deps, device, &lock).is_err());
+            }
+        }
+    }
+}

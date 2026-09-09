@@ -40,6 +40,10 @@ describe("ASR release resource preparation", () => {
       join(root, "native-asr", "artifacts", "windows-x64-cpu.zip"),
     );
 
+    for (const path of ["native-asr/runtime/crispasr-product-lock.json", "native-asr/artifacts/crispasr-cpu.zip"]) {
+      copy(join(repositoryRoot, path), join(root, path));
+    }
+
     const staleSidecar = join(
       root,
       "src-tauri",
@@ -51,6 +55,10 @@ describe("ASR release resource preparation", () => {
     writeFileSync(staleSidecar, "print('stale')");
 
     const prepared = prepareAsrResources(root);
+    const crispasr = join(root, "src-tauri/resources/native-asr/windows-x64/crispasr/cpu/crispasr.exe");
+    expect(existsSync(crispasr)).toBe(true);
+    prepareAsrResources(root);
+    expect(existsSync(crispasr)).toBe(true);
 
     expect(prepared.archiveSha256).toBe(
       "5177c87160e7b8e78685b7d61c99acf29f740071c7cbe79fdae2ba9d5cb1fbcf",
@@ -71,5 +79,5 @@ describe("ASR release resource preparation", () => {
         ),
       ),
     ).toBe(true);
-  }, 30_000);
+  }, 60_000);
 });

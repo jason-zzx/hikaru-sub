@@ -17,6 +17,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+#[cfg(windows)]
+#[path = "asr_worker_job.rs"]
+pub(crate) mod worker_job;
+
 const LIMITS_JSON: &str = include_str!("../../native-asr/protocol-v1-limits.json");
 const STDERR_LOG_RETENTION: usize = 20;
 const TERMINATION_TIMEOUT: Duration = Duration::from_secs(2);
@@ -163,6 +167,9 @@ pub(crate) struct ResolvedNativeLaunch {
     stderr_log_path: PathBuf,
     use_vad: bool,
     vad_config: Option<VadConfig>,
+    cli_work_dir: Option<PathBuf>,
+    #[cfg(test)]
+    capture_cli_result: Option<Arc<Mutex<Vec<u8>>>>,
 }
 
 impl ResolvedNativeLaunch {
@@ -190,6 +197,22 @@ impl ResolvedNativeLaunch {
             return Err("native ASR 仅接受日语源语言".into());
         }
         validate_vad(use_vad, vad_config.as_ref())?;
+        let full_cli = engine == "qwen3-asr" && model_paths.iter().any(|(role, _)| role == "vad");
+        if full_cli && (!use_vad || vad_config.is_some() || device == "vulkan") {
+            return Err("Qwen full CLI 需要必需 CPU VAD、固定默认配置与 CPU/CUDA".into());
+        }
+
+        if full_cli {
+            reject_link_path(&audio_path)?;
+            for (_, path) in &model_paths {
+                reject_link_path(path)?;
+            }
+            reject_link_path(if output_ass_path.exists() {
+                &output_ass_path
+            } else {
+                output_ass_path.parent().ok_or("ASS 输出目录无效")?
+            })?;
+        }
 
         fs::create_dir_all(cache_root)
             .map_err(|error| format!("无法创建 ASR 缓存根目录：{error}"))?;
@@ -242,7 +265,11 @@ impl ResolvedNativeLaunch {
         }
         let stderr_log_path = canonical_stderr_dir.join(format!("{job_id}.stderr.log"));
 
+        let cli_work_dir = full_cli.then(|| canonical_recovery_dir.join(format!("{job_id}-cli")));
         Ok(Self {
+            cli_work_dir,
+            #[cfg(test)]
+            capture_cli_result: None,
             job_id,
             engine,
             backend,
@@ -364,7 +391,9 @@ fn validate_route(
         return Err("native ASR model role 无效或重复".into());
     }
     if engine == "qwen3-asr" {
-        if roles.len() != 2 || !roles.contains("aligner") {
+        if !(roles.len() == 2 || roles.len() == 3 && roles.contains("vad"))
+            || !roles.contains("aligner")
+        {
             return Err("qwen3-asr 需要 model 与 aligner".into());
         }
     } else if roles.len() != 1 {
@@ -372,7 +401,7 @@ fn validate_route(
     }
     if roles
         .iter()
-        .any(|role| *role != "model" && *role != "aligner")
+        .any(|role| *role != "model" && *role != "aligner" && *role != "vad")
     {
         return Err("native ASR model role 未知".into());
     }
@@ -499,6 +528,9 @@ struct NativeAsrJob {
     snapshot: AsrJobSnapshot,
     pid: Option<u32>,
     reaped: bool,
+    worker_exited: bool,
+    reap_retry: bool,
+    cleanup_pending: bool,
     cancel_requested: bool,
     terminal_committed: bool,
     pending_completed: Option<PendingCompleted>,
@@ -517,13 +549,23 @@ struct NativeAsrJob {
 }
 
 struct JobRecord {
+    #[cfg(windows)]
+    process_job: Option<Arc<worker_job::WorkerJob>>,
+    cli_work_dir: Option<PathBuf>,
+    #[cfg(test)]
+    capture_cli_result: Option<Arc<Mutex<Vec<u8>>>>,
     inner: Mutex<NativeAsrJob>,
     reaped: Condvar,
 }
 
 impl JobRecord {
-    fn new(launch: &ResolvedNativeLaunch, pid: u32, max_segments: usize) -> Self {
+    fn new(launch: &ResolvedNativeLaunch, pid: Option<u32>, max_segments: usize) -> Self {
         Self {
+            #[cfg(windows)]
+            process_job: None,
+            cli_work_dir: launch.cli_work_dir.clone(),
+            #[cfg(test)]
+            capture_cli_result: launch.capture_cli_result.clone(),
             inner: Mutex::new(NativeAsrJob {
                 snapshot: AsrJobSnapshot {
                     id: launch.job_id.clone(),
@@ -536,8 +578,11 @@ impl JobRecord {
                     error: None,
                     segments: Vec::new(),
                 },
-                pid: Some(pid),
+                pid,
                 reaped: false,
+                worker_exited: pid.is_none(),
+                reap_retry: false,
+                cleanup_pending: launch.cli_work_dir.is_some(),
                 cancel_requested: false,
                 terminal_committed: false,
                 pending_completed: None,
@@ -559,22 +604,155 @@ impl JobRecord {
     }
 }
 
+fn terminate_record(record: &JobRecord, pid: u32) {
+    #[cfg(windows)]
+    if let Some(job) = &record.process_job {
+        job.terminate();
+        return;
+    }
+    terminate_process_tree(pid);
+}
+
+fn reap_processes(record: &JobRecord, timeout: Duration) -> Result<(), String> {
+    if !record
+        .inner
+        .lock()
+        .map_err(|_| "native ASR job 状态已损坏")?
+        .worker_exited
+    {
+        // An assignment failure can leave the worker outside an empty Job.
+        return Err("[worker_job_failed] 无法验证 ASR 进程退出".into());
+    }
+    #[cfg(windows)]
+    if let Some(job) = &record.process_job {
+        return job.reap(timeout);
+    }
+    let _ = timeout;
+    Ok(())
+}
+
+fn cleanup_cli(record: &JobRecord, job: &mut NativeAsrJob) -> Result<(), String> {
+    if !job.cleanup_pending {
+        return Ok(());
+    }
+    let cleanup = || -> Result<(), String> {
+        if let Some(path) = &record.cli_work_dir {
+            #[cfg(test)]
+            if let Some(capture) = &record.capture_cli_result {
+                if let Ok(file) = fs::File::open(path.join("result.json")) {
+                    let mut bytes = Vec::new();
+                    if file
+                        .take(ProtocolLimits::load().unwrap().max_event_line_bytes as u64)
+                        .read_to_end(&mut bytes)
+                        .is_ok()
+                    {
+                        *capture.lock().unwrap() = bytes;
+                    }
+                }
+            }
+            match fs::symlink_metadata(path) {
+                Ok(_) => {
+                    reject_link_path(path)?;
+                    fs::remove_dir_all(path).map_err(|_| "无法清理 ASR 私有结果")?;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(_) => return Err("无法清理 ASR 私有结果".into()),
+            }
+        }
+        Ok(())
+    };
+    cleanup().map_err(|_| "无法清理 ASR 私有结果".to_string())?;
+    job.cleanup_pending = false;
+    Ok(())
+}
+
+fn publish_reaped(job: &mut NativeAsrJob, gate: &ActiveJobGate) {
+    // Physical exit owns the gate; a delete-denying file handle must not strand
+    // it. cleanup_pending stays retryable via cancel, even after pid is cleared.
+    job.pid = None;
+    gate.release(&job.snapshot.id);
+    job.reap_retry = false;
+    job.reaped = true;
+}
+
+fn record_reap_failure(record: &JobRecord) {
+    if let Ok(mut job) = record.inner.lock() {
+        commit_terminal_locked(
+            &mut job,
+            TerminalKind::Failed(ProtocolFailure::new(
+                "worker_reap_failed",
+                "Failed to confirm ASR process exit",
+            )),
+        );
+        let _ = persist_snapshot(&job.recovery_path, &job.snapshot);
+        // No monitor remains to finish this exit. Existing cancel/shutdown may
+        // retry confirmation, but must not publish reap for unconfirmed children.
+        job.reap_retry = true;
+    }
+    record.reaped.notify_all();
+}
+
+fn finish_aborted_job(
+    record: &Arc<JobRecord>,
+    gate: &ActiveJobGate,
+    failure: ProtocolFailure,
+    child: Option<&mut Child>,
+) -> Result<(), String> {
+    if let Ok(Some(snapshot)) = commit_failure(record, failure) {
+        if let Ok(job) = record.inner.lock() {
+            let _ = persist_snapshot(&job.recovery_path, &snapshot);
+        }
+    }
+    if let Some(child) = child {
+        terminate_record(record, child.id());
+        // Assignment may have failed while the child was outside the Job.
+        let _ = child.kill();
+        let exited = child.wait().is_ok();
+        record
+            .inner
+            .lock()
+            .map_err(|_| "native ASR job 状态已损坏")?
+            .worker_exited = exited;
+    }
+    if let Err(error) = reap_processes(record, TERMINATION_TIMEOUT) {
+        record_reap_failure(record);
+        return Err(error);
+    }
+    let mut job = record
+        .inner
+        .lock()
+        .map_err(|_| "native ASR job 状态已损坏")?;
+    let cleanup = cleanup_cli(record, &mut job);
+    publish_reaped(&mut job, gate);
+    drop(job);
+    record.reaped.notify_all();
+    cleanup
+}
+
+fn reject_link_path(path: &Path) -> Result<(), String> {
+    for ancestor in path.ancestors() {
+        let metadata = fs::symlink_metadata(ancestor).map_err(|_| "ASR 路径无效".to_string())?;
+        #[cfg(windows)]
+        let reparse = {
+            use std::os::windows::fs::MetadataExt;
+            metadata.file_attributes() & 0x400 != 0
+        };
+        #[cfg(not(windows))]
+        let reparse = false;
+        if metadata.file_type().is_symlink() || reparse {
+            return Err("拒绝 ASR 链接或 reparse 路径".into());
+        }
+    }
+    Ok(())
+}
+
 fn abort_spawned_job(
     record: &Arc<JobRecord>,
     child: &mut Child,
-    recovery_path: &Path,
+    gate: &ActiveJobGate,
     failure: ProtocolFailure,
-) {
-    if let Ok(Some(snapshot)) = commit_failure(record, failure) {
-        let _ = persist_snapshot(recovery_path, &snapshot);
-    }
-    terminate_process_tree(child.id());
-    let _ = child.wait();
-    if let Ok(mut job) = record.inner.lock() {
-        job.pid = None;
-        job.reaped = true;
-    }
-    record.reaped.notify_all();
+) -> Result<(), String> {
+    finish_aborted_job(record, gate, failure, Some(child))
 }
 
 #[derive(Clone)]
@@ -640,6 +818,14 @@ impl NativeAsrHost {
             return Err("native ASR request 超过 protocol v1 限制".into());
         }
 
+        if let Some(work) = &launch.cli_work_dir {
+            reject_link_path(work.parent().expect("resolved workspace parent"))?;
+            reject_link_path(&launch.audio_path)?;
+            reject_link_path(&self.inner.executable)?;
+            for model in &launch.model_paths {
+                reject_link_path(Path::new(&model.path))?;
+            }
+        }
         let mut command = hidden_command(&self.inner.executable);
         command.args(&self.inner.worker_args);
         for name in &self.inner.removed_environment {
@@ -652,20 +838,77 @@ impl NativeAsrHost {
             .stderr(Stdio::piped());
         #[cfg(unix)]
         command.process_group(0);
-        let mut child = command
-            .spawn()
-            .map_err(|error| format!("启动 native ASR worker 失败：{error}"))?;
-        let pid = child.id();
-        let record = Arc::new(JobRecord::new(
-            &launch,
-            pid,
-            self.inner.limits.max_replacement_segments,
-        ));
-        self.inner
+        #[cfg(windows)]
+        let process_job = if launch.cli_work_dir.is_some() {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(crate::process::CREATE_NO_WINDOW | 0x4);
+            Some(Arc::new(worker_job::WorkerJob::new()?))
+        } else {
+            None
+        };
+        // Acquire the store and Job before creating private files. After this
+        // point every failed start retains a record for truthful cleanup retry.
+        let mut jobs = self
+            .inner
             .jobs
             .lock()
-            .map_err(|_| "native ASR job store 已损坏".to_string())?
-            .insert(launch.job_id.clone(), Arc::clone(&record));
+            .map_err(|_| "native ASR job store 已损坏")?;
+        if let Some(work) = &launch.cli_work_dir {
+            fs::create_dir(work).map_err(|_| "无法创建独占 ASR 私有结果目录".to_string())?;
+        }
+        let mut record = JobRecord::new(&launch, None, self.inner.limits.max_replacement_segments);
+        #[cfg(windows)]
+        {
+            record.process_job = process_job;
+        }
+        let record = Arc::new(record);
+        jobs.insert(launch.job_id.clone(), Arc::clone(&record));
+        if let Err(error) = reservation.activate(&launch.job_id) {
+            finish_aborted_job(
+                &record,
+                &self.inner.active_gate,
+                ProtocolFailure::new(
+                    "worker_start_cancelled",
+                    "Worker start reservation was cancelled",
+                ),
+                None,
+            )?;
+            return Err(error);
+        }
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(_) => {
+                finish_aborted_job(
+                    &record,
+                    &self.inner.active_gate,
+                    ProtocolFailure::new("worker_spawn_failed", "Failed to start ASR worker"),
+                    None,
+                )?;
+                return Err("启动 native ASR worker 失败".into());
+            }
+        };
+        {
+            let mut job = record.inner.lock().unwrap();
+            job.pid = Some(child.id());
+            job.worker_exited = false;
+        }
+        #[cfg(windows)]
+        if let Some(job) = &record.process_job {
+            if let Err(error) = job.attach_and_resume(&mut child) {
+                abort_spawned_job(
+                    &record,
+                    &mut child,
+                    &self.inner.active_gate,
+                    ProtocolFailure::new(
+                        "worker_job_failed",
+                        "Failed to constrain ASR worker lifetime",
+                    ),
+                )?;
+                return Err(error);
+            }
+        }
+
+        drop(jobs);
 
         let write_result = child
             .stdin
@@ -682,12 +925,12 @@ impl NativeAsrHost {
             abort_spawned_job(
                 &record,
                 &mut child,
-                &launch.recovery_path,
+                &self.inner.active_gate,
                 ProtocolFailure::new(
                     "worker_request_write_failed",
                     "Failed to write worker request",
                 ),
-            );
+            )?;
             return Err(error);
         }
 
@@ -695,39 +938,26 @@ impl NativeAsrHost {
             abort_spawned_job(
                 &record,
                 &mut child,
-                &launch.recovery_path,
+                &self.inner.active_gate,
                 ProtocolFailure::new(
                     "worker_pipe_unavailable",
                     "Worker stdout pipe is unavailable",
                 ),
-            );
+            )?;
             return Err("无法读取 native ASR worker stdout".into());
         };
         let Some(stderr) = child.stderr.take() else {
             abort_spawned_job(
                 &record,
                 &mut child,
-                &launch.recovery_path,
+                &self.inner.active_gate,
                 ProtocolFailure::new(
                     "worker_pipe_unavailable",
                     "Worker stderr pipe is unavailable",
                 ),
-            );
+            )?;
             return Err("无法读取 native ASR worker stderr".into());
         };
-        if let Err(error) = reservation.activate(&launch.job_id) {
-            abort_spawned_job(
-                &record,
-                &mut child,
-                &launch.recovery_path,
-                ProtocolFailure::new(
-                    "worker_start_cancelled",
-                    "Worker start reservation was cancelled",
-                ),
-            );
-            return Err(error);
-        }
-
         let stderr_log_path = launch.stderr_log_path.clone();
         let stderr_limit = self.inner.limits.max_stderr_diagnostic_bytes;
         let stderr_thread = std::thread::spawn(move || {
@@ -800,26 +1030,37 @@ impl NativeAsrHost {
         if let Some((snapshot, recovery_path)) = terminal_snapshot {
             let _ = persist_snapshot(&recovery_path, &snapshot);
         }
-        let Some(pid) = pid else {
-            self.inner.active_gate.release(job_id);
-            return Ok(());
-        };
         let termination_started = Instant::now();
-        terminate_process_tree(pid);
+        if let Some(pid) = pid {
+            terminate_record(&record, pid);
+        }
 
         let remaining = TERMINATION_TIMEOUT.saturating_sub(termination_started.elapsed());
         let guard = record
             .inner
             .lock()
             .map_err(|_| "native ASR job 状态已损坏".to_string())?;
-        let (guard, timeout) = record
+        let (mut guard, timeout) = record
             .reaped
-            .wait_timeout_while(guard, remaining, |job| !job.reaped)
+            .wait_timeout_while(guard, remaining, |job| !job.reaped && !job.reap_retry)
             .map_err(|_| "native ASR reap 状态已损坏".to_string())?;
-        if timeout.timed_out() && !guard.reaped {
+        if timeout.timed_out() && !guard.reaped && !guard.reap_retry {
             return Err("[worker_termination_timeout] native ASR worker 未在 2 秒内退出".into());
         }
-        Ok(())
+        if !guard.reaped {
+            drop(guard);
+            reap_processes(
+                &record,
+                TERMINATION_TIMEOUT.saturating_sub(termination_started.elapsed()),
+            )?;
+            guard = record
+                .inner
+                .lock()
+                .map_err(|_| "native ASR job 状态已损坏")?;
+            publish_reaped(&mut guard, &self.inner.active_gate);
+            record.reaped.notify_all();
+        }
+        cleanup_cli(&record, &mut guard)
     }
 
     pub(crate) fn shutdown(&self) {
@@ -858,7 +1099,7 @@ impl NativeAsrHost {
                             if let Ok(Some(snapshot)) = commit_failure(&record, failure) {
                                 let _ = persist_snapshot(&path, &snapshot);
                             }
-                            terminate_process_tree(child.id());
+                            terminate_record(&record, child.id());
                             break;
                         }
                     }
@@ -868,7 +1109,7 @@ impl NativeAsrHost {
                                 let _ = persist_snapshot(&job.recovery_path, &snapshot);
                             }
                         }
-                        terminate_process_tree(child.id());
+                        terminate_record(&record, child.id());
                         break;
                     }
                 },
@@ -879,7 +1120,7 @@ impl NativeAsrHost {
                             let _ = persist_snapshot(&job.recovery_path, &snapshot);
                         }
                     }
-                    terminate_process_tree(child.id());
+                    terminate_record(&record, child.id());
                     break;
                 }
             }
@@ -888,18 +1129,61 @@ impl NativeAsrHost {
         let status = child.wait();
         let _ = stderr_thread.join();
         if let Ok(mut job) = record.inner.lock() {
+            job.worker_exited = status.is_ok();
+        }
+        if reap_processes(&record, TERMINATION_TIMEOUT).is_err() {
+            record_reap_failure(&record);
+            return;
+        }
+        if let Ok(mut job) = record.inner.lock() {
+            if cleanup_cli(&record, &mut job).is_err() {
+                commit_terminal_locked(
+                    &mut job,
+                    TerminalKind::Failed(ProtocolFailure::new(
+                        "worker_cleanup_failed",
+                        "Failed to clean ASR private results",
+                    )),
+                );
+            }
+            // Persist the success candidate under the terminal lock, before its
+            // first-terminal commit. A failed recovery/ASS write is not success.
+            if !job.terminal_committed && status.as_ref().is_ok_and(|s| s.success()) {
+                if let Some(completed) = &job.pending_completed {
+                    let mut candidate = job.snapshot.clone();
+                    candidate.status = AsrJobStatus::Completed;
+                    candidate.duration_ms = completed.duration_ms;
+                    candidate.processed_ms = completed.duration_ms;
+                    candidate.progress = 1.0;
+                    candidate.detected_language = Some(completed.detected_language.clone());
+                    candidate.error = None;
+                    let persisted =
+                        persist_snapshot(&job.recovery_path, &candidate).and_then(|_| {
+                            if candidate.segments.is_empty() {
+                                Ok(())
+                            } else {
+                                write_minimal_ass(&job.output_ass_path, &candidate.segments)
+                            }
+                        });
+                    if persisted.is_err() {
+                        commit_terminal_locked(
+                            &mut job,
+                            TerminalKind::Failed(ProtocolFailure::new(
+                                "recovery_write_failed",
+                                "Failed to persist ASR recovery or subtitle",
+                            )),
+                        );
+                    }
+                }
+            }
             let terminal_snapshot = finalize_after_exit_locked(&mut job, status.as_ref().ok());
             let snapshot =
                 terminal_snapshot.or_else(|| job.terminal_committed.then(|| job.snapshot.clone()));
             if let Some(snapshot) = snapshot {
-                let _ = persist_snapshot(&job.recovery_path, &snapshot);
-                if snapshot.status == AsrJobStatus::Completed && !snapshot.segments.is_empty() {
-                    let _ = write_minimal_ass(&job.output_ass_path, &snapshot.segments);
+                if snapshot.status != AsrJobStatus::Completed {
+                    let _ = persist_snapshot(&job.recovery_path, &snapshot);
                 }
             }
-            self.inner.active_gate.release(&job_id);
-            job.pid = None;
-            job.reaped = true;
+            publish_reaped(&mut job, &self.inner.active_gate);
         } else {
             self.inner.active_gate.release(&job_id);
         }
@@ -1667,6 +1951,8 @@ mod tests {
     use std::collections::BTreeMap;
     use tempfile::TempDir;
 
+    include!("asr_worker_qwen_tests.rs");
+
     const R2_STEP6_MANIFEST_SHA256: &str =
         "aa28e40c65c029c2c7c651121606f9334daddf21ee839c59954455d3bb5bb33c";
     const R2_STEP6_CANDIDATE: &str = "R2-vad12-pad30-overlap-top-level-v1";
@@ -2421,7 +2707,7 @@ mod tests {
     fn job_record(launch: &ResolvedNativeLaunch, pid: u32) -> JobRecord {
         JobRecord::new(
             launch,
-            pid,
+            Some(pid),
             ProtocolLimits::load().unwrap().max_replacement_segments,
         )
     }

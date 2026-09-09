@@ -63,6 +63,11 @@ Because listener registration is asynchronous and the app runs under React Stric
 
 `useRuntimeDependencyPreparation` coordinates prepare/progress UI for managed deps — pair with Settings / setup panels, not ad-hoc invoke loops in unrelated views.
 
+- Transcribe's explicit CUDA Start reuses this hook and `RuntimeDependencyDialog`; the selected backend chooses `nativeAsrCuda` (CT2) or `crispasrCuda`, including its actual probe size/path. Open the dialog in a non-confirmable checking state **before** awaiting the shared dependency probe: it checks more than the selected dependency and can be slow or reject. Probe errors must be visible, bounded and retryable, never an unhandled click promise.
+- Prepare requires consent and a downloadable probe item; duplicate consent shares no second frontend start. Recheck the installed dependency and shared ASR availability before continuing through the existing ModelManager gate exactly once. Missing CUDA after refresh must not launch or fall back to CPU.
+- Closing/cancelling, changing kind or unmounting invalidates the pending continuation and ignores late probe/progress results. Closing the UI does not promise cancellation of the backend installation. Transcribe additionally rechecks the document guard after dependency/model awaits.
+- Show the actual engine/model prerequisite error before the CUDA-download hint when Start is blocked. Click regressions must exercise real availability/preparation hooks with mocked IPC, not stub their route gates.
+
 ## Native ASR Availability
 
 `useAsrAvailability(engine, model, device)` is the mounted owner for Settings/Transcribe ASR engine metadata, model dispositions, device capability, disabled options, route gating, and stale-request rejection.

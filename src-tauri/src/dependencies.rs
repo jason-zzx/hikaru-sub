@@ -15,6 +15,35 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
+#[path = "dependencies_crispasr.rs"]
+mod crispasr;
+
+#[cfg(test)]
+pub(crate) fn verify_crispasr_delivery_test_runtime(
+    root: &Path,
+    device: &str,
+) -> Result<ResolvedNativeAsrCpuRuntime, String> {
+    crispasr::verify_delivery_test_runtime(root, device)
+}
+
+pub(crate) fn crispasr_cuda_capability(app: &AppHandle) -> serde_json::Value {
+    let item = crispasr::items(app).ok().and_then(|items| {
+        items
+            .into_iter()
+            .find(|item| item.kind == RuntimeDependencyKind::CrispasrCuda)
+    });
+    serde_json::json!({"device":"cuda", "available":item.as_ref().is_some_and(|item| item.status == RuntimeDependencyStatus::Available),
+        "downloadRequired":item.as_ref().is_some_and(|item| item.expected_download_bytes.is_some()),
+        "reason":item.and_then(|item| item.reason)})
+}
+
+pub(crate) fn resolve_crispasr_runtime(
+    app: &AppHandle,
+    device: &str,
+) -> Result<ResolvedNativeAsrCpuRuntime, String> {
+    crispasr::resolve(app, device)
+}
+
 const LOG_TAIL_LIMIT: usize = 200;
 const MANIFEST_JSON: &str = include_str!("../resources/runtime-dependency-sources.json");
 const NATIVE_ASR_CUDA_LOCK_JSON: &str =
@@ -180,6 +209,8 @@ pub enum RuntimeDependencyKind {
     Ffmpeg,
     NativeAsrCpu,
     NativeAsrCuda,
+    CrispasrCpu,
+    CrispasrCuda,
     Python311,
     AsrVenv,
     AsrModels,
@@ -192,6 +223,7 @@ pub enum RuntimeDependencyKind {
 pub enum RuntimeDependencyStatus {
     Available,
     Missing,
+    #[serde(rename = "needsSetup")]
     NeedsSetup,
 }
 
@@ -243,6 +275,8 @@ pub struct RuntimeDependencySourceProfile {
     pub ffmpeg: Option<RuntimeDependencyBinarySource>,
     #[serde(default)]
     pub native_asr_cuda: Option<RuntimeDependencyBinarySource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crispasr_cuda: Option<RuntimeDependencyBinarySource>,
     pub python311: Option<RuntimeDependencyBinarySource>,
     pub pip_index_url: Option<String>,
     #[serde(default)]
@@ -389,6 +423,7 @@ pub struct ResolvedFfmpeg {
 #[derive(Default)]
 pub struct RuntimeDependencyState {
     jobs: Mutex<HashMap<String, Arc<StdMutex<RuntimeDependencyJob>>>>,
+    crispasr_storage: Arc<tokio::sync::RwLock<()>>,
 }
 
 impl RuntimeDependencyState {
@@ -1503,6 +1538,11 @@ async fn download_binary_source_to_dir(
             return Err("用户已取消运行时依赖准备".into());
         }
         let chunk = chunk.map_err(|e| format!("下载失败：{e}"))?;
+        if downloaded.saturating_add(chunk.len() as u64) > source.size_bytes {
+            drop(file);
+            let _ = fs::remove_file(&partial);
+            return Err("运行时依赖下载超过锁定大小".into());
+        }
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
         update_download_progress(job, downloaded, total);
@@ -1511,8 +1551,11 @@ async fn download_binary_source_to_dir(
     fs::rename(&partial, &target).map_err(|e| e.to_string())?;
 
     set_stage(job, "校验安装包", Some(0.20));
-    let actual = sha256_file(&target)?;
-    if actual != source.sha256 {
+    let hash_target = target.clone();
+    let actual = tauri::async_runtime::spawn_blocking(move || sha256_file(&hash_target))
+        .await
+        .map_err(|_| "运行时依赖校验任务失败")??;
+    if downloaded != source.size_bytes || actual != source.sha256 {
         let _ = fs::remove_file(&target);
         return Err(format!(
             "运行时依赖校验失败：期望 {}，实际 {}",
@@ -2087,10 +2130,11 @@ async fn run_prepare_job(
 
     match args.kind {
         RuntimeDependencyKind::Ffmpeg => prepare_ffmpeg(&app, &job, &profile).await,
-        RuntimeDependencyKind::NativeAsrCpu => {
+        RuntimeDependencyKind::NativeAsrCpu | RuntimeDependencyKind::CrispasrCpu => {
             Err("内置 Native ASR CPU 运行时不可下载或准备".into())
         }
         RuntimeDependencyKind::NativeAsrCuda => prepare_native_asr_cuda(&app, &job, &profile).await,
+        RuntimeDependencyKind::CrispasrCuda => crispasr::prepare(&app, &job, &profile).await,
         RuntimeDependencyKind::Python311 => prepare_python311(&app, &job, &profile).await,
         RuntimeDependencyKind::AsrVenv => Err("ASR 引擎依赖由 ASR 一键配置流程准备".into()),
         RuntimeDependencyKind::AsrModels => Err("ASR 模型由模型管理器按具体引擎和模型下载".into()),
@@ -2208,8 +2252,11 @@ fn cleanup_target_for_kind(
 ) -> Result<PathBuf, String> {
     match kind {
         RuntimeDependencyKind::Ffmpeg => managed_ffmpeg_dir(app),
-        RuntimeDependencyKind::NativeAsrCpu => Err("内置 Native ASR CPU 运行时不可清理".into()),
+        RuntimeDependencyKind::NativeAsrCpu | RuntimeDependencyKind::CrispasrCpu => {
+            Err("内置 Native ASR CPU 运行时不可清理".into())
+        }
         RuntimeDependencyKind::NativeAsrCuda => managed_native_asr_cuda_dir(app),
+        RuntimeDependencyKind::CrispasrCuda => Ok(crispasr::managed_root(app)?.join("current")),
         RuntimeDependencyKind::Python311 => managed_python_dir(app),
         RuntimeDependencyKind::AsrVenv => {
             let settings = load_settings(app).unwrap_or_default();
@@ -2453,6 +2500,7 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         reason: None,
     });
 
+    items.extend(crispasr::items(app)?);
     let cuda_root = managed_native_asr_cuda_dir(app)?;
     let cuda_verified = verify_native_asr_cuda_runtime_at(&cuda_root);
     let (cuda_status, cuda_version, cuda_reason) = if !native_asr_cuda_product_enabled() {
@@ -2543,6 +2591,7 @@ fn measure_runtime_dependency_storage_inner(
     let kinds = [
         RuntimeDependencyKind::Ffmpeg,
         RuntimeDependencyKind::NativeAsrCuda,
+        RuntimeDependencyKind::CrispasrCuda,
         RuntimeDependencyKind::AsrModels,
         RuntimeDependencyKind::Downloads,
         RuntimeDependencyKind::AppCache,
@@ -2554,10 +2603,12 @@ fn measure_runtime_dependency_storage_inner(
                 resolve_ffmpeg_paths(app, &settings).source == ResolvedFfmpegSource::Managed
             }
             RuntimeDependencyKind::NativeAsrCuda
+            | RuntimeDependencyKind::CrispasrCuda
             | RuntimeDependencyKind::AsrModels
             | RuntimeDependencyKind::Downloads
             | RuntimeDependencyKind::AppCache => true,
             RuntimeDependencyKind::NativeAsrCpu
+            | RuntimeDependencyKind::CrispasrCpu
             | RuntimeDependencyKind::Python311
             | RuntimeDependencyKind::AsrVenv => unreachable!(),
         };
@@ -2566,6 +2617,8 @@ fn measure_runtime_dependency_storage_inner(
         }
         let target = if kind == RuntimeDependencyKind::NativeAsrCuda {
             managed_native_asr_cuda_root(app)?
+        } else if kind == RuntimeDependencyKind::CrispasrCuda {
+            crispasr::managed_root(app)?
         } else {
             cleanup_target_for_kind(app, kind)?
         };
@@ -2573,6 +2626,8 @@ fn measure_runtime_dependency_storage_inner(
             measure_app_cache_size(&target, preserve_video_path)
         } else if kind == RuntimeDependencyKind::NativeAsrCuda {
             dir_size(&target) + dir_size(&managed_native_asr_cuda_download_dir(app)?)
+        } else if kind == RuntimeDependencyKind::CrispasrCuda {
+            dir_size(&target) + dir_size(&crispasr::download_dir(app)?)
         } else {
             dir_size(&target)
         };
@@ -2635,6 +2690,15 @@ pub async fn prepare_runtime_dependency(
     state: State<'_, RuntimeDependencyState>,
     args: PrepareRuntimeDependencyArgs,
 ) -> Result<String, String> {
+    let storage = if args.kind == RuntimeDependencyKind::CrispasrCuda {
+        Some(
+            Arc::clone(&state.crispasr_storage)
+                .try_read_owned()
+                .map_err(|_| "CrispASR 运行时缓存正在清理")?,
+        )
+    } else {
+        None
+    };
     let id = dependency_job_id(args.kind);
     let job = Arc::new(StdMutex::new(RuntimeDependencyJob::new(
         id.clone(),
@@ -2663,6 +2727,7 @@ pub async fn prepare_runtime_dependency(
 
     tauri::async_runtime::spawn(async move {
         let result = run_prepare_job(app, Arc::clone(&job), args).await;
+        drop(storage);
         match result {
             Ok(path) => finish_job(
                 &job,
@@ -2730,14 +2795,28 @@ pub async fn cleanup_runtime_dependency(
     asr_state: State<'_, crate::asr::AsrState>,
     args: CleanupRuntimeDependencyArgs,
 ) -> Result<(), String> {
-    if args.kind == RuntimeDependencyKind::NativeAsrCpu {
+    let runtime_storage = if matches!(
+        args.kind,
+        RuntimeDependencyKind::CrispasrCuda | RuntimeDependencyKind::Downloads
+    ) {
+        Some(
+            Arc::clone(&state.crispasr_storage)
+                .try_write_owned()
+                .map_err(|_| "CrispASR 运行时任务正在进行，暂不可清理")?,
+        )
+    } else {
+        None
+    };
+    if matches!(
+        args.kind,
+        RuntimeDependencyKind::NativeAsrCpu | RuntimeDependencyKind::CrispasrCpu
+    ) {
         return Err("内置 Native ASR CPU 运行时不可清理".into());
     }
-    if args.kind == RuntimeDependencyKind::NativeAsrCuda
-        && (asr_state.has_active_job()
-            || state
-                .has_active_kind(RuntimeDependencyKind::NativeAsrCuda)
-                .await)
+    if matches!(
+        args.kind,
+        RuntimeDependencyKind::NativeAsrCuda | RuntimeDependencyKind::CrispasrCuda
+    ) && (asr_state.has_active_job() || state.has_active_kind(args.kind).await)
     {
         return Err("CUDA 转录或 CUDA 运行时任务正在进行，暂不可清理".into());
     }
@@ -2752,12 +2831,31 @@ pub async fn cleanup_runtime_dependency(
         .map_err(|e| format!("清理应用缓存失败：{e}"))?;
     }
 
+    // One manager-owned lease: fail busy immediately, never wait for a long HTTP job.
+    let model_storage = if matches!(
+        args.kind,
+        RuntimeDependencyKind::AsrModels | RuntimeDependencyKind::Downloads
+    ) {
+        let guard = asr_state.native_models.begin_storage_cleanup()?;
+        if asr_state.has_active_job() {
+            return Err("转录任务正在进行，暂不可清理模型或下载缓存".into());
+        }
+        Some(guard)
+    } else {
+        None
+    };
     // 可能触发提权重启，放在阻塞扫盘之前。
     ensure_runtime_deps_writable_or_elevate(&app)?;
     let kind = args.kind;
     tauri::async_runtime::spawn_blocking(move || {
+        let _model_storage = model_storage;
+        let _runtime_storage = runtime_storage;
         let deps = deps_dir(&app)?;
         fs::create_dir_all(&deps).map_err(|e| e.to_string())?;
+        if kind == RuntimeDependencyKind::CrispasrCuda {
+            safe_remove_runtime_dependency_dir(&crispasr::managed_root(&app)?, &deps)?;
+            return safe_remove_runtime_dependency_dir(&crispasr::download_dir(&app)?, &deps);
+        }
         if kind == RuntimeDependencyKind::NativeAsrCuda {
             safe_remove_runtime_dependency_dir(&managed_native_asr_cuda_root(&app)?, &deps)?;
             return safe_remove_runtime_dependency_dir(
@@ -2777,6 +2875,38 @@ mod tests {
     use super::*;
     use crate::settings::AppSettings;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn crispasr_status_types_and_storage_lease_match_existing_consumers() {
+        assert_eq!(
+            serde_json::to_value(RuntimeDependencyStatus::NeedsSetup).unwrap(),
+            "needsSetup"
+        );
+        assert_eq!(
+            serde_json::to_value(RuntimeDependencyKind::CrispasrCpu).unwrap(),
+            "crispasrCpu"
+        );
+        assert_eq!(
+            serde_json::to_value(RuntimeDependencyKind::CrispasrCuda).unwrap(),
+            "crispasrCuda"
+        );
+        let state = RuntimeDependencyState::default();
+        let download = Arc::clone(&state.crispasr_storage)
+            .try_read_owned()
+            .unwrap();
+        assert!(Arc::clone(&state.crispasr_storage)
+            .try_write_owned()
+            .is_err());
+        drop(download);
+        let cleanup = Arc::clone(&state.crispasr_storage)
+            .try_write_owned()
+            .unwrap();
+        assert!(Arc::clone(&state.crispasr_storage)
+            .try_read_owned()
+            .is_err());
+        drop(cleanup);
+        assert!(Arc::clone(&state.crispasr_storage).try_read_owned().is_ok());
+    }
 
     #[test]
     fn python311_candidates_put_user_path_first() {

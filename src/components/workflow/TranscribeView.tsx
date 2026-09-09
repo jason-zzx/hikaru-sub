@@ -18,6 +18,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Select } from "../ui/select-adapter";
 import { ModelManager, type ModelManagerHandle } from "./ModelManager";
 import { defaultAsrModel } from "../../constants/asr";
+import { RUNTIME_DEPENDENCY_LABEL } from "../../constants/runtimeDependencies";
 import { useAsrAvailability } from "../../hooks/useAsrAvailability";
 import {
   cancelAsr,
@@ -73,7 +74,6 @@ export function TranscribeView() {
 
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
-  const cudaPreparation = useRuntimeDependencyPreparation("nativeAsrCuda");
 
   // 音轨提取
   const [audioReady, setAudioReady] = useState(false);
@@ -105,7 +105,10 @@ export function TranscribeView() {
   const cancelRequestedRef = useRef(false);
   const modelManagerRef = useRef<ModelManagerHandle | null>(null);
   const confirmDownloadBusyRef = useRef(false);
+  const startAttemptRef = useRef(false);
   const availability = useAsrAvailability(engine, model, device);
+  const cudaKind = availability.selectedModelStatus?.backend === "crispasr" ? "crispasrCuda" : "nativeAsrCuda";
+  const cudaPreparation = useRuntimeDependencyPreparation(cudaKind);
 
   useEffect(() => {
     setAsrNotice(null);
@@ -485,17 +488,24 @@ export function TranscribeView() {
     const routeAvailable = refreshed?.routeAvailable ?? availability.routeAvailable;
     const unavailableReason =
       refreshed?.unavailableReason ?? availability.unavailableReason;
-    if (!routeAvailable) {
+    if (!routeAvailable || refreshed?.deviceDownloadRequired) {
       setAsrError(unavailableReason || "当前转录路线不可用。");
       return;
     }
-    if (modelDownloading || transcribing || checkingModel || cancelling) return;
+    if (startAttemptRef.current || modelDownloading || transcribing || checkingModel || cancelling) return;
 
+    startAttemptRef.current = true;
+    const documentGuard = captureProjectDocumentGuard(session.videoPath);
     cancelRequestedRef.current = false;
     setCheckingModel(true);
     setAsrError(null);
     try {
       const gate = await modelManagerRef.current?.checkForTranscribe();
+      if (!mountedRef.current) return;
+      if (!documentGuard.unchanged()) {
+        setAsrError("字幕或工作视频已发生变化，请重新开始转录。");
+        return;
+      }
       if (gate == null) {
         setAsrError("无法检测模型状态，请稍后重试。");
         return;
@@ -515,7 +525,8 @@ export function TranscribeView() {
       }
       await runTranscribe();
     } finally {
-      setCheckingModel(false);
+      startAttemptRef.current = false;
+      if (mountedRef.current) setCheckingModel(false);
     }
   };
 
@@ -525,9 +536,20 @@ export function TranscribeView() {
       return;
     }
     if (device === "cuda" && availability.deviceDownloadRequired) {
+      const documentGuard = captureProjectDocumentGuard(session.videoPath);
       await cudaPreparation.requestDependency(async () => {
-        const refreshed = await availability.refresh();
-        await handleTranscribeAfterRuntime(refreshed);
+        setCheckingModel(true);
+        try {
+          const refreshed = await availability.refresh();
+          if (!mountedRef.current) return;
+          if (!documentGuard.unchanged()) {
+            setAsrError("字幕或工作视频已发生变化，请重新开始转录。");
+            return;
+          }
+          await handleTranscribeAfterRuntime(refreshed);
+        } finally {
+          if (mountedRef.current) setCheckingModel(false);
+        }
       });
       return;
     }
@@ -697,11 +719,11 @@ export function TranscribeView() {
           >
             {availabilityPending
               ? "正在检测 Native ASR 可用性…"
-              : availability.deviceDownloadRequired
-                ? "CUDA 运行时尚未安装，开始转录时可按提示下载"
-                : availability.routeAvailable
-                  ? "Native ASR 路线可用"
-                  : availability.unavailableReason || "当前转录路线不可用"}
+              : !availability.routeAvailable
+                ? availability.unavailableReason || "当前转录路线不可用"
+                : availability.deviceDownloadRequired
+                  ? "CUDA 运行时尚未安装，开始转录时可按提示下载"
+                  : "Native ASR 路线可用"}
           </span>
           <Button
             variant="outline"
@@ -808,7 +830,9 @@ export function TranscribeView() {
                 !availability.routeAvailable ||
                 modelDownloading ||
                 checkingModel ||
-                cancelling
+                cancelling ||
+                cudaPreparation.open ||
+                confirmDownloadOpen
               }
               className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -845,6 +869,7 @@ export function TranscribeView() {
         targetPath={ffmpegPreparation.item?.path ?? "安装目录/deps/ffmpeg/current"}
         sourceLabel={ffmpegPreparation.sourceLabel}
         status={
+          ffmpegPreparation.preparing ||
           ffmpegPreparation.snapshot?.status === "running" ||
           ffmpegPreparation.snapshot?.status === "pending"
             ? "running"
@@ -863,14 +888,17 @@ export function TranscribeView() {
 
       <RuntimeDependencyDialog
         open={cudaPreparation.open}
-        kind="nativeAsrCuda"
-        reason="显式 CUDA 转录需要下载可选的 Native ASR CUDA 运行时。"
+        kind={cudaKind}
+        reason={`显式 CUDA 转录需要下载可选的 ${RUNTIME_DEPENDENCY_LABEL[cudaKind]}。安装后将继续检查模型并转录，不会回退 CPU。`}
         sizeBytes={cudaPreparation.item?.expectedDownloadBytes ?? 0}
         targetPath={
-          cudaPreparation.item?.path ?? "安装目录/deps/asr-runtime/cuda/current"
+          cudaPreparation.item?.path ?? (cudaKind === "crispasrCuda"
+            ? "安装目录/deps/asr-runtime/crispasr/cuda/current"
+            : "安装目录/deps/asr-runtime/cuda/current")
         }
         sourceLabel={cudaPreparation.sourceLabel}
         status={
+          cudaPreparation.preparing ||
           cudaPreparation.snapshot?.status === "running" ||
           cudaPreparation.snapshot?.status === "pending"
             ? "running"
