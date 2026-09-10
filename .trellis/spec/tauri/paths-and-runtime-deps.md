@@ -38,6 +38,10 @@ Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI choo
 
 Settings entry: **probe only**. Storage sizes: user-triggered measure. Cleanup buttons: only when measured size > 0 and the target is managed.
 
+Dependency probes still perform exact runtime/model hashes; `spawn_blocking` does not make unoptimized SHA256 cheap. Keep `[profile.dev.package.sha2] opt-level = 3` in `src-tauri/Cargo.toml` so debug/dev probes do not spend minutes hashing weights. This changes neither release settings nor hash/path/device checks. Engine listing reuses both results from one `crispasr::items` call instead of hashing its CPU payload again for CUDA capability.
+
+Manual, read-only regression profiles (ignored in ordinary Cargo tests): `dependency_hash_throughput` checks a fixed 32 MiB fixture; `dependency_probe_profile` profiles actual default-model cold/cached readiness and runtime/CUDA probes. Set test-only `HIKARU_PROFILE_RESOURCES` to the resource directory and `HIKARU_PROFILE_DEPS` to executable-adjacent `deps`, then run `cargo test --manifest-path src-tauri/Cargo.toml dependency_probe_profile -- --ignored --nocapture --test-threads=1`. These inputs never affect production resolution. Compare unoptimized hashing with `--config profile.dev.package.sha2.opt-level=0`; do not run competing profiles concurrently or substitute size-only readiness to improve timings.
+
 ## Scenario: Native CPU Runtime Dependency Payload
 
 ### 1. Scope / Trigger

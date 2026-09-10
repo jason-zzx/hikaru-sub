@@ -208,6 +208,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
   activeModelRef.current = model;
   const engineRequestRef = useRef(0);
   const modelRequestRef = useRef(0);
+  const selectedModelRequestRef = useRef(0);
   const [engines, setEngines] = useState<AsrEngineInfo[] | null>(null);
   const [engineLoading, setEngineLoading] = useState(true);
   const [engineError, setEngineError] = useState<string | null>(null);
@@ -242,37 +243,54 @@ export function useAsrAvailability(engine: string, model: string, device: string
     selectedModel: string,
   ): Promise<ModelAvailabilityState | null> => {
     const requestId = ++modelRequestRef.current;
-    const models = asrModelOptions(requestedEngine).map((option) => option.value);
-    if (!models.includes(selectedModel)) models.push(selectedModel);
+    // Hash only one model at a time, with the user's selection first.
+    const models = [
+      selectedModel,
+      ...asrModelOptions(requestedEngine)
+        .map((option) => option.value)
+        .filter((value) => value !== selectedModel),
+    ];
     setModelState((current) => ({
       engine: requestedEngine,
       loading: true,
-      statuses: current.engine === requestedEngine ? current.statuses : {},
+      statuses: current.engine === requestedEngine
+        ? Object.fromEntries(
+            Object.entries(current.statuses).filter(([key]) => key !== selectedModel),
+          )
+        : {},
       errors: {},
     }));
-    const results = await Promise.all(
-      models.map(async (currentModel) => {
-        try {
-          return {
-            model: currentModel,
-            status: await checkAsrModel(requestedEngine, currentModel),
-          };
-        } catch (error) {
-          return { model: currentModel, error: String(error) };
-        }
-      }),
-    );
-    if (
-      modelRequestRef.current !== requestId ||
-      activeEngineRef.current !== requestedEngine
-    ) {
-      return null;
-    }
     const statuses: Record<string, AsrModelStatus> = {};
     const errors: Record<string, string> = {};
-    for (const result of results) {
-      if (result.status) statuses[result.model] = result.status;
-      if (result.error) errors[result.model] = result.error;
+    for (const currentModel of models) {
+      if (
+        modelRequestRef.current !== requestId ||
+        activeEngineRef.current !== requestedEngine
+      ) return null;
+      try {
+        statuses[currentModel] = await checkAsrModel(requestedEngine, currentModel);
+      } catch (error) {
+        errors[currentModel] = String(error);
+      }
+      if (
+        modelRequestRef.current !== requestId ||
+        activeEngineRef.current !== requestedEngine
+      ) return null;
+      // Publish each completed check; don't block the selected route on other weights.
+      setModelState((current) => {
+        const nextStatuses = { ...current.statuses };
+        const nextErrors = { ...current.errors };
+        delete nextStatuses[currentModel];
+        delete nextErrors[currentModel];
+        if (statuses[currentModel]) nextStatuses[currentModel] = statuses[currentModel];
+        if (errors[currentModel]) nextErrors[currentModel] = errors[currentModel];
+        return {
+          engine: requestedEngine,
+          loading: true,
+          statuses: nextStatuses,
+          errors: nextErrors,
+        };
+      });
     }
     const nextState = {
       engine: requestedEngine,
@@ -280,24 +298,35 @@ export function useAsrAvailability(engine: string, model: string, device: string
       statuses,
       errors,
     };
-    setModelState(nextState);
+    setModelState((current) => ({ ...current, loading: false }));
     return nextState;
   }, []);
 
   const refreshSelectedModel = useCallback(async (): Promise<AsrModelRefreshOutcome> => {
     const requestedEngine = engine;
     const requestedModel = model;
-    const requestId = ++modelRequestRef.current;
+    // A targeted refresh must not cancel the remaining model-list scan.
+    const requestId = ++selectedModelRequestRef.current;
+    const batchId = modelRequestRef.current;
     setModelState((current) => ({
       engine: requestedEngine,
       loading: true,
-      statuses: current.engine === requestedEngine ? current.statuses : {},
-      errors: current.engine === requestedEngine ? current.errors : {},
+      statuses: current.engine === requestedEngine
+        ? Object.fromEntries(
+            Object.entries(current.statuses).filter(([key]) => key !== requestedModel),
+          )
+        : {},
+      errors: current.engine === requestedEngine
+        ? Object.fromEntries(
+            Object.entries(current.errors).filter(([key]) => key !== requestedModel),
+          )
+        : {},
     }));
     try {
       const status = await checkAsrModel(requestedEngine, requestedModel);
       if (
-        modelRequestRef.current !== requestId ||
+        selectedModelRequestRef.current !== requestId ||
+        modelRequestRef.current !== batchId ||
         activeEngineRef.current !== requestedEngine
       ) {
         return { kind: "aborted" };
@@ -313,7 +342,8 @@ export function useAsrAvailability(engine: string, model: string, device: string
       return { kind: "ok", status };
     } catch (error) {
       if (
-        modelRequestRef.current !== requestId ||
+        selectedModelRequestRef.current !== requestId ||
+        modelRequestRef.current !== batchId ||
         activeEngineRef.current !== requestedEngine
       ) {
         return { kind: "aborted" };
@@ -359,7 +389,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
   const currentModelState = modelState.engine === engine ? modelState : null;
   const selectedModelStatus = currentModelState?.statuses[model] ?? null;
   const selectedModelError = currentModelState?.errors[model] ?? null;
-  const modelLoading = !currentModelState || currentModelState.loading;
+  const modelLoading = !selectedModelStatus && selectedModelError === null;
   const engineOptions = useMemo(
     () => asrEngineSelectOptions(engines, engineError),
     [engineError, engines],

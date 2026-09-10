@@ -39,3 +39,8 @@ sha2 = "0.10"
 [dev-dependencies]
 httpmock = "0.7"
 tempfile = "3"
+
+# Dependency probes hash multi-GiB models/runtimes even in tauri dev.
+# Keep the application debuggable without running SHA256's compression loop unoptimized.
+[profile.dev.package.sha2]
+opt-level = 3

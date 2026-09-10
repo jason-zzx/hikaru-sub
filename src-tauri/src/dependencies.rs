@@ -26,15 +26,19 @@ pub(crate) fn verify_crispasr_delivery_test_runtime(
     crispasr::verify_delivery_test_runtime(root, device)
 }
 
-pub(crate) fn crispasr_cuda_capability(app: &AppHandle) -> serde_json::Value {
-    let item = crispasr::items(app).ok().and_then(|items| {
-        items
-            .into_iter()
-            .find(|item| item.kind == RuntimeDependencyKind::CrispasrCuda)
+pub(crate) fn crispasr_engine_capabilities(app: &AppHandle) -> (bool, serde_json::Value) {
+    // items already verifies both devices; don't resolve/hash CPU a second time.
+    let items = crispasr::items(app).unwrap_or_default();
+    let cpu = items.iter().any(|item| {
+        item.kind == RuntimeDependencyKind::CrispasrCpu
+            && item.status == RuntimeDependencyStatus::Available
     });
-    serde_json::json!({"device":"cuda", "available":item.as_ref().is_some_and(|item| item.status == RuntimeDependencyStatus::Available),
+    let item = items
+        .into_iter()
+        .find(|item| item.kind == RuntimeDependencyKind::CrispasrCuda);
+    (cpu, serde_json::json!({"device":"cuda", "available":item.as_ref().is_some_and(|item| item.status == RuntimeDependencyStatus::Available),
         "downloadRequired":item.as_ref().is_some_and(|item| item.expected_download_bytes.is_some()),
-        "reason":item.and_then(|item| item.reason)})
+        "reason":item.and_then(|item| item.reason)}))
 }
 
 pub(crate) fn resolve_crispasr_runtime(
@@ -3355,6 +3359,60 @@ mod tests {
         assert_eq!(
             effective_source_id(&official),
             RuntimeDependencySourceId::Official
+        );
+    }
+
+    #[test]
+    #[ignore = "manual read-only profile of installed dependency files and CUDA probes"]
+    fn dependency_probe_profile_runtimes() {
+        let resources =
+            PathBuf::from(std::env::var_os("HIKARU_PROFILE_RESOURCES").expect("resource root"));
+        let deps = PathBuf::from(std::env::var_os("HIKARU_PROFILE_DEPS").expect("deps root"));
+        let start = std::time::Instant::now();
+        resolve_native_asr_cpu_runtime_at(&resources).unwrap();
+        for device in ["cpu", "cuda"] {
+            let stage = std::time::Instant::now();
+            let root = if device == "cpu" {
+                resources.join("native-asr/windows-x64/crispasr/cpu")
+            } else {
+                deps.join("asr-runtime/crispasr/cuda/current")
+            };
+            crispasr::verify_delivery_test_runtime(&root, device).unwrap();
+            eprintln!("CrispASR {device} verification + probe: {:?}", stage.elapsed());
+        }
+        let stage = std::time::Instant::now();
+        let (root, worker, _) =
+            verify_native_asr_cuda_runtime_at(&deps.join("asr-runtime/cuda/current")).unwrap();
+        eprintln!("CT2 CUDA file verification: {:?}", stage.elapsed());
+        let stage = std::time::Instant::now();
+        assert!(probe_native_asr_cuda_worker(&root, &worker)
+            .unwrap()
+            .available);
+        eprintln!("CT2 CUDA capability probe: {:?}", stage.elapsed());
+        eprintln!("Runtime probe total: {:?}", start.elapsed());
+    }
+
+    #[test]
+    #[ignore = "manual dependency-probe hashing throughput check"]
+    fn dependency_hash_throughput() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("payload.bin");
+        let bytes = vec![0x5a; 32 * 1024 * 1024];
+        fs::write(&path, &bytes).unwrap();
+        let start = std::time::Instant::now();
+        let actual = sha256_file(&path).unwrap();
+        let elapsed = start.elapsed().as_secs_f64();
+        eprintln!(
+            "dependency hash: 32 MiB in {elapsed:.3}s ({:.1} MiB/s)",
+            32.0 / elapsed
+        );
+        assert_eq!(
+            actual,
+            "371036ccdfc733fa30542a26a4f276536147c906d1570f0becc1d6f8b868c311"
+        );
+        assert!(
+            elapsed < 0.32,
+            "dependency hashing must exceed 100 MiB/s on the profiling host"
         );
     }
 

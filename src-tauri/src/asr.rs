@@ -948,17 +948,15 @@ pub async fn list_asr_engines(
         let engines = tauri::async_runtime::spawn_blocking(move || {
             let cpu_available = resolve_native_asr_cpu_runtime(&probe_app).is_ok();
             let cuda_capability = public_cuda_capability(native_asr_cuda_capability(&probe_app));
+            let (crispasr_cpu, crispasr_cuda) =
+                crate::dependencies::crispasr_engine_capabilities(&probe_app);
             known_native_asr_engines()?
                 .into_iter()
                 .map(|(name, supported, backend)| {
                     let (cpu, cuda) = if backend.as_deref() == Some("ctranslate2") {
                         (cpu_available, cuda_capability.clone())
                     } else if supported && backend.as_deref() == Some("crispasr") {
-                        let cpu = resolve_crispasr_runtime(&probe_app, "cpu").is_ok();
-                        (
-                            cpu,
-                            crate::dependencies::crispasr_cuda_capability(&probe_app),
-                        )
+                        (crispasr_cpu, crispasr_cuda.clone())
                     } else {
                         (false, serde_json::Value::Null)
                     };

@@ -214,6 +214,54 @@ describe("useAsrAvailability", () => {
     expect(result.current.selectedModelStatus?.model).toBe("Qwen/Qwen3-ASR-1.7B");
   });
 
+  it("checks the selected model first, publishes it before the rest, and stops stale scans", async () => {
+    mocks.listAsrEngines.mockResolvedValue([
+      { name: "faster-whisper", available: true, device: "cpu" },
+    ]);
+    const pending: Array<() => void> = [];
+    mocks.checkAsrModel.mockImplementation((engine: string, model: string) =>
+      new Promise<AsrModelStatus>((resolve) => {
+        pending.push(() => resolve(status(engine, model, "ready")));
+      }),
+    );
+    const { result, unmount } = renderHook(() =>
+      useAsrAvailability("faster-whisper", "large-v3", "cpu"),
+    );
+    await waitFor(() => expect(result.current.engineLoading).toBe(false));
+    expect(mocks.checkAsrModel.mock.calls).toEqual([["faster-whisper", "large-v3"]]);
+    await act(async () => pending.shift()!());
+    expect(result.current.routeAvailable).toBe(true);
+    expect(result.current.modelLoading).toBe(false);
+    expect(mocks.checkAsrModel).toHaveBeenCalledTimes(2);
+    expect(result.current.modelOptions.find((option) => option.value === "base")?.disabled).toBe(true);
+    unmount();
+    await act(async () => pending.shift()!());
+    expect(mocks.checkAsrModel).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the remaining scan alive when the selected model is refreshed", async () => {
+    mocks.listAsrEngines.mockResolvedValue([
+      { name: "faster-whisper", available: true, device: "cpu" },
+    ]);
+    let finishTiny!: () => void;
+    mocks.checkAsrModel.mockImplementation((engine: string, model: string) =>
+      model === "tiny"
+        ? new Promise<AsrModelStatus>((resolve) => {
+            finishTiny = () => resolve(status(engine, model, "ready"));
+          })
+        : Promise.resolve(status(engine, model, "ready")),
+    );
+    const { result } = renderHook(() => useAsrAvailability("faster-whisper", "large-v3", "cpu"));
+    await waitFor(() => expect(result.current.routeAvailable).toBe(true));
+    mocks.checkAsrModel.mockImplementation((engine: string, model: string) =>
+      Promise.resolve(status(engine, model, model === "large-v3" ? "supportedMissing" : "ready")),
+    );
+    await act(async () => { await result.current.refreshSelectedModel(); });
+    await act(async () => finishTiny());
+    await waitFor(() => expect(result.current.modelOptions.every((option) => !option.disabled)).toBe(true));
+    expect(result.current.selectedModelStatus?.disposition).toBe("supportedMissing");
+  });
+
   it("does not rescan every model when only the selected model changes", async () => {
     mocks.listAsrEngines.mockResolvedValue([
       { name: "faster-whisper", available: true, device: "cpu" },

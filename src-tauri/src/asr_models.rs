@@ -266,6 +266,8 @@ struct ManagerState {
 pub(crate) struct NativeAsrModelManager {
     state: Arc<Mutex<ManagerState>>,
     ready_cache: Arc<StdMutex<HashMap<ReadyCacheKey, ResolvedNativeAsrModel>>>,
+    // Serialize readiness hashing across pages; waiters recheck the successful cache.
+    verification: Arc<Mutex<()>>,
     // Checks/downloads share access; explicit cleanup cannot race a cache seed or publication.
     storage: Arc<RwLock<()>>,
     // One shared CPU asset. Serializing only its publication preserves other model jobs.
@@ -348,6 +350,7 @@ impl NativeAsrModelManager {
         roots: ManagedModelRoots,
         entry: ManifestModel,
     ) -> Result<Option<ResolvedNativeAsrModel>, String> {
+        let _verification = self.verification.lock().await;
         let _storage = self.storage.read().await;
         let key = ReadyCacheKey::new(&roots, &entry);
         let cached = self
@@ -1929,6 +1932,45 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[tokio::test]
+    #[ignore = "manual read-only profile of the installed default model"]
+    async fn dependency_probe_profile_default_model() {
+        let deps = PathBuf::from(std::env::var_os("HIKARU_PROFILE_DEPS").expect("deps root"));
+        let roots = ManagedModelRoots::below(&deps);
+        let manager = NativeAsrModelManager::default();
+        for pass in ["cold", "cached"] {
+            let start = std::time::Instant::now();
+            let status = manager
+                .status_with_roots(roots.clone(), "faster-whisper", "large-v3")
+                .await
+                .unwrap();
+            assert_eq!(status.disposition, NativeAsrModelDisposition::Ready);
+            eprintln!("Default model {pass} verification: {:?}", start.elapsed());
+        }
+    }
+
+    #[tokio::test]
+    async fn concurrent_readiness_waits_before_hashing_and_reuses_verified_result() {
+        let dir = tempdir().unwrap();
+        let roots = ManagedModelRoots::below(dir.path());
+        let (model, files) = complete_fixture();
+        write_model(&direct_path(&roots, &model), &files);
+        let manager = NativeAsrModelManager::default();
+        let gate = manager.verification.lock().await;
+        let check = manager.resolve_entry_with_roots(roots.clone(), model.clone());
+        tokio::pin!(check);
+        assert!(tokio::time::timeout(Duration::from_millis(20), &mut check)
+            .await
+            .is_err());
+        assert!(manager.ready_cache.lock().unwrap().is_empty());
+        // Another page may have completed verification while this caller waited.
+        let ready = resolve_sync(&roots, &model).unwrap().unwrap();
+        manager.remember_ready(&roots, &model, ready).unwrap();
+        fs::remove_file(direct_path(&roots, &model).join("model.bin")).unwrap();
+        drop(gate);
+        assert!(check.await.unwrap().is_some());
     }
 
     #[tokio::test]

@@ -73,7 +73,8 @@ Because listener registration is asynchronous and the app runs under React Stric
 `useAsrAvailability(engine, model, device)` is the mounted owner for Settings/Transcribe ASR engine metadata, model dispositions, device capability, disabled options, route gating, and stale-request rejection.
 
 - Reuse `ASR_ENGINE_OPTIONS`, `ASR_ENGINE_MODELS`, and `ASR_DEVICE_OPTIONS`; backend metadata decides enabled state.
-- On engine change, load the known model list once. Same-engine model changes reuse that status map; only a selected legacy/unknown model missing from the map gets an extra check.
+- On engine change, check the selected model first, then the remaining known models sequentially. Publish each result immediately; selected-model loading/route gating must not wait for unrelated weights. Same-engine model changes reuse that status map; only a selected legacy/unknown model missing from the map gets an extra check.
+- Stop issuing the remaining checks after unmount, an engine change or a superseding full refresh. A selected-model refresh has a separate request generation: it must not cancel the remaining list scan, and subsequent list results must merge only their own model entry rather than overwrite a fresher selected status. Cover selected-first scheduling, early route readiness, stale scan termination and refresh/list overlap in `useAsrAvailability.test.tsx`.
 - Pass the selected status/loading/error/refresh contract into `ModelManager`. Do not restore a component-local fallback `checkAsrModel` path.
 - Keep unavailable persisted values visible and unchanged until the user explicitly selects another option.
 - Settings and Transcribe each own one mounted hook instance; no global Zustand availability store is needed.
