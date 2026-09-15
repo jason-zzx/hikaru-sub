@@ -1278,3 +1278,41 @@ Integrated exact Native Kotoba Whisper v2.0 into the bundled CPU ASR route, mode
 ### Status
 
 [OK] **Completed**
+
+
+## Session 38: Completed Native Parakeet productization
+<!-- trellis-session: v=2 fp=b3ebccbca70d71ea -->
+
+**Date**: 2026-09-15
+**Task**: Completed Native Parakeet productization
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Delivered and archived exact Native Parakeet support with shared CrispASR CPU/CUDA runtime authority, managed model/VAD lifecycle, frontend integration, functional evidence, and owner-confirmed CPU/CUDA application execution.
+
+### Main Changes
+
+- Integrated exact nvidia/parakeet-tdt_ctc-0.6b-ja through the pinned CrispASR full CLI with required CPU Silero, strict device/output/lifecycle handling, managed downloads, and UI availability.
+- Published and verified shared-v2 CUDA dependency bytes, enabled Parakeet in ordinary builds, preserved Qwen/CT2 isolation and rollback authority, and kept model weights on demand.
+- Archived the completed child task and updated parent task context/acceptance state without starting ReazonSpeech.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c2a58a2` | feat(asr): productize Native Parakeet |
+| `b9f60f9` | chore(tasks): archive Native Parakeet productization |
+
+### Testing
+
+- [OK] Owner confirmed the final application runs on CPU and CUDA; retained short/medium/long host-to-ASS evidence passed on both devices.
+- [OK] Final recorded checks: Native CTest 9/9 per worker binding, Cargo 301 passed/3 ignored, frontend 893 passed, pnpm build/release:local, task validation, and diff checks.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Await explicit owner direction before planning or starting the ReazonSpeech child.

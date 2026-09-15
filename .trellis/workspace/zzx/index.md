@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 37
-- **Last Active**: 2026-08-31
+- **Total Sessions**: 38
+- **Last Active**: 2026-09-15
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1280 | Active |
+| `journal-1.md` | ~1318 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 38 | 2026-09-15 | Completed Native Parakeet productization | `c2a58a2`, `b9f60f9` | `dev-crisp-asr` |
 | 37 | 2026-08-31 | Native Kotoba production integration | `bd7f2f4`, `6846458`, `4de2060`, `12369bc` | `dev-crisp-asr` |
 | 36 | 2026-08-30 | Expand Native Faster-Whisper model support | `2623acd` | `dev-crisp-asr` |
 | 35 | 2026-08-29 | Complete Native ASR release cutover | `4c10a38` | `dev-crisp-asr` |
