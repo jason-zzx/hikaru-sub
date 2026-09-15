@@ -9,7 +9,7 @@
 > app upload/version/CHANGELOG, Git staging/history, archive or next-engine work.
 > Minimal scope and stop/escalation boundaries are in the child’s latest authorization.
 
-> **Qwen 当前状态**：完整 CLI + 默认 Q4_K pair + 必需 CPU Silero + 上游 LIS/word display（含批准的有界相邻异常合并）已完成双设备功能、交付和本地包装检查，工程复核接受，用户确认应用 CPU/CUDA 成功。选择/下载/启动及独立 CrispASR CUDA 源保持启用；CUDA 发布复核项由用户接受关闭，超时独立代理没有执行该次复核。Qwen 清理/开发 timeline 退休已接受；构建锁精确迁移和稳定 scratch 解耦已落盘；用户免除进一步复核后，child 于 2026-09-09 归档至 `.trellis/tasks/archive/2026-09/08-20-native-asr-qwen3-aligner/`，迁移独立复核未执行。Parakeet 已完成独立实施、shared-v2 依赖分发、默认双设备启用和最终复核，用户确认最终应用 CPU/CUDA 均可运行，当前仅待提交/归档；Reazon/通用 VAD 尚未实施且不自动开始。Qwen 不适用旧质量矩阵、量化竞赛、CPU 质量继承、raw-only/DP 或源码裁剪要求；Parakeet 已获用户批准采用完整上游集成与双设备功能验收；ReazonSpeech 的绝对质量合同不变。证据与限制见 Qwen `implement.md`。
+> **Qwen 当前状态**：完整 CLI + 默认 Q4_K pair + 必需 CPU Silero + 上游 LIS/word display（含批准的有界相邻异常合并）已完成双设备功能、交付和本地包装检查，工程复核接受，用户确认应用 CPU/CUDA 成功。选择/下载/启动及独立 CrispASR CUDA 源保持启用；CUDA 发布复核项由用户接受关闭，超时独立代理没有执行该次复核。Qwen 清理/开发 timeline 退休已接受；构建锁精确迁移和稳定 scratch 解耦已落盘；用户免除进一步复核后，child 于 2026-09-09 归档至 `.trellis/tasks/archive/2026-09/08-20-native-asr-qwen3-aligner/`，迁移独立复核未执行。Parakeet 已完成独立实施、shared-v2 依赖分发、默认双设备启用和最终复核，用户确认最终应用 CPU/CUDA 均可运行，并于 2026-09-15 归档至 `.trellis/tasks/archive/2026-09/09-01-native-asr-parakeet-productization/`；Reazon/通用 VAD 尚未实施且不自动开始。Qwen 不适用旧质量矩阵、量化竞赛、CPU 质量继承、raw-only/DP 或源码裁剪要求；Parakeet 已获用户批准采用完整上游集成与双设备功能验收；ReazonSpeech 的绝对质量合同不变。证据与限制见 Qwen `implement.md`。
 
 ## Goal
 
@@ -86,7 +86,7 @@
 ## Acceptance Criteria
 
 - [x] AC1: Qwen3-ASR 与 exact ForcedAligner companion 功能迁移及清理已接受，构建锁迁移已落盘；用户明确免除进一步复核后，子任务于 2026-09-09 归档。迁移独立复核未执行，未新增提交或发布。
-- [ ] AC2: Parakeet exact 日语模型完成生产 Native ASR 迁移并归档对应子任务。
+- [x] AC2: Parakeet exact 日语模型完成生产 Native ASR 迁移，并于 2026-09-15 归档对应子任务。
 - [ ] AC3: ReazonSpeech NeMo v2 exact 模型完成生产 Native ASR 迁移并归档对应子任务。
 - [ ] AC4: Qwen 必需 CPU VAD 随 AC1 完成，Parakeet 在 AC2 内复用同一必需 CPU Silero；通用 Native VAD 在前三项之后完成迁移，固定 CPU 执行；CPU 与 CUDA ASR 路线均验证 CPU-VAD → ASR 数据流，且不提供 VAD CUDA 路线。
 - [ ] AC5: 三条用户可见逻辑模型仍对应原有上游模型且各只暴露一个最终 Native artifact；按 R2 的各模型范围锁定实际产物 identity 与来源/许可，选择理由不得以体积优先，历史开发转换未被未经本轮适用验证地提升为交付权威；Qwen ASR+aligner 通过一个原子下载/readiness 单元交付。

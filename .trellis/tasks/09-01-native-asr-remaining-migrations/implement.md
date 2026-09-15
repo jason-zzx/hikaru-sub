@@ -29,7 +29,7 @@ have not started.
 - [x] Preserve exact upstream Parakeet logical identity; directly integrate the full pinned upstream toolchain and one compatible upstream/community-recommended artifact, recording actual source/revision/files/size/SHA/format/quantization/license and known conversion provenance. No quantization competition, converter research campaign or custom alignment; investigate current failures without treating old failures as current CLI evidence.
 - [x] Reuse the frozen bundled CPU/on-demand CUDA runtime contracts; implement Parakeet model delivery, CPU+CUDA execution, frontend availability and lifecycle integration. Owner approved existing required CPU Silero readiness plus full upstream Japanese slicing and actual-audio gap retranscription/segment-boundary reconstruction; no new general VAD UI or application-side custom repair.
 - [x] Complete separate real CPU/CUDA short/medium/long CLI→worker→ASS functional, resolved-device, output-safety, download/offline/cancel/recovery/cleanup and regression checks; no CER/gap/RTF threshold qualification, Python parity or inherited GPU quality label. Final independent standards/safety and requirements/distribution-evidence reviews passed with no findings, and the owner confirmed final CPU/CUDA application execution.
-- [ ] Commit and archive the completed Parakeet child before starting ReazonSpeech; this remains an owner-controlled workflow boundary, not implementation work.
+- [x] Owner-authorized commit completed and Parakeet child archived on 2026-09-15; ReazonSpeech was not started automatically.
 
 ### Phase 3 - ReazonSpeech NeMo
 

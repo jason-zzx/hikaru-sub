@@ -4,7 +4,7 @@
 
 Requirements, owner authorization and scope boundaries are defined in [`prd.md`](./prd.md).
 
-Status: in_progress; implementation and acceptance review are complete, and the child remains active only for the owner-controlled commit/archive boundary. The owner approved the complete upstream Japanese pipeline (D1), later authorized dependency publication/default enablement, and confirmed the final application runs on both CPU and CUDA. PRD acceptance AC1–AC7 is satisfied; historical quality gates do not apply.
+Status: completed and archived. The owner approved the complete upstream Japanese pipeline (D1), later authorized dependency publication/default enablement and Git commit, and confirmed the final application runs on both CPU and CUDA. PRD acceptance AC1–AC7 is satisfied; historical quality gates do not apply.
 
 ## Dependency publication / default distribution result — modelRuns=0
 
@@ -147,4 +147,4 @@ Also run targeted Native CTest against the actual CPU/CUDA build directories, ex
 - After P1: incompatible model/runtime stays local and unavailable; return to planning without deleting existing artifacts.
 - After P2/P3: disable only Parakeet; do not roll back Qwen/CT2 or restore Python.
 - After shared-runtime changes: preserve old artifacts/locks for rollback, never mutate already published identities.
-- After P4: final AC review and owner confirmation; do not archive while tests/delivery are failing or partial. No commit/push/merge/reset, version changes, uploads or release decisions are authorized. Complete/archive before proceeding to ReazonSpeech.
+- After P4: final AC review and owner confirmation completed. The owner explicitly authorized the implementation commit and task archive; no push, merge, version change or application release was performed. ReazonSpeech remains a separate planning task.
