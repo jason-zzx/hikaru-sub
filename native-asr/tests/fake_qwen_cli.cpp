@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <set>
 #define NOMINMAX
 #include <windows.h>
 
@@ -37,15 +38,36 @@ int wmain(int argc, wchar_t** argv) {
     return scenario == "probe-nonzero" ? 43 : 0;
   }
   fs::path model, result, audio;
-  std::string device;
+  std::string device, backend;
+  std::set<std::wstring> keys;
+  for (int i = 1; i < argc; ++i) keys.insert(argv[i]);
   for (int i = 1; i + 1 < argc; ++i) {
     const std::wstring key(argv[i]);
     if (key == L"-m") model = argv[i+1];
     if (key == L"-f") audio = argv[i+1];
     if (key == L"-of") result = fs::path(std::wstring(argv[i+1]) + L".json");
     if (key == L"--gpu-backend") device = fs::path(argv[i+1]).string();
+    if (key == L"--backend") backend = fs::path(argv[i+1]).string();
   }
   std::string scenario; std::ifstream(model) >> scenario;
+  const bool parakeet = backend == "parakeet";
+  if (scenario == "cwd-no-dll") {
+    // A real loadable fixture DLL is planted in the launch cwd, never own-root.
+    HMODULE unwanted = LoadLibraryW(L"hikaru-asr-fake-crispasr-cuda-marker.dll");
+    if (unwanted) { FreeLibrary(unwanted); return 46; }
+  }
+  if (parakeet) {
+    if (keys.count(L"-am") || keys.count(L"--chunk-seconds") || keys.count(L"--decoder")
+        || !keys.count(L"--vad") || !keys.count(L"-vm") || !keys.count(L"--require-vad")
+        || !keys.count(L"--strict-pipeline") || !keys.count(L"--require-word-timestamps")
+        || !keys.count(L"--split-on-punct") || !keys.count(L"-ojf")
+        || bool(keys.count(L"--no-gpu")) != (device == "cpu")
+        || GetEnvironmentVariableW(L"HIKARU_QWEN_DEVICE", nullptr, 0)
+        || GetEnvironmentVariableW(L"CRISPASR_PARAKEET_DECODER", nullptr, 0)) return 46;
+    wchar_t selected[16]{};
+    if (!GetEnvironmentVariableW(L"HIKARU_PARAKEET_DEVICE", selected, 16)
+        || fs::path(selected).string() != device) return 46;
+  }
   try { if (hikaru_asr::wav::read_pcm16_mono_16khz(audio).duration_ms != 3000) return 45; }
   catch (...) { return 45; }
   if (scenario == "descendant") {
@@ -60,10 +82,30 @@ int wmain(int argc, wchar_t** argv) {
   std::cout << "private transcript and paths must not enter protocol\n";
   std::cerr << "private diagnostic C:\\sensitive\\file synthetic transcript\n";
   std::cerr << "hikaru_vad: device=cpu chunks=3 completed=1\n";
-  for (const auto* role : {"asr", "aligner", "lazy-audio"}) {
-    if (scenario == "no-graph" && std::string(role) == "aligner") continue;
+  const auto roles = !parakeet ? std::vector<std::string>{"asr", "aligner", "lazy-audio"}
+      : device == "cpu" ? std::vector<std::string>{"parakeet-encoder"}
+      : std::vector<std::string>{"parakeet-encoder", "parakeet-predictor", "parakeet-joint"};
+  if (parakeet && scenario != "no-tdt")
+    std::cerr << "hikaru_tdt: decoder=" << (scenario == "wrong-tdt" ? "invalid" : device)
+              << " host_projection=cpu frames=10 steps=10 completed=1\n";
+  if (scenario == "cpu-cuda-init") std::cerr << "ggml_cuda_init: fixture\n";
+  for (const auto& role : roles) {
+    if (scenario == "no-graph" && role == roles.back()) continue;
     std::cerr << "hikaru_graph: role=" << role << " device=" << device << " nodes=10 other="
               << (scenario == "wrong-device" ? 1 : 0) << '\n';
+  }
+  if (scenario == "stall-progress") {
+    for (;;) {
+      std::cerr << "hikaru_slice: completed=1 total=2\r\n"
+                << "hikaru_graph: role=parakeet-encoder device=" << device << " nodes=10 other=0\n";
+      Sleep(100);
+    }
+  }
+  if (scenario == "slow-success") {
+    Sleep(65000);
+    if (parakeet) std::cerr << "hikaru_slice: completed=1 total=2\r\n";
+    Sleep(60000);
+    if (parakeet) std::cerr << "hikaru_slice: completed=2 total=2\r\n";
   }
   if (scenario == "nonzero") return 40;
   std::ofstream out(result, std::ios::binary);
@@ -72,8 +114,8 @@ int wmain(int argc, wchar_t** argv) {
   if (scenario == "oversize") { out << std::string(hikaru_asr::limits::max_event_line_bytes + 1, 'x'); return 0; }
   Json word{{"text", "合成テスト。"}, {"t0", 0}, {"t1", 100}, {"offsets", {{"from", 0}, {"to", 1000}}}};
   Json row{{"startMs", 0}, {"endMs", 1000}, {"text", "合成テスト。"}};
-  Json source{{"text", "合成テスト。"}, {"words", Json::array({word})}};
-  Json value{{"crispasr", {{"backend", "qwen3"}}}, {"displayFallback", false}, {"vadSilence", false},
+  Json source{{"text", "合成テスト。"}, {"offsets", {{"from", 0}, {"to", 1000}}}, {"words", Json::array({word})}};
+  Json value{{"crispasr", {{"backend", backend}}}, {"displayFallback", false}, {"vadSilence", false},
       {"displaySegments", Json::array({row})}, {"transcription", Json::array({source})}};
   if (scenario == "silence") { value["vadSilence"] = true; value["displaySegments"] = Json::array(); value["transcription"] = Json::array(); }
   if (scenario == "empty") { value["displaySegments"] = Json::array(); value["transcription"] = Json::array(); }
@@ -151,6 +193,22 @@ int wmain(int argc, wchar_t** argv) {
   if (scenario == "word-text-empty") value["transcription"][0]["words"][0]["text"] = "";
   if (scenario == "fallback-type") value["displayFallback"] = 0;
   if (scenario == "escaped-nul-unused") value["unused"] = std::string(1, '\0');
+  if (scenario == "wrong-backend") value["crispasr"]["backend"] = parakeet ? "qwen3" : "parakeet";
+  if (scenario == "source-control") value["transcription"][0]["text"] = "\t合成テスト。";
+  if (scenario == "word-control") value["transcription"][0]["words"][0]["text"] = "\x7f";
+  if (scenario == "source-reversed") value["transcription"][0]["offsets"]["from"] = 1001;
+  if (scenario == "source-bool") value["transcription"][0]["offsets"]["from"] = false;
+  if (scenario == "source-outside") value["transcription"][0]["offsets"]["to"] = 3001;
+  if (scenario == "word-outside") {
+    value["transcription"][0]["words"][0]["t1"] = 301;
+    value["transcription"][0]["words"][0]["offsets"]["to"] = 3010;
+  }
+  if (scenario == "raw-zero-overlap") {
+    value["transcription"][0]["words"][0]["t1"] = 0;
+    value["transcription"][0]["words"][0]["offsets"]["to"] = 0;
+    value["transcription"][0]["words"].push_back(word);
+    value["transcription"][0]["words"].push_back(word);
+  }
   auto bytes = value.dump();
   if (scenario == "duplicate") bytes.insert(1, "\"vadSilence\":false,");
   if (scenario == "unicode-invalid") bytes.insert(1, "\"invalid\":\"\\ud800\",");
@@ -158,7 +216,7 @@ int wmain(int argc, wchar_t** argv) {
   if (scenario == "nul-suffix") bytes += '\0';
   if (scenario == "nul-garbage") { bytes += '\0'; bytes += "garbage"; }
   if (scenario == "nul-invalid-utf8") { bytes += '\0'; bytes += '\xff'; }
-  if (scenario == "nul-nested-value") bytes.insert(bytes.find("qwen3") + 2, 1, '\0');
+  if (scenario == "nul-nested-value") bytes.insert(bytes.find(backend) + 2, 1, '\0');
   if (scenario == "nul-nested-key") bytes.insert(bytes.find("backend") + 2, 1, '\0');
   if (scenario == "nul-nested-token") bytes.insert(bytes.find("false") + 2, 1, '\0');
   if (scenario == "trailing-whitespace") bytes += " \t\r\n";

@@ -26,7 +26,13 @@ pub(crate) fn verify_crispasr_delivery_test_runtime(
     crispasr::verify_delivery_test_runtime(root, device)
 }
 
-pub(crate) fn crispasr_engine_capabilities(app: &AppHandle) -> (bool, serde_json::Value) {
+pub(crate) fn crispasr_supports_engine(engine: &str) -> bool {
+    crispasr::supports_engine(engine)
+}
+
+pub(crate) fn crispasr_engine_capabilities(
+    app: &AppHandle,
+) -> HashMap<String, (bool, serde_json::Value)> {
     // items already verifies both devices; don't resolve/hash CPU a second time.
     let items = crispasr::items(app).unwrap_or_default();
     let cpu = items.iter().any(|item| {
@@ -36,9 +42,14 @@ pub(crate) fn crispasr_engine_capabilities(app: &AppHandle) -> (bool, serde_json
     let item = items
         .into_iter()
         .find(|item| item.kind == RuntimeDependencyKind::CrispasrCuda);
-    (cpu, serde_json::json!({"device":"cuda", "available":item.as_ref().is_some_and(|item| item.status == RuntimeDependencyStatus::Available),
+    let cuda = serde_json::json!({"device":"cuda", "available":item.as_ref().is_some_and(|item| item.status == RuntimeDependencyStatus::Available),
         "downloadRequired":item.as_ref().is_some_and(|item| item.expected_download_bytes.is_some()),
-        "reason":item.and_then(|item| item.reason)}))
+        "reason":item.and_then(|item| item.reason)});
+    ["qwen3-asr", "parakeet"]
+        .into_iter()
+        .filter(|engine| crispasr_supports_engine(engine))
+        .map(|engine| (engine.to_string(), (cpu, cuda.clone())))
+        .collect()
 }
 
 pub(crate) fn resolve_crispasr_runtime(
@@ -90,6 +101,20 @@ pub(crate) struct ResolvedNativeAsrCpuRuntime {
     pub root: PathBuf,
     pub worker: PathBuf,
     pub artifact_id: String,
+    pub engines: Vec<String>,
+}
+
+impl ResolvedNativeAsrCpuRuntime {
+    pub(crate) fn require_engine(&self, engine: &str) -> Result<(), String> {
+        if self.engines.iter().any(|name| name == engine) {
+            Ok(())
+        } else {
+            Err(
+                "[native_runtime_engine_unsupported] 已验证的 Native ASR 运行时不支持所选引擎"
+                    .into(),
+            )
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -887,13 +912,26 @@ pub fn resolve_python311(app: &AppHandle, settings: &AppSettings) -> Option<Reso
 }
 
 pub fn peer_ffprobe_path(ffmpeg_path: &str) -> String {
-    if ffmpeg_path.ends_with("ffmpeg.exe") {
-        ffmpeg_path.replace("ffmpeg.exe", "ffprobe.exe")
-    } else if ffmpeg_path.ends_with("ffmpeg") {
-        ffmpeg_path.replace("ffmpeg", "ffprobe")
+    let name = Path::new(ffmpeg_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    let matches = |expected: &str| {
+        if cfg!(windows) {
+            name.eq_ignore_ascii_case(expected)
+        } else {
+            name == expected
+        }
+    };
+    let peer = if matches("ffmpeg.exe") {
+        "ffprobe.exe"
+    } else if matches("ffmpeg") {
+        "ffprobe"
     } else {
-        exe_name("ffprobe")
-    }
+        return exe_name("ffprobe");
+    };
+    // Replace only the filename, preserving parent spelling and separators.
+    format!("{}{peer}", &ffmpeg_path[..ffmpeg_path.len() - name.len()])
 }
 
 fn command_available(program: &str) -> bool {
@@ -995,6 +1033,7 @@ fn resolve_native_asr_cpu_runtime_at(
         root,
         worker,
         artifact_id: manifest.artifact_id,
+        engines: manifest.capabilities.engines,
     })
 }
 
@@ -3232,6 +3271,19 @@ mod tests {
             "C:/tools/ffprobe.exe"
         );
         assert_eq!(peer_ffprobe_path("/opt/bin/ffmpeg"), "/opt/bin/ffprobe");
+        assert_eq!(
+            peer_ffprobe_path("/opt/ffmpeg/bin/ffmpeg"),
+            "/opt/ffmpeg/bin/ffprobe"
+        );
+        #[cfg(windows)]
+        for name in ["ffmpeg.EXE", "FFMPEG.exe", "FfMpEg.ExE"] {
+            assert_eq!(
+                peer_ffprobe_path(&format!("C:/日本 Tools/ffmpeg.exe tools/{name}")),
+                "C:/日本 Tools/ffmpeg.exe tools/ffprobe.exe"
+            );
+        }
+        #[cfg(not(windows))]
+        assert_eq!(peer_ffprobe_path("/opt/bin/FFMPEG"), "ffprobe");
     }
 
     #[test]
@@ -3378,16 +3430,21 @@ mod tests {
                 deps.join("asr-runtime/crispasr/cuda/current")
             };
             crispasr::verify_delivery_test_runtime(&root, device).unwrap();
-            eprintln!("CrispASR {device} verification + probe: {:?}", stage.elapsed());
+            eprintln!(
+                "CrispASR {device} verification + probe: {:?}",
+                stage.elapsed()
+            );
         }
         let stage = std::time::Instant::now();
         let (root, worker, _) =
             verify_native_asr_cuda_runtime_at(&deps.join("asr-runtime/cuda/current")).unwrap();
         eprintln!("CT2 CUDA file verification: {:?}", stage.elapsed());
         let stage = std::time::Instant::now();
-        assert!(probe_native_asr_cuda_worker(&root, &worker)
-            .unwrap()
-            .available);
+        assert!(
+            probe_native_asr_cuda_worker(&root, &worker)
+                .unwrap()
+                .available
+        );
         eprintln!("CT2 CUDA capability probe: {:?}", stage.elapsed());
         eprintln!("Runtime probe total: {:?}", start.elapsed());
     }

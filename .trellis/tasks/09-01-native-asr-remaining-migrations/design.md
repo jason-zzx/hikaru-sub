@@ -2,7 +2,7 @@
 
 ## Boundary
 
-Qwen 已完成固定完整 CLI、默认 Q4_K pair、必需 CPU VAD、LIS/word display 与批准的相邻展示异常合并；双设备功能/交付工程复核和用户 CPU/CUDA 应用确认已接受。独立 CUDA 包已发布，发布复核项由用户接受关闭（非超时独立代理通过）。Qwen 清理已接受；child 保持 in_progress 完成新授权的 build lock 原字节迁至 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json` 和 `native-asr/build/full-cli` scratch 解耦，离线独立复核后才由父会话归档。非 Qwen CLI 实现被编译不等于对应模型产品化；Parakeet/Reazon/通用 VAD 待后续独立实施。下文质量/转换竞赛/CPU 继承条款只适用其他 child，不恢复 Qwen raw-only/DP/源码裁剪要求。
+Qwen 已完成固定完整 CLI、默认 Q4_K pair、必需 CPU VAD、LIS/word display 与批准的相邻展示异常合并；双设备功能/交付工程复核和用户 CPU/CUDA 应用确认已接受。独立 CUDA 包已发布，发布复核项由用户接受关闭（非超时独立代理通过）。Qwen 清理已接受；child 保持 in_progress 完成新授权的 build lock 原字节迁至 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json` 和 `native-asr/build/full-cli` scratch 解耦，离线独立复核后才由父会话归档。非 Qwen CLI 实现被编译不等于对应模型产品化；Parakeet 已完成独立实施、默认双设备启用、依赖分发和最终复核，用户确认最终应用 CPU/CUDA 均可运行，当前仅待 owner-controlled commit/archive；Reazon/通用 VAD 尚未实施。Parakeet 采用完整上游集成、CPU/CUDA 短中长功能/设备/输出安全/生命周期/交付验收；不做质量评分、性能阈值资格、量化竞赛、自研对齐或 CPU 质量继承。锁定实际产物来源/revision/文件/hash/许可并如实记录转换信息，不强制 converter 研究；用户已另行批准 Parakeet 复用必需 CPU Silero、上游日语切片与实际音频再次转录/片段边界重组；Qwen aligner/异常合并不授权给 Parakeet，应用侧自研填补仍禁止。下文质量/完整 converter 研究/转换竞赛/CPU 继承条款仅适用于 ReazonSpeech，不恢复 Qwen 或 Parakeet 已排除的要求。
 
 父任务不实现统一的新 backend，也不把不同模型强行塞进 CTranslate2。它只固定顺序和共享生产合同；每个子任务复用现有 Native worker protocol、Rust host、job lifecycle、模型管理和前端可用性流程，并为实际 backend 提供最小必要扩展。
 
@@ -20,8 +20,8 @@ ReazonSpeech NeMo
 parent integration check
 ```
 
-- 各 child 拥有 exact 模型 identity、算法和双设备 runtime 合同；Qwen 按已接受功能范围验证，Parakeet/Reazon 仍须各自取得绝对质量资格。
-- Qwen 必需 CPU VAD 在 Qwen child 冻结；其他引擎与通用 VAD 最后处理，复用该依赖，不反向改写 Qwen 流程。
+- 各 child 拥有 exact 模型 identity、算法和双设备 runtime 合同；Qwen 与 Parakeet 按各自已接受功能范围验证，ReazonSpeech 仍须取得绝对质量资格。
+- Qwen 必需 CPU VAD 在 Qwen child 冻结；Parakeet child 按批准的完整上游日语流程复用其必需依赖，覆盖下载/readiness/失败与共享资产保护。其余引擎与通用 VAD 最后处理，不反向改写 Qwen 流程。
 - 父任务只在所有 child 完成后执行跨路线一致性检查，不包含应用发布。
 
 ## Shared contracts
@@ -74,7 +74,7 @@ parent integration check
 - CPU ASR 数据流为 `CPU VAD -> CPU ASR`；CUDA ASR 数据流为 `CPU VAD -> CUDA ASR`。
 - VAD window 必须携带原始音频偏移并在主 ASR 输出后只加一次，避免 CPU/GPU 数据流产生不同时间轴。
 - 显式启用 VAD 后，VAD model/runtime 缺失、损坏或执行失败都结构化失败；不得自动改为 no-VAD 重跑。
-- VAD 不提供独立 CUDA runtime pack、不声明 CUDA 加速，模型权重不随 runtime 捆绑或因设备复制。Qwen 完整 CUDA CLI 可包含实际在 CPU 执行的 Silero 实现及 CPU 支撑代码，这不是 VAD GPU 路线。Qwen 必需依赖由 child 先冻结，通用 VAD 后续复用；不得重开质量实验或改变既有 Qwen 输入合同。
+- VAD 不提供独立 CUDA runtime pack、不声明 CUDA 加速，模型权重不随 runtime 捆绑或因设备复制。Qwen 完整 CUDA CLI 可包含实际在 CPU 执行的 Silero 实现及 CPU 支撑代码，这不是 VAD GPU 路线。Qwen 必需依赖先冻结，Parakeet 在自己的 child 中复用，通用 VAD 后续复用；不得重开质量实验或改变既有 Qwen 输入合同。
 
 ## Compatibility
 
@@ -90,7 +90,7 @@ parent integration check
 
 ## Device qualification boundary
 
-Qwen 例外：CPU 与 CUDA 各自通过短/中/长真实功能、设备、取消/恢复/离线/清理验证；不计算字幕质量，不用 `inherited-from-gpu`。下面质量矩阵条款仅适用于其他未重建 child。
+Qwen 与 Parakeet 例外：CPU 与 CUDA 各自通过短/中/长真实功能、设备、输出合法性、取消/恢复/离线/清理验证；不计算字幕质量，不用 `inherited-from-gpu`。下面质量/性能阈值矩阵条款仅适用于 ReazonSpeech；共同双设备覆盖与 identity 绑定要求仍适用于所有模型。
 
 - 用户已确认所有剩余 ASR 模型都必须同时支持 CPU 和 CUDA。
 - 每个 child 必须分别锁定 CPU/CUDA runtime、设备解析、预检、真实执行、错误和生命周期证据；任一设备缺失时不得把该模型标记为迁移完成。

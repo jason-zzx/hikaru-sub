@@ -9,8 +9,16 @@
 #include <fstream>
 
 namespace hikaru_qwen {
+inline bool parakeet() { return std::getenv("HIKARU_PARAKEET_DEVICE") != nullptr; }
 inline const char* device() {
     const char* value = std::getenv("HIKARU_QWEN_DEVICE");
+    if (parakeet()) {
+        if (value) {
+            std::fprintf(stderr, "hikaru_error: conflicting_device_controls\n");
+            std::exit(40);
+        }
+        value = std::getenv("HIKARU_PARAKEET_DEVICE");
+    }
     if (value && std::strcmp(value, "cpu") && std::strcmp(value, "cuda")) {
         std::fprintf(stderr, "hikaru_error: invalid_device\n");
         std::exit(40);
@@ -63,6 +71,20 @@ inline ggml_status compute(ggml_backend_sched_t sched, ggml_cgraph* graph, const
     auto status = ggml_backend_sched_graph_compute(sched, graph);
     if (device()) {
         if (status != GGML_STATUS_SUCCESS) fail("graph_compute_failed");
+        std::fprintf(stderr, "hikaru_graph: role=%s device=%s nodes=%d other=0\n",
+                     role, cuda() ? "cuda" : "cpu", ggml_graph_n_nodes(graph));
+    }
+    return status;
+}
+// Parakeet's persistent predictor/joint graphs use a single direct backend,
+// not the encoder scheduler. Host state/readback/encoder projection remain
+// upstream CPU operations; this attests the actual graph dispatch, not those.
+inline ggml_status direct_compute(ggml_backend_t selected, ggml_cgraph* graph, const char* role) {
+    if (parakeet() && (!selected || !matches(ggml_backend_get_device(selected), cuda())))
+        fail("parakeet_decoder_device_mismatch");
+    auto status = ggml_backend_graph_compute(selected, graph);
+    if (parakeet()) {
+        if (status != GGML_STATUS_SUCCESS) fail("parakeet_decoder_compute_failed");
         std::fprintf(stderr, "hikaru_graph: role=%s device=%s nodes=%d other=0\n",
                      role, cuda() ? "cuda" : "cpu", ggml_graph_n_nodes(graph));
     }

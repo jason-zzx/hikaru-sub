@@ -11,6 +11,7 @@ const availability = vi.hoisted(() => ({
     { value: "faster-whisper", label: "faster-whisper" },
     { value: "kotoba-faster-whisper", label: "kotoba-faster-whisper" },
     { value: "qwen3-asr", label: "qwen3" },
+    { value: "parakeet", label: "parakeet" },
   ],
   modelOptions: [
     {
@@ -100,21 +101,20 @@ describe("SettingsTranscriptionPanel Native availability", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("allows explicitly selecting Kotoba and its exact default model", async () => {
+  it.each([
+    ["kotoba-faster-whisper", "kotoba-tech/kotoba-whisper-v2.0-faster"],
+    ["parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja"],
+  ])("selects %s and its exact default model when backend readiness allows it", async (engine, model) => {
     const user = userEvent.setup();
     const update = vi.fn();
     render(<SettingsTranscriptionPanel settings={settings} update={update} />);
 
     await user.selectOptions(
       screen.getAllByRole("combobox")[0],
-      "kotoba-faster-whisper",
+      engine,
     );
 
-    expect(update).toHaveBeenNthCalledWith(1, "asrEngine", "kotoba-faster-whisper");
-    expect(update).toHaveBeenNthCalledWith(
-      2,
-      "asrModel",
-      "kotoba-tech/kotoba-whisper-v2.0-faster",
-    );
+    expect(update).toHaveBeenNthCalledWith(1, "asrEngine", engine);
+    expect(update).toHaveBeenNthCalledWith(2, "asrModel", model);
   });
 });

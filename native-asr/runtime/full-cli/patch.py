@@ -58,8 +58,11 @@ def adapt(root):
         return 1;
     }
     if (hikaru_qwen::device()) {
-        if (!hikaru_qwen::local_file(params.model) || !hikaru_qwen::local_file(params.aligner_model))
+        if (!hikaru_qwen::local_file(params.model) ||
+            (!hikaru_qwen::parakeet() && !hikaru_qwen::local_file(params.aligner_model)))
             hikaru_qwen::fail("explicit_model_unreadable");
+        if (hikaru_qwen::parakeet() && (params.backend != "parakeet" || !params.aligner_model.empty()))
+            hikaru_qwen::fail("parakeet_route_mismatch");
         if (!params.vad || !hikaru_qwen::local_file(params.vad_model)) {
             fprintf(stderr, "hikaru_error: VAD_unreadable\\n");
             return 30;
@@ -162,6 +165,70 @@ def adapt(root):
         fprintf(stderr, "hikaru_vad: device=cpu chunks=%d completed=1\\n", n_chunks);
     const int64_t t_this_vad = ggml_time_us() - t_start_vad_us;''')
     changes['src/crispasr.cpp'] = '#include "core/hikaru_qwen_device.h"\n' + changes['src/crispasr.cpp']
+
+    # Parakeet uses the selected encoder scheduler, native CPU TDT loops on
+    # CPU, and persistent single-backend predictor/joint graphs on CUDA.
+    # Observe these real dispatches; do not move operations or change decoding.
+    changes['src/parakeet.cpp'] = '#include "core/hikaru_qwen_device.h"\n' + (root / 'src/parakeet.cpp').read_text(encoding='utf-8')
+    replace('src/parakeet.cpp', '    ctx->backend = pick_backend(params.use_gpu);',
+            '''    if (hikaru_qwen::parakeet() && params.use_gpu != hikaru_qwen::cuda())
+        hikaru_qwen::fail("parakeet_requested_device_mismatch");
+    ctx->backend = pick_backend(params.use_gpu);
+    if (hikaru_qwen::parakeet()) hikaru_qwen::backend(ctx->backend, params.use_gpu, "parakeet");''')
+    replace('src/parakeet.cpp', '    model.buf = wl.buf;',
+            '    model.buf = wl.buf;\n    if (hikaru_qwen::parakeet()) hikaru_qwen::buffer(model.buf);')
+    replace('src/parakeet.cpp', '    parakeet_fold_batchnorm(ctx->model, ctx->backend);',
+            '''    parakeet_fold_batchnorm(ctx->model, ctx->backend);
+    if (hikaru_qwen::parakeet()) {
+        hikaru_qwen::buffer(ctx->model.buf_f32);
+        fprintf(stderr, "hikaru_stage: parakeet_model_loaded\\n");
+    }''')
+    # Every single-pass, later slice, gap retranscription and streamed window
+    # reaches this allocator. Fail before an empty result can trigger retry or
+    # be merged with earlier successful text; keep uncontrolled upstream return.
+    replace('src/parakeet.cpp', '        fprintf(stderr, "parakeet: failed to alloc encoder graph\\n");',
+            '''        if (hikaru_qwen::parakeet()) hikaru_qwen::fail("parakeet_encoder_allocation_failed");
+        fprintf(stderr, "parakeet: failed to alloc encoder graph\\n");''')
+    replace('src/parakeet.cpp', 'ggml_backend_sched_graph_compute(ctx->sched, gf)',
+            'hikaru_qwen::compute(ctx->sched, gf, "parakeet-encoder")', 2)
+    replace('src/parakeet.cpp', '    return ggml_dec;',
+            '''    if (hikaru_qwen::parakeet() && ggml_dec != hikaru_qwen::cuda())
+        hikaru_qwen::fail("parakeet_decoder_device_mismatch");
+    return ggml_dec;''', 2)
+    # The default persistent decoder ignores allocation failure upstream. In
+    # controlled mode fail before any partial graph can be used or retried.
+    for graph, allocator in [('pgf', 'palloc'), ('jgf', 'jalloc')]:
+        replace('src/core/rnnt_ggml.h',
+                f'    if (!ggml_gallocr_alloc_graph(d.{allocator}, d.{graph}))\n        return false;',
+                f'''    if (!ggml_gallocr_alloc_graph(d.{allocator}, d.{graph})) {{
+        if (hikaru_qwen::parakeet()) hikaru_qwen::fail("parakeet_decoder_allocation_failed");
+        return false;
+    }}''')
+    replace('src/core/rnnt_ggml.h', '#include "ggml-backend.h"',
+            '#include "hikaru_qwen_device.h"\n#include "ggml-backend.h"')
+    replace('src/core/rnnt_ggml.h', '    ggml_backend_sched_graph_compute(sched, gf);',
+            '    hikaru_qwen::compute(sched, gf, "parakeet-decoder-perstep");', 2)
+    for graph, role in [('pgf', 'parakeet-predictor'), ('jgf', 'parakeet-joint')]:
+        replace('src/core/rnnt_ggml.h', f'    ggml_backend_graph_compute(d.backend, d.{graph});',
+                f'    hikaru_qwen::direct_compute(d.backend, d.{graph}, "{role}");')
+    # CPU manual TDT execution evidence belongs after the real decode, including
+    # the upstream host projection/argmax work common to CPU and CUDA.
+    replace('src/parakeet.cpp', '    if (time_dec) {\n        auto _dt1 = std::chrono::steady_clock::now();',
+            '''    if (hikaru_qwen::parakeet())
+        fprintf(stderr, "hikaru_tdt: decoder=%s host_projection=cpu frames=%d steps=%d completed=1\\n",
+                ggml_dec ? "cuda" : "cpu", T_enc, total_steps);
+    if (time_dec) {
+        auto _dt1 = std::chrono::steady_clock::now();''')
+    replace('examples/cli/crispasr_backend_parakeet.cpp',
+            '        is_ja_model_ = parakeet_vocab_is_japanese(ctx_) != 0;',
+            '''        is_ja_model_ = parakeet_vocab_is_japanese(ctx_) != 0;
+        if (hikaru_qwen::parakeet() && (!is_ja_model_ || !p.parakeet_decoder.empty()))
+            hikaru_qwen::fail("parakeet_japanese_tdt_required");''')
+    changes['examples/cli/crispasr_backend_parakeet.cpp'] = '#include "core/hikaru_qwen_device.h"\n' + changes['examples/cli/crispasr_backend_parakeet.cpp']
+    replace('examples/cli/crispasr_run.cpp', '        per_slice[i] = std::move(segs);',
+            '''        per_slice[i] = std::move(segs);
+        if (hikaru_qwen::parakeet())
+            fprintf(stderr, "hikaru_slice: completed=%zu total=%zu\\n", i + 1, slices.size());''')
 
     # Mark the exact fallback branch, without changing its grouping algorithm.
     replace('examples/cli/crispasr_output.h', 'int max_len, bool split_on_punct = false);',

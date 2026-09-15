@@ -36,6 +36,7 @@ docs/superpowers/
 .pi-subagents/
 
 # ASR benchmark private corpora, raw results, models, and interrupted writes
+/native-asr/artifacts/crispasr-cuda-*.zip
 /.asr-benchmark/
 /asr-service/benchmarks/results/
 /asr-service/benchmarks/local/

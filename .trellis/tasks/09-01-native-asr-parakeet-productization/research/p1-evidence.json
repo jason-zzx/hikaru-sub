@@ -1,0 +1,1734 @@
+{
+  "schemaVersion": 2,
+  "scope": "P1 only; not worker/host/ASS delivery, qualification, publication or enablement",
+  "acquisitionLock": {
+    "sizeBytes": 3023,
+    "sha256": "87573bb1454dc460302b3585b2f4c7fcda9b99f370b5295c43284988ccdc991d"
+  },
+  "runtimeLock": {
+    "sizeBytes": 5244,
+    "sha256": "397cc99bf6227cfb83e71a872b2108aae4f0bf42c726c454f9a6005d4cf7cf9a"
+  },
+  "candidateRuntime": {
+    "sourceLock": {
+      "sizeBytes": 10312,
+      "sha256": "4fd2ffdd79f553005551308d5f7f8cdef3e155dca96feca4c240ee8f57fef28a"
+    },
+    "acquisitionLock": {
+      "sizeBytes": 3023,
+      "sha256": "87573bb1454dc460302b3585b2f4c7fcda9b99f370b5295c43284988ccdc991d"
+    },
+    "preparedSources": {
+      "sizeBytes": 857962,
+      "sha256": "de113fd2b1e8cc6cbed2154c6cfe1b1e9035612a11ebd8a30e066b42155202cb"
+    },
+    "devices": {
+      "cpu": {
+        "files": {
+          "crispasr.exe": {
+            "sizeBytes": 17151488,
+            "sha256": "53a5f468cb73dfadfab55beae18894485c3e1e1e1f43b77a4f9f2efb0818024f"
+          },
+          "msvcp140.dll": {
+            "sizeBytes": 553552,
+            "sha256": "def46aa6a8f72f27bafac0c43334419486a4d1dcdb6c479a8ef7034b3e1fa4cb"
+          },
+          "vcruntime140.dll": {
+            "sizeBytes": 123472,
+            "sha256": "184146852727a9db4eea06178716bec3cdbb1015c911f6b0f915b184ad7775b2"
+          },
+          "vcruntime140_1.dll": {
+            "sizeBytes": 47264,
+            "sha256": "e6bfb3662ab4b1969a73441dbe35c96d51441b6bff8cf1fe7430bd5b246ca605"
+          },
+          "vcomp140.dll": {
+            "sizeBytes": 213064,
+            "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7"
+          }
+        },
+        "cmakeCache": {
+          "sizeBytes": 38752,
+          "sha256": "fb90b3bbd24bac398b0d2d96475944298d3c33e007d37667fd15d2261d29bc90"
+        }
+      },
+      "cuda": {
+        "files": {
+          "crispasr.exe": {
+            "sizeBytes": 175336960,
+            "sha256": "28a872ea54b4aaaee38d51ec7a7bddfbf7eb896fde63c13959674002719ffc4f"
+          },
+          "msvcp140.dll": {
+            "sizeBytes": 553552,
+            "sha256": "def46aa6a8f72f27bafac0c43334419486a4d1dcdb6c479a8ef7034b3e1fa4cb"
+          },
+          "vcruntime140.dll": {
+            "sizeBytes": 123472,
+            "sha256": "184146852727a9db4eea06178716bec3cdbb1015c911f6b0f915b184ad7775b2"
+          },
+          "vcruntime140_1.dll": {
+            "sizeBytes": 47264,
+            "sha256": "e6bfb3662ab4b1969a73441dbe35c96d51441b6bff8cf1fe7430bd5b246ca605"
+          },
+          "vcomp140.dll": {
+            "sizeBytes": 213064,
+            "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7"
+          },
+          "cudart64_12.dll": {
+            "sizeBytes": 573952,
+            "sha256": "c2c9a9c22a9bcba90e261825968836787b331038047a26770cffb7a583c28344"
+          },
+          "cublas64_12.dll": {
+            "sizeBytes": 113716224,
+            "sha256": "9513540e4ec4c51ee9e7304138c2cc255c29a8c181f9e80c38efa25738becd99"
+          },
+          "cublasLt64_12.dll": {
+            "sizeBytes": 674667520,
+            "sha256": "b199d1ff892a81b7fd3d57ba1781549609b41500b36008fef326038393ad46c7"
+          }
+        },
+        "cmakeCache": {
+          "sizeBytes": 58802,
+          "sha256": "31104f41d949a98db6625bf1ba391ae2957d436c3e617bf559b21a76a8049e07"
+        }
+      }
+    },
+    "adaptations": {
+      "audio_failure_check.py": {
+        "sizeBytes": 3384,
+        "sha256": "75ca0c4780ac3b380ff4aeac274442da6a74a74015b2bb5efc796e6a14a2fba2"
+      },
+      "build.cmd": {
+        "sizeBytes": 1550,
+        "sha256": "019cde147a8a1f6ed06b874869b5d7e14dd42a11789e3bad930b30c8194c015a"
+      },
+      "check.py": {
+        "sizeBytes": 7765,
+        "sha256": "fb47a591790a6ab417f326713990033f908c3a31a05803d9e869c0f401421399"
+      },
+      "delivery.cmake": {
+        "sizeBytes": 628,
+        "sha256": "3b8e74a240f2defd06b2ec9a9849682c7cb154f7e22f6cae044006936720c6b4"
+      },
+      "encoder_failure_check.py": {
+        "sizeBytes": 6179,
+        "sha256": "1cf66fff5806e698cde9d21c0525720c485b4ed41f2d7107d5a630fa3c1cb2db"
+      },
+      "hikaru_cuda_probe.h": {
+        "sizeBytes": 2029,
+        "sha256": "4b8294e210320f117956982f079f7d48fdcae0d162ce86b300e0c012b4029612"
+      },
+      "hikaru_qwen_device.h": {
+        "sizeBytes": 4370,
+        "sha256": "19a4f7d027c183a9bf367935d1b7028b2042c51abea5721cf72ef8e05a2a3c52"
+      },
+      "output_test.cpp": {
+        "sizeBytes": 1937,
+        "sha256": "00facda972c11af95957f43d0f3f159021649051d9fe2b0f68e71860af76982e"
+      },
+      "package.py": {
+        "sizeBytes": 11253,
+        "sha256": "0ce6c56b879fe1e7a18e058f122041ccd67c032c8081cb0a2cdf74458c0a80b7"
+      },
+      "parakeet_smoke.py": {
+        "sizeBytes": 20108,
+        "sha256": "861494035c5316310ebc176b430db6a607aeb533ad71d74e98c18f2433c8968f"
+      },
+      "patch.py": {
+        "sizeBytes": 21141,
+        "sha256": "f9b553dfc467b717a1b3a523fca76d9432773861a3a78efe9074553d955f37e2"
+      },
+      "path_check.py": {
+        "sizeBytes": 5193,
+        "sha256": "c88b2df61b8c3109edf9c00174d442c579a6451f1e08111cb176d678dada4e6b"
+      },
+      "prepare.py": {
+        "sizeBytes": 3596,
+        "sha256": "d9939927c6be752079749872306b70ab203defb662faa09ceb777863311409ec"
+      },
+      "recovery_check.py": {
+        "sizeBytes": 9310,
+        "sha256": "b1df4083ee3be14e516cc45c8f0c78767c92d0c5b574187c97fa06cb8eb92821"
+      },
+      "smoke.py": {
+        "sizeBytes": 14367,
+        "sha256": "acd8590dbc1300d8678276dc2c7af7eef5f0799c0f930d135fcbac98a2d50cf9"
+      },
+      "vad_failure_check.py": {
+        "sizeBytes": 9567,
+        "sha256": "1a4fc72b2411a6dc05ee9a205f3c0b0c1b253bf0c9b86d74b53c204b33bf9793"
+      },
+      "validate.py": {
+        "sizeBytes": 5373,
+        "sha256": "a053ea10afbfec9db129a7f021368314accc46d4e766e6b1048afcc0f9a484a8"
+      }
+    }
+  },
+  "preservedR3": {
+    "root": "native-asr/build/full-cli/p1-r3-preserved",
+    "runtime": {
+      "sourceLock": {
+        "sizeBytes": 10312,
+        "sha256": "4fd2ffdd79f553005551308d5f7f8cdef3e155dca96feca4c240ee8f57fef28a"
+      },
+      "acquisitionLock": {
+        "sizeBytes": 3023,
+        "sha256": "87573bb1454dc460302b3585b2f4c7fcda9b99f370b5295c43284988ccdc991d"
+      },
+      "preparedSources": {
+        "sizeBytes": 879948,
+        "sha256": "346c7dbfb95973421e7cc429a1d14f258a2a5caea8a6a2f4bd892fc08c4f60bf"
+      },
+      "devices": {
+        "cpu": {
+          "files": {
+            "crispasr.exe": {
+              "sizeBytes": 17151488,
+              "sha256": "62f39e24dfb4f7672dd133082d78af9736f6892d551862310936135ea4f20a58"
+            },
+            "msvcp140.dll": {
+              "sizeBytes": 553552,
+              "sha256": "def46aa6a8f72f27bafac0c43334419486a4d1dcdb6c479a8ef7034b3e1fa4cb"
+            },
+            "vcruntime140.dll": {
+              "sizeBytes": 123472,
+              "sha256": "184146852727a9db4eea06178716bec3cdbb1015c911f6b0f915b184ad7775b2"
+            },
+            "vcruntime140_1.dll": {
+              "sizeBytes": 47264,
+              "sha256": "e6bfb3662ab4b1969a73441dbe35c96d51441b6bff8cf1fe7430bd5b246ca605"
+            },
+            "vcomp140.dll": {
+              "sizeBytes": 213064,
+              "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7"
+            }
+          },
+          "cmakeCache": {
+            "sizeBytes": 38752,
+            "sha256": "fb90b3bbd24bac398b0d2d96475944298d3c33e007d37667fd15d2261d29bc90"
+          }
+        },
+        "cuda": {
+          "files": {
+            "crispasr.exe": {
+              "sizeBytes": 175336960,
+              "sha256": "b2f1ac51f43715f7cc6e101f8c6d78ac432cd6ba8d87d1c04f7daebba13cecdf"
+            },
+            "msvcp140.dll": {
+              "sizeBytes": 553552,
+              "sha256": "def46aa6a8f72f27bafac0c43334419486a4d1dcdb6c479a8ef7034b3e1fa4cb"
+            },
+            "vcruntime140.dll": {
+              "sizeBytes": 123472,
+              "sha256": "184146852727a9db4eea06178716bec3cdbb1015c911f6b0f915b184ad7775b2"
+            },
+            "vcruntime140_1.dll": {
+              "sizeBytes": 47264,
+              "sha256": "e6bfb3662ab4b1969a73441dbe35c96d51441b6bff8cf1fe7430bd5b246ca605"
+            },
+            "vcomp140.dll": {
+              "sizeBytes": 213064,
+              "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7"
+            },
+            "cudart64_12.dll": {
+              "sizeBytes": 573952,
+              "sha256": "c2c9a9c22a9bcba90e261825968836787b331038047a26770cffb7a583c28344"
+            },
+            "cublas64_12.dll": {
+              "sizeBytes": 113716224,
+              "sha256": "9513540e4ec4c51ee9e7304138c2cc255c29a8c181f9e80c38efa25738becd99"
+            },
+            "cublasLt64_12.dll": {
+              "sizeBytes": 674667520,
+              "sha256": "b199d1ff892a81b7fd3d57ba1781549609b41500b36008fef326038393ad46c7"
+            }
+          },
+          "cmakeCache": {
+            "sizeBytes": 58802,
+            "sha256": "31104f41d949a98db6625bf1ba391ae2957d436c3e617bf559b21a76a8049e07"
+          }
+        }
+      },
+      "adaptations": {
+        "audio_failure_check.py": {
+          "sizeBytes": 3384,
+          "sha256": "75ca0c4780ac3b380ff4aeac274442da6a74a74015b2bb5efc796e6a14a2fba2"
+        },
+        "build.cmd": {
+          "sizeBytes": 1550,
+          "sha256": "019cde147a8a1f6ed06b874869b5d7e14dd42a11789e3bad930b30c8194c015a"
+        },
+        "check.py": {
+          "sizeBytes": 5449,
+          "sha256": "54411fe8cfd6de5db778aaf3a56b93a8f28a9837237e62ee972a7feafba7794d"
+        },
+        "delivery.cmake": {
+          "sizeBytes": 628,
+          "sha256": "3b8e74a240f2defd06b2ec9a9849682c7cb154f7e22f6cae044006936720c6b4"
+        },
+        "hikaru_cuda_probe.h": {
+          "sizeBytes": 2029,
+          "sha256": "4b8294e210320f117956982f079f7d48fdcae0d162ce86b300e0c012b4029612"
+        },
+        "hikaru_qwen_device.h": {
+          "sizeBytes": 4370,
+          "sha256": "19a4f7d027c183a9bf367935d1b7028b2042c51abea5721cf72ef8e05a2a3c52"
+        },
+        "output_test.cpp": {
+          "sizeBytes": 1937,
+          "sha256": "00facda972c11af95957f43d0f3f159021649051d9fe2b0f68e71860af76982e"
+        },
+        "package.py": {
+          "sizeBytes": 11253,
+          "sha256": "0ce6c56b879fe1e7a18e058f122041ccd67c032c8081cb0a2cdf74458c0a80b7"
+        },
+        "parakeet_smoke.py": {
+          "sizeBytes": 15283,
+          "sha256": "aebdabfe39f496bef7a6450030f2c55972d5ef9ee906a3132029a069a3435930"
+        },
+        "patch.py": {
+          "sizeBytes": 20613,
+          "sha256": "0e82aae141498c707e9f93319e0dbf3bef79ff925a7e784473f4b63f846bcfcc"
+        },
+        "path_check.py": {
+          "sizeBytes": 5193,
+          "sha256": "c88b2df61b8c3109edf9c00174d442c579a6451f1e08111cb176d678dada4e6b"
+        },
+        "prepare.py": {
+          "sizeBytes": 3596,
+          "sha256": "d9939927c6be752079749872306b70ab203defb662faa09ceb777863311409ec"
+        },
+        "smoke.py": {
+          "sizeBytes": 14367,
+          "sha256": "acd8590dbc1300d8678276dc2c7af7eef5f0799c0f930d135fcbac98a2d50cf9"
+        },
+        "vad_failure_check.py": {
+          "sizeBytes": 9567,
+          "sha256": "1a4fc72b2411a6dc05ee9a205f3c0b0c1b253bf0c9b86d74b53c204b33bf9793"
+        },
+        "validate.py": {
+          "sizeBytes": 4167,
+          "sha256": "a4a564beffbea2d7aac6bcc365197506af5525b5e13cc02ad230828be78a74c5"
+        }
+      }
+    },
+    "evidence": {
+      "sizeBytes": 30564,
+      "sha256": "6402cd5b775a3c73ba5790c16941dd9804cf6898a57bb7becf0255d28ca0d5b8"
+    }
+  },
+  "reviewCorrections": {
+    "output-check-p1-r4/encoder-fault/result.json": {
+      "identity": {
+        "sizeBytes": 3591,
+        "sha256": "29280dded9f711784d769c073dfde7baaf981f4235bce3ee89f6827fcae8f4f5"
+      },
+      "cases": [
+        {
+          "case": "fixed-cpu-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "fixed-cpu-1",
+          "exitCode": 40,
+          "expectedExitCode": 40,
+          "passed": true
+        },
+        {
+          "case": "fixed-cpu-5",
+          "exitCode": 40,
+          "expectedExitCode": 40,
+          "passed": true
+        },
+        {
+          "case": "fixed-cpu-6",
+          "exitCode": 40,
+          "expectedExitCode": 40,
+          "passed": true
+        },
+        {
+          "case": "fixed-cuda-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "fixed-cuda-1",
+          "exitCode": 40,
+          "expectedExitCode": 40,
+          "passed": true
+        },
+        {
+          "case": "fixed-cuda-5",
+          "exitCode": 40,
+          "expectedExitCode": 40,
+          "passed": true
+        },
+        {
+          "case": "fixed-cuda-6",
+          "exitCode": 40,
+          "expectedExitCode": 40,
+          "passed": true
+        },
+        {
+          "case": "fixed-uncontrolled-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "fixed-uncontrolled-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "fixed-uncontrolled-5",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "fixed-uncontrolled-6",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-cpu-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-cpu-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-cpu-5",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-cpu-6",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-cuda-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-cuda-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-cuda-5",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-cuda-6",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-uncontrolled-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-uncontrolled-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-uncontrolled-5",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "guard-removed-negative-control-uncontrolled-6",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "output-check-p1-r4/vad-failure-result.json": {
+      "identity": {
+        "sizeBytes": 3683,
+        "sha256": "679854d38b06ff18f3a677a8227269fa88087867524adbb3e98cee21e197caec"
+      },
+      "cases": [
+        {
+          "case": "vad-cpu-detect-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-detect-2",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-detect-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-segments-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-segments-2",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-segments-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-slices-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-slices-2",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-slices-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-strict-1",
+          "exitCode": 30,
+          "expectedExitCode": 30,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-strict-2",
+          "exitCode": 30,
+          "expectedExitCode": 30,
+          "passed": true
+        },
+        {
+          "case": "vad-cpu-strict-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-detect-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-detect-2",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-detect-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-segments-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-segments-2",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-segments-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-slices-1",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-slices-2",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-slices-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-strict-1",
+          "exitCode": 30,
+          "expectedExitCode": 30,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-strict-2",
+          "exitCode": 30,
+          "expectedExitCode": 30,
+          "passed": true
+        },
+        {
+          "case": "vad-cuda-strict-0",
+          "exitCode": 0,
+          "expectedExitCode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "recovery-check-r4-final2/result.json": {
+      "identity": {
+        "sizeBytes": 1605,
+        "sha256": "9c1861b68eb4a31a15aec1eeb813e4c2f4d67dd398b3ffe48f52acf8c1c2d405"
+      },
+      "cases": [
+        {
+          "backend": "parakeet",
+          "scenario": "external-exit",
+          "identityDriftsRejected": 6,
+          "deadlineMutationRejected": true,
+          "wrongCompletionsRejected": 2,
+          "hashBoundSentinelCleared": true,
+          "passed": true
+        },
+        {
+          "backend": "parakeet",
+          "scenario": "interrupted-owner",
+          "identityDriftsRejected": 6,
+          "deadlineMutationRejected": true,
+          "wrongCompletionsRejected": 2,
+          "hashBoundSentinelCleared": true,
+          "passed": true
+        },
+        {
+          "backend": "parakeet",
+          "scenario": "live-owner",
+          "identityDriftsRejected": 6,
+          "deadlineMutationRejected": true,
+          "wrongCompletionsRejected": 2,
+          "hashBoundSentinelCleared": true,
+          "passed": true
+        },
+        {
+          "backend": "qwen3",
+          "scenario": "external-exit",
+          "identityDriftsRejected": 6,
+          "deadlineMutationRejected": true,
+          "wrongCompletionsRejected": 2,
+          "hashBoundSentinelCleared": true,
+          "passed": true
+        },
+        {
+          "backend": "qwen3",
+          "scenario": "interrupted-owner",
+          "identityDriftsRejected": 6,
+          "deadlineMutationRejected": true,
+          "wrongCompletionsRejected": 2,
+          "hashBoundSentinelCleared": true,
+          "passed": true
+        },
+        {
+          "backend": "qwen3",
+          "scenario": "live-owner",
+          "identityDriftsRejected": 6,
+          "deadlineMutationRejected": true,
+          "wrongCompletionsRejected": 2,
+          "hashBoundSentinelCleared": true,
+          "passed": true
+        }
+      ]
+    },
+    "audio-reader": {
+      "casesPassed": 24,
+      "log": {
+        "sizeBytes": 2786,
+        "sha256": "33bfb27c353205e088dde058b1143ee734f89e9a6adc35ba2983807111d0a9df"
+      }
+    }
+  },
+  "verifiedGguf": {
+    "version": 3,
+    "tensorCount": 967,
+    "tensorTypes": {
+      "F32": 664,
+      "F16": 303
+    },
+    "metadata": {
+      "general.architecture": "parakeet",
+      "parakeet.sample_rate": 16000,
+      "parakeet.n_mels": 80,
+      "parakeet.n_fft": 512,
+      "parakeet.win_length": 400,
+      "parakeet.hop_length": 160,
+      "parakeet.d_model": 1024,
+      "parakeet.n_layers": 24,
+      "parakeet.n_heads": 8,
+      "parakeet.head_dim": 128,
+      "parakeet.ff_dim": 4096,
+      "parakeet.subsampling_factor": 8,
+      "parakeet.subsampling_channels": 256,
+      "parakeet.conv_kernel": 9,
+      "parakeet.xscaling": true,
+      "parakeet.pred_hidden": 640,
+      "parakeet.pred_layers": 2,
+      "parakeet.joint_hidden": 640,
+      "parakeet.vocab_size": 3072,
+      "parakeet.blank_id": 3072,
+      "parakeet.n_tdt_durations": 5,
+      "parakeet.tdt_durations": null,
+      "parakeet.frame_dur_cs": 8,
+      "parakeet.has_ctc": true,
+      "parakeet.ctc_vocab_size": 3073
+    }
+  },
+  "runs": [
+    {
+      "run": "parakeet-cpu-short-p1",
+      "device": "cpu",
+      "backend": "parakeet",
+      "case": "short-v1",
+      "disposition": "failed-original-harness-case-sensitive-module-path",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "a57baa620d7fbfc810126a131054a9f4192772fcfbdd1f0f36043408cc40d8a2"
+      },
+      "elapsedSeconds": 9.078,
+      "outputValidation": {
+        "displayCount": 9,
+        "sourceCount": 9,
+        "graphRoles": [
+          "parakeet-encoder"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 30,
+      "summary": {
+        "sizeBytes": 1996,
+        "sha256": "65c29ed1fa9ff7b7c1c48a93845529cc614a156973d3a593158f4bca87594947"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 695,
+          "sha256": "683c1da296ae803e94a4f3374170d20213571e59e000c81d362f14a82829c83f"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 5063,
+          "sha256": "216e39b2cc1b93a87b6bb925da517ea600ccb71f06aa73a0658cf24c768d9329"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 1661,
+          "sha256": "d7f692363a332339abf626096a82035d76857df5481c30148df08593f1f8f9bf"
+        },
+        "ownership.json": {
+          "sizeBytes": 1546,
+          "sha256": "11b385ba181e3fd48d8c55f88ed7d39243d0c352b39d5385f0664156e00477ed"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11603,
+          "sha256": "dfef605c1f4a99ecff100b711ac5dff099a0e09e4d7936c18d6a70ca5b87eee2"
+        },
+        "stderr.log": {
+          "sizeBytes": 3942,
+          "sha256": "a84468190f9f60f04b0cc1bac78cfaad9e2a9cc011832af2b5735b4ed9fd776f"
+        }
+      }
+    },
+    {
+      "run": "parakeet-cpu-short-p1-r2",
+      "device": "cpu",
+      "backend": "parakeet",
+      "case": "short-v1",
+      "disposition": "passed-short-functional-smoke",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "5a90717a430cf58ef5bf413fa5f7f23469d98ce21c30a0c9dc4b3c0983041437"
+      },
+      "elapsedSeconds": 8.75,
+      "outputValidation": {
+        "displayCount": 9,
+        "sourceCount": 9,
+        "graphRoles": [
+          "parakeet-encoder"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 29,
+      "summary": {
+        "sizeBytes": 1948,
+        "sha256": "f5287748cce364b8a221db3cb8ff43144425737b515d5cdb7820b7ebe354e2fa"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 695,
+          "sha256": "267c7f2f2dcc4c006c225008928307f3b1a768f889b91cdeeb0ed92c5ac4c1e8"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 4906,
+          "sha256": "ba3d3f8feffa53ed98c304f984a4fff4b6cd8be2a8be4bdb64f546b0e0f0d4e3"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 1618,
+          "sha256": "acd87b1b88456457982f7803e24792281fa7892fb41a0af207269ba3f32de4b3"
+        },
+        "ownership.json": {
+          "sizeBytes": 1549,
+          "sha256": "b6ad5b646fb9c1c8e927e02255d6a2b626aff73e8833fec28b5d0f4366e5c712"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11603,
+          "sha256": "dfef605c1f4a99ecff100b711ac5dff099a0e09e4d7936c18d6a70ca5b87eee2"
+        },
+        "stderr.log": {
+          "sizeBytes": 3942,
+          "sha256": "ea9890b43cae6be21fa497da4e702209bebd1604be02dad10361ece4dfb973bf"
+        }
+      }
+    },
+    {
+      "run": "parakeet-cuda-short-p1-r2",
+      "device": "cuda",
+      "backend": "parakeet",
+      "case": "short-v1",
+      "disposition": "passed-short-functional-smoke",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "5a90717a430cf58ef5bf413fa5f7f23469d98ce21c30a0c9dc4b3c0983041437"
+      },
+      "elapsedSeconds": 2.297,
+      "outputValidation": {
+        "displayCount": 9,
+        "sourceCount": 9,
+        "graphRoles": [
+          "parakeet-encoder",
+          "parakeet-joint",
+          "parakeet-predictor"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 51,
+      "summary": {
+        "sizeBytes": 2005,
+        "sha256": "5b2f8c01a53c5a66811604a8a23c4ec9feeccfc4c60667aec231548f410aa1e5"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 695,
+          "sha256": "267c7f2f2dcc4c006c225008928307f3b1a768f889b91cdeeb0ed92c5ac4c1e8"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 8721,
+          "sha256": "4fa782a611d5572a9ae19bc3d236e35b21403bbf5415fcdd179124fd323f662e"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 8729,
+          "sha256": "d4d9aeb84a15db33a161ff48bfa045aa0502393790e01c1c0090d2622ac511da"
+        },
+        "ownership.json": {
+          "sizeBytes": 1540,
+          "sha256": "548805b31afbc24fa451e8f21ed8e986b3426e431fb3d3235baa405bec7d462b"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11603,
+          "sha256": "dfef605c1f4a99ecff100b711ac5dff099a0e09e4d7936c18d6a70ca5b87eee2"
+        },
+        "stderr.log": {
+          "sizeBytes": 20866,
+          "sha256": "1ba1906630e71b8a0c263b5557b60d11db8975fdaefe36e87dc80ae1d11fe012"
+        }
+      }
+    },
+    {
+      "run": "qwen-cpu-short-parakeet-p1",
+      "device": "cpu",
+      "backend": "qwen3",
+      "case": "short-v1",
+      "disposition": "passed-short-shared-runtime-regression",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "5a90717a430cf58ef5bf413fa5f7f23469d98ce21c30a0c9dc4b3c0983041437"
+      },
+      "elapsedSeconds": 12.0,
+      "outputValidation": {
+        "displayCount": 8,
+        "sourceCount": 2,
+        "graphRoles": [
+          "aligner",
+          "asr",
+          "lazy-audio"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 30,
+      "summary": {
+        "sizeBytes": 1741,
+        "sha256": "b801989c96955f745b68cad12612d3cfb4e71e1322dbc82a03f60f1b9d186578"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 823,
+          "sha256": "a01fbbefb1e90b226f05e05370a47252d803ed44cf158dede7e0bce381c59cf9"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 5064,
+          "sha256": "0f31ba2d82fab5ecf40490acd7be8b865625876020419bef30d074ac703f7268"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 4861,
+          "sha256": "da55013fdd560ea18a7f7800ef76b43c07ecd64d4acb7031b987208f68dac482"
+        },
+        "ownership.json": {
+          "sizeBytes": 1789,
+          "sha256": "710cf114bdbcaeda3217ccaec8ca68df369dfaa3d63040651ad4b14bdb0deb5a"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11718,
+          "sha256": "d543c3f026b7d448c8ed4af75929c6f226f633995c3ebb0b9faac4231f6fc2fe"
+        },
+        "stderr.log": {
+          "sizeBytes": 7999,
+          "sha256": "f1867e466c0e68db812c37b827f0ab3af82113ef0412966495ae7a79ab59100f"
+        }
+      }
+    },
+    {
+      "run": "qwen-cuda-short-parakeet-p1",
+      "device": "cuda",
+      "backend": "qwen3",
+      "case": "short-v1",
+      "disposition": "passed-short-shared-runtime-regression",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "5a90717a430cf58ef5bf413fa5f7f23469d98ce21c30a0c9dc4b3c0983041437"
+      },
+      "elapsedSeconds": 5.875,
+      "outputValidation": {
+        "displayCount": 8,
+        "sourceCount": 2,
+        "graphRoles": [
+          "aligner",
+          "asr",
+          "lazy-audio"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 50,
+      "summary": {
+        "sizeBytes": 1743,
+        "sha256": "2f8e6aed4b7039e754a46aa28b1b4b9e5196acceede3c14028adf937b4de056e"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 823,
+          "sha256": "a01fbbefb1e90b226f05e05370a47252d803ed44cf158dede7e0bce381c59cf9"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 8564,
+          "sha256": "13f454d9082388b95b101810a1e8c8ed8b541640967f7f8997f601a665eaf64f"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 8572,
+          "sha256": "c4ac22e70aadc9d4949743a2ce3eb4b6f98954d68f7b20d621957e6cd09b0b68"
+        },
+        "ownership.json": {
+          "sizeBytes": 1778,
+          "sha256": "a41e6eb0fe12cf0209455d8069f45f3bee5ba209a8096669a267c8dae88825fe"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11718,
+          "sha256": "43106f0177b92b84867233e150bb0d819bfd19b05c876fc0259b63d300ab8c09"
+        },
+        "stderr.log": {
+          "sizeBytes": 8371,
+          "sha256": "a99988fe9c0527291ea89a0660e587020506405fb4454493c5cdbb198beb963d"
+        }
+      }
+    },
+    {
+      "run": "parakeet-cpu-short-p1-r3",
+      "device": "cpu",
+      "backend": "parakeet",
+      "case": "short-v1",
+      "disposition": "passed-short-functional-smoke",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "732febf036fed7d4b44beec8abee20572762249c81b03e69809cb495fee61496"
+      },
+      "elapsedSeconds": 8.703,
+      "outputValidation": {
+        "displayCount": 9,
+        "sourceCount": 9,
+        "graphRoles": [
+          "parakeet-encoder"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 29,
+      "summary": {
+        "sizeBytes": 1949,
+        "sha256": "60014205d152834a44a40337e9fe1e4b65c0048467276806cbe87d253720f009"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 695,
+          "sha256": "d9274fc943b6ea6ff4480bdc19315f5ca80160fcad23d9277c2f5c1d781745a0"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 4906,
+          "sha256": "ba3d3f8feffa53ed98c304f984a4fff4b6cd8be2a8be4bdb64f546b0e0f0d4e3"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 1618,
+          "sha256": "ed2aa61ae7fcbf6ca8b924de19ba005fe01d5b6eabe5f8b9c9f4c16204a9e25c"
+        },
+        "ownership.json": {
+          "sizeBytes": 1552,
+          "sha256": "6d4a009f4cd92085e080013d7137433ac7c73a53f6dbc92b28aaea3052ff2619"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11603,
+          "sha256": "dfef605c1f4a99ecff100b711ac5dff099a0e09e4d7936c18d6a70ca5b87eee2"
+        },
+        "stderr.log": {
+          "sizeBytes": 3942,
+          "sha256": "c51e2833401d7d3a0eb6640f8803cf3fa21472944facb9bead1dd03ff4db11bf"
+        }
+      }
+    },
+    {
+      "run": "parakeet-cuda-short-p1-r3",
+      "device": "cuda",
+      "backend": "parakeet",
+      "case": "short-v1",
+      "disposition": "passed-short-functional-smoke",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "732febf036fed7d4b44beec8abee20572762249c81b03e69809cb495fee61496"
+      },
+      "elapsedSeconds": 2.204,
+      "outputValidation": {
+        "displayCount": 9,
+        "sourceCount": 9,
+        "graphRoles": [
+          "parakeet-encoder",
+          "parakeet-joint",
+          "parakeet-predictor"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 50,
+      "summary": {
+        "sizeBytes": 2005,
+        "sha256": "dae30528253c8dc61098ef280d6856011e0fe44216efa497c8698f2a6b76720f"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 695,
+          "sha256": "d9274fc943b6ea6ff4480bdc19315f5ca80160fcad23d9277c2f5c1d781745a0"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 8564,
+          "sha256": "13f454d9082388b95b101810a1e8c8ed8b541640967f7f8997f601a665eaf64f"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 8600,
+          "sha256": "7deb6ab2f9d22605f0e451c50f81f5510b4ce65844e5144272bd28d77b8999d7"
+        },
+        "ownership.json": {
+          "sizeBytes": 1541,
+          "sha256": "fe240d31f452c05d2f8a2f3808b5a733bd348af018285470f73f44005091046f"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11603,
+          "sha256": "dfef605c1f4a99ecff100b711ac5dff099a0e09e4d7936c18d6a70ca5b87eee2"
+        },
+        "stderr.log": {
+          "sizeBytes": 20866,
+          "sha256": "4d10db8c3d46b412316dfa84fd8dfcdce051d5bbfacce214ec31f5501fc1e5db"
+        }
+      }
+    },
+    {
+      "run": "qwen-cpu-short-parakeet-p1-r3",
+      "device": "cpu",
+      "backend": "qwen3",
+      "case": "short-v1",
+      "disposition": "passed-short-shared-runtime-regression",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "732febf036fed7d4b44beec8abee20572762249c81b03e69809cb495fee61496"
+      },
+      "elapsedSeconds": 12.64,
+      "outputValidation": {
+        "displayCount": 8,
+        "sourceCount": 2,
+        "graphRoles": [
+          "aligner",
+          "asr",
+          "lazy-audio"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 30,
+      "summary": {
+        "sizeBytes": 1742,
+        "sha256": "b6fdecb0adbb2a541613e6c71dfe688b01c227023b5c331d9c3725f0333b5f19"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 823,
+          "sha256": "f717b7d8d3bff8f8694e3ecf9540c2e1e11b680dc1f7049a3683fd986760607d"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 5064,
+          "sha256": "0f31ba2d82fab5ecf40490acd7be8b865625876020419bef30d074ac703f7268"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 4861,
+          "sha256": "70a12eb24dcaca897330ce6f0ffe30f2aeb7310426d1738116dc4aa09f1e657d"
+        },
+        "ownership.json": {
+          "sizeBytes": 1795,
+          "sha256": "ec8b415753697059d9f0fa85d2f8b113de872809b387a6fe7585761d466e40b8"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11718,
+          "sha256": "d543c3f026b7d448c8ed4af75929c6f226f633995c3ebb0b9faac4231f6fc2fe"
+        },
+        "stderr.log": {
+          "sizeBytes": 7999,
+          "sha256": "74b87cd9330e6489e324a94e853bd5847b9dc8c57019d4f6116c615982f9d4b1"
+        }
+      }
+    },
+    {
+      "run": "qwen-cuda-short-parakeet-p1-r3",
+      "device": "cuda",
+      "backend": "qwen3",
+      "case": "short-v1",
+      "disposition": "passed-short-shared-runtime-regression",
+      "finalHarnessEvidence": false,
+      "runtimeLock": {
+        "sizeBytes": 5099,
+        "sha256": "732febf036fed7d4b44beec8abee20572762249c81b03e69809cb495fee61496"
+      },
+      "elapsedSeconds": 8.703,
+      "outputValidation": {
+        "displayCount": 8,
+        "sourceCount": 2,
+        "graphRoles": [
+          "aligner",
+          "asr",
+          "lazy-audio"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 50,
+      "summary": {
+        "sizeBytes": 1743,
+        "sha256": "18899ceb9441a5f7ccb5c90e8d7843d733d611404ea8380098349769e46e6cea"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 823,
+          "sha256": "f717b7d8d3bff8f8694e3ecf9540c2e1e11b680dc1f7049a3683fd986760607d"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 8564,
+          "sha256": "13f454d9082388b95b101810a1e8c8ed8b541640967f7f8997f601a665eaf64f"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 8572,
+          "sha256": "5c509af265f98af5affed12a46c09850652969bc5fd4c3949fb01a2a13d21871"
+        },
+        "ownership.json": {
+          "sizeBytes": 1785,
+          "sha256": "0fbe1ed6133df60e155174a8e0b1a42d8da6cc8f8d83547626e03efd4a15d95d"
+        },
+        "process-after.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "process-before.json": {
+          "sizeBytes": 4,
+          "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+        },
+        "result.json": {
+          "sizeBytes": 11718,
+          "sha256": "43106f0177b92b84867233e150bb0d819bfd19b05c876fc0259b63d300ab8c09"
+        },
+        "stderr.log": {
+          "sizeBytes": 8371,
+          "sha256": "8f7a327dec2d39ef85d787c467aec91bc9008125a5ef87f0fd0d11803ac02f2a"
+        }
+      }
+    },
+    {
+      "run": "parakeet-cpu-short-p1-r4",
+      "device": "cpu",
+      "backend": "parakeet",
+      "case": "short-v1",
+      "disposition": "passed-short-functional-smoke",
+      "finalHarnessEvidence": true,
+      "runtimeLock": {
+        "sizeBytes": 5244,
+        "sha256": "397cc99bf6227cfb83e71a872b2108aae4f0bf42c726c454f9a6005d4cf7cf9a"
+      },
+      "elapsedSeconds": 9.344,
+      "outputValidation": {
+        "displayCount": 9,
+        "sourceCount": 9,
+        "graphRoles": [
+          "parakeet-encoder"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 29,
+      "summary": {
+        "sizeBytes": 1909,
+        "sha256": "727653f74a982f08096d107b15732a047c881186251833faea955a2167ae62fc"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 671,
+          "sha256": "287f1755fa52fe23ef184a10b7616166e240669ed9bcca34489a1f3582dd90f9"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 4788,
+          "sha256": "3360fb4f3036b06d77935c6c6705b4cb548a1108f5522c0a92d77cbdd0c129d4"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 1585,
+          "sha256": "c42f3acf558efa8870a8291f5f15396315e97a8c04a26228e763f69870ccc01a"
+        },
+        "ownership.json": {
+          "sizeBytes": 1592,
+          "sha256": "fdf5aab959b064e794433ec2a97b39b10bfd0d40065fd0e2ff8c34da88e81dfe"
+        },
+        "process-after.json": {
+          "sizeBytes": 3,
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        "process-before.json": {
+          "sizeBytes": 3,
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        "result.json": {
+          "sizeBytes": 11603,
+          "sha256": "dfef605c1f4a99ecff100b711ac5dff099a0e09e4d7936c18d6a70ca5b87eee2"
+        },
+        "stderr.log": {
+          "sizeBytes": 3942,
+          "sha256": "3d56c125340cd9480dc28e38c13573a9036090d67b0651eed703177c3c1fb9e1"
+        }
+      }
+    },
+    {
+      "run": "parakeet-cuda-short-p1-r4",
+      "device": "cuda",
+      "backend": "parakeet",
+      "case": "short-v1",
+      "disposition": "passed-short-functional-smoke",
+      "finalHarnessEvidence": true,
+      "runtimeLock": {
+        "sizeBytes": 5244,
+        "sha256": "397cc99bf6227cfb83e71a872b2108aae4f0bf42c726c454f9a6005d4cf7cf9a"
+      },
+      "elapsedSeconds": 2.531,
+      "outputValidation": {
+        "displayCount": 9,
+        "sourceCount": 9,
+        "graphRoles": [
+          "parakeet-encoder",
+          "parakeet-joint",
+          "parakeet-predictor"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 50,
+      "summary": {
+        "sizeBytes": 2250,
+        "sha256": "09ab5c75eddd09caf24539f2c960370d14fd7047026186fe6c3ff9ecc024c0d3"
+      },
+      "rawEvidence": {
+        "cuda-attempt.json": {
+          "sizeBytes": 2315,
+          "sha256": "5df45ba584c8f9b0d7cb9a10221d3c62d148e878fa073a4a1e4d9b59f82ff8c4"
+        },
+        "cuda-completion.json": {
+          "sizeBytes": 2421,
+          "sha256": "d910599cb6eac94f3726f2ebc0687f4b877cb410da93cd106340a762502b7ea2"
+        },
+        "inputs.json": {
+          "sizeBytes": 671,
+          "sha256": "287f1755fa52fe23ef184a10b7616166e240669ed9bcca34489a1f3582dd90f9"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 8362,
+          "sha256": "ad6d9823ae6554089b06dda9804991f73546b0a27c5688e1ba84954f5f1e7c8b"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 8442,
+          "sha256": "9de1654bba033ed50de53fc5fd873567f56e5880c1f332bc0afec9fa169209ed"
+        },
+        "ownership.json": {
+          "sizeBytes": 1778,
+          "sha256": "4378148d78b3abf1873045a53bad97d714378778c121bcf1f206168d17455658"
+        },
+        "process-after.json": {
+          "sizeBytes": 3,
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        "process-before.json": {
+          "sizeBytes": 3,
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        "result.json": {
+          "sizeBytes": 11603,
+          "sha256": "dfef605c1f4a99ecff100b711ac5dff099a0e09e4d7936c18d6a70ca5b87eee2"
+        },
+        "stderr.log": {
+          "sizeBytes": 20866,
+          "sha256": "0a1d350de5992c2e67708080e6e073e59e480ec524221bd23ffc6948d48595cd"
+        }
+      }
+    },
+    {
+      "run": "qwen-cpu-short-parakeet-p1-r4",
+      "device": "cpu",
+      "backend": "qwen3",
+      "case": "short-v1",
+      "disposition": "passed-short-shared-runtime-regression",
+      "finalHarnessEvidence": true,
+      "runtimeLock": {
+        "sizeBytes": 5244,
+        "sha256": "397cc99bf6227cfb83e71a872b2108aae4f0bf42c726c454f9a6005d4cf7cf9a"
+      },
+      "elapsedSeconds": 14.281,
+      "outputValidation": {
+        "displayCount": 8,
+        "sourceCount": 2,
+        "graphRoles": [
+          "aligner",
+          "asr",
+          "lazy-audio"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 30,
+      "summary": {
+        "sizeBytes": 1683,
+        "sha256": "196cb7ce955c031569f4acdb0c70a54b4329517591a5e5c19d367bb5daabb272"
+      },
+      "rawEvidence": {
+        "inputs.json": {
+          "sizeBytes": 795,
+          "sha256": "b4e7f3a601f29619afebba6b2c8be643b4c9e7d2b9acda9dbb2d86087a42bf91"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 4942,
+          "sha256": "dd14428d38166cddb071ff5e85dff0844aed83c61cf39c9ddefc9105bd38cd83"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 4765,
+          "sha256": "1a0572713820454a9eb8aee5c1690179ace6830dd50dce74563d05876b753d2e"
+        },
+        "ownership.json": {
+          "sizeBytes": 1835,
+          "sha256": "9177d77b413cefa76c02cecfb203bb7c196f342a9e13bd1575e938ab9f241e69"
+        },
+        "process-after.json": {
+          "sizeBytes": 3,
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        "process-before.json": {
+          "sizeBytes": 3,
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        "result.json": {
+          "sizeBytes": 11718,
+          "sha256": "d543c3f026b7d448c8ed4af75929c6f226f633995c3ebb0b9faac4231f6fc2fe"
+        },
+        "stderr.log": {
+          "sizeBytes": 7999,
+          "sha256": "d4d1420e61f40de4ed308feb932000d3c5381d47ae394435454c45f66246eb37"
+        }
+      }
+    },
+    {
+      "run": "qwen-cuda-short-parakeet-p1-r4",
+      "device": "cuda",
+      "backend": "qwen3",
+      "case": "short-v1",
+      "disposition": "passed-short-shared-runtime-regression",
+      "finalHarnessEvidence": true,
+      "runtimeLock": {
+        "sizeBytes": 5244,
+        "sha256": "397cc99bf6227cfb83e71a872b2108aae4f0bf42c726c454f9a6005d4cf7cf9a"
+      },
+      "elapsedSeconds": 16.093,
+      "outputValidation": {
+        "displayCount": 8,
+        "sourceCount": 2,
+        "graphRoles": [
+          "aligner",
+          "asr",
+          "lazy-audio"
+        ],
+        "vadCpu": true,
+        "utf8": true,
+        "integerMs": true,
+        "positiveBoundedIntervals": true,
+        "textConserved": true,
+        "silence": false
+      },
+      "processExitCode": 0,
+      "activeJobProcesses": 0,
+      "loadedModuleCount": 50,
+      "summary": {
+        "sizeBytes": 1971,
+        "sha256": "525973611b633f0ae6e15348f2d51ee02feb13359452937567faa38abddf1926"
+      },
+      "rawEvidence": {
+        "cuda-attempt.json": {
+          "sizeBytes": 2556,
+          "sha256": "f14ca88233d56301346dfccb83e9f437aad95ad63a4869a7998bba33b1026dbd"
+        },
+        "cuda-completion.json": {
+          "sizeBytes": 2131,
+          "sha256": "f2d3224cb9ce3cd08dcd7453667967f647dde089c86d610672cf15e0ab6d9173"
+        },
+        "inputs.json": {
+          "sizeBytes": 795,
+          "sha256": "b4e7f3a601f29619afebba6b2c8be643b4c9e7d2b9acda9dbb2d86087a42bf91"
+        },
+        "loaded-module-identities.json": {
+          "sizeBytes": 8362,
+          "sha256": "ad6d9823ae6554089b06dda9804991f73546b0a27c5688e1ba84954f5f1e7c8b"
+        },
+        "loaded-modules.json": {
+          "sizeBytes": 8414,
+          "sha256": "c6c11cc6fb3e6aa8273fc93962cecb976b45b64cc27184b2028212a0a9337743"
+        },
+        "ownership.json": {
+          "sizeBytes": 2026,
+          "sha256": "98fe1f3c0ed7ceb16ea85e6c5119c9b0b0a33a0f8498a1ebd97743dfc8cc9c4f"
+        },
+        "process-after.json": {
+          "sizeBytes": 3,
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        "process-before.json": {
+          "sizeBytes": 3,
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        "result.json": {
+          "sizeBytes": 11718,
+          "sha256": "43106f0177b92b84867233e150bb0d819bfd19b05c876fc0259b63d300ab8c09"
+        },
+        "stderr.log": {
+          "sizeBytes": 8372,
+          "sha256": "30f2c64aa33911d71d6afe8ef35c72897dddbe4d8b709aef6d150782e237837d"
+        }
+      }
+    }
+  ],
+  "hardware": [
+    {
+      "name": "NVIDIA GeForce RTX 3070",
+      "driver_version": "596.49",
+      "memory.total [MiB]": "8192 MiB"
+    }
+  ],
+  "cudaArchitectureListBeforeAndAfterRetry": "50-virtual;61-virtual;70-virtual;75-virtual;80-virtual;86-real;89-real;90-virtual;120a-real",
+  "finalProcessInventory": {
+    "sizeBytes": 4,
+    "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+  },
+  "buildLogs": {
+    "build-cpu.log": {
+      "sizeBytes": 2566253,
+      "sha256": "536365be5f9d937f002e72d57a5852ffa57906e528eb0f0669f50ca0863c7a90"
+    },
+    "build-cuda.log": {
+      "sizeBytes": 126263887,
+      "sha256": "fb044c9c866894ed1b6ef8cb8273aa2e3bea0b8c2045b1ec1d7111911a17b32e"
+    },
+    "build-cuda-retry.log": {
+      "sizeBytes": 152149795,
+      "sha256": "eda4ae0efe697710b076bda9148235095de7314d99dbad56ce8d195349fd5ff8"
+    },
+    "check-p1-r3.log": {
+      "sizeBytes": 2633,
+      "sha256": "5398b782087f486d1b38c5973729942df05d8b198e407ce0a870e39f1430eaa7"
+    },
+    "timeline-retirement-e78aced5-cli-ctest.log": {
+      "sizeBytes": 903,
+      "sha256": "a42e663211a50f982671e57b4689cceebec13f7998d86813d338c139e3a9409b"
+    },
+    "timeline-retirement-e78aced5-dev-ctest.log": {
+      "sizeBytes": 1010,
+      "sha256": "c0bf8437aa4707ae27318b800961e21d0fd5eec21717715f1925e1dfbf5598cb"
+    },
+    "build-cpu-r4.log": {
+      "sizeBytes": 2102491,
+      "sha256": "36c209377e581c544811c06a5a3ef61e0399a15189437210711fe368948e0a00"
+    },
+    "build-cuda-r4.log": {
+      "sizeBytes": 2102961,
+      "sha256": "b862b5b6a690f4056e2bbf81ac510233053e6f8aa2b1a3c3caa9accf758891ee"
+    },
+    "check-p1-r4.log": {
+      "sizeBytes": 34,
+      "sha256": "48bfa2c2e47924766379841fa56252a12f9eaefcbc4f5d64c33b3c6e754afb87"
+    },
+    "check-p1-r4-retry.log": {
+      "sizeBytes": 2786,
+      "sha256": "33bfb27c353205e088dde058b1143ee734f89e9a6adc35ba2983807111d0a9df"
+    },
+    "recovery-check-r4-final2.log": {
+      "sizeBytes": 137,
+      "sha256": "c1883702f7c342039062a883e909c71c61a792246adfd8a7195ea9a7ec0718c1"
+    }
+  },
+  "compilerTimeoutEvidence": {
+    "pre-retry-identities.json": {
+      "sizeBytes": 1168,
+      "sha256": "fae8a64ec911368d5b3b02192f2a3b64e896b5c676399578f926191d5b628de5"
+    },
+    "pre-retry-processes.json": {
+      "sizeBytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "build-processes.json": {
+      "sizeBytes": 526,
+      "sha256": "2192ebd6a060403487c080356cfd007e167f46360358e4f610e9a18d0a7341e5"
+    }
+  },
+  "tooling": {
+    "p1_acquisition.py": {
+      "sizeBytes": 8595,
+      "sha256": "d018ca688355f6577b09a0dc8eaa55c0a9bc82eebb9277b2986d955bf4778ac4"
+    },
+    "p1_qwen_regression.py": {
+      "sizeBytes": 4813,
+      "sha256": "169134f3156336bcbc568c83213d84b754cb5c495b20b2de613a2edcf1b5020c"
+    },
+    "p1_publish.py": {
+      "sizeBytes": 15176,
+      "sha256": "0d8478a0d9147862cf420f75335ab1899b4e650fbac7cc8a6a15c4296729d65d"
+    }
+  },
+  "limitations": [
+    "Original 1800s CUDA compiler timeout retained; owner-approved same-command incremental retry succeeded. No CUDA inference was killed.",
+    "CMakeCache bytes changed across normal reconfigure (58760 to 58802 bytes); pre-retry hash is retained, not the original cache bytes. Both logs report identical architectures; Ninja resumed the remaining 719 of 853 targets after 134 completed. Final cache/binaries are authority.",
+    "Original CPU smoke failed harness path-case comparison despite valid output; preserved, not relabeled.",
+    "Earlier r2/r3 successes and the original failed row remain unchanged. Only the four r4 runs are current-harness evidence after accepted R1-R3 corrections.",
+    "Malformed new VS check launcher failed before compiler startup; log/launcher/partial diff retained. Supervisor authorized same-protocol correction from original launcher bytes; retry passed.",
+    "Encoder faults and recovery sentinel failures use model-free exact-source/owned Python fixtures, not induced GPU OOM or terminated ASR hardware runs.",
+    "Only short-v1 CLI execution; medium/long, host/ASS, model manager, packaging and lifecycle matrix remain pending.",
+    "CUDA graph proof covers encoder/predictor/joint. Upstream host mel/projection/state/argmax work remains CPU; VAD is required CPU.",
+    "RTX 3070 8 GiB only; architecture code coverage is not other-hardware verification.",
+    "New shared candidate is local only and has not replaced published artifact identities."
+  ]
+}

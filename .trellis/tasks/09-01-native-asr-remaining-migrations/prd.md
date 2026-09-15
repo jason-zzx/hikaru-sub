@@ -1,6 +1,15 @@
 # Complete remaining Native ASR migrations
 
-> **Qwen 当前状态**：完整 CLI + 默认 Q4_K pair + 必需 CPU Silero + 上游 LIS/word display（含批准的有界相邻异常合并）已完成双设备功能、交付和本地包装检查，工程复核接受，用户确认应用 CPU/CUDA 成功。选择/下载/启动及独立 CrispASR CUDA 源保持启用；CUDA 发布复核项由用户接受关闭，超时独立代理没有执行该次复核。Qwen 清理/开发 timeline 退休已接受；构建锁精确迁移和稳定 scratch 解耦已落盘；用户免除进一步复核后，child 于 2026-09-09 归档至 `.trellis/tasks/archive/2026-09/08-20-native-asr-qwen3-aligner/`，迁移独立复核未执行。Parakeet/Reazon/通用 VAD 尚待独立实施，不自动开始。Qwen 不适用旧质量矩阵、量化竞赛、CPU 质量继承、raw-only/DP 或源码裁剪要求；其他 child 的绝对质量合同不变。证据与限制见 Qwen `implement.md`。
+> **Narrow owner-authorized dependency exception:** Parakeet may now publish one new
+> shared Qwen+Parakeet CUDA asset on the existing `native-asr-cuda-v1` dependency
+> release, verify official/China-mirror bytes, update default build/download authority
+> and enable ordinary builds, then run targeted local packaging validation. Earlier
+> blanket publication exclusions below remain for application releases, not this
+> exact dependency action. Preserve old assets/locks/evidence; no tag/release creation,
+> app upload/version/CHANGELOG, Git staging/history, archive or next-engine work.
+> Minimal scope and stop/escalation boundaries are in the child’s latest authorization.
+
+> **Qwen 当前状态**：完整 CLI + 默认 Q4_K pair + 必需 CPU Silero + 上游 LIS/word display（含批准的有界相邻异常合并）已完成双设备功能、交付和本地包装检查，工程复核接受，用户确认应用 CPU/CUDA 成功。选择/下载/启动及独立 CrispASR CUDA 源保持启用；CUDA 发布复核项由用户接受关闭，超时独立代理没有执行该次复核。Qwen 清理/开发 timeline 退休已接受；构建锁精确迁移和稳定 scratch 解耦已落盘；用户免除进一步复核后，child 于 2026-09-09 归档至 `.trellis/tasks/archive/2026-09/08-20-native-asr-qwen3-aligner/`，迁移独立复核未执行。Parakeet 已完成独立实施、shared-v2 依赖分发、默认双设备启用和最终复核，用户确认最终应用 CPU/CUDA 均可运行，当前仅待提交/归档；Reazon/通用 VAD 尚未实施且不自动开始。Qwen 不适用旧质量矩阵、量化竞赛、CPU 质量继承、raw-only/DP 或源码裁剪要求；Parakeet 已获用户批准采用完整上游集成与双设备功能验收；ReazonSpeech 的绝对质量合同不变。证据与限制见 Qwen `implement.md`。
 
 ## Goal
 
@@ -27,7 +36,7 @@
 
 ### R2 - Production Native definition
 
-每条模型迁移须满足以下适用条件。**Qwen 范围例外**：采用上游默认 Q4_K pair，不做量化质量竞赛或字幕质量矩阵；CPU/CUDA 分别验证功能、设备和生命周期，不使用质量继承标签。锁定实际发布文件 identity/来源/许可证，变更 bytes 后重跑受影响的功能验证，不强制重建转换或恢复旧研究。接受上游 LIS/插值及 child 已批准的最小相邻展示异常组合并（现有端点包络、原文守恒），不接受其他自研修补或无 word timing 的文本均分 fallback。以下旧质量/完整 converter 研究要求仅保留给未重建的其他 child。
+每条模型迁移须满足以下适用条件。**Qwen 范围例外**：采用上游默认 Q4_K pair，不做量化质量竞赛或字幕质量矩阵；CPU/CUDA 分别验证功能、设备和生命周期，不使用质量继承标签。锁定实际发布文件 identity/来源/许可证，变更 bytes 后重跑受影响的功能验证，不强制重建转换或恢复旧研究。接受上游 LIS/插值及 child 已批准的最小相邻展示异常组合并（现有端点包络、原文守恒），不接受其他自研修补或无 word timing 的文本均分 fallback。**Parakeet 范围例外（用户已确认）**：同样采用完整上游集成与 CPU/CUDA 短/中/长真实功能、设备、输出合法性、生命周期和产品交付验收，不做量化竞赛、CER/语义缺口/RTF 阈值资格、Python parity、自研对齐或 CPU 质量继承。优先兼容的上游/社区推荐产物，锁定实际来源/revision/文件/size/SHA/格式/量化/许可证，转换信息如实记录；不强制新 converter 研究。主观质量由用户试听评估，不承诺量化达标；用户另行确认 Parakeet 完整上游日语流程，包含复用必需 CPU Silero、上游 12 秒切片及对未覆盖实际音频的再次转录/片段边界重组；不授权应用侧自研填补。Qwen aligner/异常合并不扩展到 Parakeet。详见 Parakeet PRD。以下旧质量/完整 converter 研究要求仅保留给 ReazonSpeech，不能用于重新阻塞 Parakeet；共同安全、交付与本地包装合同保持。
 
 共同的交付、安全与产品边界保持：
 
@@ -61,12 +70,12 @@
 ### R4 - Qwen prerequisite first; general VAD last; always CPU
 
 - Qwen 必需的最小 CPU VAD 由 Qwen child 前置接入并冻结，为固定前处理，不开放全局 UI；Qwen 下载总进度和启动 readiness 必须覆盖该依赖。
-- 其他引擎/通用 Native VAD 仍在三条模型路线完成后实现，复用已冻结 Qwen VAD 资产与合同，不重新设计 Qwen 行为。
+- Parakeet 必需 CPU VAD 由该 child 复用已冻结 Silero，覆盖逻辑下载/readiness、失败不降级与共享资产清理保护；这是已批准的固定上游前处理，不开放通用设置。其余引擎/通用 Native VAD 仍在三条模型路线完成后实现，不重新设计 Qwen 行为。
 - VAD 模型与推理固定使用 CPU，即使主 ASR 模型选择 CUDA；不提供 VAD CUDA runtime、设备选择或 GPU 资格声明。
 - 请求中的 `cpu|cuda|auto` 只决定主 ASR 模型设备。CUDA ASR 路线启用 VAD 时，先在 CPU 完成 VAD window 计算，再将窗口交给 CUDA ASR。
 - VAD 子任务负责明确适用引擎、协议参数、模型资产、CPU runtime 依赖、时间轴影响和失败策略。
 - VAD 已显式启用时，CPU VAD 失败必须结构化失败，不得静默关闭 VAD 后重跑主模型。
-- 不因迁移 VAD 改写已经验收的模型输出或自行 gap fill、clip/stretch、伪造时间戳；Qwen 已确认采用的上游 LIS/插值后处理不受旧 raw-only 禁令约束。
+- 不因迁移 VAD 改写已经验收的模型输出或自行 gap fill、clip/stretch、伪造时间戳；Qwen 已确认采用的上游 LIS/插值，以及 Parakeet 已确认的上游实际音频再次转录/片段边界重组不受旧 raw-only 禁令约束；两者均不授权应用侧任意修补。
 
 ### R5 - Parent boundary
 
@@ -79,9 +88,9 @@
 - [x] AC1: Qwen3-ASR 与 exact ForcedAligner companion 功能迁移及清理已接受，构建锁迁移已落盘；用户明确免除进一步复核后，子任务于 2026-09-09 归档。迁移独立复核未执行，未新增提交或发布。
 - [ ] AC2: Parakeet exact 日语模型完成生产 Native ASR 迁移并归档对应子任务。
 - [ ] AC3: ReazonSpeech NeMo v2 exact 模型完成生产 Native ASR 迁移并归档对应子任务。
-- [ ] AC4: Qwen 必需 CPU VAD 随 AC1 完成，通用 Native VAD 在前三项之后完成迁移，固定 CPU 执行；CPU 与 CUDA ASR 路线均验证 CPU-VAD → ASR 数据流，且不提供 VAD CUDA 路线。
-- [ ] AC5: 三条用户可见逻辑模型仍对应原有上游模型且各只暴露一个最终 Native artifact；最终转换/量化 identity 完整锁定，选择记录证明质量/合理性优先而非体积优先，历史开发转换未被未经资格验证地提升为发布权威；Qwen ASR+aligner 通过一个原子下载/readiness 单元交付。
-- [ ] AC6: Qwen3、Parakeet 与 ReazonSpeech 均同时支持生产 CPU 和 CUDA；Qwen 两种设备各自通过短/中/长功能与生命周期验证，不做质量评分/继承；其他 child 的 CUDA 按 WAV+ASS 与 `native-ground-truth-absolute-v1` 完成完整质量/性能矩阵且不以 Python parity 判定，CPU 完成真实 short/medium/long 功能矩阵及生命周期门禁且不伪造重复质量指标。
+- [ ] AC4: Qwen 必需 CPU VAD 随 AC1 完成，Parakeet 在 AC2 内复用同一必需 CPU Silero；通用 Native VAD 在前三项之后完成迁移，固定 CPU 执行；CPU 与 CUDA ASR 路线均验证 CPU-VAD → ASR 数据流，且不提供 VAD CUDA 路线。
+- [ ] AC5: 三条用户可见逻辑模型仍对应原有上游模型且各只暴露一个最终 Native artifact；按 R2 的各模型范围锁定实际产物 identity 与来源/许可，选择理由不得以体积优先，历史开发转换未被未经本轮适用验证地提升为交付权威；Qwen ASR+aligner 通过一个原子下载/readiness 单元交付。
+- [ ] AC6: Qwen3、Parakeet 与 ReazonSpeech 均同时支持生产 CPU 和 CUDA；Qwen 与 Parakeet 两种设备各自通过短/中/长功能与生命周期验证，不做质量评分/继承；ReazonSpeech 的 CUDA 按 WAV+ASS 与 `native-ground-truth-absolute-v1` 完成完整质量/性能矩阵且不以 Python parity 判定，CPU 完成真实 short/medium/long 功能矩阵及生命周期门禁且不伪造重复质量指标。
 - [ ] AC7: 共享 CrispASR CPU runtime 作为独立闭集 artifact/root 随安装包/portable 提供，共享 CrispASR CUDA pack 使用独立受管 root 按需下载；两者均不覆盖 CTranslate2 runtime，模型权重仍按需下载，最终包满足 80/90 MiB 预算。
 - [ ] AC8: 所有新路线均无 Python fallback，并通过模型交付、协议、时间轴、取消、恢复、离线、隐私、许可证和路径边界门禁。
 - [ ] AC9: 已发布 Faster-Whisper、Kotoba、CPU/CUDA 与安装版/portable 行为无回归。
@@ -92,4 +101,4 @@
 - Hikaru Sub 版本发布、版本号、CHANGELOG、安装包上传或 GitHub Release。
 - Kotoba K3、普通 Faster-Whisper 新模型、Vulkan、多 GPU 或非 Windows 平台。
 - 恢复生产 Python sidecar/runtime 或静默 Python fallback。
-- 用 reference repair、自研 synthetic timing、gap fill、clip/stretch 掩盖模型或对齐失败；Qwen 已批准的上游 LIS/插值不等于授权任意修补。
+- 用 reference repair、自研 synthetic timing、gap fill、clip/stretch 掩盖模型或对齐失败；Qwen 上游 LIS/插值与 Parakeet 上游实际音频再次转录/片段边界重组的批准均不等于授权应用侧任意修补。

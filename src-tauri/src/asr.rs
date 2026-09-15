@@ -245,26 +245,32 @@ pub(crate) fn cuda_host_environment(root: &Path) -> Result<Vec<(OsString, OsStri
 
 fn select_native_runtime(
     backend: &str,
+    engine: &str,
     requested: RequestedNativeDevice,
     mut resolve: impl FnMut(&str, &str) -> Result<ResolvedNativeAsrCpuRuntime, String>,
 ) -> Result<(ResolvedNativeAsrCpuRuntime, &'static str, Option<String>), String> {
     if !matches!(backend, "ctranslate2" | "crispasr") {
         return Err("Native ASR backend 不受支持".into());
     }
+    let mut resolve_device = |device| {
+        let runtime = resolve(backend, device)?;
+        runtime.require_engine(engine)?;
+        Ok(runtime)
+    };
     if requested != RequestedNativeDevice::Cpu {
-        match resolve(backend, "cuda") {
+        match resolve_device("cuda") {
             Ok(runtime) => return Ok((runtime, "cuda", None)),
             Err(error) if requested == RequestedNativeDevice::Cuda => return Err(error),
             Err(_) => {
                 return Ok((
-                    resolve(backend, "cpu")?,
+                    resolve_device("cpu")?,
                     "cpu",
                     prelaunch_fallback_notice(requested, true),
                 ))
             }
         }
     }
-    Ok((resolve(backend, "cpu")?, "cpu", None))
+    Ok((resolve_device("cpu")?, "cpu", None))
 }
 
 fn native_host_key(backend: &str, artifact: &str, device: &str) -> String {
@@ -275,25 +281,39 @@ async fn resolve_native_execution(
     app: &AppHandle,
     state: &AsrState,
     backend: &str,
+    engine: &str,
     requested: RequestedNativeDevice,
 ) -> Result<ResolvedNativeExecution, String> {
     let app = app.clone();
     let selected_backend = backend.to_string();
+    let selected_engine = engine.to_string();
     let (runtime, device, notice) = tauri::async_runtime::spawn_blocking(move || {
-        select_native_runtime(&selected_backend, requested, |backend, device| {
-            match (backend, device) {
-                ("ctranslate2", "cpu") => resolve_native_asr_cpu_runtime(&app),
-                ("ctranslate2", "cuda") => resolve_native_asr_cuda_runtime(&app).map(|runtime| {
-                    ResolvedNativeAsrCpuRuntime {
-                        root: runtime.root,
-                        worker: runtime.worker,
-                        artifact_id: runtime.artifact_id,
+        select_native_runtime(
+            &selected_backend,
+            &selected_engine,
+            requested,
+            |backend, device| {
+                match (backend, device) {
+                    ("ctranslate2", "cpu") => resolve_native_asr_cpu_runtime(&app),
+                    ("ctranslate2", "cuda") => {
+                        resolve_native_asr_cuda_runtime(&app).map(|runtime| {
+                            ResolvedNativeAsrCpuRuntime {
+                                root: runtime.root,
+                                worker: runtime.worker,
+                                artifact_id: runtime.artifact_id,
+                                // CT2 CUDA verification requires exactly these two engines.
+                                engines: vec![
+                                    "faster-whisper".into(),
+                                    "kotoba-faster-whisper".into(),
+                                ],
+                            }
+                        })
                     }
-                }),
-                ("crispasr", device) => resolve_crispasr_runtime(&app, device),
-                _ => Err("Native ASR runtime 不受支持".into()),
-            }
-        })
+                    ("crispasr", device) => resolve_crispasr_runtime(&app, device),
+                    _ => Err("Native ASR runtime 不受支持".into()),
+                }
+            },
+        )
     })
     .await
     .map_err(|_| "解析 Native ASR 运行时失败".to_string())??;
@@ -443,9 +463,9 @@ fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
 
 fn validate_native_request(args: &StartAsrArgs) -> Result<(), String> {
     RequestedNativeDevice::parse(&args.device)?;
-    if args.engine == "qwen3-asr" {
+    if matches!(args.engine.as_str(), "qwen3-asr" | "parakeet") {
         if args.vad_config.is_some() {
-            return Err("Qwen 使用固定默认 CPU VAD，不接受自定义配置".into());
+            return Err("该模型使用固定默认 CPU VAD，不接受自定义配置".into());
         }
     } else if args.use_vad {
         return Err("[vad_not_built] Native ASR 运行时未包含 VAD".into());
@@ -470,7 +490,7 @@ pub(crate) fn qualified_native_launch(
     validate_native_request(&args)?;
     if model.logical_id != format!("{}/{}", args.engine, args.model)
         || model.backend
-            != if args.engine == "qwen3-asr" {
+            != if matches!(args.engine.as_str(), "qwen3-asr" | "parakeet") {
                 "crispasr"
             } else {
                 "ctranslate2"
@@ -478,14 +498,14 @@ pub(crate) fn qualified_native_launch(
     {
         return Err("Native ASR 已验证模型与请求身份不一致".into());
     }
-    let qwen = args.engine == "qwen3-asr";
+    let full_cli = matches!(args.engine.as_str(), "qwen3-asr" | "parakeet");
     let mut roles: Vec<_> = model.roles.iter().map(|(role, _)| role.as_str()).collect();
     roles.sort_unstable();
     if roles
-        != if qwen {
-            vec!["aligner", "model", "vad"]
-        } else {
-            vec!["model"]
+        != match args.engine.as_str() {
+            "qwen3-asr" => vec!["aligner", "model", "vad"],
+            "parakeet" => vec!["model", "vad"],
+            _ => vec!["model"],
         }
     {
         return Err("Native ASR 已验证模型角色不完整".into());
@@ -499,8 +519,8 @@ pub(crate) fn qualified_native_launch(
         PathBuf::from(args.audio_path),
         PathBuf::from(args.output_ass_path.ok_or("缺少转录字幕输出路径")?),
         &cache_root,
-        qwen || args.use_vad,
-        if qwen { None } else { args.vad_config },
+        full_cli || args.use_vad,
+        if full_cli { None } else { args.vad_config },
     )
 }
 
@@ -948,15 +968,17 @@ pub async fn list_asr_engines(
         let engines = tauri::async_runtime::spawn_blocking(move || {
             let cpu_available = resolve_native_asr_cpu_runtime(&probe_app).is_ok();
             let cuda_capability = public_cuda_capability(native_asr_cuda_capability(&probe_app));
-            let (crispasr_cpu, crispasr_cuda) =
-                crate::dependencies::crispasr_engine_capabilities(&probe_app);
+            let crispasr = crate::dependencies::crispasr_engine_capabilities(&probe_app);
             known_native_asr_engines()?
                 .into_iter()
                 .map(|(name, supported, backend)| {
                     let (cpu, cuda) = if backend.as_deref() == Some("ctranslate2") {
                         (cpu_available, cuda_capability.clone())
                     } else if supported && backend.as_deref() == Some("crispasr") {
-                        (crispasr_cpu, crispasr_cuda.clone())
+                        crispasr
+                            .get(&name)
+                            .cloned()
+                            .unwrap_or((false, serde_json::Value::Null))
                     } else {
                         (false, serde_json::Value::Null)
                     };
@@ -1041,7 +1063,8 @@ pub async fn start_asr(
             .await?
             .ok_or_else(|| "Native ASR 模型或必需依赖不可用".to_string())?;
         let requested = RequestedNativeDevice::parse(&args.device)?;
-        let execution = resolve_native_execution(&app, &state, &model.backend, requested).await?;
+        let execution =
+            resolve_native_execution(&app, &state, &model.backend, &args.engine, requested).await?;
         let ResolvedNativeExecution {
             host,
             device,
@@ -1439,6 +1462,61 @@ mod tests {
     }
 
     #[test]
+    fn selected_engine_is_authorized_before_host_cache_or_launch() {
+        for engine in ["qwen3-asr", "parakeet"] {
+            for requested in [
+                RequestedNativeDevice::Cpu,
+                RequestedNativeDevice::Cuda,
+                RequestedNativeDevice::Auto,
+            ] {
+                for shared_cpu in [false, true] {
+                    for shared_cuda in [false, true] {
+                        let mut calls = Vec::new();
+                        let result =
+                            select_native_runtime("crispasr", engine, requested, |_, device| {
+                                calls.push(device.to_string());
+                                let shared = if device == "cpu" {
+                                    shared_cpu
+                                } else {
+                                    shared_cuda
+                                };
+                                Ok(ResolvedNativeAsrCpuRuntime {
+                                    root: PathBuf::from(device),
+                                    worker: PathBuf::from("worker.exe"),
+                                    artifact_id: format!(
+                                        "{device}-{}",
+                                        if shared { "shared" } else { "qwen" }
+                                    ),
+                                    engines: if shared {
+                                        vec!["qwen3-asr".into(), "parakeet".into()]
+                                    } else {
+                                        vec!["qwen3-asr".into()]
+                                    },
+                                })
+                            });
+                        let allowed = engine == "qwen3-asr"
+                            || match requested {
+                                RequestedNativeDevice::Cpu => shared_cpu,
+                                RequestedNativeDevice::Cuda => shared_cuda,
+                                RequestedNativeDevice::Auto => shared_cpu || shared_cuda,
+                            };
+                        assert_eq!(result.is_ok(), allowed);
+                        if requested == RequestedNativeDevice::Cpu {
+                            assert_eq!(calls, ["cpu"]);
+                        }
+                        if requested == RequestedNativeDevice::Cuda {
+                            assert_eq!(calls, ["cuda"]);
+                        }
+                        if let Ok((runtime, _, _)) = result {
+                            runtime.require_engine(engine).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn backend_device_selection_is_prelaunch_only_and_never_crosses_runtime_trees() {
         for backend in ["ctranslate2", "crispasr"] {
             for requested in [
@@ -1449,8 +1527,11 @@ mod tests {
                 for cuda_ok in [false, true] {
                     for cpu_ok in [false, true] {
                         let mut calls = Vec::new();
-                        let result =
-                            select_native_runtime(backend, requested, |selected, device| {
+                        let result = select_native_runtime(
+                            backend,
+                            "fixture-engine",
+                            requested,
+                            |selected, device| {
                                 calls.push((selected.to_string(), device.to_string()));
                                 if if device == "cuda" { cuda_ok } else { cpu_ok } {
                                     Ok(ResolvedNativeAsrCpuRuntime {
@@ -1459,11 +1540,13 @@ mod tests {
                                             "{selected}/{device}/worker.exe"
                                         )),
                                         artifact_id: "same-artifact-test".into(),
+                                        engines: vec!["fixture-engine".into()],
                                     })
                                 } else {
                                     Err(format!("{selected}-{device}-unavailable"))
                                 }
-                            });
+                            },
+                        );
                         let expected = match requested {
                             RequestedNativeDevice::Cpu => vec!["cpu"],
                             RequestedNativeDevice::Cuda => vec!["cuda"],

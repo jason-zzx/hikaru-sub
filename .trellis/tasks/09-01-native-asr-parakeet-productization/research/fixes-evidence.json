@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "scope": "F1-F5 local engineering fixes and shared candidate extraction/resolution; not task/release acceptance",
+  "rawLock": {
+    "sizeBytes": 9995,
+    "sha256": "a9ebfdccb34f58f33c1a9040ca6992665f3ed8ce32b4440a21907a06584b0eff"
+  },
+  "candidateLock": {
+    "sizeBytes": 9914,
+    "sha256": "cee57fd031073e0ee9b378333ca953dc849d6ca04507a7a43e284eb8acb055b4"
+  },
+  "artifacts": {
+    "cpu": {
+      "artifactId": "hikaru-asr-crispasr-windows-x64-cpu-shared-local-r1",
+      "archive": {
+        "path": "native-asr/build/full-cli/shared-local-r1/crispasr-cpu.zip",
+        "root": "windows-x64/crispasr/cpu/",
+        "sizeBytes": 7666374,
+        "sha256": "7ec335ac5f42c4350c60c03191efaed5db133233596679e01557c6b588636c41"
+      },
+      "manifestSha256": "3cb0f158a15422ec96e34ff4b80653ad723e97edf3cad415c493a56a24e707bc",
+      "fileCount": 22,
+      "worker": {
+        "path": "hikaru-asr-worker.exe",
+        "sizeBytes": 372224,
+        "sha256": "5870db2f85adc88618a0c91ac538d61ba82d27c9a59b79fd80094582817101f2"
+      }
+    },
+    "cuda": {
+      "artifactId": "hikaru-asr-crispasr-windows-x64-cuda-shared-local-r1",
+      "archive": {
+        "path": "native-asr/build/full-cli/shared-local-r1/crispasr-cuda.zip",
+        "root": "windows-x64/crispasr/cuda/",
+        "sizeBytes": 719774328,
+        "sha256": "81d3422aceea39b058afe36e86a833661c295daeb9b32600fdcc20965a6379e1"
+      },
+      "manifestSha256": "fed14065b756e651db1c2157948cca7e6f0d1a73b015d9724f2c3410b7a3e550",
+      "fileCount": 27,
+      "worker": {
+        "path": "hikaru-asr-worker.exe",
+        "sizeBytes": 372224,
+        "sha256": "a054d74c60cbfcd0456f2b3a053c4c0763a2fdfefbefc8e6ec58b95a03fb66e6"
+      }
+    }
+  },
+  "applications": {
+    "nsis": {
+      "sizeBytes": 16285275,
+      "sha256": "e62190cf00d9d05995dc6dd5cfb889a27f6a9d13b43db5b50f9905be5616a8ae"
+    },
+    "portable": {
+      "sizeBytes": 23353808,
+      "sha256": "fc8c005ce3b9556bbf07f78c2d080c11a573710da77817517915b9290eae7b4c"
+    }
+  },
+  "packageRootChecks": {
+    "installed": {
+      "cpuArtifact": "hikaru-asr-crispasr-windows-x64-cpu-shared-local-r1",
+      "cudaArtifact": "hikaru-asr-crispasr-windows-x64-cuda-shared-local-r1",
+      "cudaComputeProbe": true,
+      "exactClosure": true,
+      "externalStableAssetPublished": false,
+      "managedRootAdjacent": true,
+      "manualInstallOrUi": false,
+      "missingAndCorruptRejected": true,
+      "priorAssPreserved": true,
+      "syntheticDeviceFailureIsolated": true
+    },
+    "portable": {
+      "cpuArtifact": "hikaru-asr-crispasr-windows-x64-cpu-shared-local-r1",
+      "cudaArtifact": "hikaru-asr-crispasr-windows-x64-cuda-shared-local-r1",
+      "cudaComputeProbe": true,
+      "exactClosure": true,
+      "externalStableAssetPublished": false,
+      "managedRootAdjacent": true,
+      "manualInstallOrUi": false,
+      "missingAndCorruptRejected": true,
+      "priorAssPreserved": true,
+      "syntheticDeviceFailureIsolated": true
+    }
+  },
+  "frontendRetainedOutputReplays": [
+    {
+      "run": "p3-parakeet-cpu-short",
+      "snapshotSha256": "595f36ce5c3eead698a041d6a5266833a70573e6cb08718253f13f205baae8b1",
+      "count": 9,
+      "exactDocumentRows": true,
+      "exactAssRows": true,
+      "assSha256": "5939ef1060b0220cf1017bffc89f185e0dd759a4cf9cf8db0ebaf553b2194340",
+      "modelInference": false
+    },
+    {
+      "run": "p3-parakeet-cuda-short",
+      "snapshotSha256": "595f36ce5c3eead698a041d6a5266833a70573e6cb08718253f13f205baae8b1",
+      "count": 9,
+      "exactDocumentRows": true,
+      "exactAssRows": true,
+      "assSha256": "5939ef1060b0220cf1017bffc89f185e0dd759a4cf9cf8db0ebaf553b2194340",
+      "modelInference": false
+    },
+    {
+      "run": "p4-parakeet-cpu-long",
+      "snapshotSha256": "a906f9e5896f07988b71ae5f0c529678d78a73bf2ad435f7f9ca5d3bd0a11641",
+      "count": 630,
+      "exactDocumentRows": true,
+      "exactAssRows": true,
+      "assSha256": "9ad7fa60cb00d0cca8938d1c2bd85afc0ef560ddd5c19d52662c1cf3cc669811",
+      "modelInference": false
+    },
+    {
+      "run": "p4-parakeet-cpu-medium",
+      "snapshotSha256": "8a454f597b7ba0f8f72994f77c27adffeffb6f33e1175430548467e8c8bf047a",
+      "count": 99,
+      "exactDocumentRows": true,
+      "exactAssRows": true,
+      "assSha256": "39bc903276927719c1ab700363895364652837ac7008cc1de3d29324b8819761",
+      "modelInference": false
+    },
+    {
+      "run": "p4-parakeet-cuda-long",
+      "snapshotSha256": "a959a0aa85ccafae2f506ecf8a1e1e6ea1f69af0ee4f265c0a9035f05b882729",
+      "count": 630,
+      "exactDocumentRows": true,
+      "exactAssRows": true,
+      "assSha256": "32978ddea7a406ceb777f31193b98e9e08ecdd6a7b88485cf5433a02e0930e8a",
+      "modelInference": false
+    },
+    {
+      "run": "p4-parakeet-cuda-medium",
+      "snapshotSha256": "6e290aab80411fe14c9156765005ee915a41e77dffd4fa40c3e1409097d6c5bf",
+      "count": 99,
+      "exactDocumentRows": true,
+      "exactAssRows": true,
+      "assSha256": "bc56f619fda735077fccad8160b3e93d5c9a489cbe33754473c8073879f82739",
+      "modelInference": false
+    }
+  ],
+  "passedLogChecks": [
+    "fixes-build-cpu-r2.log",
+    "fixes-build-cuda.log",
+    "fixes-pnpm-test-final-r2.log",
+    "fixes-cargo-full-final.log",
+    "fixes-cargo-candidate-full.log",
+    "fixes-pnpm-build.log",
+    "fixes-release-local.log",
+    "fixes-ui-replay.log"
+  ],
+  "originalP1AndProductEvidenceReproduced": true,
+  "publishedAuthorityUnchanged": true,
+  "cliAndRuntimeDllBytesUnchanged": true,
+  "postMvpUnavailable": true,
+  "limits": [
+    "No new model inference; six original managed host successes retain their original source/worker scope.",
+    "New worker path tested with real-clock synthetic CLI, not a new hardware quality matrix.",
+    "CUDA probe is model-free; physical P1 evidence remains RTX 3070 only.",
+    "No manual installer/WebView interaction, external candidate distribution, model enablement or release decision.",
+    "Initial ordinary fixture/setup/test failures remain in the frozen log set; no historical failure was relabeled."
+  ]
+}

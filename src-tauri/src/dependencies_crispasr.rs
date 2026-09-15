@@ -6,7 +6,10 @@ use crate::asr_models::verify_plain_ancestors;
 #[path = "dependencies_crispasr_probe.rs"]
 mod cuda_probe;
 
-const LOCK_JSON: &str = include_str!("../../native-asr/runtime/crispasr-product-lock.json");
+const LOCK_JSON: &str = include_str!(concat!(env!("OUT_DIR"), "/crispasr-runtime-lock.json"));
+#[cfg(test)]
+const PUBLISHED_LOCK_JSON: &str =
+    include_str!("../../native-asr/runtime/crispasr-product-lock.json");
 const UNAVAILABLE: &str = "[crispasr_runtime_unavailable] CrispASR 运行时缺失、损坏或不受支持";
 
 #[derive(Debug, Deserialize)]
@@ -24,6 +27,8 @@ struct ProductLock {
 #[serde(rename_all = "camelCase")]
 struct ArtifactLock {
     artifact_id: String,
+    #[serde(default)]
+    engines: Option<Vec<String>>,
     manifest_sha256: String,
     files: Vec<NativeAsrRuntimeFile>,
     #[serde(default)]
@@ -36,6 +41,49 @@ struct ArchiveLock {
     size_bytes: u64,
     sha256: String,
     root: String,
+}
+
+impl ArtifactLock {
+    fn engines(&self, device: &str) -> Result<Vec<String>, String> {
+        let engines = self
+            .engines
+            .clone()
+            .unwrap_or_else(|| vec!["qwen3-asr".into()]);
+        if !self
+            .artifact_id
+            .starts_with(&format!("hikaru-asr-crispasr-windows-x64-{device}-"))
+            || (engines != ["qwen3-asr"] && engines != ["qwen3-asr", "parakeet"])
+            || (engines.len() == 2
+                && !self
+                    .artifact_id
+                    .starts_with(&format!("hikaru-asr-crispasr-windows-x64-{device}-shared-")))
+        {
+            return Err(UNAVAILABLE.into());
+        }
+        Ok(engines)
+    }
+}
+
+impl ProductLock {
+    fn supports_engine(&self, engine: &str) -> bool {
+        self.schema_version == 1
+            && self.product_enablement_allowed
+            && [("cpu", &self.cpu), ("cuda", &self.cuda)]
+                .iter()
+                .all(|(device, artifact)| {
+                    artifact.as_ref().is_some_and(|artifact| {
+                        artifact
+                            .engines(device)
+                            .is_ok_and(|engines| engines.iter().any(|name| name == engine))
+                    })
+                })
+    }
+}
+
+// Model support is a build capability, not a CUDA publication or runtime-env flag.
+// Listing and launch still verify the installed payload against this authority.
+pub(super) fn supports_engine(engine: &str) -> bool {
+    serde_json::from_str::<ProductLock>(LOCK_JSON).is_ok_and(|lock| lock.supports_engine(engine))
 }
 
 fn runtime_root(resources: &Path, deps: &Path, device: &str) -> Result<PathBuf, String> {
@@ -91,6 +139,7 @@ fn verify_payload(
     )
     .map_err(|_| UNAVAILABLE)?;
     let caps = &manifest.capabilities;
+    let engines = artifact.engines(device)?;
     if manifest.schema_version != 1
         || manifest.protocol_version != 1
         || manifest.artifact_id != artifact.artifact_id
@@ -98,7 +147,7 @@ fn verify_payload(
         || manifest.arch != "x64"
         || caps.backend != "crispasr"
         || caps.device != device
-        || caps.engines != ["qwen3-asr"]
+        || caps.engines != engines
         || !caps.vad
         || !caps.crispasr
         || caps.cuda != (device == "cuda")
@@ -109,8 +158,20 @@ fn verify_payload(
     }
     let checksums = parse_runtime_checksums(&root).map_err(|_| UNAVAILABLE)?;
     let mut expected = HashSet::new();
+    let mut binaries = vec![
+        "hikaru-asr-worker.exe",
+        "crispasr.exe",
+        "msvcp140.dll",
+        "vcruntime140.dll",
+        "vcruntime140_1.dll",
+        "vcomp140.dll",
+    ];
+    if device == "cuda" {
+        binaries.extend(["cudart64_12.dll", "cublas64_12.dll", "cublasLt64_12.dll"]);
+    }
     for row in &artifact.files {
-        if !safe_runtime_relative_path(&row.path)
+        if (!row.path.starts_with("licenses/") && !binaries.contains(&row.path.as_str()))
+            || !safe_runtime_relative_path(&row.path)
             || row.path.contains(['\\', ':'])
             || row
                 .path
@@ -148,8 +209,9 @@ fn verify_payload(
                 .iter()
                 .map(|file| file.path.clone())
                 .collect()
-        || !expected.contains("hikaru-asr-worker.exe")
-        || !expected.contains("crispasr.exe")
+        || binaries
+            .iter()
+            .any(|path| !expected.contains(&path.to_ascii_lowercase()))
         || !expected.contains("licenses/third-party-notices.json")
     {
         return Err(UNAVAILABLE.into());
@@ -158,6 +220,7 @@ fn verify_payload(
         worker: root.join("hikaru-asr-worker.exe"),
         root: root.to_path_buf(),
         artifact_id: artifact.artifact_id.clone(),
+        engines,
     })
 }
 
@@ -214,11 +277,19 @@ mod tests {
         fs::create_dir_all(root.join("licenses")).unwrap();
         let mut files = Vec::new();
         let mut checksums = String::new();
-        for path in [
+        let mut paths = vec![
             "hikaru-asr-worker.exe",
             "crispasr.exe",
+            "msvcp140.dll",
+            "vcruntime140.dll",
+            "vcruntime140_1.dll",
+            "vcomp140.dll",
             "licenses/THIRD-PARTY-NOTICES.json",
-        ] {
+        ];
+        if device == "cuda" {
+            paths.extend(["cudart64_12.dll", "cublas64_12.dll", "cublasLt64_12.dll"]);
+        }
+        for path in paths {
             let bytes = format!("synthetic {device} {path}");
             fs::write(root.join(path), &bytes).unwrap();
             checksums.push_str(&format!("{}  {path}\n", hash(bytes.as_bytes())));
@@ -240,11 +311,45 @@ mod tests {
     }
 
     #[test]
+    fn build_engine_support_requires_both_devices_not_cuda_publication() {
+        let published: ProductLock = serde_json::from_str(PUBLISHED_LOCK_JSON).unwrap();
+        assert!(published.supports_engine("qwen3-asr"));
+        assert!(published.supports_engine("parakeet"));
+        assert!(!published.supports_engine("reazonspeech-nemo"));
+        // Retained published v1 remains valid rollback authority, not Parakeet support.
+        let mut lock: ProductLock = serde_json::from_str(include_str!(
+            "../../native-asr/runtime/crispasr-product-lock-v1.json"
+        ))
+        .unwrap();
+        assert!(lock.supports_engine("qwen3-asr"));
+        assert!(!lock.supports_engine("parakeet"));
+        for (device, artifact) in [
+            ("cpu", lock.cpu.as_mut().unwrap()),
+            ("cuda", lock.cuda.as_mut().unwrap()),
+        ] {
+            artifact.artifact_id =
+                format!("hikaru-asr-crispasr-windows-x64-{device}-shared-fixture");
+            artifact.engines = Some(vec!["qwen3-asr".into(), "parakeet".into()]);
+        }
+        lock.external_stable_asset_published = false;
+        assert!(lock.supports_engine("parakeet"));
+        assert!(lock.supports_engine("qwen3-asr"));
+        assert!(!lock.supports_engine("reazonspeech-nemo"));
+        lock.cuda.as_mut().unwrap().engines = None;
+        assert!(!lock.supports_engine("parakeet"));
+        assert!(lock.supports_engine("qwen3-asr"));
+        lock.cuda = None;
+        assert!(!lock.supports_engine("parakeet"));
+        lock.product_enablement_allowed = false;
+        assert!(!lock.supports_engine("qwen3-asr"));
+    }
+
+    #[test]
     fn enabled_authority_rejects_missing_and_wrong_runtime_bytes() {
         let dir = tempdir().unwrap();
         let resources = dir.path().join("resources");
         let deps = dir.path().join("deps");
-        let lock: ProductLock = serde_json::from_str(LOCK_JSON).unwrap();
+        let lock: ProductLock = serde_json::from_str(PUBLISHED_LOCK_JSON).unwrap();
         assert!(lock.product_enablement_allowed);
         assert!(lock.external_stable_asset_published);
         assert!(lock.cpu.is_some() && lock.cuda.is_some());
@@ -252,6 +357,70 @@ mod tests {
             assert!(verify_at(&resources, &deps, device, &lock).is_err());
             fixture(&resources, &deps, device);
             assert!(verify_at(&resources, &deps, device, &lock).is_err());
+        }
+    }
+
+    #[test]
+    fn shared_candidate_requires_exact_capabilities_and_complete_device_closure() {
+        for device in ["cpu", "cuda"] {
+            let dir = tempdir().unwrap();
+            let resources = dir.path().join("resources");
+            let deps = dir.path().join("deps");
+            let mut lock = fixture(&resources, &deps, device);
+            let old_runtime = verify_at(&resources, &deps, device, &lock).unwrap();
+            old_runtime.require_engine("qwen3-asr").unwrap();
+            assert!(old_runtime.require_engine("parakeet").is_err());
+            let root = runtime_root(&resources, &deps, device).unwrap();
+            let artifact = if device == "cpu" {
+                lock.cpu.as_mut().unwrap()
+            } else {
+                lock.cuda.as_mut().unwrap()
+            };
+            artifact.artifact_id =
+                format!("hikaru-asr-crispasr-windows-x64-{device}-shared-fixture");
+            artifact.engines = Some(vec!["qwen3-asr".into(), "parakeet".into()]);
+            let manifest_path = root.join("runtime-manifest.json");
+            let mut manifest: serde_json::Value =
+                serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+            manifest["artifactId"] = artifact.artifact_id.clone().into();
+            manifest["capabilities"]["engines"] = serde_json::json!(["qwen3-asr", "parakeet"]);
+            let bytes = serde_json::to_vec(&manifest).unwrap();
+            fs::write(&manifest_path, &bytes).unwrap();
+            artifact.manifest_sha256 = hash(&bytes);
+            let shared = verify_payload(&root, device, artifact).unwrap();
+            shared.require_engine("qwen3-asr").unwrap();
+            shared.require_engine("parakeet").unwrap();
+            assert!(shared.require_engine("reazonspeech-nemo").is_err());
+            for engines in [
+                vec!["parakeet".into()],
+                vec!["parakeet".into(), "qwen3-asr".into()],
+                vec!["qwen3-asr".into()],
+            ] {
+                artifact.engines = Some(engines);
+                assert!(verify_payload(&root, device, artifact).is_err());
+            }
+            artifact.engines = Some(vec!["qwen3-asr".into(), "parakeet".into()]);
+            for dll in [
+                "vcomp140.dll",
+                if device == "cuda" {
+                    "cublasLt64_12.dll"
+                } else {
+                    "msvcp140.dll"
+                },
+            ] {
+                let path = root.join(dll);
+                let bytes = fs::read(&path).unwrap();
+                fs::remove_file(&path).unwrap();
+                assert!(verify_payload(&root, device, artifact).is_err());
+                fs::write(path, bytes).unwrap();
+            }
+            verify_payload(&root, device, artifact).unwrap();
+            assert!(verify_payload(
+                &root,
+                if device == "cpu" { "cuda" } else { "cpu" },
+                artifact
+            )
+            .is_err());
         }
     }
 

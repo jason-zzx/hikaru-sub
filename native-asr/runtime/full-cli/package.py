@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import zipfile
@@ -26,6 +27,29 @@ def is_published_cuda_archive(archive, authority):
 
 
 def package(args):
+    candidate = getattr(args, 'candidate_id', None)
+    acquisition_path = getattr(args, 'parakeet_acquisition_lock', None)
+    if bool(candidate) != bool(acquisition_path):
+        raise ValueError('shared candidate requires explicit id and acquisition lock')
+    acquisition = None
+    if candidate:
+        if not re.fullmatch(r'shared-[a-z0-9]+(?:-[a-z0-9]+)*', candidate):
+            raise ValueError('invalid shared candidate id')
+        # Candidate archives stay separately addressable; never replace published assets.
+        args.output = args.output.resolve()
+        if not args.output.is_relative_to(ROOT / 'native-asr/build/full-cli'):
+            raise ValueError('candidate output must use ignored full-cli scratch')
+        acquisition = json.loads(acquisition_path.read_text(encoding='utf-8'))
+        model = acquisition['model']
+        manifest = json.loads((ROOT / 'src-tauri/resources/native-asr-models.json').read_text(encoding='utf-8'))
+        expected = next(r for r in manifest['models'] if r['engine'] == 'parakeet')
+        if (model['logicalModel'] != 'nvidia/parakeet-tdt_ctc-0.6b-ja'
+                or model['license'] != 'CC-BY-4.0'
+                or any(model[k] != expected[k] for k in ('repository', 'revision'))
+                or any(model[k] != expected['files'][0][v] for k, v in
+                       [('file', 'path'), ('sizeBytes', 'sizeBytes'), ('sha256', 'sha256')])):
+            raise ValueError('candidate model authority mismatch')
+    engines = ['qwen3-asr', 'parakeet'] if candidate else ['qwen3-asr']
     # Fresh output preserves every prior runtime/evidence byte.
     args.output.mkdir(parents=True, exist_ok=False)
     source_files = [{'path': p.relative_to(args.source).as_posix(), **identity(p)}
@@ -39,6 +63,9 @@ def package(args):
     write_json(args.output / 'source-identities.json', source_files)
     lock = {'schemaVersion': 1, 'status': 'qwen-application-enabled-owner-manual-verification-pending',
             'productEnablementAllowed': True, 'externalStableAssetPublished': False}
+    if candidate:
+        lock.update(status='local-shared-candidate-not-published', candidateId=candidate,
+                    acquisitionLock=identity(acquisition_path))
     for device in ('cpu', 'cuda'):
         build = getattr(args, device + '_build')
         worker = getattr(args, device + '_worker')
@@ -94,6 +121,9 @@ def package(args):
         model_lock=json.loads(LOCK.read_text(encoding='utf-8'))
         model_notice={'weightsBundled':False,'converterCommit':None,'conversionProvenance':'Reused published GGUF bytes; publisher did not state converter commit. No conversion performed.',
                       'assets':[{k:r[k] for k in ('logicalModel','repository','revision','file','publicationSizeBytes','publicationSha256','licenseDeclaredByModelCard','modelCard')} for r in model_lock['models']]}
+        if acquisition:
+            # Full attribution/changes/provenance limits; no fabricated converter commit.
+            model_notice['assets'].append(acquisition['model'])
         write_json(licenses/'MODEL-SOURCES.json',model_notice)
         write_json(licenses/'THIRD-PARTY-NOTICES.json',{'components':notices,'modelsBundled':False,
                    'uromanAcknowledgement':"This project uses the universal romanizer software 'uroman' written by Ulf Hermjakob, USC Information Sciences Institute (2015-2020). Bibliography: Ulf Hermjakob, Jonathan May, and Kevin Knight. 2018. Out-of-the-box universal romanization tool uroman. Proceedings of the 56th Annual Meeting of Association for Computational Linguistics, Demo Track.",
@@ -107,8 +137,8 @@ def package(args):
             if f.suffix.lower() in ('.exe','.dll') and any(n in data for n in (b'.trellis',b'C:/Users/',b'C:'+bytes([92])+b'Users')):
                 raise ValueError('private build path in runtime')
             files.append({'path':f.relative_to(root).as_posix(),**identity(f)})
-        manifest={'schemaVersion':1,'artifactId':f'hikaru-asr-crispasr-windows-x64-{device}-v1','platform':'windows-x64','arch':'x64','protocolVersion':1,
-                  'capabilities':{'backend':'crispasr','device':device,'engines':['qwen3-asr'],'vad':True,'crispasr':True,'cuda':device=='cuda','vulkan':False,'modelsBundled':False},
+        manifest={'schemaVersion':1,'artifactId':f'hikaru-asr-crispasr-windows-x64-{device}-{candidate or "v1"}','platform':'windows-x64','arch':'x64','protocolVersion':1,
+                  'capabilities':{'backend':'crispasr','device':device,'engines':engines,'vad':True,'crispasr':True,'cuda':device=='cuda','vulkan':False,'modelsBundled':False},
                   'source':source,'build':{'target':'crispasr-cli','cmakeCacheSha256':identity(build/'CMakeCache.txt')['sha256'],
                     'cudaArchitectures': '50-virtual;61-virtual;70-virtual;75-virtual;80-virtual;86-real;89-real;90-virtual;120a-real' if device=='cuda' else None,
                     'cudaToolchain':'CUDA 12.8 + MSVC 14.50 -allow-unsupported-compiler; locally tested, not vendor-supported toolchain' if device=='cuda' else None},'files':files}
@@ -120,7 +150,10 @@ def package(args):
                 if f.is_file():
                     info=zipfile.ZipInfo(f.relative_to(args.output/device).as_posix(),(2026,1,1,0,0,0));info.compress_type=zipfile.ZIP_DEFLATED;z.writestr(info,f.read_bytes(),compresslevel=9)
         lock[device]={'artifactId':manifest['artifactId'],'manifestSha256':identity(root/'runtime-manifest.json')['sha256'],'files':files,
-                      'archive':{'path':f'native-asr/artifacts/crispasr-{device}.zip','root':f'windows-x64/crispasr/{device}/',**identity(archive)}}
+                      'archive':{'path':archive.relative_to(ROOT).as_posix() if candidate else f'native-asr/artifacts/crispasr-{device}.zip',
+                                 'root':f'windows-x64/crispasr/{device}/',**identity(archive)}}
+        if candidate:
+            lock[device]['engines'] = engines
     authority = json.loads((ROOT/'native-asr/runtime/crispasr-product-lock.json').read_text(encoding='utf-8'))
     lock['externalStableAssetPublished'] = is_published_cuda_archive(lock['cuda']['archive'], authority)
     write_json(args.output/'crispasr-product-lock.json',lock)
@@ -129,4 +162,6 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('source','cpu-build','cuda-build','cpu-worker','cuda-worker','redist','cuda-toolkit','extra-licenses','output'):
         parser.add_argument('--'+name,type=Path,required=True)
+    parser.add_argument('--candidate-id', help='Fresh shared-* identity; never a publication or model availability toggle')
+    parser.add_argument('--parakeet-acquisition-lock', type=Path)
     package(parser.parse_args())

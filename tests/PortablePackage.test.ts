@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -158,8 +158,21 @@ describe("portable package", () => {
     20_000,
   );
 
-  it("re-verifies the tracked native runtime before portable staging", () => {
-    const root = fileURLToPath(new URL("..", import.meta.url));
+  it("re-verifies the tracked native runtime before portable staging", async () => {
+    // Resource preparation replaces directories. Never mutate the actual build
+    // tree here: Rust/Tauri can be reading those same files during other checks.
+    const { root } = await makeReleaseDir();
+    const crispasr = JSON.parse(readFileSync(rootFile("native-asr/runtime/crispasr-product-lock.json"), "utf8"));
+    expect(crispasr.cpu.engines).toEqual(["qwen3-asr", "parakeet"]);
+    expect(crispasr.cuda.engines).toEqual(["qwen3-asr", "parakeet"]);
+    expect(crispasr.externalStableAssetPublished).toBe(true);
+    for (const path of [
+      "native-asr/runtime/windows-x64-cpu-lock.json", "native-asr/artifacts/windows-x64-cpu.zip",
+      "native-asr/runtime/crispasr-product-lock.json", crispasr.cpu.archive.path,
+    ]) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await copyFile(rootFile(path), join(root, path));
+    }
     const lock = JSON.parse(
       readFileSync(
         join(root, "native-asr", "runtime", "windows-x64-cpu-lock.json"),

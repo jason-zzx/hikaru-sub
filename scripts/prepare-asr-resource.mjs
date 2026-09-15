@@ -10,7 +10,7 @@ import { verifyCrispasrArchive } from "./verify-crispasr-runtime.mjs";
 
 const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
 
-export function prepareAsrResources(root = defaultRoot) {
+export function prepareAsrResources(root = defaultRoot, candidateLockPath = process.env.HIKARU_CRISPASR_CANDIDATE_LOCK) {
   const legacyTarget = join(root, "src-tauri", "resources", "asr-service");
   const runtimeLockPath = join(
     root,
@@ -28,7 +28,7 @@ export function prepareAsrResources(root = defaultRoot) {
     lockPath: runtimeLockPath,
     extractPayloadTo: join(nativeRuntimeTarget, "windows-x64", "cpu"),
   });
-  verifyCrispasrArchive({ root, device: "cpu", extractTo: join(nativeRuntimeTarget, "windows-x64/crispasr/cpu") });
+  verifyCrispasrArchive({ root, device: "cpu", candidateLockPath, extractTo: join(nativeRuntimeTarget, "windows-x64/crispasr/cpu") });
   return result;
 }
 

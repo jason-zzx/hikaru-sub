@@ -319,9 +319,16 @@ mod tests {
     #[tokio::test]
     async fn actual_local_frozen_archive_publication() {
         let source_profile = std::env::var("HIKARU_ASR_CRISPASR_ARCHIVE_TEST_SOURCE").ok();
+        let local_archive = std::env::var_os("HIKARU_ASR_CRISPASR_ARCHIVE_TEST_ARCHIVE");
+        let resources =
+            std::env::var_os("HIKARU_ASR_CRISPASR_PACKAGE_TEST_RESOURCES").map(PathBuf::from);
+        assert!(
+            source_profile.is_none() || local_archive.is_none(),
+            "choose one archive input"
+        );
         let Some(path) = std::env::var_os("HIKARU_ASR_CRISPASR_ARCHIVE_TEST_ROOT") else {
             assert!(
-                source_profile.is_none(),
+                source_profile.is_none() && local_archive.is_none() && resources.is_none(),
                 "archive source requires isolated test root"
             );
             return;
@@ -356,29 +363,86 @@ mod tests {
             .expect("public archive download deadline")
             .expect("public archive download failed")
         } else {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../native-asr/artifacts/crispasr-cuda.zip")
+            local_archive.map(PathBuf::from).unwrap_or_else(|| {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../native-asr/artifacts/crispasr-cuda-shared-v2.zip")
+            })
         };
-        let target = root.join("deps/asr-runtime/crispasr/cuda/current");
+        let deps = resources.as_ref().unwrap_or(&root).join("deps");
+        let target = deps.join("asr-runtime/crispasr/cuda/current");
         publish_archive(&archive, &root, &target, lock.cuda.as_ref().unwrap()).unwrap();
         verify_payload(&target, "cuda", lock.cuda.as_ref().unwrap()).unwrap();
         cuda_probe::probe(&target).unwrap();
+        if let Some(resources) = resources {
+            // Actual extracted NSIS/portable CPU plus locally installed CUDA
+            // candidate. No WebView/installer interaction or model inference.
+            assert_eq!(deps, resources.join("deps")); // executable-adjacent in both modes
+            let prior = root.join("prior.ass");
+            fs::write(&prior, b"preserve prior ASS").unwrap();
+            let download_available = published(&lock, &platform_sources().unwrap());
+            let ready = items_at(&resources, &deps, &lock, download_available, |_| Ok(())).unwrap();
+            assert!(ready.iter().all(|item| {
+                item.status == RuntimeDependencyStatus::Available
+                    && item.expected_download_bytes.is_none()
+            }));
+            for device in ["cpu", "cuda"] {
+                let runtime = verify_at(&resources, &deps, device, &lock).unwrap();
+                runtime.require_engine("qwen3-asr").unwrap();
+                runtime.require_engine("parakeet").unwrap();
+                assert!(runtime.require_engine("reazonspeech-nemo").is_err());
+                let dll = runtime.root.join("vcomp140.dll");
+                let original = fs::read(&dll).unwrap();
+                fs::remove_file(&dll).unwrap();
+                let missing = verify_at(&resources, &deps, device, &lock);
+                fs::write(&dll, vec![0; original.len()]).unwrap();
+                let corrupt = verify_at(&resources, &deps, device, &lock);
+                fs::write(&dll, original).unwrap();
+                assert!(missing.is_err() && corrupt.is_err());
+                verify_at(&resources, &deps, device, &lock).unwrap();
+            }
+            assert!(verify_at(&resources, &deps, "vulkan", &lock).is_err());
+            let failed_device = items_at(&resources, &deps, &lock, download_available, |_| {
+                Err("synthetic device failure".into())
+            })
+            .unwrap();
+            assert_eq!(failed_device[0].status, RuntimeDependencyStatus::Available);
+            assert_eq!(failed_device[1].status, RuntimeDependencyStatus::Missing);
+            assert_eq!(
+                failed_device[1].expected_download_bytes,
+                download_available
+                    .then(|| lock.cuda.as_ref().unwrap().archive.as_ref().unwrap().size_bytes)
+            );
+            assert_eq!(fs::read(prior).unwrap(), b"preserve prior ASS");
+            fs::write(
+                root.join("package-check.json"),
+                serde_json::to_vec_pretty(&serde_json::json!({
+                    "cpuArtifact":lock.cpu.as_ref().unwrap().artifact_id,
+                    "cudaArtifact":lock.cuda.as_ref().unwrap().artifact_id,
+                    "exactClosure":true,"cudaComputeProbe":true,"missingAndCorruptRejected":true,"managedRootAdjacent":true,
+                    "syntheticDeviceFailureIsolated":true,"priorAssPreserved":true,
+                    "externalStableAssetPublished":lock.external_stable_asset_published,
+                    "downloadAvailable":download_available,"bothEnginesAuthorized":true,"manualInstallOrUi":false
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+        }
     }
 
     #[test]
     fn public_sources_match_uploaded_archive_and_reject_unpublished_or_mismatched_bytes() {
-        let mut lock: ProductLock = serde_json::from_str(LOCK_JSON).unwrap();
+        let mut lock: ProductLock = serde_json::from_str(PUBLISHED_LOCK_JSON).unwrap();
         let mut sources = platform_sources().unwrap();
         assert!(published(&lock, &sources));
         let official = sources.official.crispasr_cuda.as_ref().unwrap();
         let china = sources.china.crispasr_cuda.as_ref().unwrap();
-        assert_eq!(official.url, "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-v1.zip");
+        assert_eq!(official.url, "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip");
         assert_eq!(china.url, format!("https://ghfast.top/{}", official.url));
         assert_eq!(
             official.sha256,
-            "5a8e0272d41341e1759a32765fc4a218135df6626bfec83c80eed2b08379370d"
+            "23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d"
         );
-        assert_eq!(official.size_bytes, 719_774_409);
+        assert_eq!(official.size_bytes, 719_774_286);
         let temp = tempfile::tempdir().unwrap();
         let items = items_at(
             &temp.path().join("resources"),
@@ -389,7 +453,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(items[1].status, RuntimeDependencyStatus::Missing);
-        assert_eq!(items[1].expected_download_bytes, Some(719_774_409));
+        assert_eq!(items[1].expected_download_bytes, Some(719_774_286));
         assert_ne!(items[1].reason.as_deref(), Some(PENDING));
         assert!(items[0].expected_download_bytes.is_none());
         lock.external_stable_asset_published = false;

@@ -291,7 +291,19 @@ export function TranscribeView() {
           const full = await getAsrProgress(jobId, true);
           if (!pollingRef.current || rejectStaleResult()) break;
           const segments = full.segments ?? [];
-          const cues = mergeShortCues(segmentsToCues(segments, PRIMARY_STYLE));
+          if (engine === "parakeet" && segments.length === 0) {
+            // Truthful silence is not a replacement document or a discard of
+            // unsaved recovery. Keep cues, metadata, target and save token intact.
+            setResultCount(0);
+            setJob(full);
+            setAsrNotice("转录完成，未检测到语音；已保留现有字幕，未保存 ASS");
+            updateTask("asr", { status: "success", progress: 100 });
+            break;
+          }
+          const sourceCues = segmentsToCues(segments, PRIMARY_STYLE);
+          const cues = engine === "parakeet"
+            ? sourceCues.map((cue, i) => ({ ...cue, primaryText: segments[i].text }))
+            : mergeShortCues(sourceCues);
           const applied = await withDiscardedSubtitleRecovery(
             discardRecoveryVideoPath,
             () => {
@@ -346,7 +358,7 @@ export function TranscribeView() {
                 scriptInfo: snap.scriptInfo ?? doc.scriptInfo,
                 styles: snap.styles.length > 0 ? snap.styles : doc.styles,
                 cues: snap.cues,
-              });
+              }, { preserveOrder: engine === "parakeet" });
               await saveAssText(session.transcribedAssPath, assText);
               if (!saveGuard.sameDocument()) {
                 updateTask("asr", { status: "error" });

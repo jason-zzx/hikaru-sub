@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "status": "local-shared-candidate-not-published",
+  "productEnablementAllowed": true,
+  "externalStableAssetPublished": false,
+  "candidateId": "shared-local-r1",
+  "acquisitionLock": {
+    "sizeBytes": 3023,
+    "sha256": "87573bb1454dc460302b3585b2f4c7fcda9b99f370b5295c43284988ccdc991d"
+  },
+  "cpu": {
+    "artifactId": "hikaru-asr-crispasr-windows-x64-cpu-shared-local-r1",
+    "manifestSha256": "3cb0f158a15422ec96e34ff4b80653ad723e97edf3cad415c493a56a24e707bc",
+    "files": [
+      {
+        "path": "crispasr.exe",
+        "sizeBytes": 17151488,
+        "sha256": "53a5f468cb73dfadfab55beae18894485c3e1e1e1f43b77a4f9f2efb0818024f"
+      },
+      {
+        "path": "hikaru-asr-worker.exe",
+        "sizeBytes": 372224,
+        "sha256": "5870db2f85adc88618a0c91ac538d61ba82d27c9a59b79fd80094582817101f2"
+      },
+      {
+        "path": "licenses/Apache-2.0.txt",
+        "sizeBytes": 11357,
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "licenses/c2pa-MIT.txt",
+        "sizeBytes": 1254,
+        "sha256": "b86f835523f67e55423756bfa8f07c791bc8b1854f57c6290783e9ae2ae23d51"
+      },
+      {
+        "path": "licenses/cpp-httplib-MIT.txt",
+        "sizeBytes": 1075,
+        "sha256": "4b45cbe16d7b71b89ae6127e26e0d90a029198ca5e958ad8e3d0b8bbed364d8b"
+      },
+      {
+        "path": "licenses/CrispASR-MIT.txt",
+        "sizeBytes": 1078,
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+      },
+      {
+        "path": "licenses/glint-MIT.txt",
+        "sizeBytes": 1075,
+        "sha256": "ab08fb7ec4a030bd27a9a0d1fb60a39b832f7779fb11d0f2753e85593f6f944e"
+      },
+      {
+        "path": "licenses/micro-ecc-BSD.txt",
+        "sizeBytes": 1300,
+        "sha256": "ffd8b033d2df7568c25a98866bd92b1656f7da82d7f813c0b2eb85ec36611193"
+      },
+      {
+        "path": "licenses/Microsoft-Visual-Cpp-Runtime.txt",
+        "sizeBytes": 451,
+        "sha256": "ee08755af3f7ad646d1da47b1b409372ff34afbca52613a3683c71fea1ed6f27"
+      },
+      {
+        "path": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+        "sizeBytes": 39553,
+        "sha256": "08651651a7602fc7c0e2763de0fde1ff9f868df2780597cd1775ee9d6441c783"
+      },
+      {
+        "path": "licenses/miniaudio.txt",
+        "sizeBytes": 2425,
+        "sha256": "49657f1277165b95afdb721c26180f9ce8e6e49264ddb2d10ef8c478d2bb04bf"
+      },
+      {
+        "path": "licenses/MODEL-SOURCES.json",
+        "sizeBytes": 3741,
+        "sha256": "23a65f8053703b73b48d27d54be93b183069fde187cdedf2bd543eaac11f03e0"
+      },
+      {
+        "path": "licenses/nlohmann-worker-MIT.txt",
+        "sizeBytes": 1076,
+        "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+      },
+      {
+        "path": "licenses/stb-vorbis.txt",
+        "sizeBytes": 2592,
+        "sha256": "36df9677aa6a2ae37a01c7aaa39c3206fa02a4e06bb5037ebe89e5828b931f31"
+      },
+      {
+        "path": "licenses/THIRD-PARTY-NOTICES.json",
+        "sizeBytes": 3924,
+        "sha256": "17e890205eb1275ac8c32e730bd7650e3b5155457b26b51f8e852da73ca8bdd5"
+      },
+      {
+        "path": "licenses/upstream-THIRD-PARTY-NOTICES.txt",
+        "sizeBytes": 30992,
+        "sha256": "4460c1520ac07c0bb55ffee0f07552285fc6f5d1a5cb0b7c4a3be8f448747d1f"
+      },
+      {
+        "path": "licenses/uroman-MIT.txt",
+        "sizeBytes": 1533,
+        "sha256": "b19e1eebc2379bdaa86af602cb307fa0e05ac906d0796f2864dadf2c32dc29b4"
+      },
+      {
+        "path": "licenses/WebRTC-BSD.txt",
+        "sizeBytes": 2715,
+        "sha256": "c652961f6c92f978ebe4acea6b8b68d4d2d777bd0a1df130c9deffca12d482cd"
+      },
+      {
+        "path": "msvcp140.dll",
+        "sizeBytes": 553552,
+        "sha256": "def46aa6a8f72f27bafac0c43334419486a4d1dcdb6c479a8ef7034b3e1fa4cb"
+      },
+      {
+        "path": "vcomp140.dll",
+        "sizeBytes": 213064,
+        "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7"
+      },
+      {
+        "path": "vcruntime140.dll",
+        "sizeBytes": 123472,
+        "sha256": "184146852727a9db4eea06178716bec3cdbb1015c911f6b0f915b184ad7775b2"
+      },
+      {
+        "path": "vcruntime140_1.dll",
+        "sizeBytes": 47264,
+        "sha256": "e6bfb3662ab4b1969a73441dbe35c96d51441b6bff8cf1fe7430bd5b246ca605"
+      }
+    ],
+    "archive": {
+      "path": "native-asr/build/full-cli/shared-local-r1/crispasr-cpu.zip",
+      "root": "windows-x64/crispasr/cpu/",
+      "sizeBytes": 7666374,
+      "sha256": "7ec335ac5f42c4350c60c03191efaed5db133233596679e01557c6b588636c41"
+    },
+    "engines": [
+      "qwen3-asr",
+      "parakeet"
+    ]
+  },
+  "cuda": {
+    "artifactId": "hikaru-asr-crispasr-windows-x64-cuda-shared-local-r1",
+    "manifestSha256": "fed14065b756e651db1c2157948cca7e6f0d1a73b015d9724f2c3410b7a3e550",
+    "files": [
+      {
+        "path": "crispasr.exe",
+        "sizeBytes": 175336960,
+        "sha256": "28a872ea54b4aaaee38d51ec7a7bddfbf7eb896fde63c13959674002719ffc4f"
+      },
+      {
+        "path": "cublas64_12.dll",
+        "sizeBytes": 113716224,
+        "sha256": "9513540e4ec4c51ee9e7304138c2cc255c29a8c181f9e80c38efa25738becd99"
+      },
+      {
+        "path": "cublasLt64_12.dll",
+        "sizeBytes": 674667520,
+        "sha256": "b199d1ff892a81b7fd3d57ba1781549609b41500b36008fef326038393ad46c7"
+      },
+      {
+        "path": "cudart64_12.dll",
+        "sizeBytes": 573952,
+        "sha256": "c2c9a9c22a9bcba90e261825968836787b331038047a26770cffb7a583c28344"
+      },
+      {
+        "path": "hikaru-asr-worker.exe",
+        "sizeBytes": 372224,
+        "sha256": "a054d74c60cbfcd0456f2b3a053c4c0763a2fdfefbefc8e6ec58b95a03fb66e6"
+      },
+      {
+        "path": "licenses/Apache-2.0.txt",
+        "sizeBytes": 11357,
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "licenses/c2pa-MIT.txt",
+        "sizeBytes": 1254,
+        "sha256": "b86f835523f67e55423756bfa8f07c791bc8b1854f57c6290783e9ae2ae23d51"
+      },
+      {
+        "path": "licenses/cpp-httplib-MIT.txt",
+        "sizeBytes": 1075,
+        "sha256": "4b45cbe16d7b71b89ae6127e26e0d90a029198ca5e958ad8e3d0b8bbed364d8b"
+      },
+      {
+        "path": "licenses/CrispASR-MIT.txt",
+        "sizeBytes": 1078,
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+      },
+      {
+        "path": "licenses/glint-MIT.txt",
+        "sizeBytes": 1075,
+        "sha256": "ab08fb7ec4a030bd27a9a0d1fb60a39b832f7779fb11d0f2753e85593f6f944e"
+      },
+      {
+        "path": "licenses/micro-ecc-BSD.txt",
+        "sizeBytes": 1300,
+        "sha256": "ffd8b033d2df7568c25a98866bd92b1656f7da82d7f813c0b2eb85ec36611193"
+      },
+      {
+        "path": "licenses/Microsoft-Visual-Cpp-Runtime.txt",
+        "sizeBytes": 451,
+        "sha256": "ee08755af3f7ad646d1da47b1b409372ff34afbca52613a3683c71fea1ed6f27"
+      },
+      {
+        "path": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+        "sizeBytes": 39553,
+        "sha256": "08651651a7602fc7c0e2763de0fde1ff9f868df2780597cd1775ee9d6441c783"
+      },
+      {
+        "path": "licenses/miniaudio.txt",
+        "sizeBytes": 2425,
+        "sha256": "49657f1277165b95afdb721c26180f9ce8e6e49264ddb2d10ef8c478d2bb04bf"
+      },
+      {
+        "path": "licenses/MODEL-SOURCES.json",
+        "sizeBytes": 3741,
+        "sha256": "23a65f8053703b73b48d27d54be93b183069fde187cdedf2bd543eaac11f03e0"
+      },
+      {
+        "path": "licenses/nlohmann-worker-MIT.txt",
+        "sizeBytes": 1076,
+        "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+      },
+      {
+        "path": "licenses/NVIDIA-EULA.txt",
+        "sizeBytes": 63021,
+        "sha256": "e2c71babfd18a8e69542dd7e9ca018f9caa438094001a58e6bc4d8c999bf0d07"
+      },
+      {
+        "path": "licenses/NVIDIA-LICENSE",
+        "sizeBytes": 63021,
+        "sha256": "e2c71babfd18a8e69542dd7e9ca018f9caa438094001a58e6bc4d8c999bf0d07"
+      },
+      {
+        "path": "licenses/stb-vorbis.txt",
+        "sizeBytes": 2592,
+        "sha256": "36df9677aa6a2ae37a01c7aaa39c3206fa02a4e06bb5037ebe89e5828b931f31"
+      },
+      {
+        "path": "licenses/THIRD-PARTY-NOTICES.json",
+        "sizeBytes": 4387,
+        "sha256": "9a4e1aeb91d7c3b59ebb9be58f68943f289a65a48ed666662ca743cbd484cd79"
+      },
+      {
+        "path": "licenses/upstream-THIRD-PARTY-NOTICES.txt",
+        "sizeBytes": 30992,
+        "sha256": "4460c1520ac07c0bb55ffee0f07552285fc6f5d1a5cb0b7c4a3be8f448747d1f"
+      },
+      {
+        "path": "licenses/uroman-MIT.txt",
+        "sizeBytes": 1533,
+        "sha256": "b19e1eebc2379bdaa86af602cb307fa0e05ac906d0796f2864dadf2c32dc29b4"
+      },
+      {
+        "path": "licenses/WebRTC-BSD.txt",
+        "sizeBytes": 2715,
+        "sha256": "c652961f6c92f978ebe4acea6b8b68d4d2d777bd0a1df130c9deffca12d482cd"
+      },
+      {
+        "path": "msvcp140.dll",
+        "sizeBytes": 553552,
+        "sha256": "def46aa6a8f72f27bafac0c43334419486a4d1dcdb6c479a8ef7034b3e1fa4cb"
+      },
+      {
+        "path": "vcomp140.dll",
+        "sizeBytes": 213064,
+        "sha256": "31af29c03643f8396a6f26bcd601c6369d26493d7d78b714827ab2801bd284c7"
+      },
+      {
+        "path": "vcruntime140.dll",
+        "sizeBytes": 123472,
+        "sha256": "184146852727a9db4eea06178716bec3cdbb1015c911f6b0f915b184ad7775b2"
+      },
+      {
+        "path": "vcruntime140_1.dll",
+        "sizeBytes": 47264,
+        "sha256": "e6bfb3662ab4b1969a73441dbe35c96d51441b6bff8cf1fe7430bd5b246ca605"
+      }
+    ],
+    "archive": {
+      "path": "native-asr/build/full-cli/shared-local-r1/crispasr-cuda.zip",
+      "root": "windows-x64/crispasr/cuda/",
+      "sizeBytes": 719774328,
+      "sha256": "81d3422aceea39b058afe36e86a833661c295daeb9b32600fdcc20965a6379e1"
+    },
+    "engines": [
+      "qwen3-asr",
+      "parakeet"
+    ]
+  }
+}

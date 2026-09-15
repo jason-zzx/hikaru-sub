@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { verifyCrispasrArchive, verifyCrispasrTree } from "./verify-crispasr-runtime.mjs";
+import { sha256File } from "./verify-native-asr-runtime.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 describe("independent CrispASR CPU artifact", () => {
@@ -28,6 +29,51 @@ assert not check(archive, unpublished)
 assert not check(archive, {})
 `], { cwd: root, stdio: "pipe" });
   });
+  it("requires explicit shared identity, exact capabilities, model credit and full DLL closure", () => {
+    const temp = mkdtempSync(join(tmpdir(), "crispasr-shared-"));
+    try {
+      // Synthetic metadata over the verified CPU payload, not new model proof.
+      const target = join(temp, "runtime");
+      verifyCrispasrArchive({ root, extractTo: target });
+      const artifact = JSON.parse(readFileSync(join(root, "native-asr/runtime/crispasr-product-lock.json"), "utf8")).cpu;
+      const manifest = JSON.parse(readFileSync(join(target, "runtime-manifest.json"), "utf8"));
+      artifact.artifactId = manifest.artifactId = "hikaru-asr-crispasr-windows-x64-cpu-shared-fixture";
+      artifact.engines = manifest.capabilities.engines = ["qwen3-asr", "parakeet"];
+      const modelPath = join(target, "licenses/MODEL-SOURCES.json");
+      const models = JSON.parse(readFileSync(modelPath, "utf8"));
+      models.assets = models.assets.filter(row => row.logicalModel !== "nvidia/parakeet-tdt_ctc-0.6b-ja");
+      models.assets.push({ logicalModel: "nvidia/parakeet-tdt_ctc-0.6b-ja", license: "CC-BY-4.0",
+        attribution: "Synthetic credit", modificationNotice: "Synthetic conversion", licenseUrl: "https://creativecommons.org/licenses/by/4.0/" });
+      const relock = () => {
+        writeFileSync(modelPath, JSON.stringify(models));
+        for (const file of artifact.files) {
+          const path = join(target, file.path);
+          file.sizeBytes = readFileSync(path).length;
+          file.sha256 = sha256File(path);
+        }
+        manifest.files = artifact.files;
+        writeFileSync(join(target, "runtime-manifest.json"), JSON.stringify(manifest));
+        artifact.manifestSha256 = sha256File(join(target, "runtime-manifest.json"));
+        writeFileSync(join(target, "SHA256SUMS"), artifact.files.map(f => `${f.sha256}  ${f.path}\n`).join(""));
+      };
+      relock();
+      verifyCrispasrTree(target, artifact, "cpu");
+      for (const engines of [["parakeet"], ["parakeet", "qwen3-asr"], ["qwen3-asr"]]) {
+        expect(() => verifyCrispasrTree(target, { ...artifact, engines }, "cpu")).toThrow();
+      }
+      delete models.assets.at(-1).attribution;
+      relock();
+      expect(() => verifyCrispasrTree(target, artifact, "cpu")).toThrow();
+      models.assets.at(-1).attribution = "Synthetic credit";
+      // Even a self-consistent manifest cannot omit a required runtime DLL.
+      artifact.files = artifact.files.filter(f => f.path !== "vcomp140.dll");
+      rmSync(join(target, "vcomp140.dll"));
+      relock();
+      expect(() => verifyCrispasrTree(target, artifact, "cpu")).toThrow();
+      expect(() => verifyCrispasrArchive({ root, candidateLockPath: "relative.json" })).toThrow();
+      expect(() => verifyCrispasrArchive({ root, candidateLockPath: join(root, "native-asr/runtime/crispasr-product-lock.json") })).toThrow();
+    } finally { rmSync(temp, { recursive: true, force: true }); }
+  }, 60000);
   it("verifies the real archive and rejects missing, extra, corrupt, wrong-device and manifest data", () => {
     const temp = mkdtempSync(join(tmpdir(), "crispasr-verify-"));
     try {

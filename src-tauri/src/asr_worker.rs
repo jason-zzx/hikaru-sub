@@ -197,9 +197,10 @@ impl ResolvedNativeLaunch {
             return Err("native ASR 仅接受日语源语言".into());
         }
         validate_vad(use_vad, vad_config.as_ref())?;
-        let full_cli = engine == "qwen3-asr" && model_paths.iter().any(|(role, _)| role == "vad");
+        let full_cli = matches!(engine.as_str(), "qwen3-asr" | "parakeet")
+            && model_paths.iter().any(|(role, _)| role == "vad");
         if full_cli && (!use_vad || vad_config.is_some() || device == "vulkan") {
-            return Err("Qwen full CLI 需要必需 CPU VAD、固定默认配置与 CPU/CUDA".into());
+            return Err("Native full CLI 需要必需 CPU VAD、固定默认配置与 CPU/CUDA".into());
         }
 
         if full_cli {
@@ -395,6 +396,10 @@ fn validate_route(
             || !roles.contains("aligner")
         {
             return Err("qwen3-asr 需要 model 与 aligner".into());
+        }
+    } else if engine == "parakeet" {
+        if roles.len() > 2 || roles.contains("aligner") {
+            return Err("Parakeet full CLI 只接受 model 与必需 CPU vad".into());
         }
     } else if roles.len() != 1 {
         return Err("当前 native ASR route 只接受 model role".into());
@@ -1952,6 +1957,8 @@ mod tests {
     use tempfile::TempDir;
 
     include!("asr_worker_qwen_tests.rs");
+    include!("asr_worker_parakeet_tests.rs");
+    include!("asr_worker_parakeet_real_tests.rs");
 
     const R2_STEP6_MANIFEST_SHA256: &str =
         "aa28e40c65c029c2c7c651121606f9334daddf21ee839c59954455d3bb5bb33c";

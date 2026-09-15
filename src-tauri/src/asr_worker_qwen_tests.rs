@@ -101,6 +101,17 @@ fn qwen_launch(
     audio: Option<&Path>,
     device: &str,
 ) -> ResolvedNativeLaunch {
+    full_cli_launch(temp, id, "qwen3-asr", roles, audio, device)
+}
+
+fn full_cli_launch(
+    temp: &TempDir,
+    id: &str,
+    engine: &str,
+    roles: Vec<(String, PathBuf)>,
+    audio: Option<&Path>,
+    device: &str,
+) -> ResolvedNativeLaunch {
     let cache = temp.path().join("中文 缓存");
     let workspace = cache.join("workspace/中文 工作区");
     fs::create_dir_all(&workspace).unwrap();
@@ -126,7 +137,7 @@ fn qwen_launch(
     }
     ResolvedNativeLaunch::resolve(
         id.into(),
-        "qwen3-asr".into(),
+        engine.into(),
         roles,
         device.into(),
         "ja".into(),
@@ -335,76 +346,81 @@ fn qwen_cli_fixture_cancel_shutdown_crash_and_immediate_reopen() {
     let Some(worker) = std::env::var_os("HIKARU_ASR_QWEN_CLI_FIXTURE_WORKER") else {
         return;
     };
-    for action in ["cancel", "shutdown", "crash"] {
-        let temp = tempfile::tempdir().unwrap();
-        let gate = Arc::new(ActiveJobGate::default());
-        let host = NativeAsrHost::new(PathBuf::from(&worker), vec![], Arc::clone(&gate)).unwrap();
-        let launch = qwen_launch(
-            &temp,
-            action,
-            qwen_fixture_roles(&temp, "descendant"),
-            None,
-            "cpu",
-        );
-        let output = launch.output_ass_path.clone();
-        let recovery = launch.recovery_path.clone();
-        fs::write(&output, "preserve").unwrap();
-        host.start(launch, gate.reserve().unwrap()).unwrap();
-        let record = host.inner.jobs.lock().unwrap().get(action).unwrap().clone();
-        let owned = record.process_job.as_ref().unwrap();
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while owned.active().unwrap() < 3 {
-            assert!(
-                Instant::now() < deadline,
-                "fixture descendant never started: {:?}",
-                host.snapshot(action, true).unwrap()
+    for engine in ["qwen3-asr", "parakeet"] {
+        for action in ["cancel", "shutdown", "crash"] {
+            let temp = tempfile::tempdir().unwrap();
+            let gate = Arc::new(ActiveJobGate::default());
+            let host =
+                NativeAsrHost::new(PathBuf::from(&worker), vec![], Arc::clone(&gate)).unwrap();
+            let launch = full_cli_launch(
+                &temp,
+                action,
+                engine,
+                full_cli_fixture_roles(engine, &temp, "descendant"),
+                None,
+                "cpu",
             );
-            std::thread::sleep(Duration::from_millis(5));
-        }
-        assert!(gate.reserve().is_err());
-        let began = Instant::now();
-        match action {
-            "cancel" => host.cancel(action).unwrap(),
-            "shutdown" => host.shutdown(),
-            _ => {
-                let pid = record.inner.lock().unwrap().pid.unwrap();
-                // Kill only this test-owned worker, deliberately not /T, to prove
-                // nested kill-on-close + host ownership reap its real descendants.
-                assert!(hidden_command("taskkill")
-                    .args(["/PID", &pid.to_string(), "/F"])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .unwrap()
-                    .success());
+            let output = launch.output_ass_path.clone();
+            let recovery = launch.recovery_path.clone();
+            fs::write(&output, "preserve").unwrap();
+            host.start(launch, gate.reserve().unwrap()).unwrap();
+            let record = host.inner.jobs.lock().unwrap().get(action).unwrap().clone();
+            let owned = record.process_job.as_ref().unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while owned.active().unwrap() < 3 {
+                assert!(
+                    Instant::now() < deadline,
+                    "fixture descendant never started: {:?}",
+                    host.snapshot(action, true).unwrap()
+                );
+                std::thread::sleep(Duration::from_millis(5));
             }
-        }
-        let result = wait_terminal(&host, action);
-        assert!(began.elapsed() < Duration::from_secs(2));
-        assert_eq!(owned.active().unwrap(), 0);
-        assert!(!gate.has_active());
-        assert_eq!(
-            result["status"],
-            if action == "crash" {
-                "failed"
-            } else {
-                "cancelled"
+            assert!(gate.reserve().is_err());
+            let began = Instant::now();
+            match action {
+                "cancel" => host.cancel(action).unwrap(),
+                "shutdown" => host.shutdown(),
+                _ => {
+                    let pid = record.inner.lock().unwrap().pid.unwrap();
+                    // Kill only this test-owned worker, deliberately not /T, to prove
+                    // nested kill-on-close + host ownership reap its real descendants.
+                    assert!(hidden_command("taskkill")
+                        .args(["/PID", &pid.to_string(), "/F"])
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .unwrap()
+                        .success());
+                }
             }
-        );
-        assert_eq!(fs::read_to_string(&output).unwrap(), "preserve");
-        assert_eq!(
-            serde_json::from_slice::<Value>(&fs::read(recovery).unwrap()).unwrap(),
-            result
-        );
-        let next = qwen_launch(
-            &temp,
-            "reopen",
-            qwen_fixture_roles(&temp, "success"),
-            None,
-            "cpu",
-        );
-        host.start(next, gate.reserve().unwrap()).unwrap();
-        assert_eq!(wait_terminal(&host, "reopen")["status"], "completed");
+            let result = wait_terminal(&host, action);
+            assert!(began.elapsed() < Duration::from_secs(2));
+            assert_eq!(owned.active().unwrap(), 0);
+            assert!(!gate.has_active());
+            assert_eq!(
+                result["status"],
+                if action == "crash" {
+                    "failed"
+                } else {
+                    "cancelled"
+                }
+            );
+            assert_eq!(fs::read_to_string(&output).unwrap(), "preserve");
+            assert_eq!(
+                serde_json::from_slice::<Value>(&fs::read(recovery).unwrap()).unwrap(),
+                result
+            );
+            let next = full_cli_launch(
+                &temp,
+                "reopen",
+                engine,
+                full_cli_fixture_roles(engine, &temp, "success"),
+                None,
+                "cpu",
+            );
+            host.start(next, gate.reserve().unwrap()).unwrap();
+            assert_eq!(wait_terminal(&host, "reopen")["status"], "completed");
+        }
     }
 }
 
@@ -558,8 +574,10 @@ fn qwen_cli_final_manager_host_functional_case() {
     assert_eq!(sha256_file_for_test(&runtime.worker), input.worker.sha256);
     let temp = tempfile::tempdir().unwrap();
     let model = tokio::runtime::Runtime::new().unwrap().block_on(
-        crate::asr_models::resolve_qwen_delivery_test_model(
+        crate::asr_models::resolve_full_cli_delivery_test_model(
             &temp.path().join("中文 deps"),
+            "qwen3-asr",
+            "Qwen/Qwen3-ASR-1.7B",
             &[
                 input.model.path.clone(),
                 input.aligner.path.clone(),
@@ -959,139 +977,146 @@ fn qwen_cli_locked_results_release_process_gate_and_retry_cleanup() {
     let Some(worker) = std::env::var_os("HIKARU_ASR_QWEN_CLI_FIXTURE_WORKER") else {
         return;
     };
-    for action in ["cancel", "shutdown", "crash", "finish"] {
-        let temp = tempfile::tempdir().unwrap();
-        let gate = Arc::new(ActiveJobGate::default());
-        let host = NativeAsrHost::new(PathBuf::from(&worker), vec![], Arc::clone(&gate)).unwrap();
-        let launch = qwen_launch(
-            &temp,
-            action,
-            qwen_fixture_roles(
+    for engine in ["qwen3-asr", "parakeet"] {
+        for action in ["cancel", "shutdown", "crash", "finish"] {
+            let temp = tempfile::tempdir().unwrap();
+            let gate = Arc::new(ActiveJobGate::default());
+            let host =
+                NativeAsrHost::new(PathBuf::from(&worker), vec![], Arc::clone(&gate)).unwrap();
+            let launch = full_cli_launch(
                 &temp,
-                if action == "finish" {
-                    "wait-success"
+                action,
+                engine,
+                full_cli_fixture_roles(
+                    engine,
+                    &temp,
+                    if action == "finish" {
+                        "wait-success"
+                    } else {
+                        "descendant"
+                    },
+                ),
+                None,
+                "cpu",
+            );
+            let work = launch.cli_work_dir.clone().unwrap();
+            let output = launch.output_ass_path.clone();
+            let recovery = launch.recovery_path.clone();
+            fs::write(&output, "preserve locked-result ASS").unwrap();
+            host.start(launch, gate.reserve().unwrap()).unwrap();
+            let record = host.inner.jobs.lock().unwrap().get(action).unwrap().clone();
+            let owned = record.process_job.as_ref().unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while owned.active().unwrap() < if action == "finish" { 2 } else { 3 }
+                || !work.join("result.json").is_file()
+            {
+                assert!(Instant::now() < deadline, "fixture did not start");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let held = fs::OpenOptions::new()
+                .read(true)
+                .share_mode(3)
+                .open(work.join("result.json"))
+                .unwrap();
+            let began = Instant::now();
+            match action {
+                "cancel" => {
+                    let error = host.cancel(action).unwrap_err();
+                    assert!(error.contains("无法清理 ASR 私有结果"), "{error}");
+                }
+                "shutdown" => host.shutdown(),
+                "finish" => fs::write(work.join("finish"), "").unwrap(),
+                _ => {
+                    let pid = record.inner.lock().unwrap().pid.unwrap();
+                    assert!(hidden_command("taskkill")
+                        .args(["/PID", &pid.to_string(), "/F"])
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .unwrap()
+                        .success());
+                }
+            }
+            let guard = record.inner.lock().unwrap();
+            let (guard, timeout) = record
+                .reaped
+                .wait_timeout_while(
+                    guard,
+                    Duration::from_secs(2).saturating_sub(began.elapsed()),
+                    |j| !j.reaped,
+                )
+                .unwrap();
+            assert!(
+                !timeout.timed_out() || guard.reaped,
+                "physical reap must publish despite locked file"
+            );
+            assert!(guard.reaped && guard.pid.is_none() && guard.cleanup_pending);
+            assert!(
+                !gate.has_active(),
+                "gate must release before reap notification"
+            );
+            drop(guard);
+            assert!(began.elapsed() < Duration::from_secs(2));
+            assert_eq!(owned.active().unwrap(), 0);
+            assert!(work.exists(), "failed deletion is not removal");
+            assert!(host
+                .cancel(action)
+                .unwrap_err()
+                .contains("无法清理 ASR 私有结果"));
+            let result = host.snapshot(action, true).unwrap().unwrap();
+            assert_eq!(
+                result["status"],
+                if matches!(action, "cancel" | "shutdown") {
+                    "cancelled"
                 } else {
-                    "descendant"
-                },
-            ),
-            None,
-            "cpu",
-        );
-        let work = launch.cli_work_dir.clone().unwrap();
-        let output = launch.output_ass_path.clone();
-        let recovery = launch.recovery_path.clone();
-        fs::write(&output, "preserve locked-result ASS").unwrap();
-        host.start(launch, gate.reserve().unwrap()).unwrap();
-        let record = host.inner.jobs.lock().unwrap().get(action).unwrap().clone();
-        let owned = record.process_job.as_ref().unwrap();
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while owned.active().unwrap() < if action == "finish" { 2 } else { 3 }
-            || !work.join("result.json").is_file()
-        {
-            assert!(Instant::now() < deadline, "fixture did not start");
-            std::thread::sleep(Duration::from_millis(5));
-        }
-        let held = fs::OpenOptions::new()
-            .read(true)
-            .share_mode(3)
-            .open(work.join("result.json"))
-            .unwrap();
-        let began = Instant::now();
-        match action {
-            "cancel" => {
-                let error = host.cancel(action).unwrap_err();
-                assert!(error.contains("无法清理 ASR 私有结果"), "{error}");
-            }
-            "shutdown" => host.shutdown(),
-            "finish" => fs::write(work.join("finish"), "").unwrap(),
-            _ => {
-                let pid = record.inner.lock().unwrap().pid.unwrap();
-                assert!(hidden_command("taskkill")
-                    .args(["/PID", &pid.to_string(), "/F"])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
+                    "failed"
+                }
+            );
+            if action == "finish" {
+                assert!(result["error"]
+                    .as_str()
                     .unwrap()
-                    .success());
+                    .contains("worker_cleanup_failed"));
             }
+            assert_eq!(
+                serde_json::from_slice::<Value>(&fs::read(&recovery).unwrap()).unwrap(),
+                result
+            );
+            assert_eq!(
+                fs::read_to_string(&output).unwrap(),
+                "preserve locked-result ASS"
+            );
+            // A real new job can finish while the old deletion remains obstructed.
+            let next = full_cli_launch(
+                &temp,
+                "while-locked",
+                engine,
+                full_cli_fixture_roles(engine, &temp, "silence"),
+                None,
+                "cpu",
+            );
+            host.start(next, gate.reserve().unwrap()).unwrap();
+            assert_eq!(wait_terminal(&host, "while-locked")["status"], "completed");
+            assert_eq!(
+                fs::read_to_string(&output).unwrap(),
+                "preserve locked-result ASS"
+            );
+            drop(held);
+            host.cancel(action).unwrap();
+            assert!(!work.exists());
+            assert_eq!(host.snapshot(action, true).unwrap().unwrap(), result);
+            assert!(!record.inner.lock().unwrap().cleanup_pending);
+            let next = full_cli_launch(
+                &temp,
+                "reopen",
+                engine,
+                full_cli_fixture_roles(engine, &temp, "success"),
+                None,
+                "cpu",
+            );
+            host.start(next, gate.reserve().unwrap()).unwrap();
+            assert_eq!(wait_terminal(&host, "reopen")["status"], "completed");
         }
-        let guard = record.inner.lock().unwrap();
-        let (guard, timeout) = record
-            .reaped
-            .wait_timeout_while(
-                guard,
-                Duration::from_secs(2).saturating_sub(began.elapsed()),
-                |j| !j.reaped,
-            )
-            .unwrap();
-        assert!(
-            !timeout.timed_out() || guard.reaped,
-            "physical reap must publish despite locked file"
-        );
-        assert!(guard.reaped && guard.pid.is_none() && guard.cleanup_pending);
-        assert!(
-            !gate.has_active(),
-            "gate must release before reap notification"
-        );
-        drop(guard);
-        assert!(began.elapsed() < Duration::from_secs(2));
-        assert_eq!(owned.active().unwrap(), 0);
-        assert!(work.exists(), "failed deletion is not removal");
-        assert!(host
-            .cancel(action)
-            .unwrap_err()
-            .contains("无法清理 ASR 私有结果"));
-        let result = host.snapshot(action, true).unwrap().unwrap();
-        assert_eq!(
-            result["status"],
-            if matches!(action, "cancel" | "shutdown") {
-                "cancelled"
-            } else {
-                "failed"
-            }
-        );
-        if action == "finish" {
-            assert!(result["error"]
-                .as_str()
-                .unwrap()
-                .contains("worker_cleanup_failed"));
-        }
-        assert_eq!(
-            serde_json::from_slice::<Value>(&fs::read(&recovery).unwrap()).unwrap(),
-            result
-        );
-        assert_eq!(
-            fs::read_to_string(&output).unwrap(),
-            "preserve locked-result ASS"
-        );
-        // A real new job can finish while the old deletion remains obstructed.
-        let next = qwen_launch(
-            &temp,
-            "while-locked",
-            qwen_fixture_roles(&temp, "silence"),
-            None,
-            "cpu",
-        );
-        host.start(next, gate.reserve().unwrap()).unwrap();
-        assert_eq!(wait_terminal(&host, "while-locked")["status"], "completed");
-        assert_eq!(
-            fs::read_to_string(&output).unwrap(),
-            "preserve locked-result ASS"
-        );
-        drop(held);
-        host.cancel(action).unwrap();
-        assert!(!work.exists());
-        assert_eq!(host.snapshot(action, true).unwrap().unwrap(), result);
-        assert!(!record.inner.lock().unwrap().cleanup_pending);
-        let next = qwen_launch(
-            &temp,
-            "reopen",
-            qwen_fixture_roles(&temp, "success"),
-            None,
-            "cpu",
-        );
-        host.start(next, gate.reserve().unwrap()).unwrap();
-        assert_eq!(wait_terminal(&host, "reopen")["status"], "completed");
     }
 }
 

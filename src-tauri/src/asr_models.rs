@@ -115,19 +115,22 @@ impl ReadyCacheKey {
 }
 
 #[cfg(test)]
-pub(crate) async fn resolve_qwen_delivery_test_model(
+pub(crate) async fn resolve_full_cli_delivery_test_model(
     deps: &Path,
+    engine: &str,
+    model: &str,
     inputs: &[PathBuf],
 ) -> ResolvedNativeAsrModel {
     let roots = ManagedModelRoots::below(deps);
-    let entry = find_model(
-        &load_manifest().unwrap(),
-        "qwen3-asr",
-        "Qwen/Qwen3-ASR-1.7B",
-    )
-    .unwrap()
-    .clone();
-    assert!(!entry.post_mvp_unavailable);
+    let entry = find_model(&load_manifest().unwrap(), engine, model)
+        .unwrap()
+        .clone();
+    // Private managed-path evidence, never an availability override. Production
+    // status/download/resolve still reject a post-MVP entry before reaching here.
+    assert_eq!(
+        inputs.len(),
+        entry.files.len() + usize::from(entry.required_vad.is_some())
+    );
     for ((model, file), input) in entry
         .files
         .iter()
@@ -142,11 +145,31 @@ pub(crate) async fn resolve_qwen_delivery_test_model(
     {
         assert_eq!(fs::metadata(input).unwrap().len(), file.size_bytes);
         assert_eq!(sha256_file(input).unwrap(), file.sha256);
-        let root = direct_path(&roots, &model);
+        let root = download_path(&roots, &model).join("parts");
         fs::create_dir_all(&root).unwrap();
-        fs::hard_link(input, root.join(&file.path)).unwrap();
+        fs::hard_link(input, root.join(format!("{}.part", file.path))).unwrap();
     }
     let manager = NativeAsrModelManager::default();
+    let id = manager
+        .start_download_for_model(entry.clone(), roots.clone(), "http://127.0.0.1:1".into())
+        .await
+        .unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(90);
+    loop {
+        let snapshot = manager.job_snapshot(&id).await.unwrap();
+        if snapshot.status != ModelDownloadJobStatus::Running {
+            assert_eq!(
+                snapshot.status,
+                ModelDownloadJobStatus::Completed,
+                "{:?}",
+                snapshot.error
+            );
+            assert_eq!(snapshot.downloaded_bytes, model_total(&entry));
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
     let model = manager
         .resolve_entry_with_roots(roots.clone(), entry.clone())
         .await
@@ -308,7 +331,7 @@ impl NativeAsrModelManager {
         let Some(entry) = find_model(&manifest, engine, model) else {
             return Ok(unavailable_status(engine, model));
         };
-        if entry.post_mvp_unavailable {
+        if !model_supported(entry) {
             return Ok(unavailable_status(engine, model));
         }
         let entry = entry.clone();
@@ -338,7 +361,7 @@ impl NativeAsrModelManager {
         let Some(entry) = find_model(&manifest, engine, model).cloned() else {
             return Ok(None);
         };
-        if entry.post_mvp_unavailable {
+        if !model_supported(&entry) {
             return Ok(None);
         }
         let roots = ManagedModelRoots::from_app(app)?;
@@ -533,6 +556,7 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
     }
     let mut logical_ids = HashSet::new();
     let mut identities = HashSet::new();
+    let mut shared_vad = None;
     for model in &manifest.models {
         for (name, value) in [
             ("logicalId", model.logical_id.as_str()),
@@ -548,7 +572,8 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
         }
         validate_segment("engine", &model.engine)?;
         validate_model_id(&model.model)?;
-        let qwen = model.backend == "crispasr";
+        let crispasr = model.backend == "crispasr";
+        let qwen = crispasr && model.engine == "qwen3-asr";
         if !qwen {
             validate_repository(&model.repository)?;
         }
@@ -602,10 +627,17 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
             {
                 return Err("Qwen pair 身份或角色无效".into());
             }
-            let vad = model.required_vad.as_ref().ok_or("Qwen 缺少必需 CPU VAD")?;
-            validate_asset(vad)?;
-            if vad.role != "vad" || vad.path != "ggml-silero-v6.2.0.bin" || vad.source.is_none() {
-                return Err("Qwen VAD 身份无效".into());
+        } else if crispasr {
+            if model.engine != "parakeet"
+                || model.model != "nvidia/parakeet-tdt_ctc-0.6b-ja"
+                || model.repository != "cstr/parakeet-tdt-0.6b-ja-GGUF"
+                || model.format != "gguf"
+                || model.license.spdx != "CC-BY-4.0"
+                || roles != HashSet::from(["model".to_string()])
+                || model.files[0].path != "parakeet-tdt-0.6b-ja.gguf"
+                || model.files[0].source.is_some()
+            {
+                return Err("Parakeet 日语 F16 模型身份或角色无效".into());
             }
         } else {
             if model.backend != "ctranslate2"
@@ -620,6 +652,20 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
                     return Err(format!("模型缺少必需文件角色：{role}"));
                 }
             }
+        }
+        if crispasr {
+            let vad = model
+                .required_vad
+                .as_ref()
+                .ok_or("Native 模型缺少必需 CPU VAD")?;
+            validate_asset(vad)?;
+            if vad.role != "vad" || vad.path != "ggml-silero-v6.2.0.bin" || vad.source.is_none() {
+                return Err("Native CPU VAD 身份无效".into());
+            }
+            if shared_vad.is_some_and(|previous| previous != vad) {
+                return Err("共享 CPU VAD 身份不一致".into());
+            }
+            shared_vad = Some(vad);
         }
         if model.engine == "kotoba-faster-whisper"
             && !model
@@ -766,13 +812,19 @@ fn find_model<'a>(
         .find(|entry| entry.engine == engine && entry.model == model)
 }
 
+fn model_supported(entry: &ManifestModel) -> bool {
+    !entry.post_mvp_unavailable
+        && (entry.backend != "crispasr"
+            || crate::dependencies::crispasr_supports_engine(&entry.engine))
+}
+
 fn downloadable_entry<'a>(
     manifest: &'a ModelManifest,
     engine: &str,
     model: &str,
 ) -> Result<&'a ManifestModel, String> {
     let entry = find_model(manifest, engine, model).ok_or("当前 Native ASR 路线不提供该模型")?;
-    if entry.post_mvp_unavailable {
+    if !model_supported(entry) {
         return Err("该模型将在后续版本支持".into());
     }
     Ok(entry)
@@ -799,11 +851,8 @@ pub(crate) fn known_native_asr_engines() -> Result<Vec<(String, bool, Option<Str
     let mut engines = Vec::new();
     for model in manifest.models {
         if !engines.iter().any(|(engine, _, _)| engine == &model.engine) {
-            engines.push((
-                model.engine,
-                !model.post_mvp_unavailable,
-                Some(model.backend),
-            ));
+            let supported = model_supported(&model);
+            engines.push((model.engine, supported, Some(model.backend)));
         }
     }
     for (engine, _) in POST_MVP_MODELS {
@@ -1615,6 +1664,7 @@ mod tests {
     use tempfile::tempdir;
 
     include!("asr_models_qwen_tests.rs");
+    include!("asr_models_parakeet_tests.rs");
 
     fn hash(bytes: &[u8]) -> String {
         format!("{:x}", Sha256::digest(bytes))
@@ -2124,7 +2174,12 @@ mod tests {
             Some("ctranslate2".into())
         )));
         assert!(engines.contains(&("qwen3-asr".into(), true, Some("crispasr".into()))));
-        for engine in ["parakeet", "reazonspeech-nemo"] {
+        assert!(engines.contains(&(
+            "parakeet".into(),
+            crate::dependencies::crispasr_supports_engine("parakeet"),
+            Some("crispasr".into())
+        )));
+        for engine in ["reazonspeech-nemo"] {
             assert!(engines
                 .iter()
                 .any(|(name, enabled, _)| name == engine && !enabled));

@@ -54,7 +54,8 @@ Protocol path validation is syntax-only. Drive-rooted, UNC, and extended Windows
 |---|---|---|---|
 | `faster-whisper` | `ctranslate2` | `model` | `cpu`, `cuda` |
 | `kotoba-faster-whisper` | `ctranslate2` | `model` | `cpu`, `cuda` |
-| `parakeet` | `crispasr` | `model` | `cpu`, `cuda`, `vulkan` |
+| `parakeet` (generic historical protocol) | `crispasr` | `model`; additive `vad` permitted | `cpu`, `cuda`, `vulkan` |
+| `parakeet` (full-CLI application worker, availability gated) | `crispasr` | `model`, `vad` | `cpu`, `cuda` |
 | `reazonspeech-nemo` | `crispasr` | `model` | `cpu`, `cuda`, `vulkan` |
 | `qwen3-asr` (generic historical protocol) | `crispasr` | `model`, `aligner`; additive `vad` permitted | `cpu`, `cuda`, `vulkan` |
 | `qwen3-asr` (full-CLI application worker) | `crispasr` | `model`, `aligner`, `vad` | `cpu`, `cuda` |
@@ -64,11 +65,13 @@ full-CLI readiness contract. The custom timeline unit is retired; the
 DEVELOPMENT Qwen worker keeps the original backend/ForcedAligner capability
 call followed by `qwen_timeline_policy_not_implemented` / exit20, with no segment,
 replacement or completed event; shared ABI and sibling worker tests remain.
-The full-CLI worker rejects a missing explicit `vad`,
+Both Qwen and Parakeet full-CLI worker routes reject a missing explicit `vad`,
 `useVad=false`, any `vadConfig`, or Vulkan before `ready`/inference. It uses the
 pinned upstream default CPU VAD configuration. There is no guessed dependency
-path and no silent VAD disablement. Other routes still accept only `model`, so
-adding a `vad` role does not enable or change CTranslate2 VAD/device semantics.
+path and no silent VAD disablement. Historical Parakeet model-only syntax remains
+valid only at the generic protocol/development seam, not the full-CLI launch
+boundary. Parakeet has no aligner role. CT2 and Reazon still accept only `model`;
+adding a `vad` role does not enable or change their VAD/device semantics.
 Duplicate, unknown, or route-extra roles are rejected; array order has no meaning.
 
 ### VAD ranges
@@ -106,6 +109,29 @@ All fields shown below are required for that event. Unknown additive fields are 
 | `error` | Lowercase machine `code` (`[a-z0-9_]+`) and bounded, non-empty, control-free `message`. Unique failure terminal; it may occur before ready for request/startup validation. |
 
 A segment is legal only when `0 <= startMs < endMs <= ready.durationMs`, text is valid and bounded, and segment order is non-decreasing by `startMs`. Replacement lists obey the same rules. The generic layer never clamps, expands, sorts, synthesizes, or partially applies invalid segments.
+
+## Engine-specific full-CLI output and progress
+
+- Parakeet consumes the pinned upstream Japanese TDT pipeline, required CPU Silero,
+  12-second VAD slicing and actual-audio gap retranscription. Native word timestamps
+  are centiseconds; final upstream `displaySegments` use integer milliseconds.
+  After strict byte/UTF-8/text/timeline/device validation, emit one atomic
+  `segmentsReplace`, then `completed`. Neither adapter nor frontend sorts, merges,
+  clips or regroups these rows; equal starts and overlaps retain upstream order
+  through document installation and ASS serialization. Explicit truthful silence
+  is empty success: no ASS write, document/metadata/active path/dirty state change
+  or unsaved-recovery discard.
+- Parakeet's 120-second no-progress execution deadline advances only on increasing
+  model/VAD/graph stages or completed slice counts with a fixed total. Repeated
+  graph/slice messages and arbitrary stderr do not count as progress. Slice
+  completion maps to the existing bounded protocol fraction; `ready` does not
+  claim model loading or graph execution.
+- Qwen retains its accepted full-CLI wait/cancel behavior and Qwen-specific adjacent
+  output-anomaly grouping. The pinned Qwen CLI does not expose the Parakeet slice
+  progress source; it must not inherit that deadline as a false 120-second total
+  runtime cap. Its execution diagnostics remain fail-closed device assertions,
+  not a fabricated progress clock. Host cancellation/Job-tree reap, output bounds
+  and terminal persistence apply to both engines unchanged.
 
 ## Lifecycle
 

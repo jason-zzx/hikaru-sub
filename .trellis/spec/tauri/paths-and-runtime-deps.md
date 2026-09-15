@@ -113,9 +113,9 @@ Wrong:   include bundled native-asr resources in managed storage/cleanup
 Correct: report builtIn unmanaged runtime -> reject cleanup
 ```
 
-## Qwen CrispASR application dependencies
+## Shared Qwen + Parakeet CrispASR application dependencies
 
-- `native-asr/runtime/crispasr-product-lock.json` enables Qwen application use while
+- `native-asr/runtime/crispasr-product-lock.json` enables Qwen and Parakeet ordinary-build use while
   external CUDA publication remains a separate download-only condition. Both
   CPU and CUDA must still pass exact runtime manifest/file closure verification;
   CUDA additionally passes the bounded model-free compute probe at resolution.
@@ -124,7 +124,7 @@ Correct: report builtIn unmanaged runtime -> reject cleanup
   Valid installed CUDA reports available even without published source rows.
   Missing/invalid CUDA reports missing and offers download only when both bundled
   `crispasrCuda` source rows and the publication flag match the locked archive.
-  The published asset is `hikaru-asr-crispasr-windows-x64-cuda-v1.zip` on the existing
+  The published asset is `hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip` on the existing
   `native-asr-cuda-v1` dependency release: official GitHub plus the same URL prefixed
   by `https://ghfast.top/`, both with identical size/SHA. Never replace the CT2 asset,
   infer all-generation GPU qualification from PTX coverage, or disable Qwen CPU.
@@ -136,6 +136,52 @@ Correct: report builtIn unmanaged runtime -> reject cleanup
   repair and offline reuse. VAD missing/corrupt means Qwen is not ready.
 - Resource preparation verifies existing archives and never resets model support
   metadata. Enabling application selection is not installer/UI/release acceptance.
+
+## Capability-gated Parakeet managed delivery
+
+### 1. Scope / Trigger
+
+Exact `nvidia/parakeet-tdt_ctc-0.6b-ja` uses cstr F16 GGUF at immutable revision `d9e3ba65a6579796389ea89e5939509ed257f972`, CC-BY-4.0 attribution and conversion notice. Ordinary builds now embed published shared-v2 CPU/CUDA support and permit public status/download/start. Remote CUDA publication remains a download-only condition, not a verified installed-use prerequisite. Capability/UI and cwd/media/hygiene source reviews are accepted; the new default local app includes the fixes, while the retained old app remains pre-fix. General long-path limitations below remain open.
+
+### 2. Signatures
+
+- `ProductLock::supports_engine(&self, engine: &str) -> bool`
+- `ResolvedNativeAsrCpuRuntime::require_engine(&self, engine: &str) -> Result<(), String>`
+- `select_native_runtime(backend, engine, requested, resolve)` authorizes the selected engine before host-cache lookup or launch.
+- Existing `list_asr_engines`, `check_asr_model`, `download_asr_model` and `start_asr` command contracts are unchanged.
+
+### 3. Contracts
+
+- `model_supported` requires both the model flag and embedded build authority: schema 1, product enablement, valid CPU **and** CUDA artifact engine membership. This check precedes readiness-cache reuse. Listing uses verified per-engine runtime capabilities; launch independently checks membership returned by exact payload verification. No runtime environment override is permitted.
+- ASR installs under `deps/models/crispasr/parakeet/nvidia/parakeet-tdt_ctc-0.6b-ja/<revision>`. A logical download/readiness unit includes the identical existing shared Silero asset; combined size is 1,247,817,898 bytes. Reuse the existing stages, Range restart/resume, hash verification, atomic publication, VAD publication mutex and cleanup storage lease. Different references to the same shared VAD are a manifest error.
+- There is no per-model cleanup/download-cancel API. Parakeet staging/repair must not remove shared VAD or sibling Qwen installs; the existing explicit all-model storage cleanup still owns the complete managed models root.
+- Private model-backed tests may exercise managed complete-partial publication and host/ASS without overriding public support. They are not proof that the immutable Qwen-only published runtime contains Parakeet.
+- The existing full-CLI packager generates a fresh `shared-*` CPU/CUDA candidate with exact ordered engines `["qwen3-asr", "parakeet"]`, complete four/seven-DLL closure and full model-source credit. Default builds embed the verified published shared-v2 authority; exact Qwen-only rollback bytes remain in `crispasr-product-lock-v1.json`. Absolute `HIKARU_CRISPASR_CANDIDATE_LOCK` selects that immutable authority at build time across resource preparation, Rust embedding and portable packaging; running apps never read it or a mutable external lock. Explicit candidate CUDA stays unpublished/non-downloadable. Default source rows point to the new shared-v2 asset: 719,774,286 bytes, SHA-256 `23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d`; both official and ghfast.top bytes were verified. Old remote assets are untouched.
+- Local extracted NSIS/portable file/probe checks and real short-path portable WebView CPU/CUDA selection/start/frontend ASS save are recorded separately. Synthetic file-drop and a verified preseeded audio cache were used; this is not manual install/uninstall or a fresh model network download. No release readiness or support beyond measured hardware is inferred.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Retained Qwen-only v1 rollback + permitted Parakeet model row | Public unavailable before cache/download/start; Qwen remains supported |
+| Missing/mixed device authority | Parakeet unsupported; no single-device build authorization |
+| Shared authority + exact installed CPU/CUDA payload | Normal local model readiness/start, regardless of CUDA publication |
+| Missing/corrupt/wrong-engine runtime | Structured failure; no explicit CUDA fallback or cached-host bypass |
+| Candidate CUDA missing, old public download rows present | Missing and no candidate download offer; never download old bytes as candidate |
+| Deep private CLI cwd (observed 272 characters) | Source runner uses verified/pinned CLI own-root only when private cwd reaches MAX_PATH; canonical same-volume relative audio and original private result/cache/TEMP remain unchanged. Model-free real-I/O regression passes, and the new default build contains the fix; old retained app is pre-fix. No writable ancestor/alias/cache relocation. Long/expanded-relative audio paths, deep CLI roots and cross-volume deep-work remain unsupported |
+
+### 5. Good / Base / Bad Cases
+
+Good: shared embedded authority, verified model+VAD and local CUDA → normal Parakeet UI start/save. Base: ordinary shared build → both engines supported, exact model+required VAD still needed; Qwen-only rollback → Parakeet unavailable. Bad: globally enabling Parakeet from Qwen readiness, or requiring remote publication for an already verified local CUDA install.
+
+### 6. Tests Required
+
+`build_engine_support_requires_both_devices_not_cuda_publication`, `selected_engine_is_authorized_before_host_cache_or_launch`, shared closure/capability rejection, and model-manager public/default/candidate support checks must cover both authorities. Retained complete Cargo runs are 301 passed/3 ignored per authority. Real CPU/CUDA short UI evidence is reproduced by the task's `research/local_app_publish.py --check`; keep CPU functional success separate from its historical outer shutdown diagnostic. No inference rerun for harness-only changes.
+
+### 7. Wrong vs Correct
+
+Wrong: `verified Qwen backend -> Parakeet ready`, or `unpublished CUDA -> installed CUDA unusable`.
+Correct: `embedded both-device engine support -> exact payload verification -> selected-engine authorization -> existing cached host/start`; publication controls download only.
 
 ## Anti-Patterns
 

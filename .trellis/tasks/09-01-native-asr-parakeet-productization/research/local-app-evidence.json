@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "scope": "retained exact-byte short-path local WebView CPU/CUDA delivery; independent review pending",
+  "rawLock": {
+    "sizeBytes": 12041,
+    "sha256": "c5092f9775341daf5f144f446947f793bf9baf6f68fa2c3caec97441e550a9ce"
+  },
+  "app": {
+    "sizeBytes": 24524800,
+    "sha256": "b516277031322220fb4188bfba4c1be07b87400ff3cefcde0c64fbccbf366788"
+  },
+  "packages": {
+    "Hikaru Sub_0.4.1_x64-portable.zip": {
+      "sizeBytes": 23361437,
+      "sha256": "0e8362c79c79fd5018e511b6262230c3ffd8dc08c5e08c71f486dda190f4de2c"
+    },
+    "Hikaru Sub_0.4.1_x64-setup.exe": {
+      "sizeBytes": 16296391,
+      "sha256": "40b58169f418baf149159ade2de6b896e1c42737f8cff766e5f3edddf90a32f3"
+    }
+  },
+  "candidateLock": {
+    "sizeBytes": 9914,
+    "sha256": "cee57fd031073e0ee9b378333ca953dc849d6ca04507a7a43e284eb8acb055b4"
+  },
+  "modelAndVad": {
+    "parakeet-tdt-0.6b-ja.gguf": {
+      "sizeBytes": 1246932800,
+      "sha256": "374eb0132eebaec4df77a9631cbbeb03790be48a4a517f6cc8e8bdb38fe9a584"
+    },
+    "ggml-silero-v6.2.0.bin": {
+      "sizeBytes": 885098,
+      "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987"
+    }
+  },
+  "runs": [
+    {
+      "run": "fresh-short-app-ui-cpu",
+      "functional": {
+        "device": "cpu",
+        "backend": "parakeet",
+        "status": "passed",
+        "realWebView": true,
+        "normalModelManagerReady": true,
+        "selectionStartCompletionSave": true,
+        "syntheticFileDropEvent": true,
+        "seededVerifiedAudioCache": true,
+        "modelInference": true,
+        "segmentCount": 9,
+        "exactAssRows": true,
+        "snapshotSha256": "eaec96d5b34c81bda897444a12c28c63751d1249077249c9bf1ce07be5cfdabf",
+        "assSha256": "d1d9409dd42d3d70b6ff2629d0da0bad9d4e061c33098cfafadbb4f3aa9ee72f",
+        "elapsedSeconds": 10.112,
+        "cudaDownloadOffered": false
+      },
+      "historicalRunner": {
+        "state": "terminated-unscored",
+        "outcome": "interrupted",
+        "failure": "ValueError:child_process_remaining",
+        "exitCode": 0,
+        "processExitConfirmed": true,
+        "activeJobProcesses": 0
+      }
+    },
+    {
+      "run": "fresh-short-app-ui-cuda",
+      "functional": {
+        "device": "cuda",
+        "backend": "parakeet",
+        "status": "passed",
+        "realWebView": true,
+        "normalModelManagerReady": true,
+        "selectionStartCompletionSave": true,
+        "syntheticFileDropEvent": true,
+        "seededVerifiedAudioCache": true,
+        "modelInference": true,
+        "segmentCount": 9,
+        "exactAssRows": true,
+        "snapshotSha256": "f322791e2c5d027f3d685ac79327c7d4d7cf5bbd7a81f92c64a1a4be5f9699d8",
+        "assSha256": "d1d9409dd42d3d70b6ff2629d0da0bad9d4e061c33098cfafadbb4f3aa9ee72f",
+        "elapsedSeconds": 4.192,
+        "cudaDownloadOffered": false,
+        "runtimeLock": {
+          "sizeBytes": 1595,
+          "sha256": "f14ed72d6b0859f142a63ec64991c0819228dfbbde215f18b56545fa6b141928"
+        }
+      },
+      "historicalRunner": {
+        "state": "reaped",
+        "outcome": "exited-zero",
+        "failure": null,
+        "exitCode": 0,
+        "processExitConfirmed": true,
+        "activeJobProcesses": 0
+      }
+    }
+  ],
+  "retainedPassedLogs": [
+    "fixes-pnpm-test-final-r2.log",
+    "local-app-cargo-default-r2.log",
+    "local-app-cargo-candidate.log",
+    "local-app-release-local.log"
+  ],
+  "defaultResources": {
+    "before": "hikaru-asr-crispasr-windows-x64-cpu-shared-local-r1",
+    "after": "hikaru-asr-crispasr-windows-x64-cpu-v1",
+    "engines": [
+      "qwen3-asr"
+    ],
+    "defaultLockSha256": "c59c08c5d118e541ef7908df0a402727e3d724e22bbe03639097423e996f3c57",
+    "manifestSha256": "507e95b5a97b78e81899e7ad2289c786d0a4d3762119142cdc4a0b1ed08c340b",
+    "candidateAppTrees": "cpu/cuda exact verification passed",
+    "candidateCudaPublished": false
+  },
+  "safetyAtFinalization": {
+    "modelProcesses": [],
+    "durableCudaGates": [],
+    "mutexAcquired": true,
+    "retainedOwnedProcesses": [
+      {
+        "run": "local-app-ui-cpu",
+        "originalProcessAbsent": true,
+        "matchingProcessLive": false
+      },
+      {
+        "run": "fresh-short-app-ui-cpu",
+        "originalProcessAbsent": true,
+        "matchingProcessLive": false
+      },
+      {
+        "run": "fresh-short-app-ui-cuda",
+        "originalProcessAbsent": true,
+        "matchingProcessLive": false
+      }
+    ]
+  },
+  "longPath": {
+    "resolved": false,
+    "failedProductCwdCharacters": 272,
+    "productErrorCode": "parakeet_cli_process_failed",
+    "modelFreeCreateProcessResults": [
+      {
+        "length": 59,
+        "extended": false,
+        "returncode": 1
+      },
+      {
+        "length": 342,
+        "extended": false,
+        "winerror": 267
+      },
+      {
+        "length": 346,
+        "extended": true,
+        "winerror": 267
+      }
+    ]
+  },
+  "limits": [
+    "No new inference during finalization; no relabeling of CPU outer interrupted/unscored disposition.",
+    "UI used real selections/clicks and normal product start/save, with synthetic file-drop and seeded verified audio cache.",
+    "No manual installer/uninstaller test or fresh model network download. CUDA is locally installed, unpublished and not offered for download.",
+    "Short-path success does not fix the deep-path CLI working-directory failure.",
+    "P1 unchanged runtime/device evidence and six prior host cases retain their original scope; physical CUDA evidence is RTX 3070 only.",
+    "No quality score, owner listening judgment, whole-task acceptance or release decision."
+  ]
+}

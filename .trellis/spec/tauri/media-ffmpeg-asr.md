@@ -8,7 +8,7 @@
 2. System `PATH`  
 3. Managed install under `deps/ffmpeg/current`
 
-Frontend caches status via `checkFfmpeg` / invalidation events; backend remains source of truth for resolution.
+Frontend caches status via `checkFfmpeg` / invalidation events; backend remains source of truth for resolution. `peer_ffprobe_path` replaces only the executable filename, compares it case-insensitively on Windows (including `.EXE`), and preserves parent spelling and POSIX case semantics. With a configured FFmpeg outside PATH, metadata must still use its sibling ffprobe; direct ffprobe success alone does not validate `get_video_info`. Model-free product media checks should use a real known-resolution video and uncached `extract_audio`, then verify dimensions/duration and PCM16 mono16kHz output; frontend completion tests assert both saved ASS PlayRes values.
 
 ## Media Playback
 
@@ -171,7 +171,7 @@ Correct: cargo test --lib asr_worker::tests::production_worker_runs... -- --exac
 
 ### 1. Scope / Trigger
 
-Apply the shared command/route contracts below when changing Native model commands or `ResolvedNativeLaunch`. Current source supports CT2's original eight routes plus exact Qwen through separate CrispASR CPU/CUDA artifacts. Qwen requires model+aligner+CPU Silero; general/other-engine VAD and Parakeet/Reazon remain unavailable. Current explicit CUDA never falls back, CPU never initializes CUDA, and `auto` selects a verified device only before worker launch. Qwen dependency/readiness and published sources are in `paths-and-runtime-deps.md`.
+Apply the shared command/route contracts below when changing Native model commands or `ResolvedNativeLaunch`. Current source supports CT2's original eight routes plus exact Qwen through separate CrispASR CPU/CUDA artifacts. Qwen requires model+aligner+CPU Silero; Parakeet uses required CPU Silero and native TDT timestamps through the shared-v2 authority; general/other-engine VAD and Reazon remain unavailable. Current explicit CUDA never falls back, CPU never initializes CUDA, and `auto` selects a verified device only before worker launch. Qwen dependency/readiness and published sources are in `paths-and-runtime-deps.md`.
 
 The v3 CPU-only capability statements below describe the **original CT2 CPU artifact**, not a universal application restriction. Its no-VAD/no-CrispASR closure remains strict; current CT2 CUDA and independent CrispASR artifacts do not broaden that verifier.
 

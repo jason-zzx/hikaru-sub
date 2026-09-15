@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/09-01-native-asr-parakeet-productization/prd.md", "reason": "Review actual user-approved acceptance, not retired quality scoring"}
+{"file": "native-asr/docs/protocol-v1.md", "reason": "Output validation, device and lifecycle contract"}
+{"file": ".trellis/tasks/09-01-native-asr-parakeet-productization/design.md", "reason": "Check accepted semantics/runtime compatibility and section 7: optional observer is not an acceptance gate; preserve successful functional facts separately from diagnostic failures, no repeated forensics requirement"}
+{"file": ".trellis/spec/tauri/paths-and-runtime-deps.md", "reason": "Runtime root and dependency isolation"}

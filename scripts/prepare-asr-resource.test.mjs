@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -40,7 +41,9 @@ describe("ASR release resource preparation", () => {
       join(root, "native-asr", "artifacts", "windows-x64-cpu.zip"),
     );
 
-    for (const path of ["native-asr/runtime/crispasr-product-lock.json", "native-asr/artifacts/crispasr-cpu.zip"]) {
+    const lockPath = "native-asr/runtime/crispasr-product-lock.json";
+    const lock = JSON.parse(readFileSync(join(repositoryRoot, lockPath), "utf8"));
+    for (const path of [lockPath, lock.cpu.archive.path]) {
       copy(join(repositoryRoot, path), join(root, path));
     }
 

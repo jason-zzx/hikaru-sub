@@ -1,0 +1,8 @@
+{"file": ".trellis/tasks/09-01-native-asr-parakeet-productization/prd.md", "reason": "Owner-approved Parakeet functional-only scope; overrides historical quality gates"}
+{"file": ".trellis/spec/asr/index.md", "reason": "Native ASR spec routing and boundaries"}
+{"file": "native-asr/runtime/full-cli/README.md", "reason": "Pinned full CLI and shared runtime authority; Qwen-only assumptions must not be copied"}
+{"file": ".trellis/tasks/09-01-native-asr-parakeet-productization/design.md", "reason": "Owner-confirmed complete Japanese pipeline design; explicit implementation authorization still required"}
+{"file": ".trellis/tasks/09-01-native-asr-parakeet-productization/implement.md", "reason": "Ordered implementation, real-device and delivery gates"}
+{"file": ".trellis/tasks/09-01-native-asr-parakeet-productization/research/planning-evidence.md", "reason": "Pinned upstream JA VAD, native timestamps, artifact recommendations and evidence limits"}
+{"file": ".trellis/spec/tauri/index.md", "reason": "Tauri spec routing; explicitly read relevant Native host/ASS sections of media-ffmpeg-asr.md from disk before editing (too large for full injection)"}
+{"file": ".trellis/spec/frontend/services-and-tauri-bridge.md", "reason": "Existing frontend service and status boundaries"}

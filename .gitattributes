@@ -7,3 +7,7 @@
 # picking either side (task state lives in task.json, not index.md). See
 # .trellis/spec/cli/backend/directory-structure.md for details.
 .trellis/workspace/*/journal-*.md merge=union
+
+# These hash-bound Parakeet sources were reviewed and built with CRLF bytes.
+**/research/p2_host.py text eol=crlf
+native-asr/src/full_cli.cpp text eol=crlf

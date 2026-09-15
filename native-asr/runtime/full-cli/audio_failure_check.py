@@ -36,8 +36,9 @@ std::vector<float> resample_polyphase(const float*, int, int, int) { std::abort(
 int main(int argc, char** argv) {
     if (argc != 2) return 10;
     int checks = 0;
-    for (const char* mode : {"cpu", "cuda", ""}) {
-        _putenv_s("HIKARU_QWEN_DEVICE", mode);
+    for (const char* control : {"HIKARU_QWEN_DEVICE", "HIKARU_PARAKEET_DEVICE"}) {
+      for (const char* mode : {"cpu", "cuda", ""}) {
+        _putenv_s(control, mode);
         for (bool stereo : {false, true}) {
             for (bool valid : {false, true}) {
                 native_calls = subprocess_calls = 0;
@@ -51,6 +52,7 @@ int main(int argc, char** argv) {
                 ++checks;
             }
         }
+    }
     }
     std::printf("PASS: %d exact-reader audio cases; controlled failures reach zero fallback calls\n", checks);
     return 0;

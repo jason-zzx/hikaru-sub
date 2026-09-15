@@ -27,9 +27,12 @@ describe("ModelManager Native dispositions", () => {
     expect(screen.getByRole("button", { name: "下载模型" })).toBeTruthy();
   });
 
-  it("offers the existing Qwen pair download and shows ready after shared status refresh", () => {
+  it.each([
+    ["qwen3-asr", "Qwen/Qwen3-ASR-1.7B"],
+    ["parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja"],
+  ])("uses the existing compound download/readiness UI for %s", (engine, model) => {
     const props = {
-      engine: "qwen3-asr", model: "Qwen/Qwen3-ASR-1.7B",
+      engine, model,
       checking: false, checkError: null, refreshStatus,
     };
     const missing: AsrModelStatus = {

@@ -1013,7 +1013,7 @@ namespace hikaru_asr::qwen_cli::identity {
     "inline constexpr const char* sha256 = \"${cli_hash}\";
 }
 ")
-  add_executable(hikaru-asr-qwen-cli-worker src/main.cpp src/qwen_cli.cpp)
+  add_executable(hikaru-asr-qwen-cli-worker src/main.cpp src/qwen_cli.cpp src/full_cli.cpp src/parakeet_cli.cpp)
   target_compile_definitions(hikaru-asr-qwen-cli-worker PRIVATE HIKARU_ASR_QWEN_CLI_WORKER=1)
   target_link_libraries(hikaru-asr-qwen-cli-worker PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio bcrypt)
   target_include_directories(hikaru-asr-qwen-cli-worker SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
@@ -1025,7 +1025,7 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING AND HIKARU_ASR_BUILD_QWEN_CLI_WORKER)
-  add_executable(hikaru-asr-qwen-cli-fixture-worker src/main.cpp src/qwen_cli.cpp)
+  add_executable(hikaru-asr-qwen-cli-fixture-worker src/main.cpp src/qwen_cli.cpp src/full_cli.cpp src/parakeet_cli.cpp)
   target_compile_definitions(hikaru-asr-qwen-cli-fixture-worker PRIVATE
     HIKARU_ASR_QWEN_CLI_WORKER=1 HIKARU_QWEN_CLI_FIXTURE=1)
   target_link_libraries(hikaru-asr-qwen-cli-fixture-worker PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio bcrypt)
@@ -1044,6 +1044,15 @@ if(BUILD_TESTING AND HIKARU_ASR_BUILD_QWEN_CLI_WORKER)
   add_test(NAME qwen-cli-worker-contract COMMAND "${Python3_EXECUTABLE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/qwen_cli_contract.py" "$<TARGET_FILE:hikaru-asr-qwen-cli-fixture-worker>")
   set_tests_properties(qwen-cli-worker-contract PROPERTIES TIMEOUT 90)
+  add_test(NAME parakeet-cli-worker-contract COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/parakeet_cli_contract.py" "$<TARGET_FILE:hikaru-asr-qwen-cli-fixture-worker>")
+  set_tests_properties(parakeet-cli-worker-contract PROPERTIES TIMEOUT 90)
+  add_test(NAME full-cli-deep-paths COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/full_cli_paths.py" "$<TARGET_FILE:hikaru-asr-qwen-cli-fixture-worker>")
+  set_tests_properties(full-cli-deep-paths PROPERTIES TIMEOUT 90)
+  add_test(NAME full-cli-monotonic-watchdog COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/full_cli_watchdog.py" "$<TARGET_FILE:hikaru-asr-qwen-cli-fixture-worker>")
+  set_tests_properties(full-cli-monotonic-watchdog PROPERTIES TIMEOUT 150)
 endif()
 if(BUILD_TESTING)
   add_test(NAME protocol-core COMMAND hikaru-asr-protocol-tests)

@@ -1,4 +1,36 @@
-# Full upstream CLI integration (Qwen application enabled)
+# Full upstream CLI integration (Qwen + Parakeet ordinary builds)
+
+## Current shared dependency authority
+
+Owner-authorized dependency publication completed on the existing `native-asr-cuda-v1`
+release: **`hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip`**, 719,774,286 bytes,
+SHA-256 `23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d`.
+Official GitHub and normal `https://ghfast.top/` source downloads both match. Default
+`../crispasr-product-lock.json` now embeds Qwen+Parakeet on both devices and truthful
+publication flags. Ordinary builds require no candidate environment input. CPU archive
+is `native-asr/artifacts/crispasr-cpu-shared-v2.zip`; CUDA is separate/on-demand.
+Exact former authority is retained at `../crispasr-product-lock-v1.json`, and old
+released assets and historical proofs are untouched. A candidate build still uses
+its explicit unpublished lock; do not pass the published lock as a candidate input.
+
+Only worker CPU/CUDA bindings were rebuilt for the reviewed own-root cwd fix; full
+P1 CLI/DLL/model bytes are unchanged. Fresh archive/license verification, both downloaded
+installations/readiness/bounded model-free CUDA probes, both-device capability/CT2
+isolation tests and default `pnpm release:local` pass. Six host/two UI proofs retain
+their original identities; **modelRuns=0** in this distribution step. New local app is
+`.local/parakeet-final/hikaru-sub.exe`; `.local/parakeet-app` remains pre-fix. Required
+F16 Parakeet+shared CPU Silero stay on-demand; new app has no model weights preinstalled.
+Observed272 source/media/hygiene independent review is accepted. General long/expanded
+relative audio paths, deep CLI roots and cross-volume deep work remain unsupported.
+Only RTX3070 was physically verified. This is not a new application release, manual
+installation/uninstallation, new inference/UI proof or whole-task acceptance.
+Reproducible sanitized distribution details: Parakeet `research/dependency-evidence.json`.
+
+## Historical Qwen and local-candidate records
+
+The following records retain their original artifact/review scope; their former
+"current/default/unpublished/pre-fix" statements are superseded by the shared
+dependency authority above, not retroactively changed evidence.
 
 ## Current state and authority
 
@@ -159,6 +191,168 @@ Historical Qwen task evidence remains under its `research/local/integration-firs
 no raw transcript/token/logit/private path belongs in tracked documentation.
 These historical files are not new scratch inputs; the archive-aware ignore rule
 protects them after task archive as well. Do not migrate or delete them.
+
+## Local shared Qwen+Parakeet candidate (build-capability gated; not published)
+
+The Parakeet task's `research/p1-source-trace.md`, `p1-acquisition-lock.json`
+and deterministically generated `p1-evidence.json` bind the exact Japanese F16
+artifact, unchanged CPU Silero and new local full-toolchain candidate. The task's
+`research/product-evidence.json` now additionally records gated full-CLI worker,
+managed-model, host/ASS and UI source integration. Six local CPU/CUDA
+short/medium/long host flows passed (9/99/630 cues on each device), with silence,
+invalid-input, cancel/cleanup/recovery cases. Those host checks predate the final
+packaged worker and retained the model flag gate. Later local application support
+requires embedded both-device engine authorization; default published Qwen-only
+builds still reject Parakeet. The existing producer supports a shared local candidate;
+JS/Rust verifiers require its exact ordered Qwen+Parakeet capabilities and full
+four/seven-DLL CPU/CUDA closure. Never mutate the published lock or claim its old
+asset contains Parakeet. Local packaging is not remote download readiness, and
+remote publication is not a prerequisite for verified installed CUDA use.
+
+`HIKARU_PARAKEET_DEVICE=cpu|cuda` opts into the shared local-path/offline/output
+safeguards without requiring a Qwen aligner. It adds Parakeet-specific encoder
+scheduler and persistent predictor/joint direct-dispatch checks. The shared
+encoder allocation failure now terminates controlled execution before an empty
+result can enter streamed retry or later-slice/gap partial success. CUDA scheduler
+CPU/unknown nodes or failed direct compute fail closed. CPU TDT uses upstream
+host loops; even CUDA retains upstream CPU mel/projection/state/argmax work.
+Those intrinsic operations are not claimed to be CUDA arithmetic or silently
+reassigned graph nodes. Required VAD stays CPU. Native Japanese slicing,
+actual-audio gap retranscription and display grouping are unchanged.
+
+`parakeet_smoke.py` reuses existing Job/module/inventory helpers, but has its own
+bounded stderr reader, 120-second monotonic stage/completed-slice watchdog,
+restricted environment, case-correct own-root module checks and hash-bound CUDA
+recovery sentinel. A flushed hash-bound CUDA attempt/gate is persisted before
+process creation, shared by the Parakeet and task Qwen callers. Physical reap does
+not imply success: external nonzero exit and interrupted ownership retain the
+blocker. Reconciliation under the task mutex checks PID+creation time, refuses
+live owners/unreaped children and requires identical runtime/model/harness/backend
+short evidence (<=120 seconds after an unfinished attempt). Only the matching gate
+is cleared after durable validated completion; no different live owner is killed.
+Repeated graph/stderr lines do not extend the deadline.
+It checks the **actual full-CLI closure**: four CPU DLLs, seven CUDA DLLs, plus
+its statically linked CLI executable; the older six-DLL shared-library assumption
+does not describe this full-CLI layout. Qwen's original `smoke.py` loop is not
+used as the P1 execution watchdog.
+
+P1 local short proof: Parakeet CPU/CUDA each produced 9 legal display rows;
+Qwen shared-candidate CPU/CUDA each produced 8. This remains RTX 3070-only CUDA
+hardware evidence. Later host/ASS evidence above has its own hash-bound lock;
+neither stage establishes final package or release acceptance.
+An initial compiler timeout and original case-sensitive harness failure remain
+retained; neither was relabeled. Accepted review corrections R1–R3 received fresh
+r4 CPU/CUDA Parakeet and Qwen short proofs; P1 independent re-review was accepted.
+The previous r3 source/tools/runtime/evidence are preserved under ignored scratch
+`p1-r3-preserved/`. The corrected validator rejects C0/DEL in consumed subtitle
+text and invalid source timestamp types/bounds/endpoint order/centisecond units;
+legal metadata escaped NUL and zero-duration raw word anchors remain permitted.
+No timing repair or extra global word non-overlap/order rule is introduced.
+
+Focused model-free correction checks (new output directories; Developer prompt
+for `check.py`):
+
+```bat
+python -B native-asr/runtime/full-cli/check.py --source native-asr/build/full-cli/source-parakeet-p1 --output native-asr/build/full-cli/output-check-new
+python -B native-asr/runtime/full-cli/recovery_check.py --output native-asr/build/full-cli/recovery-check-new
+```
+
+The encoder regression extracts the complete native function and real fatal
+helper, with allocator/compute data stand-ins. Recovery tests actually terminate
+owned Python fixture processes, never ASR models; fixtures use isolated gates.
+
+With the task's verified acquisition inputs and locally built/staged CPU/CUDA
+closures present, use a **fresh** lock/run name (never overwrite retained locks):
+
+```bat
+set "ACQUISITION=.trellis/tasks/09-01-native-asr-parakeet-productization/research/p1-acquisition-lock.json"
+python -B native-asr/runtime/full-cli/parakeet_smoke.py --freeze-runtime --runtime-lock native-asr/build/full-cli/parakeet-runtime-new.json --acquisition-lock "%ACQUISITION%"
+python -B native-asr/runtime/full-cli/parakeet_smoke.py --device cpu --name parakeet-cpu-new --runtime-lock native-asr/build/full-cli/parakeet-runtime-new.json --acquisition-lock "%ACQUISITION%" --audio "%SHORT_WAV%"
+python -B native-asr/runtime/full-cli/parakeet_smoke.py --device cuda --name parakeet-cuda-new --runtime-lock native-asr/build/full-cli/parakeet-runtime-new.json --acquisition-lock "%ACQUISITION%" --audio "%SHORT_WAV%"
+```
+
+Run serially and stop on failure. `research/p1_publish.py --check` is the offline
+retained-evidence reproduction/mutation check; it runs no model and publishes no
+transcript, quality score or GPU-inherited qualification label.
+
+### Local package input and verification
+
+`package.py --candidate-id shared-local-r1 --parakeet-acquisition-lock <reviewed-lock>`
+extends the existing full CPU/CUDA packager (all normal build/redist/license/output
+inputs remain required). Candidate output must be fresh under ignored full-CLI
+scratch. It includes Qwen pair/Silero source notices plus the exact Parakeet
+CC-BY-4.0 credit, modification notice and honest missing-converter limitation;
+weights remain on-demand. It generates a separate lock with actual file/archive
+hashes and `externalStableAssetPublished=false`, never modifies published authority.
+
+For local application packaging, set the **build-time only**
+`HIKARU_CRISPASR_CANDIDATE_LOCK` to the absolute generated lock path, then run
+`pnpm release:local`. The existing resource preparer, Rust build embedding and
+portable preparer consume that same input. Unset means the unchanged published
+Qwen lock. The running app reads neither this environment variable nor a mutable
+external authority; there is no model-availability override. Current candidate
+builds permit normal Parakeet selection/download/start only through embedded
+CPU-and-CUDA engine support, exact model/VAD readiness and verified per-device
+runtime engine membership before host-cache lookup/launch. Default Qwen-only
+builds still reject Parakeet even with its model manifest flag enabled. Candidate
+CUDA remains unpublished and not offered for download; exact installed bytes may
+be used locally. Do not mix candidate resources with a default-authority executable.
+
+`shared-local-r1/` under ignored scratch contains the runtime archives/lock and
+`app-r2/` extracted NSIS/portable checks. Local NSIS is 16,285,275 bytes and portable
+is 23,353,808 bytes (within 80/90 MiB). Both retain CT2 unchanged and contain no
+weights, CUDA, Python or FFmpeg payload. Rust checked both extracted CPU roots
+with separately installed exact CUDA, missing/corrupt DLL rejection and a bounded
+model-free CUDA compute probe. These are extraction/resolution checks, **not**
+manual install/uninstall, WebView interaction, all-GPU qualification or publication.
+
+### Retained local application UI follow-up
+
+The task's `research/local_app_publish.py --check` reproduces hash-bound current
+application/package/source/UI evidence offline. It does not launch inference.
+The exact portable executable is retained at ignored `.local/parakeet-app/hikaru-sub.exe`
+(SHA-256 `b516277031322220fb4188bfba4c1be07b87400ff3cefcde0c64fbccbf366788`).
+Both real short UI selections completed and the frontend saved 9 exact ASS rows:
+CPU 10.112s, CUDA 4.192s. These elapsed times are descriptive, not performance gates.
+The runner used real WebView controls, normal public start/save, a synthetic file-drop
+and verified preseeded audio cache—not injected stores or simulated success.
+
+CPU's outer Node/Job runner historically recorded interrupted/unscored because
+it checked WebView descendants immediately after exit. Its completed transcription,
+ASS and eventual physical cleanup are retained separately, not relabeled or rerun.
+A fresh app-local runner copy added only a two-second post-exit grace before the
+single CUDA attempt; unchanged owned Job cleanup then confirmed zero descendants,
+exit 0, empty inventory and durable matching CUDA completion. No monitor repair.
+
+**Bounded path follow-up:** the initial portable run failed before inference at
+private cwd272; historical model-free error267 was at342 ordinary/346 extended,
+not a captured Windows error for that product run. The latest short-path
+capability/UI review is accepted. A later worker-source fix retains ordinary
+private cwd but uses the pinned verified CLI own-root when cwd reaches MAX_PATH;
+canonical same-volume relative audio and original private result/cache/TEMP stay
+unchanged. Never use a writable ancestor (DLL search), alias or cache relocation.
+`tests/full_cli_paths.py` exercises real fixture audio/result I/O, ancestor-DLL
+rejection and cleanup for both routes/device labels, with deep-root/cross-volume
+structured failures. Long audio/expanded-relative CRT paths remain unsupported.
+The accepted app is still pre-fix; no runtime/packaging/inference rerun or general
+long-path claim. This scoped follow-up awaits independent review; no whole-task,
+manual installation/uninstallation or release claim.
+
+The later app packages are NSIS 16,296,391 bytes and portable 23,361,437 bytes, still
+within 80/90 MiB. Their identities differ from historical `app-r2` above. Weights
+and local CUDA are installed beside the isolated app, not bundled. Default source
+resources were restored via the existing preparer and verified as Qwen-only v1;
+the isolated candidate app remains intact. Remote distribution is separate owner
+work and is not required to repeat this local use.
+
+The shared worker now applies the stage/slice watchdog only to Parakeet. Qwen
+retains its accepted wait/cancel policy because its pinned CLI lacks that slice
+source; arbitrary/repeated diagnostics do not become progress. Real-clock fixture
+checks cover Qwen and progressing Parakeet finishing after 125 seconds, and a
+Parakeet repeated-progress stall rejected after 120 seconds. No runtime algorithm
+or CLI bytes changed. Six retained host snapshots replay through actual frontend
+document/ASS completion unchanged (9/99/630 rows per device); empty Parakeet success
+preserves the loaded document and recovery rather than installing an empty one.
 
 Offline relocation regression (stdlib, Windows Python; no model/CLI/compiler):
 

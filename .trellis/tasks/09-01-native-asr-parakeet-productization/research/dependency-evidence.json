@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "scope": "shared dependency publication and default local distribution; independent review pending",
+  "rawLock": {
+    "sizeBytes": 7621,
+    "sha256": "74335bc6a281495abe626c70ca284e8e5b2c7a3332cb4d139438c017235c51e9"
+  },
+  "productLock": {
+    "sizeBytes": 9878,
+    "sha256": "75de397e9d6f88a16d6a204db94457c6e0942b8b450d1fdfbaa689265175b19c"
+  },
+  "rollbackLock": {
+    "sizeBytes": 9579,
+    "sha256": "c59c08c5d118e541ef7908df0a402727e3d724e22bbe03639097423e996f3c57"
+  },
+  "oldCudaArchive": {
+    "path": "native-asr/artifacts/crispasr-cuda.zip",
+    "root": "windows-x64/crispasr/cuda/",
+    "sizeBytes": 719774409,
+    "sha256": "5a8e0272d41341e1759a32765fc4a218135df6626bfec83c80eed2b08379370d"
+  },
+  "asset": {
+    "id": "RA_kwDOS0OLF84hbvrC",
+    "name": "hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip",
+    "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip",
+    "size": 719774286,
+    "digest": "sha256:23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d"
+  },
+  "downloads": [
+    {
+      "profile": "official",
+      "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip",
+      "exitCode": 0,
+      "elapsedSeconds": 53.891,
+      "verified": true,
+      "sizeBytes": 719774286,
+      "sha256": "23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d"
+    },
+    {
+      "profile": "china",
+      "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip",
+      "exitCode": 0,
+      "elapsedSeconds": 232.641,
+      "verified": true,
+      "sizeBytes": 719774286,
+      "sha256": "23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d"
+    }
+  ],
+  "app": {
+    "sizeBytes": 24520704,
+    "sha256": "ebdd55fe119ae3bdf22ab6ba055ef16affbfdceee441c194cce1ef1c1218f5c4"
+  },
+  "oldPreFixApp": {
+    "sizeBytes": 24524800,
+    "sha256": "b516277031322220fb4188bfba4c1be07b87400ff3cefcde0c64fbccbf366788"
+  },
+  "packages": {
+    "nsis": {
+      "sizeBytes": 16295031,
+      "sha256": "9505825acef1ae67e28f1f09b43b9de9b3a4c42d3f222e62f549e43fd99bea1a"
+    },
+    "portable": {
+      "sizeBytes": 23359299,
+      "sha256": "2cfcc650128f80cb320b6dffc62894875ed095fe7290abc786ea69c1d40bac8c"
+    }
+  },
+  "installationChecks": {
+    "official": {
+      "bothEnginesAuthorized": true,
+      "cpuArtifact": "hikaru-asr-crispasr-windows-x64-cpu-shared-v2",
+      "cudaArtifact": "hikaru-asr-crispasr-windows-x64-cuda-shared-v2",
+      "cudaComputeProbe": true,
+      "downloadAvailable": true,
+      "exactClosure": true,
+      "externalStableAssetPublished": true,
+      "managedRootAdjacent": true,
+      "manualInstallOrUi": false,
+      "missingAndCorruptRejected": true,
+      "priorAssPreserved": true,
+      "syntheticDeviceFailureIsolated": true
+    },
+    "china": {
+      "bothEnginesAuthorized": true,
+      "cpuArtifact": "hikaru-asr-crispasr-windows-x64-cpu-shared-v2",
+      "cudaArtifact": "hikaru-asr-crispasr-windows-x64-cuda-shared-v2",
+      "cudaComputeProbe": true,
+      "downloadAvailable": true,
+      "exactClosure": true,
+      "externalStableAssetPublished": true,
+      "managedRootAdjacent": true,
+      "manualInstallOrUi": false,
+      "missingAndCorruptRejected": true,
+      "priorAssPreserved": true,
+      "syntheticDeviceFailureIsolated": true
+    }
+  },
+  "modelRuns": 0,
+  "unchangedP1CliAndDlls": true,
+  "ct2FilesUnchangedPerPackage": 19,
+  "limits": [
+    "No new application release, manual installation/uninstallation or fresh inference/UI claim.",
+    "New local app contains no model weights; exact F16 and required CPU Silero remain on-demand.",
+    "Six retained host and two UI proofs retain their original source/runtime identities.",
+    "Long/expanded-relative audio paths, deep CLI roots and cross-volume deep-work remain unsupported.",
+    "Physical CUDA inference evidence remains RTX 3070 only; probe is model-free.",
+    "Initial command-line no-op and stale resource fixture failure are retained separately from successful checks."
+  ]
+}
