@@ -1,3 +1,5 @@
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+
 const MAX_PROVIDER_ERROR_LENGTH = 300;
 const MAX_GENERATION_ERROR_LENGTH = 180;
 const MIN_CREDENTIAL_OVERLAP_LENGTH = 4;
@@ -9,6 +11,11 @@ interface GenerationSensitiveValues {
   credentials: Array<string | undefined>;
   requestContent: Array<string | undefined>;
 }
+
+export const getHttpFetch = (): typeof fetch =>
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+    ? tauriFetch
+    : globalThis.fetch;
 
 export function buildProviderUrl(baseUrl: string, path: string): URL {
   const url = new URL(baseUrl);
@@ -28,7 +35,7 @@ export async function fetchWithTimeout(
     ? AbortSignal.any([init.signal, timeoutSignal])
     : timeoutSignal;
   try {
-    return await fetch(input, { ...init, signal });
+    return await getHttpFetch()(input, { ...init, signal });
   } catch (error) {
     if (init.signal?.aborted) throw error;
     if (timeoutSignal.aborted) throw new GenerationError("timeout");
