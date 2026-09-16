@@ -15,6 +15,15 @@
     "fs:default",
     "fs:allow-read-file",
     "fs:allow-read",
-    "shell:default"
+    "shell:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://*/**" },
+        { "url": "https://*:*/**" },
+        { "url": "http://*/**" },
+        { "url": "http://*:*/**" }
+      ]
+    }
   ]
 }
