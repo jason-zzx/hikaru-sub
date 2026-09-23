@@ -113,10 +113,9 @@ Wrong:   include bundled native-asr resources in managed storage/cleanup
 Correct: report builtIn unmanaged runtime -> reject cleanup
 ```
 
-## Shared Qwen + Parakeet CrispASR application dependencies
+## Shared Qwen + Parakeet + ReazonSpeech CrispASR application dependencies
 
-- `native-asr/runtime/crispasr-product-lock.json` enables Qwen and Parakeet ordinary-build use while
-  external CUDA publication remains a separate download-only condition. Both
+- `native-asr/runtime/crispasr-product-lock.json` enables Qwen, Parakeet and ReazonSpeech ordinary-build use. External CUDA publication remains a download-only condition, not an application release. Both
   CPU and CUDA must still pass exact runtime manifest/file closure verification;
   CUDA additionally passes the bounded model-free compute probe at resolution.
 - CPU root: `resource_dir()/native-asr/windows-x64/crispasr/cpu`; managed CUDA:
@@ -124,9 +123,9 @@ Correct: report builtIn unmanaged runtime -> reject cleanup
   Valid installed CUDA reports available even without published source rows.
   Missing/invalid CUDA reports missing and offers download only when both bundled
   `crispasrCuda` source rows and the publication flag match the locked archive.
-  The published asset is `hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip` on the existing
+  The published asset is `hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip` on the existing
   `native-asr-cuda-v1` dependency release: official GitHub plus the same URL prefixed
-  by `https://ghfast.top/`, both with identical size/SHA. Never replace the CT2 asset,
+  by `https://ghfast.top/`, both verified at 719,771,622 bytes / SHA-256 `5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0`. Never replace the CT2 asset,
   infer all-generation GPU qualification from PTX coverage, or disable Qwen CPU.
   Producer metadata may retain publication only for exact already-uploaded bytes;
   a changed archive remains unpublished until separately authorized and verified.
@@ -136,12 +135,13 @@ Correct: report builtIn unmanaged runtime -> reject cleanup
   repair and offline reuse. VAD missing/corrupt means Qwen is not ready.
 - Resource preparation verifies existing archives and never resets model support
   metadata. Enabling application selection is not installer/UI/release acceptance.
+- Published shared-v3 advertises `reazonspeech-nemo` on both devices and preserves the exact reviewed Q8_0 candidate bytes. The CPU/CUDA short/medium/long functional matrix, local application flows, official/China download/install/probe checks and ordinary-build gating pass. Status, download and start still require matching embedded CPU-and-CUDA engine authority plus exact model/VAD readiness. Exact shared-v2 lock, CPU archive and remote asset remain immutable rollback authority.
 
 ## Capability-gated Parakeet managed delivery
 
 ### 1. Scope / Trigger
 
-Exact `nvidia/parakeet-tdt_ctc-0.6b-ja` uses cstr F16 GGUF at immutable revision `d9e3ba65a6579796389ea89e5939509ed257f972`, CC-BY-4.0 attribution and conversion notice. Ordinary builds now embed published shared-v2 CPU/CUDA support and permit public status/download/start. Remote CUDA publication remains a download-only condition, not a verified installed-use prerequisite. Capability/UI and cwd/media/hygiene source reviews are accepted; the new default local app includes the fixes, while the retained old app remains pre-fix. General long-path limitations below remain open.
+Exact `nvidia/parakeet-tdt_ctc-0.6b-ja` uses cstr F16 GGUF at immutable revision `d9e3ba65a6579796389ea89e5939509ed257f972`, CC-BY-4.0 attribution and conversion notice. Ordinary builds now embed published shared-v3 CPU/CUDA support for Qwen, Parakeet and ReazonSpeech and permit public status/download/start when exact model readiness also passes. Remote CUDA publication remains a download-only condition, not a verified installed-use prerequisite or application release. General long-path limitations below remain open.
 
 ### 2. Signatures
 
@@ -156,7 +156,7 @@ Exact `nvidia/parakeet-tdt_ctc-0.6b-ja` uses cstr F16 GGUF at immutable revision
 - ASR installs under `deps/models/crispasr/parakeet/nvidia/parakeet-tdt_ctc-0.6b-ja/<revision>`. A logical download/readiness unit includes the identical existing shared Silero asset; combined size is 1,247,817,898 bytes. Reuse the existing stages, Range restart/resume, hash verification, atomic publication, VAD publication mutex and cleanup storage lease. Different references to the same shared VAD are a manifest error.
 - There is no per-model cleanup/download-cancel API. Parakeet staging/repair must not remove shared VAD or sibling Qwen installs; the existing explicit all-model storage cleanup still owns the complete managed models root.
 - Private model-backed tests may exercise managed complete-partial publication and host/ASS without overriding public support. They are not proof that the immutable Qwen-only published runtime contains Parakeet.
-- The existing full-CLI packager generates a fresh `shared-*` CPU/CUDA candidate with exact ordered engines `["qwen3-asr", "parakeet"]`, complete four/seven-DLL closure and full model-source credit. Default builds embed the verified published shared-v2 authority; exact Qwen-only rollback bytes remain in `crispasr-product-lock-v1.json`. Absolute `HIKARU_CRISPASR_CANDIDATE_LOCK` selects that immutable authority at build time across resource preparation, Rust embedding and portable packaging; running apps never read it or a mutable external lock. Explicit candidate CUDA stays unpublished/non-downloadable. Default source rows point to the new shared-v2 asset: 719,774,286 bytes, SHA-256 `23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d`; both official and ghfast.top bytes were verified. Old remote assets are untouched.
+- The existing full-CLI packager generates a fresh `shared-*` CPU/CUDA candidate with exact ordered engines `["qwen3-asr", "parakeet", "reazonspeech-nemo"]`, complete four/seven-DLL closure and full model-source credit. Default builds embed the verified published shared-v3 authority; exact shared-v2 rollback bytes remain in `crispasr-product-lock-v2.json`, and Qwen-only rollback remains in `crispasr-product-lock-v1.json`. Absolute `HIKARU_CRISPASR_CANDIDATE_LOCK` selects an immutable candidate at build time across resource preparation, Rust embedding and portable packaging; running apps never read it or a mutable external lock. Default source rows point to shared-v3: 719,771,622 bytes, SHA-256 `5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0`; both official and ghfast.top bytes were verified. Old remote assets are untouched.
 - Local extracted NSIS/portable file/probe checks and real short-path portable WebView CPU/CUDA selection/start/frontend ASS save are recorded separately. Synthetic file-drop and a verified preseeded audio cache were used; this is not manual install/uninstall or a fresh model network download. No release readiness or support beyond measured hardware is inferred.
 
 ### 4. Validation & Error Matrix

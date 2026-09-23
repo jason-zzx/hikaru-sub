@@ -10,14 +10,16 @@
 
 namespace hikaru_qwen {
 inline bool parakeet() { return std::getenv("HIKARU_PARAKEET_DEVICE") != nullptr; }
+inline bool reazonspeech() { return std::getenv("HIKARU_REAZONSPEECH_DEVICE") != nullptr; }
+inline bool parakeet_family() { return parakeet() || reazonspeech(); }
 inline const char* device() {
     const char* value = std::getenv("HIKARU_QWEN_DEVICE");
-    if (parakeet()) {
-        if (value) {
-            std::fprintf(stderr, "hikaru_error: conflicting_device_controls\n");
-            std::exit(40);
-        }
-        value = std::getenv("HIKARU_PARAKEET_DEVICE");
+    if ((value ? 1 : 0) + (parakeet() ? 1 : 0) + (reazonspeech() ? 1 : 0) > 1) {
+        std::fprintf(stderr, "hikaru_error: conflicting_device_controls\n");
+        std::exit(40);
+    }
+    if (parakeet_family()) {
+        value = std::getenv(parakeet() ? "HIKARU_PARAKEET_DEVICE" : "HIKARU_REAZONSPEECH_DEVICE");
     }
     if (value && std::strcmp(value, "cpu") && std::strcmp(value, "cuda")) {
         std::fprintf(stderr, "hikaru_error: invalid_device\n");
@@ -80,10 +82,10 @@ inline ggml_status compute(ggml_backend_sched_t sched, ggml_cgraph* graph, const
 // not the encoder scheduler. Host state/readback/encoder projection remain
 // upstream CPU operations; this attests the actual graph dispatch, not those.
 inline ggml_status direct_compute(ggml_backend_t selected, ggml_cgraph* graph, const char* role) {
-    if (parakeet() && (!selected || !matches(ggml_backend_get_device(selected), cuda())))
+    if (parakeet_family() && (!selected || !matches(ggml_backend_get_device(selected), cuda())))
         fail("parakeet_decoder_device_mismatch");
     auto status = ggml_backend_graph_compute(selected, graph);
-    if (parakeet()) {
+    if (parakeet_family()) {
         if (status != GGML_STATUS_SUCCESS) fail("parakeet_decoder_compute_failed");
         std::fprintf(stderr, "hikaru_graph: role=%s device=%s nodes=%d other=0\n",
                      role, cuda() ? "cuda" : "cpu", ggml_graph_n_nodes(graph));

@@ -17,12 +17,13 @@ required CPU VAD, fail-safe ASS, cancellation/recovery/reap, path/privacy/licens
 and delivery contracts. CLI silence requires successful CPU VAD, not missing or
 partial output. Graph/device proof is distinct from a model-free CUDA probe.
 
-The absolute-quality qualification scenario below applies to other independently
-scoped Native candidates (including the pending Parakeet/Reazon children), not a
-request to rerun accepted Qwen. The old Qwen development timeline library and its
-dedicated tests are retired. Shared session/backend ABI tests and the generic
-Qwen structured-failure seam remain development compatibility checks; they do
-not select or replace the independent full-CLI product path.
+The absolute-quality qualification scenario below is retained for historical
+research only; it does not apply to the current Qwen, Parakeet or ReazonSpeech
+production routes. These routes passed separate CPU/CUDA functional and delivery
+gates without CER, RTF or inherited-GPU qualification. The old Qwen development
+timeline library and its dedicated tests are retired. Shared session/backend ABI
+tests and the generic Qwen structured-failure seam remain development compatibility
+checks; they do not select or replace the independent full-CLI product path.
 
 ## Historical sidecar verification
 
@@ -52,7 +53,7 @@ When optional engines or models are absent, report that limitation instead of cl
 
 ### 1. Scope / Trigger
 
-Use this contract when a Native ASR candidate outside the current Qwen full-CLI scope is measured for migration feasibility or production qualification. User-provided `.asr-benchmark` WAV+ASS pairs remain the only text, speech-region, and timeline truth. Native qualification uses the absolute `native-ground-truth-absolute-v1` profile. Archived `python-legacy-cuda-v1` rows are historical diagnostics only: they may be displayed separately, but they never define expected output, create or repair reference annotations, or contribute a Native pass/fail decision. Only the frozen GPU candidate runs model-backed quality/performance qualification; a matching CPU route separately completes its required functional/lifecycle matrix and then inherits that exact GPU candidate disposition.
+This historical contract describes earlier Native ASR candidate research; do not apply it to the current Qwen, Parakeet or ReazonSpeech production routes. User-provided `.asr-benchmark` WAV+ASS pairs remain the only text, speech-region, and timeline truth. Native qualification uses the absolute `native-ground-truth-absolute-v1` profile. Archived `python-legacy-cuda-v1` rows are historical diagnostics only: they may be displayed separately, but they never define expected output, create or repair reference annotations, or contribute a Native pass/fail decision. Only the frozen GPU candidate runs model-backed quality/performance qualification; a matching CPU route separately completes its required functional/lifecycle matrix and then inherits that exact GPU candidate disposition.
 
 ### 2. Signatures
 

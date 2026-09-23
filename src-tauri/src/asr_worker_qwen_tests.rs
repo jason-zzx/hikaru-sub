@@ -346,7 +346,7 @@ fn qwen_cli_fixture_cancel_shutdown_crash_and_immediate_reopen() {
     let Some(worker) = std::env::var_os("HIKARU_ASR_QWEN_CLI_FIXTURE_WORKER") else {
         return;
     };
-    for engine in ["qwen3-asr", "parakeet"] {
+    for engine in ["qwen3-asr", "parakeet", "reazonspeech-nemo"] {
         for action in ["cancel", "shutdown", "crash"] {
             let temp = tempfile::tempdir().unwrap();
             let gate = Arc::new(ActiveJobGate::default());
@@ -977,7 +977,7 @@ fn qwen_cli_locked_results_release_process_gate_and_retry_cleanup() {
     let Some(worker) = std::env::var_os("HIKARU_ASR_QWEN_CLI_FIXTURE_WORKER") else {
         return;
     };
-    for engine in ["qwen3-asr", "parakeet"] {
+    for engine in ["qwen3-asr", "parakeet", "reazonspeech-nemo"] {
         for action in ["cancel", "shutdown", "crash", "finish"] {
             let temp = tempfile::tempdir().unwrap();
             let gate = Arc::new(ActiveJobGate::default());

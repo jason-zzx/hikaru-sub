@@ -80,8 +80,10 @@ def check_encoder_failure(source: Path, out: Path):
     native = (source / 'src/parakeet.cpp').read_text(encoding='utf-8')
     header = (source / 'src/core/hikaru_qwen_device.h').read_text(encoding='utf-8')
     encoder = between(native, 'static std::vector<float> parakeet_encode_mel(', '\n}\n')
-    helper = between(header, 'inline bool parakeet()', '\n') + between(header, '[[noreturn]] inline void fail(', '\n}\n')
-    guard = '        if (hikaru_qwen::parakeet()) hikaru_qwen::fail("parakeet_encoder_allocation_failed");\n'
+    helper = ''.join(between(header, marker, '\n') for marker in [
+        'inline bool parakeet()', 'inline bool reazonspeech()', 'inline bool parakeet_family()'
+    ]) + between(header, '[[noreturn]] inline void fail(', '\n}\n')
+    guard = '        if (hikaru_qwen::parakeet_family()) hikaru_qwen::fail("parakeet_encoder_allocation_failed");\n'
     assert encoder.count(guard) == 1
     # All relevant callers share this one encoder: transcribe_ex and streamed
     # windows in native; gap fill calls the same backend transcribe entry.

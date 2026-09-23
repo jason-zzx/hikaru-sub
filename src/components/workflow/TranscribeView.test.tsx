@@ -32,6 +32,7 @@ vi.mock("../../hooks/useAsrAvailability", () => ({
       { value: "kotoba-faster-whisper", label: "kotoba-faster-whisper" },
       { value: "qwen3-asr", label: "Qwen3" },
       { value: "parakeet", label: "parakeet" },
+      { value: "reazonspeech-nemo", label: "ReazonSpeech NeMo" },
     ],
     modelOptions: [{ value: model, label: model }],
     deviceOptions: [
@@ -217,6 +218,40 @@ describe("TranscribeView Native ASR flow", () => {
     expect(mocks.getVideoInfo).not.toHaveBeenCalled();
     expect(mocks.saveAssText).not.toHaveBeenCalled();
     expect(useTaskStore.getState().tasks.asr?.status).toBe("success");
+  });
+
+  it("keeps prior subtitles when ReazonSpeech rejects an invalid medium/long result", async () => {
+    const doc = createDefaultDocument("Existing document", 640, 480);
+    doc.cues = [{ id: "old", startMs: 10, endMs: 900, primaryText: "Existing", style: "Primary", layer: 0 }];
+    useProjectStore.getState().loadAssDocument(doc, { kind: "translated", path: "C:/media/input.translated.ass" });
+    useProjectStore.getState().updateCue("old", { primaryText: "Unsaved edit" });
+    const before = useProjectStore.getState();
+    mocks.getSettings.mockResolvedValue({
+      asrEngine: "reazonspeech-nemo",
+      asrModel: "reazon-research/reazonspeech-nemo-v2",
+      asrDevice: "cpu",
+    });
+    mocks.startAsr.mockResolvedValue({ jobId: "failed-reazon-job" });
+    mocks.getAsrProgress.mockResolvedValue({
+      id: "failed-reazon-job",
+      status: "failed",
+      progress: 1,
+      durationMs: 498_872,
+      processedMs: 498_872,
+      segmentCount: 0,
+      segments: [],
+      detectedLanguage: null,
+      error: "Native pipeline failed safely",
+    });
+
+    await renderAndStart();
+
+    expect(await screen.findByText("Native pipeline failed safely")).toBeTruthy();
+    expect(useProjectStore.getState()).toBe(before);
+    expect(withDiscardedSubtitleRecovery).not.toHaveBeenCalled();
+    expect(mocks.getVideoInfo).not.toHaveBeenCalled();
+    expect(mocks.saveAssText).not.toHaveBeenCalled();
+    expect(useTaskStore.getState().tasks.asr?.status).toBe("error");
   });
 
   it("rejects a stale Parakeet completion after the final async snapshot read", async () => {

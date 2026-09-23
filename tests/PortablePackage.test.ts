@@ -163,8 +163,8 @@ describe("portable package", () => {
     // tree here: Rust/Tauri can be reading those same files during other checks.
     const { root } = await makeReleaseDir();
     const crispasr = JSON.parse(readFileSync(rootFile("native-asr/runtime/crispasr-product-lock.json"), "utf8"));
-    expect(crispasr.cpu.engines).toEqual(["qwen3-asr", "parakeet"]);
-    expect(crispasr.cuda.engines).toEqual(["qwen3-asr", "parakeet"]);
+    expect(crispasr.cpu.engines).toEqual(["qwen3-asr", "parakeet", "reazonspeech-nemo"]);
+    expect(crispasr.cuda.engines).toEqual(["qwen3-asr", "parakeet", "reazonspeech-nemo"]);
     expect(crispasr.externalStableAssetPublished).toBe(true);
     for (const path of [
       "native-asr/runtime/windows-x64-cpu-lock.json", "native-asr/artifacts/windows-x64-cpu.zip",

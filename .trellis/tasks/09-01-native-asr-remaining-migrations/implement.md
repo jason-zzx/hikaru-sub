@@ -6,10 +6,11 @@
 
 Functionality/delivery and owner CPU/CUDA application runs are accepted; CUDA
 publication review was owner-closed, not independently executed by the timed-out
-reviewer. Cleanup/timeline retirement is accepted. The child remains in_progress
-for the newly authorized exact-byte lock relocation and stable scratch decoupling;
-offline checks and independent review precede parent-owned archive. Other children
-have not started.
+reviewer. Cleanup/timeline retirement and exact-byte lock relocation to stable
+scratch are accepted; the owner waived further review and the Qwen child was
+archived on 2026-09-09. Parakeet is archived; ReazonSpeech implementation, local
+qualification and owner-authorized shared-v3 dependency/default enablement are
+complete, and its child awaits archive; general VAD has not started.
 
 - [x] Freeze the parent device-coverage decision: Qwen3, Parakeet and ReazonSpeech must each support production CPU and CUDA.
 - [x] Review the new integration-first design and curated context for `08-20-native-asr-qwen3-aligner`; user explicitly instructed 开始实施 and task.py start activated the child.
@@ -21,7 +22,7 @@ have not started.
 - [x] Establish independent CrispASR CPU/CUDA artifact IDs, locks, verifiers and roots: bundled CPU and managed on-demand CUDA, both isolated from the existing CTranslate2 artifacts and without model weights.
 - [x] Integrate required CPU VAD in Qwen, include its asset in logical progress/readiness, and preserve upstream word-aware alignment/display semantics; only the child-approved adjacent display anomaly merge using existing endpoint envelopes; no other repair or text-duration fallback.
 - [x] Run separate CPU/CUDA short/medium/long functional and lifecycle checks; no reference ASS, quality scoring, Python parity or inherited GPU quality label.
-- [ ] Finish the authorized exact-byte Qwen lock relocation to `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json` and scratch decoupling to `native-asr/build/full-cli`; after offline checks and independent review, parent preflights the whole-directory move and archives without commit. Mark complete and update actual archived context paths only after archive succeeds; no automatic sibling activation or repeated qualification.
+- [x] Finish the exact-byte Qwen lock relocation to `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json` and scratch decoupling to `native-asr/build/full-cli`; offline checks passed, the owner waived further independent review, and the child was archived without automatic sibling activation or repeated qualification.
 
 ### Phase 2 - Parakeet
 
@@ -33,10 +34,11 @@ have not started.
 
 ### Phase 3 - ReazonSpeech NeMo
 
-- [ ] Refine `09-01-native-asr-reazonspeech-productization` from R1/R2 archived evidence.
-- [ ] Preserve exact upstream ReazonSpeech logical identity, qualify viable Native conversion/quantization candidates that resolve the long-audio zero-duration failure without synthetic repair, then select one final artifact by reviewed quality/community/maturity evidence rather than size and freeze its complete conversion identity.
-- [ ] Reuse the frozen bundled CPU/on-demand CUDA runtime contracts; implement only ReazonSpeech model delivery, CPU+CUDA execution, frontend availability and lifecycle integration.
-- [ ] Complete the WAV+ASS absolute CUDA quality-performance matrix plus CPU short/medium/long functional/lifecycle matrix and archive the child before starting VAD.
+- [x] Refine and implement `09-01-native-asr-reazonspeech-productization` from R1/R2 archived evidence.
+- [x] Preserve exact upstream identity and freeze the registry-recommended Q8_0 artifact/source/license without subtitle-quality or F16/Q4_K competition.
+- [x] Reuse shared CPU/on-demand CUDA runtime contracts and exact CPU Silero through pinned full-CLI `model + vad`; complete model delivery, CPU/CUDA execution, frontend availability and lifecycle integration without general VAD settings.
+- [x] Complete CPU/CUDA short/medium/long functional, resolved-device, exact PCM-support endpoint, output-safety, download/offline/cancel/recovery/cleanup and local product-delivery checks without quality/performance qualification.
+- [ ] Complete final child review and archive before starting general VAD; the independent owner checkpoint has published/verified shared-v3 and preserved shared-v2 rollback.
 
 ### Phase 4 - General Native VAD (Qwen prerequisite already owned by Phase 1)
 
@@ -50,9 +52,9 @@ have not started.
 
 - [ ] Verify all four children are completed and archived in the fixed order.
 - [ ] Verify all original v0.4.1 selectable model routes are production Native on both CPU and CUDA and no longer `postMvpUnavailable`.
-- [ ] Verify each route retains its exact upstream logical model and one final artifact with source/hash/license authority. Qwen uses the upstream-recommended pair and Parakeet uses its compatible upstream/community-recommended artifact with new runtime functional validation, not a quality competition or fresh conversion research; retain ReazonSpeech’s own candidate-selection contract.
+- [ ] Verify each route retains its exact upstream logical model and one final artifact with source/hash/license authority. Qwen uses the upstream-recommended pair, Parakeet uses its compatible upstream/community-recommended artifact, and ReazonSpeech uses the upstream registry-recommended exact Q8_0; all rely on new runtime functional validation, not quality competition or fresh conversion research.
 - [ ] Verify Qwen ASR+aligner download/status/repair/cleanup behaves as one logical pair and can never expose a single-role or mixed-version ready state.
-- [ ] Verify Qwen and Parakeet each have separate CPU/CUDA short/medium/long functional and lifecycle coverage without subtitle-quality checks. Apply ReazonSpeech’s own still-active verification contract; do not restore retired quality/inheritance rules for Qwen or Parakeet.
+- [ ] Verify Qwen, Parakeet and ReazonSpeech each have separate CPU/CUDA short/medium/long functional, resolved-device, output-safety and lifecycle coverage without subtitle-quality checks, performance-threshold qualification or inherited GPU quality labels.
 - [ ] Verify the shared CrispASR CPU runtime is bundled as an independent closed world with zero model weights, the shared CUDA pack is managed/on-demand under an independent root, neither can load/repair/clean the CTranslate2 artifacts, and final NSIS/portable ZIP sizes remain within 80/90 MiB.
 - [ ] Verify VAD remains CPU-only for both CPU and CUDA ASR routes, with no VAD GPU choice or separate CUDA VAD pack. Qwen's full CUDA CLI may include CPU Silero code/support; VAD weights stay shared and outside runtime packs.
 - [ ] Verify no Python/runtime/venv/PyTorch/NeMo fallback or package dependency was restored.
@@ -83,7 +85,7 @@ git diff --check
 
 Do not run `task.py start` for the parent or a child until:
 
-- that child applies its current agreed verification scope: Qwen's rebuild is functional-only on CPU/CUDA, including mandatory CPU VAD and upstream LIS; do not resurrect old quality gates. Parakeet is also functional-only on CPU/CUDA with full upstream integration and no quality/quantization competition; owner separately approved reusing required CPU Silero and retaining upstream Japanese actual-audio gap retranscription/segment reconstruction, not Qwen aligner/repair behavior. ReazonSpeech and general VAD retain their own planning contracts;
+- that child applies its current agreed verification scope: Qwen's rebuild is functional-only on CPU/CUDA, including mandatory CPU VAD and upstream LIS; do not resurrect old quality gates. Parakeet is also functional-only on CPU/CUDA with full upstream integration and no quality/quantization competition; owner separately approved reusing required CPU Silero and retaining upstream Japanese actual-audio gap retranscription/segment reconstruction, not Qwen aligner/repair behavior. ReazonSpeech is likewise functional-only on CPU/CUDA, fixes the upstream registry-recommended exact Q8_0 without a quality/quantization competition, and reuses the same exact CPU Silero only through its pinned full-CLI `model + vad` route; general VAD remains last;
 - for Qwen's integration-first start, the bundled-CPU/on-demand-CUDA distribution, independent roots and final packaging contract are specified; exact final artifact identities/pack measurements are frozen after functional integration, not required before starting it. Later model children must wait for that final shared runtime contract and reuse it rather than creating per-model runtime packs;
 - that child has converged PRD/design/implement artifacts;
 - its `implement.jsonl` and `check.jsonl` contain real spec/research context;

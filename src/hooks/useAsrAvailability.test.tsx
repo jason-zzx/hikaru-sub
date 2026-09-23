@@ -214,6 +214,22 @@ describe("useAsrAvailability", () => {
     expect(result.current.selectedModelStatus?.model).toBe("Qwen/Qwen3-ASR-1.7B");
   });
 
+  it("enables ReazonSpeech only after embedded both-device capability and model readiness agree", async () => {
+    const model = "reazon-research/reazonspeech-nemo-v2";
+    mocks.listAsrEngines.mockResolvedValue([{
+      name: "reazonspeech-nemo", backend: "crispasr", available: true, device: "cpu",
+      devices: [{ device: "cpu", available: true }, { device: "cuda", available: true, downloadRequired: false }],
+    }]);
+    mocks.checkAsrModel.mockResolvedValue(status("reazonspeech-nemo", model, "supportedMissing"));
+    const { result } = renderHook(() => useAsrAvailability("reazonspeech-nemo", model, "cpu"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.routeAvailable).toBe(true);
+    expect(result.current.unavailableReason).toBeNull();
+    expect(result.current.engineOptions.find((option) => option.value === "reazonspeech-nemo")?.disabled).toBeFalsy();
+    expect(result.current.modelOptions).toEqual([expect.objectContaining({ value: model })]);
+    expect(result.current.modelOptions[0].disabled).toBeFalsy();
+  });
+
   it("checks the selected model first, publishes it before the rest, and stops stale scans", async () => {
     mocks.listAsrEngines.mockResolvedValue([
       { name: "faster-whisper", available: true, device: "cpu" },

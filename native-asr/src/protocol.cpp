@@ -459,10 +459,10 @@ bool parse_request_line(std::string_view line, WorkerRequestV1& request, Protoco
     if (roles.count(ModelRole::Aligner) == 0 || roles.size() < 2 || roles.size() > 3) {
       return fail(error, "missing_model_role", "qwen3-asr requires model and aligner roles");
     }
-  } else if (parsed.engine == Engine::Parakeet) {
+  } else if (parsed.engine == Engine::Parakeet || parsed.engine == Engine::ReazonSpeechNemo) {
     // Retain model-only historical development requests. Full CLI requires VAD.
     if (roles.size() > 2 || roles.count(ModelRole::Aligner))
-      return fail(error, "unexpected_model_role", "parakeet accepts only model and vad roles");
+      return fail(error, "unexpected_model_role", "parakeet-family routes accept only model and vad roles");
   } else if (roles.size() != 1) {
     return fail(error, "unexpected_model_role", "this route accepts only the model role");
   }

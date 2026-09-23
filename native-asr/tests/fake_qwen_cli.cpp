@@ -51,12 +51,14 @@ int wmain(int argc, wchar_t** argv) {
   }
   std::string scenario; std::ifstream(model) >> scenario;
   const bool parakeet = backend == "parakeet";
+  const bool reazonspeech = backend == "reazonspeech";
+  const bool parakeet_family = parakeet || reazonspeech;
   if (scenario == "cwd-no-dll") {
     // A real loadable fixture DLL is planted in the launch cwd, never own-root.
     HMODULE unwanted = LoadLibraryW(L"hikaru-asr-fake-crispasr-cuda-marker.dll");
     if (unwanted) { FreeLibrary(unwanted); return 46; }
   }
-  if (parakeet) {
+  if (parakeet_family) {
     if (keys.count(L"-am") || keys.count(L"--chunk-seconds") || keys.count(L"--decoder")
         || !keys.count(L"--vad") || !keys.count(L"-vm") || !keys.count(L"--require-vad")
         || !keys.count(L"--strict-pipeline") || !keys.count(L"--require-word-timestamps")
@@ -65,8 +67,10 @@ int wmain(int argc, wchar_t** argv) {
         || GetEnvironmentVariableW(L"HIKARU_QWEN_DEVICE", nullptr, 0)
         || GetEnvironmentVariableW(L"CRISPASR_PARAKEET_DECODER", nullptr, 0)) return 46;
     wchar_t selected[16]{};
-    if (!GetEnvironmentVariableW(L"HIKARU_PARAKEET_DEVICE", selected, 16)
-        || fs::path(selected).string() != device) return 46;
+    const auto control = parakeet ? L"HIKARU_PARAKEET_DEVICE" : L"HIKARU_REAZONSPEECH_DEVICE";
+    const auto other = parakeet ? L"HIKARU_REAZONSPEECH_DEVICE" : L"HIKARU_PARAKEET_DEVICE";
+    if (!GetEnvironmentVariableW(control, selected, 16)
+        || fs::path(selected).string() != device || GetEnvironmentVariableW(other, nullptr, 0)) return 46;
   }
   try { if (hikaru_asr::wav::read_pcm16_mono_16khz(audio).duration_ms != 3000) return 45; }
   catch (...) { return 45; }
@@ -82,11 +86,14 @@ int wmain(int argc, wchar_t** argv) {
   std::cout << "private transcript and paths must not enter protocol\n";
   std::cerr << "private diagnostic C:\\sensitive\\file synthetic transcript\n";
   std::cerr << "hikaru_vad: device=cpu chunks=3 completed=1\n";
-  const auto roles = !parakeet ? std::vector<std::string>{"asr", "aligner", "lazy-audio"}
+  const auto roles = !parakeet_family ? std::vector<std::string>{"asr", "aligner", "lazy-audio"}
       : device == "cpu" ? std::vector<std::string>{"parakeet-encoder"}
       : std::vector<std::string>{"parakeet-encoder", "parakeet-predictor", "parakeet-joint"};
   if (parakeet && scenario != "no-tdt")
     std::cerr << "hikaru_tdt: decoder=" << (scenario == "wrong-tdt" ? "invalid" : device)
+              << " host_projection=cpu frames=10 steps=10 completed=1\n";
+  if (reazonspeech && scenario != "no-rnnt")
+    std::cerr << "hikaru_rnnt: decoder=" << (scenario == "wrong-rnnt" ? "invalid" : device)
               << " host_projection=cpu frames=10 steps=10 completed=1\n";
   if (scenario == "cpu-cuda-init") std::cerr << "ggml_cuda_init: fixture\n";
   for (const auto& role : roles) {
@@ -103,9 +110,9 @@ int wmain(int argc, wchar_t** argv) {
   }
   if (scenario == "slow-success") {
     Sleep(65000);
-    if (parakeet) std::cerr << "hikaru_slice: completed=1 total=2\r\n";
+    if (parakeet_family) std::cerr << "hikaru_slice: completed=1 total=2\r\n";
     Sleep(60000);
-    if (parakeet) std::cerr << "hikaru_slice: completed=2 total=2\r\n";
+    if (parakeet_family) std::cerr << "hikaru_slice: completed=2 total=2\r\n";
   }
   if (scenario == "nonzero") return 40;
   std::ofstream out(result, std::ios::binary);
@@ -115,7 +122,8 @@ int wmain(int argc, wchar_t** argv) {
   Json word{{"text", "合成テスト。"}, {"t0", 0}, {"t1", 100}, {"offsets", {{"from", 0}, {"to", 1000}}}};
   Json row{{"startMs", 0}, {"endMs", 1000}, {"text", "合成テスト。"}};
   Json source{{"text", "合成テスト。"}, {"offsets", {{"from", 0}, {"to", 1000}}}, {"words", Json::array({word})}};
-  Json value{{"crispasr", {{"backend", backend}}}, {"displayFallback", false}, {"vadSilence", false},
+  Json value{{"crispasr", {{"backend", parakeet_family ? "parakeet" : backend}, {"model", model.u8string()}}},
+      {"displayFallback", false}, {"vadSilence", false},
       {"displaySegments", Json::array({row})}, {"transcription", Json::array({source})}};
   if (scenario == "silence") { value["vadSilence"] = true; value["displaySegments"] = Json::array(); value["transcription"] = Json::array(); }
   if (scenario == "empty") { value["displaySegments"] = Json::array(); value["transcription"] = Json::array(); }
@@ -193,7 +201,8 @@ int wmain(int argc, wchar_t** argv) {
   if (scenario == "word-text-empty") value["transcription"][0]["words"][0]["text"] = "";
   if (scenario == "fallback-type") value["displayFallback"] = 0;
   if (scenario == "escaped-nul-unused") value["unused"] = std::string(1, '\0');
-  if (scenario == "wrong-backend") value["crispasr"]["backend"] = parakeet ? "qwen3" : "parakeet";
+  if (scenario == "wrong-backend") value["crispasr"]["backend"] = parakeet_family ? "qwen3" : "parakeet";
+  if (scenario == "wrong-model") value["crispasr"]["model"] = "C:/wrong/model.gguf";
   if (scenario == "source-control") value["transcription"][0]["text"] = "\t合成テスト。";
   if (scenario == "word-control") value["transcription"][0]["words"][0]["text"] = "\x7f";
   if (scenario == "source-reversed") value["transcription"][0]["offsets"]["from"] = 1001;

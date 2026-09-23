@@ -1047,6 +1047,9 @@ if(BUILD_TESTING AND HIKARU_ASR_BUILD_QWEN_CLI_WORKER)
   add_test(NAME parakeet-cli-worker-contract COMMAND "${Python3_EXECUTABLE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/parakeet_cli_contract.py" "$<TARGET_FILE:hikaru-asr-qwen-cli-fixture-worker>")
   set_tests_properties(parakeet-cli-worker-contract PROPERTIES TIMEOUT 90)
+  add_test(NAME reazonspeech-cli-worker-contract COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/reazonspeech_cli_contract.py" "$<TARGET_FILE:hikaru-asr-qwen-cli-fixture-worker>")
+  set_tests_properties(reazonspeech-cli-worker-contract PROPERTIES TIMEOUT 90)
   add_test(NAME full-cli-deep-paths COMMAND "${Python3_EXECUTABLE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/full_cli_paths.py" "$<TARGET_FILE:hikaru-asr-qwen-cli-fixture-worker>")
   set_tests_properties(full-cli-deep-paths PROPERTIES TIMEOUT 90)

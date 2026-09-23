@@ -56,7 +56,8 @@ Protocol path validation is syntax-only. Drive-rooted, UNC, and extended Windows
 | `kotoba-faster-whisper` | `ctranslate2` | `model` | `cpu`, `cuda` |
 | `parakeet` (generic historical protocol) | `crispasr` | `model`; additive `vad` permitted | `cpu`, `cuda`, `vulkan` |
 | `parakeet` (full-CLI application worker, availability gated) | `crispasr` | `model`, `vad` | `cpu`, `cuda` |
-| `reazonspeech-nemo` | `crispasr` | `model` | `cpu`, `cuda`, `vulkan` |
+| `reazonspeech-nemo` (generic historical protocol) | `crispasr` | `model` | `cpu`, `cuda`, `vulkan` |
+| `reazonspeech-nemo` (full-CLI application worker, availability gated) | `crispasr` | `model`, `vad` | `cpu`, `cuda` |
 | `qwen3-asr` (generic historical protocol) | `crispasr` | `model`, `aligner`; additive `vad` permitted | `cpu`, `cuda`, `vulkan` |
 | `qwen3-asr` (full-CLI application worker) | `crispasr` | `model`, `aligner`, `vad` | `cpu`, `cuda` |
 
@@ -65,13 +66,13 @@ full-CLI readiness contract. The custom timeline unit is retired; the
 DEVELOPMENT Qwen worker keeps the original backend/ForcedAligner capability
 call followed by `qwen_timeline_policy_not_implemented` / exit20, with no segment,
 replacement or completed event; shared ABI and sibling worker tests remain.
-Both Qwen and Parakeet full-CLI worker routes reject a missing explicit `vad`,
+Qwen, Parakeet, and ReazonSpeech full-CLI worker routes reject a missing explicit `vad`,
 `useVad=false`, any `vadConfig`, or Vulkan before `ready`/inference. It uses the
 pinned upstream default CPU VAD configuration. There is no guessed dependency
-path and no silent VAD disablement. Historical Parakeet model-only syntax remains
-valid only at the generic protocol/development seam, not the full-CLI launch
-boundary. Parakeet has no aligner role. CT2 and Reazon still accept only `model`;
-adding a `vad` role does not enable or change their VAD/device semantics.
+path and no silent VAD disablement. Historical Parakeet/ReazonSpeech model-only
+syntax remains valid only at the generic protocol/development seam, not the full-CLI
+launch boundary. Neither route has an aligner role. CT2 still accepts only `model`;
+adding a `vad` role does not enable or change its VAD/device semantics.
 Duplicate, unknown, or route-extra roles are rejected; array order has no meaning.
 
 ### VAD ranges
@@ -121,17 +122,29 @@ A segment is legal only when `0 <= startMs < endMs <= ready.durationMs`, text is
   through document installation and ASS serialization. Explicit truthful silence
   is empty success: no ASS write, document/metadata/active path/dirty state change
   or unsaved-recovery discard.
-- Parakeet's 120-second no-progress execution deadline advances only on increasing
-  model/VAD/graph stages or completed slice counts with a fixed total. Repeated
-  graph/slice messages and arbitrary stderr do not count as progress. Slice
-  completion maps to the existing bounded protocol fraction; `ready` does not
-  claim model loading or graph execution.
+- ReazonSpeech uses the same pinned Japanese FastConformer/RNN-T CLI orchestration
+  with an explicit exact model path and required CPU Silero, while retaining its own
+  model identity and RNNT execution proof. Pure-RNNT nonblank tokens use the
+  authoritative NeMo half-open encoder cell `[t,t+1)`. Before display grouping, each
+  token/word/segment end is intersected only with the exact PCM sample support passed
+  to that parent or gap decode call; starts are unchanged, and an outside or
+  non-positive intersection fails closed. This removes only convolution-padding
+  extent beyond supplied PCM: it is not a next-cue, display-row, VAD-boundary or
+  slice-end guess and does not sort, merge or relax protocol validation. The final
+  `displaySegments` still require positive duration, ordered audio bounds and text
+  conservation before one atomic `segmentsReplace`; failure preserves existing ASS
+  and recovery. The exact Q8_0 CPU/CUDA short/medium/long functional matrix passes.
+- Parakeet/ReazonSpeech's 120-second no-progress execution deadline advances only on
+  increasing model/VAD/graph stages or completed slice counts with a fixed total.
+  Repeated graph/slice messages and arbitrary stderr do not count as progress. Slice
+  completion maps to the existing bounded protocol fraction; `ready` does not claim
+  model loading or graph execution.
 - Qwen retains its accepted full-CLI wait/cancel behavior and Qwen-specific adjacent
   output-anomaly grouping. The pinned Qwen CLI does not expose the Parakeet slice
   progress source; it must not inherit that deadline as a false 120-second total
   runtime cap. Its execution diagnostics remain fail-closed device assertions,
   not a fabricated progress clock. Host cancellation/Job-tree reap, output bounds
-  and terminal persistence apply to both engines unchanged.
+  and terminal persistence apply to all three engines unchanged.
 
 ## Lifecycle
 

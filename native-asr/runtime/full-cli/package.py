@@ -40,16 +40,33 @@ def package(args):
         if not args.output.is_relative_to(ROOT / 'native-asr/build/full-cli'):
             raise ValueError('candidate output must use ignored full-cli scratch')
         acquisition = json.loads(acquisition_path.read_text(encoding='utf-8'))
-        model = acquisition['model']
+        if acquisition.get('schemaVersion') != 1:
+            raise ValueError('candidate acquisition schema mismatch')
+        models = acquisition.get('models') or [acquisition['model']]
         manifest = json.loads((ROOT / 'src-tauri/resources/native-asr-models.json').read_text(encoding='utf-8'))
-        expected = next(r for r in manifest['models'] if r['engine'] == 'parakeet')
-        if (model['logicalModel'] != 'nvidia/parakeet-tdt_ctc-0.6b-ja'
-                or model['license'] != 'CC-BY-4.0'
-                or any(model[k] != expected[k] for k in ('repository', 'revision'))
-                or any(model[k] != expected['files'][0][v] for k, v in
-                       [('file', 'path'), ('sizeBytes', 'sizeBytes'), ('sha256', 'sha256')])):
-            raise ValueError('candidate model authority mismatch')
-    engines = ['qwen3-asr', 'parakeet'] if candidate else ['qwen3-asr']
+        expected_models = {
+            'nvidia/parakeet-tdt_ctc-0.6b-ja': next(r for r in manifest['models'] if r['engine'] == 'parakeet'),
+            'reazon-research/reazonspeech-nemo-v2': next(r for r in manifest['models'] if r['engine'] == 'reazonspeech-nemo'),
+        }
+        logical_models = [model['logicalModel'] for model in models]
+        if (len(logical_models) != len(set(logical_models))
+                or set(logical_models) not in ({'nvidia/parakeet-tdt_ctc-0.6b-ja'}, set(expected_models))):
+            raise ValueError('candidate model set mismatch')
+        for model in models:
+            expected = expected_models[model['logicalModel']]
+            if (model['license'] != expected['license']['spdx']
+                    or any(model[k] != expected[k] for k in ('repository', 'revision'))
+                    or any(model[k] != expected['files'][0][v] for k, v in
+                           [('file', 'path'), ('sizeBytes', 'sizeBytes'), ('sha256', 'sha256')])):
+                raise ValueError('candidate model authority mismatch')
+            if (model['logicalModel'] == 'reazon-research/reazonspeech-nemo-v2'
+                    and (model.get('upstreamRepository') != model['logicalModel']
+                         or model.get('upstreamRevision') != '33693408be76b7cba9fd4a7546a0a8772430211b'
+                         or not model.get('upstreamModelCard'))):
+                raise ValueError('candidate upstream model authority mismatch')
+    engines = ['qwen3-asr'] + (['parakeet'] if candidate else [])
+    if candidate and 'reazon-research/reazonspeech-nemo-v2' in logical_models:
+        engines.append('reazonspeech-nemo')
     # Fresh output preserves every prior runtime/evidence byte.
     args.output.mkdir(parents=True, exist_ok=False)
     source_files = [{'path': p.relative_to(args.source).as_posix(), **identity(p)}
@@ -123,7 +140,7 @@ def package(args):
                       'assets':[{k:r[k] for k in ('logicalModel','repository','revision','file','publicationSizeBytes','publicationSha256','licenseDeclaredByModelCard','modelCard')} for r in model_lock['models']]}
         if acquisition:
             # Full attribution/changes/provenance limits; no fabricated converter commit.
-            model_notice['assets'].append(acquisition['model'])
+            model_notice['assets'].extend(models)
         write_json(licenses/'MODEL-SOURCES.json',model_notice)
         write_json(licenses/'THIRD-PARTY-NOTICES.json',{'components':notices,'modelsBundled':False,
                    'uromanAcknowledgement':"This project uses the universal romanizer software 'uroman' written by Ulf Hermjakob, USC Information Sciences Institute (2015-2020). Bibliography: Ulf Hermjakob, Jonathan May, and Kevin Knight. 2018. Out-of-the-box universal romanization tool uroman. Proceedings of the 56th Annual Meeting of Association for Computational Linguistics, Demo Track.",

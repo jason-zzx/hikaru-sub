@@ -1,17 +1,19 @@
-# Full upstream CLI integration (Qwen + Parakeet ordinary builds)
+# Full upstream CLI integration (Qwen + Parakeet + ReazonSpeech ordinary builds)
 
 ## Current shared dependency authority
 
 Owner-authorized dependency publication completed on the existing `native-asr-cuda-v1`
-release: **`hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip`**, 719,774,286 bytes,
-SHA-256 `23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d`.
-Official GitHub and normal `https://ghfast.top/` source downloads both match. Default
-`../crispasr-product-lock.json` now embeds Qwen+Parakeet on both devices and truthful
-publication flags. Ordinary builds require no candidate environment input. CPU archive
-is `native-asr/artifacts/crispasr-cpu-shared-v2.zip`; CUDA is separate/on-demand.
-Exact former authority is retained at `../crispasr-product-lock-v1.json`, and old
-released assets and historical proofs are untouched. A candidate build still uses
-its explicit unpublished lock; do not pass the published lock as a candidate input.
+release: **`hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip`**, 719,771,622 bytes,
+SHA-256 `5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0`.
+Official GitHub and normal `https://ghfast.top/` source downloads both match and pass
+isolated closure, three-engine authorization and CUDA probe checks. Default
+`../crispasr-product-lock.json` embeds Qwen+Parakeet+ReazonSpeech on both devices with
+truthful publication flags. Ordinary builds require no candidate environment input.
+CPU archive is `native-asr/artifacts/crispasr-cpu-shared-v3.zip`; CUDA remains separate/on-demand.
+Exact shared-v2 rollback authority is retained at `../crispasr-product-lock-v2.json`;
+Qwen-only v1, old remote assets and historical proofs are untouched. This dependency
+publication is not an application release. A candidate build still uses its explicit
+unpublished lock; do not pass the published lock as a candidate input.
 
 Only worker CPU/CUDA bindings were rebuilt for the reviewed own-root cwd fix; full
 P1 CLI/DLL/model bytes are unchanged. Fresh archive/license verification, both downloaded

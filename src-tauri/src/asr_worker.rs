@@ -197,8 +197,10 @@ impl ResolvedNativeLaunch {
             return Err("native ASR 仅接受日语源语言".into());
         }
         validate_vad(use_vad, vad_config.as_ref())?;
-        let full_cli = matches!(engine.as_str(), "qwen3-asr" | "parakeet")
-            && model_paths.iter().any(|(role, _)| role == "vad");
+        let full_cli = matches!(
+            engine.as_str(),
+            "qwen3-asr" | "parakeet" | "reazonspeech-nemo"
+        ) && model_paths.iter().any(|(role, _)| role == "vad");
         if full_cli && (!use_vad || vad_config.is_some() || device == "vulkan") {
             return Err("Native full CLI 需要必需 CPU VAD、固定默认配置与 CPU/CUDA".into());
         }
@@ -397,9 +399,9 @@ fn validate_route(
         {
             return Err("qwen3-asr 需要 model 与 aligner".into());
         }
-    } else if engine == "parakeet" {
-        if roles.len() > 2 || roles.contains("aligner") {
-            return Err("Parakeet full CLI 只接受 model 与必需 CPU vad".into());
+    } else if matches!(engine, "parakeet" | "reazonspeech-nemo") {
+        if roles.len() != 2 || !roles.contains("vad") || roles.contains("aligner") {
+            return Err("Parakeet-family full CLI 只接受 model 与必需 CPU vad".into());
         }
     } else if roles.len() != 1 {
         return Err("当前 native ASR route 只接受 model role".into());
@@ -2692,20 +2694,22 @@ mod tests {
         let workspace = cache.join("workspace").join("job");
         let output = temp.path().join("output");
         let model = temp.path().join("model.gguf");
+        let vad = temp.path().join("vad.bin");
         fs::create_dir_all(&workspace).unwrap();
         fs::create_dir_all(&output).unwrap();
         fs::write(workspace.join("audio.wav"), b"fake").unwrap();
         fs::write(&model, b"fake").unwrap();
+        fs::write(&vad, b"fake").unwrap();
         ResolvedNativeLaunch::resolve(
             job_id.into(),
             "reazonspeech-nemo".into(),
-            vec![("model".into(), model)],
+            vec![("model".into(), model), ("vad".into(), vad)],
             "cpu".into(),
             "ja".into(),
             workspace.join("audio.wav"),
             output.join("result.ass"),
             &cache,
-            false,
+            true,
             None,
         )
         .unwrap()
@@ -3244,6 +3248,11 @@ mod tests {
         let launch = crispasr_fixture_launch(&temp, job_id);
         let recovery = launch.recovery_path.clone();
         let output = launch.output_ass_path.clone();
+        fs::write(
+            &output,
+            "existing ASS must survive invalid ReazonSpeech output",
+        )
+        .unwrap();
         host.start(launch, gate.reserve().unwrap()).unwrap();
         let snapshot = wait_terminal(&host, job_id);
         let trace = host.event_trace(job_id);
@@ -3257,7 +3266,10 @@ mod tests {
         assert_eq!(trace.segment_events, 0);
         assert_eq!(trace.replacement_events, 0);
         assert_eq!(recovered["segments"].as_array().unwrap().len(), 0);
-        assert!(!output.exists());
+        assert_eq!(
+            fs::read_to_string(output).unwrap(),
+            "existing ASS must survive invalid ReazonSpeech output"
+        );
         assert!(gate.current().is_none());
     }
 

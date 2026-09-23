@@ -69,7 +69,7 @@ pnpm asr:setup        # 仅开发/排障历史 Python sidecar 依赖
 
 - 始终使用 `pnpm`，不要用 `npm` 或 `yarn`。
 - 根 `package.json` 是应用版本的唯一人工来源；Tauri 直接读取该文件，Cargo 版本通过 `pnpm version:set <version>` 同步。发布说明写入 `CHANGELOG.md` 中与 tag 完全匹配的版本条目。
-- 当前源码 ASR 使用独立随包 Native CPU runtime、已发布的按需 CUDA pack 与 exact manifest 模型：CT2 支持 Faster-Whisper `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo` 和 exact `kotoba-tech/kotoba-whisper-v2.0-faster`；CrispASR 完整 CLI 支持 `Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B` 与必需 CPU Silero VAD。普通构建另支持 exact `nvidia/parakeet-tdt_ctc-0.6b-ja`（F16 + 同一必需 CPU Silero，共享 shared-v2 CPU/CUDA）；Reazon/通用 VAD 仍待迁移，Python profile 只供源码开发/历史研究；源码支持不等于新应用已发布。
+- 当前源码 ASR 使用独立随包 Native CPU runtime、已发布的按需 CUDA pack 与 exact manifest 模型：CT2 支持 Faster-Whisper `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo` 和 exact `kotoba-tech/kotoba-whisper-v2.0-faster`；CrispASR 完整 CLI 支持 `Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`、exact `nvidia/parakeet-tdt_ctc-0.6b-ja`（F16）与 exact `reazon-research/reazonspeech-nemo-v2`（Q8_0），三者共享必需 CPU Silero 与 shared-v3 CPU/CUDA authority。通用 VAD 仍待迁移，Python profile 只供源码开发/历史研究；源码与依赖发布不等于新应用已发布。
 
 ## 测试与验证
 
@@ -178,7 +178,7 @@ interface SubtitleCue {
 - 不要重新引入 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 作为大型受管依赖目录。
 - 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，设置页仅可选官方源或中国大陆镜像（默认官方源）；CUDA pack 的两条 source row 必须保持同一精确 size/SHA，禁止镜像重打包。旧配置中的 `auto`/`custom` 加载时静默迁移为官方源。
 - Native 模型下载只从受信 manifest 的 repository/revision/file 与官方/中国大陆 source profile 派生 URL；中国大陆源使用 `https://hf-mirror.com`。不得接受自定义模型 URL，也不得记录 headers、正文或私有路径。
-- 当前源码支持上述 CT2/Qwen/Parakeet CPU 与可选 CUDA；Qwen 与 Parakeet 共享已交付的必需 CPU Silero，其他引擎/通用 VAD、ReazonSpeech、Vulkan 尚未实现，不能通过缺 DLL 或 Python fallback 模拟能力。Qwen 使用上游完整 CLI、推荐 Q4_K pair、LIS/word-aware display 和已批准的相邻展示异常合并，不恢复 raw-only/DP/质量实验或源码裁剪。Kotoba 仍仅 exact `kotoba-tech/kotoba-whisper-v2.0-faster`、日语、无 VAD。CUDA 仅 RTX 3070 8 GiB 真机实测；其他代际的 SASS/PTX 覆盖不等于实际 GPU/驱动/显存验证，CrispASR CUDA12.8/MSVC unsupported-host override 限制见 full-cli README。
+- 当前源码支持上述 CT2/Qwen/Parakeet/ReazonSpeech CPU 与可选 CUDA；三个 CrispASR 模型共享已交付的必需 CPU Silero，其他引擎/通用 VAD、Vulkan 尚未实现，不能通过缺 DLL 或 Python fallback 模拟能力。Qwen 使用上游完整 CLI、推荐 Q4_K pair、LIS/word-aware display 和已批准的相邻展示异常合并，不恢复 raw-only/DP/质量实验或源码裁剪。ReazonSpeech 固定 exact Q8_0 与 owner-approved RNNT endpoint/PCM-support contract。Kotoba 仍仅 exact `kotoba-tech/kotoba-whisper-v2.0-faster`、日语、无 VAD。CUDA 仅 RTX 3070 8 GiB 真机实测；其他代际的 SASS/PTX 覆盖不等于实际 GPU/驱动/显存验证，CrispASR CUDA12.8/MSVC unsupported-host override 限制见 full-cli README。
 - 修改历史 Python sidecar 时仍须遵循其独立测试与 Kotoba `preprocessor_config.json` 等开发合同，但不得把这些规则扩展为 ordinary Faster-Whisper 的产品 readiness 条件；Systran `tiny/base/small/medium/large-v2` 使用 `vocabulary.txt`，`large-v3/large-v3-turbo` 使用 `vocabulary.json`。
 
 ## 媒体与字幕渲染

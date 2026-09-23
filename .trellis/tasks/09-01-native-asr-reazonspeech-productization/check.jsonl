@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/09-01-native-asr-reazonspeech-productization/prd.md", "reason": "Review functional-only acceptance gates and out-of-scope quality/release work"}
+{"file": ".trellis/tasks/09-01-native-asr-reazonspeech-productization/design.md", "reason": "Check full-CLI reuse, fail-closed structural output, device proof and publication boundary"}
+{"file": ".trellis/tasks/09-01-native-asr-reazonspeech-productization/implement.md", "reason": "Check complete phase coverage, matrix continuation and rollback"}
+{"file": "native-asr/docs/protocol-v1.md", "reason": "Worker protocol, output validation, lifecycle and device contract"}
+{"file": ".trellis/spec/tauri/paths-and-runtime-deps.md", "reason": "Runtime root, package, model storage and dependency isolation"}
+{"file": ".trellis/spec/frontend/services-and-tauri-bridge.md", "reason": "Frontend availability/download/start integration standards"}

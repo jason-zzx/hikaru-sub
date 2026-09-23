@@ -151,11 +151,11 @@ void verify_cli(const fs::path& path) {
 #endif
 }
 struct Execution {
-  bool error = false, vad = false, cpu_cuda = false, tdt = false;
+  bool error = false, vad = false, cpu_cuda = false, tdt = false, rnnt = false;
   int stage = 0;
   std::int64_t slice = 0, total = 0;
   std::set<std::string> roles;
-  bool line(const std::string& value, const std::string& device, bool parakeet) {
+  bool line(const std::string& value, const std::string& device, Engine engine) {
     const auto previous_stage = stage;
     const auto previous_slice = slice;
     if (value == "hikaru_stage: parakeet_model_loaded") stage = std::max(stage, 1);
@@ -175,8 +175,13 @@ struct Execution {
     }
     static const std::regex tdt_line(R"(^hikaru_tdt: decoder=(cpu|cuda) host_projection=cpu frames=([1-9][0-9]*) steps=([1-9][0-9]*) completed=1$)");
     if (value.rfind("hikaru_tdt:", 0) == 0) {
-      if (!parakeet || !std::regex_match(value, m, tdt_line) || m[1] != device) error = true;
+      if (engine != Engine::Parakeet || !std::regex_match(value, m, tdt_line) || m[1] != device) error = true;
       else tdt = true;
+    }
+    static const std::regex rnnt_line(R"(^hikaru_rnnt: decoder=(cpu|cuda) host_projection=cpu frames=([1-9][0-9]*) steps=([1-9][0-9]*) completed=1$)");
+    if (value.rfind("hikaru_rnnt:", 0) == 0) {
+      if (engine != Engine::ReazonSpeechNemo || !std::regex_match(value, m, rnnt_line) || m[1] != device) error = true;
+      else rnnt = true;
     }
     static const std::regex slice_line(R"(^hikaru_slice: completed=([0-9]+) total=([0-9]+)$)");
     if (value.rfind("hikaru_slice:", 0) == 0) {
@@ -213,9 +218,11 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
                                const std::function<void(std::int64_t)>& ready,
                                const std::function<void(std::int64_t, std::int64_t)>& progress) {
   const bool parakeet = request.engine == Engine::Parakeet;
-  require((parakeet || request.engine == Engine::Qwen3Asr) && request.backend == Backend::CrispAsr
+  const bool reazonspeech = request.engine == Engine::ReazonSpeechNemo;
+  const bool parakeet_family = parakeet || reazonspeech;
+  require((parakeet_family || request.engine == Engine::Qwen3Asr) && request.backend == Backend::CrispAsr
       && request.device != Device::Vulkan && request.use_vad && !request.vad_config
-      && request.model_paths.size() == (parakeet ? 2 : 3), "qwen_cli_request_invalid");
+      && request.model_paths.size() == (parakeet_family ? 2 : 3), "qwen_cli_request_invalid");
   require(!request.job_id.empty() && std::all_of(request.job_id.begin(), request.job_id.end(), [](unsigned char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
   }), "qwen_cli_path_invalid");
@@ -225,7 +232,7 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
     const fs::path path(wide(model.path)); pins.add(path); models.emplace(model.role, path);
   }
   require(models.size() == request.model_paths.size() && models.count(ModelRole::Model)
-      && models.count(ModelRole::Aligner) == (parakeet ? 0 : 1) && models.count(ModelRole::Vad), "qwen_cli_request_invalid");
+      && models.count(ModelRole::Aligner) == (parakeet_family ? 0 : 1) && models.count(ModelRole::Vad), "qwen_cli_request_invalid");
   const fs::path audio(wide(request.audio_path)); pins.add(audio);
 
   const fs::path work = audio.parent_path() / "asr-jobs" / (request.job_id + "-cli");
@@ -251,12 +258,12 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
       FILE_ATTRIBUTE_TEMPORARY, nullptr));
   require(output.value != INVALID_HANDLE_VALUE, "qwen_cli_result_failed");
   std::wstring command = quote(cli.wstring());
-  std::vector<std::wstring> args = {L"--backend", parakeet ? L"parakeet" : L"qwen3", L"-m", models.at(ModelRole::Model).wstring(),
+  std::vector<std::wstring> args = {L"--backend", parakeet ? L"parakeet" : reazonspeech ? L"reazonspeech" : L"qwen3", L"-m", models.at(ModelRole::Model).wstring(),
       L"--vad", L"-vm", models.at(ModelRole::Vad).wstring(),
       L"--strict-pipeline", L"--require-vad", L"--require-word-timestamps", L"-l", L"ja",
       L"--split-on-punct", L"-ojf", L"-of", (work / "result").wstring(), L"-f", relative_audio.wstring(),
       L"--gpu-backend", wide(to_string(request.device)), L"-t", L"8", L"--cache-dir", (work / "cache").wstring()};
-  if (!parakeet) { args.push_back(L"-am"); args.push_back(models.at(ModelRole::Aligner).wstring()); }
+  if (!parakeet_family) { args.push_back(L"-am"); args.push_back(models.at(ModelRole::Aligner).wstring()); }
   if (request.device == Device::Cpu) args.push_back(L"--no-gpu");
   for (const auto& arg : args) command += L" " + quote(arg);
   wchar_t system[32768]{};
@@ -265,7 +272,7 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
   // No inherited PATH, model cache, loader or device knobs. All non-system DLLs
   // must be beside the pinned CLI; final artifact closure remains packaging's job.
   const std::map<std::wstring, std::wstring> env = {
-      {parakeet ? L"HIKARU_PARAKEET_DEVICE" : L"HIKARU_QWEN_DEVICE", wide(to_string(request.device))},
+      {parakeet ? L"HIKARU_PARAKEET_DEVICE" : reazonspeech ? L"HIKARU_REAZONSPEECH_DEVICE" : L"HIKARU_QWEN_DEVICE", wide(to_string(request.device))},
       {L"PATH", cli.parent_path().wstring() + L";" + system},
       {L"SystemRoot", root}, {L"TEMP", work.wstring()}, {L"TMP", work.wstring()}, {L"WINDIR", root}};
   std::wstring environment;
@@ -318,9 +325,9 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
   std::size_t diagnostic_bytes = 0;
   const auto consume = [&] {
     const auto previous = execution.slice;
-    if (execution.line(line, to_string(request.device), parakeet))
+    if (execution.line(line, to_string(request.device), request.engine))
       last_progress = std::chrono::steady_clock::now();
-    if (parakeet && execution.slice > previous) {
+    if (parakeet_family && execution.slice > previous) {
       // Slice counts cannot exceed milliseconds in the bounded PCM WAV. This
       // also bounds the integer fraction used by the protocol progress bridge.
       require(execution.total <= duration, "qwen_cli_execution_invalid");
@@ -328,11 +335,11 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
     }
     line.clear();
   };
-  // Only Parakeet emits monotonic stage/slice progress in this pinned CLI.
+  // The Parakeet-family routes emit monotonic stage/slice progress in this pinned CLI.
   // Keep Qwen's accepted wait/cancel policy: graph diagnostics are execution
   // assertions, not a progress clock or a reason to impose a total-time cutoff.
   while (true) {
-    require(!parakeet || std::chrono::steady_clock::now() - last_progress < std::chrono::seconds(120),
+    require(!parakeet_family || std::chrono::steady_clock::now() - last_progress < std::chrono::seconds(120),
             "qwen_cli_no_progress_timeout");
     DWORD available = 0;
     if (!PeekNamedPipe(reader.value, nullptr, 0, nullptr, &available, nullptr)) {
@@ -384,12 +391,15 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
   require(ReadFile(output.value, bytes.data(), static_cast<DWORD>(bytes.size()), &count, nullptr)
       && count == bytes.size());
   bool silence = false;
-  auto segments = parakeet ? parakeet_cli::parse_result(bytes, duration, silence)
-                           : qwen_cli::parse_result(bytes, duration, silence);
-  const auto expected = !parakeet ? std::set<std::string>{"asr", "aligner", "lazy-audio"}
+  auto segments = parakeet_family
+      ? parakeet_cli::parse_result(bytes, duration, silence,
+          reazonspeech ? models.at(ModelRole::Model).u8string() : std::string{})
+      : qwen_cli::parse_result(bytes, duration, silence);
+  const auto expected = !parakeet_family ? std::set<std::string>{"asr", "aligner", "lazy-audio"}
       : request.device == Device::Cpu ? std::set<std::string>{"parakeet-encoder"}
       : std::set<std::string>{"parakeet-encoder", "parakeet-predictor", "parakeet-joint"};
-  require(silence || (execution.roles == expected && (!parakeet || execution.tdt)),
+  const bool decoder_proved = parakeet ? execution.tdt : !reazonspeech || execution.rnnt;
+  require(silence || (execution.roles == expected && decoder_proved),
           "qwen_cli_execution_invalid");
   return segments;
 }

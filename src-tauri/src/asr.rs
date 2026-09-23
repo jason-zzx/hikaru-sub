@@ -463,7 +463,10 @@ fn validate_start_asr_args(args: &StartAsrArgs) -> Result<(), String> {
 
 fn validate_native_request(args: &StartAsrArgs) -> Result<(), String> {
     RequestedNativeDevice::parse(&args.device)?;
-    if matches!(args.engine.as_str(), "qwen3-asr" | "parakeet") {
+    if matches!(
+        args.engine.as_str(),
+        "qwen3-asr" | "parakeet" | "reazonspeech-nemo"
+    ) {
         if args.vad_config.is_some() {
             return Err("该模型使用固定默认 CPU VAD，不接受自定义配置".into());
         }
@@ -490,7 +493,10 @@ pub(crate) fn qualified_native_launch(
     validate_native_request(&args)?;
     if model.logical_id != format!("{}/{}", args.engine, args.model)
         || model.backend
-            != if matches!(args.engine.as_str(), "qwen3-asr" | "parakeet") {
+            != if matches!(
+                args.engine.as_str(),
+                "qwen3-asr" | "parakeet" | "reazonspeech-nemo"
+            ) {
                 "crispasr"
             } else {
                 "ctranslate2"
@@ -498,13 +504,16 @@ pub(crate) fn qualified_native_launch(
     {
         return Err("Native ASR 已验证模型与请求身份不一致".into());
     }
-    let full_cli = matches!(args.engine.as_str(), "qwen3-asr" | "parakeet");
+    let full_cli = matches!(
+        args.engine.as_str(),
+        "qwen3-asr" | "parakeet" | "reazonspeech-nemo"
+    );
     let mut roles: Vec<_> = model.roles.iter().map(|(role, _)| role.as_str()).collect();
     roles.sort_unstable();
     if roles
         != match args.engine.as_str() {
             "qwen3-asr" => vec!["aligner", "model", "vad"],
-            "parakeet" => vec!["model", "vad"],
+            "parakeet" | "reazonspeech-nemo" => vec!["model", "vad"],
             _ => vec!["model"],
         }
     {
@@ -1463,7 +1472,7 @@ mod tests {
 
     #[test]
     fn selected_engine_is_authorized_before_host_cache_or_launch() {
-        for engine in ["qwen3-asr", "parakeet"] {
+        for engine in ["qwen3-asr", "parakeet", "reazonspeech-nemo"] {
             for requested in [
                 RequestedNativeDevice::Cpu,
                 RequestedNativeDevice::Cuda,
@@ -1488,7 +1497,11 @@ mod tests {
                                         if shared { "shared" } else { "qwen" }
                                     ),
                                     engines: if shared {
-                                        vec!["qwen3-asr".into(), "parakeet".into()]
+                                        vec![
+                                            "qwen3-asr".into(),
+                                            "parakeet".into(),
+                                            "reazonspeech-nemo".into(),
+                                        ]
                                     } else {
                                         vec!["qwen3-asr".into()]
                                     },

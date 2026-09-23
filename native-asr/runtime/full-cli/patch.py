@@ -59,10 +59,12 @@ def adapt(root):
     }
     if (hikaru_qwen::device()) {
         if (!hikaru_qwen::local_file(params.model) ||
-            (!hikaru_qwen::parakeet() && !hikaru_qwen::local_file(params.aligner_model)))
+            (!hikaru_qwen::parakeet_family() && !hikaru_qwen::local_file(params.aligner_model)))
             hikaru_qwen::fail("explicit_model_unreadable");
         if (hikaru_qwen::parakeet() && (params.backend != "parakeet" || !params.aligner_model.empty()))
             hikaru_qwen::fail("parakeet_route_mismatch");
+        if (hikaru_qwen::reazonspeech() && (params.backend != "reazonspeech" || !params.aligner_model.empty()))
+            hikaru_qwen::fail("reazonspeech_route_mismatch");
         if (!params.vad || !hikaru_qwen::local_file(params.vad_model)) {
             fprintf(stderr, "hikaru_error: VAD_unreadable\\n");
             return 30;
@@ -171,15 +173,26 @@ def adapt(root):
     # Observe these real dispatches; do not move operations or change decoding.
     changes['src/parakeet.cpp'] = '#include "core/hikaru_qwen_device.h"\n' + (root / 'src/parakeet.cpp').read_text(encoding='utf-8')
     replace('src/parakeet.cpp', '    ctx->backend = pick_backend(params.use_gpu);',
-            '''    if (hikaru_qwen::parakeet() && params.use_gpu != hikaru_qwen::cuda())
+            '''    if (hikaru_qwen::parakeet_family() && params.use_gpu != hikaru_qwen::cuda())
         hikaru_qwen::fail("parakeet_requested_device_mismatch");
     ctx->backend = pick_backend(params.use_gpu);
-    if (hikaru_qwen::parakeet()) hikaru_qwen::backend(ctx->backend, params.use_gpu, "parakeet");''')
+    if (hikaru_qwen::parakeet_family()) hikaru_qwen::backend(ctx->backend, params.use_gpu, "parakeet");''')
     replace('src/parakeet.cpp', '    model.buf = wl.buf;',
-            '    model.buf = wl.buf;\n    if (hikaru_qwen::parakeet()) hikaru_qwen::buffer(model.buf);')
+            '    model.buf = wl.buf;\n    if (hikaru_qwen::parakeet_family()) hikaru_qwen::buffer(model.buf);')
+    replace('src/parakeet.h', 'bool parakeet_has_ctc(struct parakeet_context* ctx);',
+            'bool parakeet_has_ctc(struct parakeet_context* ctx);\nbool parakeet_is_rnnt(struct parakeet_context* ctx);')
+    replace('src/parakeet.cpp', '''extern "C" bool parakeet_has_ctc(struct parakeet_context* ctx) {
+    return ctx && ctx->model.has_ctc;
+}''', '''extern "C" bool parakeet_has_ctc(struct parakeet_context* ctx) {
+    return ctx && ctx->model.has_ctc;
+}
+
+extern "C" bool parakeet_is_rnnt(struct parakeet_context* ctx) {
+    return ctx && ctx->model.hparams.n_tdt_durations == 0;
+}''')
     replace('src/parakeet.cpp', '    parakeet_fold_batchnorm(ctx->model, ctx->backend);',
             '''    parakeet_fold_batchnorm(ctx->model, ctx->backend);
-    if (hikaru_qwen::parakeet()) {
+    if (hikaru_qwen::parakeet_family()) {
         hikaru_qwen::buffer(ctx->model.buf_f32);
         fprintf(stderr, "hikaru_stage: parakeet_model_loaded\\n");
     }''')
@@ -187,12 +200,12 @@ def adapt(root):
     # reaches this allocator. Fail before an empty result can trigger retry or
     # be merged with earlier successful text; keep uncontrolled upstream return.
     replace('src/parakeet.cpp', '        fprintf(stderr, "parakeet: failed to alloc encoder graph\\n");',
-            '''        if (hikaru_qwen::parakeet()) hikaru_qwen::fail("parakeet_encoder_allocation_failed");
+            '''        if (hikaru_qwen::parakeet_family()) hikaru_qwen::fail("parakeet_encoder_allocation_failed");
         fprintf(stderr, "parakeet: failed to alloc encoder graph\\n");''')
     replace('src/parakeet.cpp', 'ggml_backend_sched_graph_compute(ctx->sched, gf)',
             'hikaru_qwen::compute(ctx->sched, gf, "parakeet-encoder")', 2)
     replace('src/parakeet.cpp', '    return ggml_dec;',
-            '''    if (hikaru_qwen::parakeet() && ggml_dec != hikaru_qwen::cuda())
+            '''    if (hikaru_qwen::parakeet_family() && ggml_dec != hikaru_qwen::cuda())
         hikaru_qwen::fail("parakeet_decoder_device_mismatch");
     return ggml_dec;''', 2)
     # The default persistent decoder ignores allocation failure upstream. In
@@ -201,7 +214,7 @@ def adapt(root):
         replace('src/core/rnnt_ggml.h',
                 f'    if (!ggml_gallocr_alloc_graph(d.{allocator}, d.{graph}))\n        return false;',
                 f'''    if (!ggml_gallocr_alloc_graph(d.{allocator}, d.{graph})) {{
-        if (hikaru_qwen::parakeet()) hikaru_qwen::fail("parakeet_decoder_allocation_failed");
+        if (hikaru_qwen::parakeet_family()) hikaru_qwen::fail("parakeet_decoder_allocation_failed");
         return false;
     }}''')
     replace('src/core/rnnt_ggml.h', '#include "ggml-backend.h"',
@@ -211,6 +224,95 @@ def adapt(root):
     for graph, role in [('pgf', 'parakeet-predictor'), ('jgf', 'parakeet-joint')]:
         replace('src/core/rnnt_ggml.h', f'    ggml_backend_graph_compute(d.backend, d.{graph});',
                 f'    hikaru_qwen::direct_compute(d.backend, d.{graph}, "{role}");')
+    # NeMo standard pure-RNNT timestamps are half-open encoder-cell intervals.
+    # Change only the three pure-RNNT nonblank emission seams; TDT/CTC timing,
+    # decoder decisions and all frame/search advancement remain untouched.
+    replace('src/parakeet.cpp',
+            'nh.emitted.push_back({c.token, parent.t, parent.t, c.tok_p});',
+            'nh.emitted.push_back({c.token, parent.t, parent.t + 1, c.tok_p});')
+    replace('src/parakeet.cpp',
+            'nh.emitted.push_back({tok, t, t, (float)std::exp(new_score - h.score)});',
+            'nh.emitted.push_back({tok, t, t + 1, (float)std::exp(new_score - h.score)});')
+    replace('src/parakeet.cpp', '''            emitted.push_back({tok, t, t, tok_p});
+            if (has_hotwords)
+                core_context_bias::advance(ctx->hotword_trie, hw_state, tok);''', '''            emitted.push_back({tok, t, t + 1, tok_p});
+            if (has_hotwords)
+                core_context_bias::advance(ctx->hotword_trie, hw_state, tok);''')
+
+    # The decoder grid may include a padded final cell beyond the PCM supplied
+    # to one concrete parent or gap invocation. Carry that invocation's exact
+    # sample range to the Reazon adapter; never reconstruct it from t_offset_cs.
+    changes['examples/cli/hikaru_reazonspeech_pcm.h'] = '''#pragma once
+
+#include <cstdint>
+
+namespace hikaru_reazonspeech_pcm {
+struct support {
+    int64_t start_sample = -1;
+    int64_t end_sample = -1;
+};
+inline thread_local support current;
+inline void set(int64_t start_sample, int64_t end_sample) { current = {start_sample, end_sample}; }
+inline support take() {
+    const support value = current;
+    current = {};
+    return value;
+}
+} // namespace hikaru_reazonspeech_pcm
+'''
+    replace('examples/cli/crispasr_backend_parakeet.cpp',
+            '''        apply_sticky_params(params);
+
+        // Issue #89 / #257: long-audio path selection,''',
+            '''        const auto pcm_support = hikaru_reazonspeech_pcm::take();
+        apply_sticky_params(params);
+
+        // Issue #89 / #257: long-audio path selection,''')
+    replace('examples/cli/crispasr_backend_parakeet.cpp',
+            '''        for (const auto& ps : parakeet_transcribe_segments(ctx_, samples, n_samples, t_offset_cs, is_ja_model_, oo))
+            out.push_back(seg_from_parakeet_seg(ps));
+        return out;
+    }
+
+    // ---- Split transcribe: encode ∥ decode across dispatcher slices ----''',
+            '''        auto segments = parakeet_transcribe_segments(ctx_, samples, n_samples, t_offset_cs, is_ja_model_, oo);
+        if (hikaru_qwen::reazonspeech() && parakeet_is_rnnt(ctx_))
+            intersect_exact_pcm_end(segments, n_samples, pcm_support);
+        for (const auto& ps : segments)
+            out.push_back(seg_from_parakeet_seg(ps));
+        return out;
+    }
+
+    static void intersect_exact_pcm_end(std::vector<parakeet_seg>& segments, int n_samples,
+                                        const hikaru_reazonspeech_pcm::support& support) {
+        constexpr int64_t kSamplesPerCs = 160;
+        if (support.start_sample < 0 || support.end_sample <= support.start_sample ||
+            support.end_sample - support.start_sample != (int64_t)n_samples)
+            hikaru_qwen::fail("reazonspeech_pcm_support_invalid");
+
+        // Timestamps are whole centiseconds. Conservatively use only complete
+        // boundaries inside the exact PCM support; never round outside it.
+        const int64_t support_start_cs = (support.start_sample + kSamplesPerCs - 1) / kSamplesPerCs;
+        const int64_t support_end_cs = support.end_sample / kSamplesPerCs;
+        auto intersect = [&](int64_t& t1, int64_t t0, const char* code) {
+            if (t0 < support_start_cs || t0 >= support_end_cs)
+                hikaru_qwen::fail(code);
+            t1 = std::min(t1, support_end_cs);
+            if (t1 <= t0 || t1 > support_end_cs)
+                hikaru_qwen::fail(code);
+        };
+        for (auto& seg : segments) {
+            for (auto& token : seg.tokens)
+                intersect(token.t1, token.t0, "reazonspeech_token_pcm_intersection_invalid");
+            for (auto& word : seg.words)
+                intersect(word.t1, word.t0, "reazonspeech_word_pcm_intersection_invalid");
+            if (!seg.text.empty() || !seg.words.empty() || !seg.tokens.empty())
+                intersect(seg.t1, seg.t0, "reazonspeech_segment_pcm_intersection_invalid");
+        }
+    }
+
+    // ---- Split transcribe: encode ∥ decode across dispatcher slices ----''')
+
     # CPU manual TDT execution evidence belongs after the real decode, including
     # the upstream host projection/argmax work common to CPU and CUDA.
     replace('src/parakeet.cpp', '    if (time_dec) {\n        auto _dt1 = std::chrono::steady_clock::now();',
@@ -219,15 +321,69 @@ def adapt(root):
                 ggml_dec ? "cuda" : "cpu", T_enc, total_steps);
     if (time_dec) {
         auto _dt1 = std::chrono::steady_clock::now();''')
+    replace('src/parakeet.cpp', '''    int t = 0;
+    while (t < T_enc) {
+        joint_proj_enc(J, enc + (size_t)t * d_model, proj_e);
+
+        int n_inner = 0;
+        while (n_inner < max_per_step) {
+            if (ggml_dec)''', '''    int t = 0;
+    int total_steps = 0;
+    while (t < T_enc) {
+        joint_proj_enc(J, enc + (size_t)t * d_model, proj_e);
+
+        int n_inner = 0;
+        while (n_inner < max_per_step) {
+            total_steps++;
+            if (ggml_dec)''')
+    replace('src/parakeet.cpp', '''        if (n_inner >= max_per_step)
+            t++;
+    }
+
+    return emitted;
+}
+
+// ===========================================================================
+// CTC greedy decode''', '''        if (n_inner >= max_per_step)
+            t++;
+    }
+
+    if (hikaru_qwen::reazonspeech())
+        fprintf(stderr, "hikaru_rnnt: decoder=%s host_projection=cpu frames=%d steps=%d completed=1\\n",
+                ggml_dec ? "cuda" : "cpu", T_enc, total_steps);
+    return emitted;
+}
+
+// ===========================================================================
+// CTC greedy decode''')
     replace('examples/cli/crispasr_backend_parakeet.cpp',
             '        is_ja_model_ = parakeet_vocab_is_japanese(ctx_) != 0;',
             '''        is_ja_model_ = parakeet_vocab_is_japanese(ctx_) != 0;
         if (hikaru_qwen::parakeet() && (!is_ja_model_ || !p.parakeet_decoder.empty()))
-            hikaru_qwen::fail("parakeet_japanese_tdt_required");''')
-    changes['examples/cli/crispasr_backend_parakeet.cpp'] = '#include "core/hikaru_qwen_device.h"\n' + changes['examples/cli/crispasr_backend_parakeet.cpp']
+            hikaru_qwen::fail("parakeet_japanese_tdt_required");
+        if (hikaru_qwen::reazonspeech() && (!is_ja_model_ || !parakeet_is_rnnt(ctx_) || !p.parakeet_decoder.empty()))
+            hikaru_qwen::fail("reazonspeech_japanese_rnnt_required");''')
+    changes['examples/cli/crispasr_backend_parakeet.cpp'] = ('#include "core/hikaru_qwen_device.h"\n'
+        '#include "hikaru_reazonspeech_pcm.h"\n' + changes['examples/cli/crispasr_backend_parakeet.cpp'])
+    replace('examples/cli/crispasr_run.cpp',
+            '''        slice_ext_range(i, ext_start, ext_end, ext_t0_cs);
+        finish_slice(i, be.transcribe(samples.data() + ext_start, ext_end - ext_start, ext_t0_cs, params), be);''',
+            '''        slice_ext_range(i, ext_start, ext_end, ext_t0_cs);
+        hikaru_reazonspeech_pcm::set(ext_start, ext_end);
+        finish_slice(i, be.transcribe(samples.data() + ext_start, ext_end - ext_start, ext_t0_cs, params), be);''')
+    replace('examples/cli/crispasr_gap_fill.h',
+            '''            if (s1 - s0 < sample_rate / 4)
+                continue;
+            auto fill = be.transcribe(samples + s0, s1 - s0, win0_cs, params);''',
+            '''            if (s1 - s0 < sample_rate / 4)
+                continue;
+            hikaru_reazonspeech_pcm::set(s0, s1);
+            auto fill = be.transcribe(samples + s0, s1 - s0, win0_cs, params);''')
+    replace('examples/cli/crispasr_gap_fill.h', '#include "crispasr_vad.h"',
+            '#include "crispasr_vad.h"\n#include "hikaru_reazonspeech_pcm.h"')
     replace('examples/cli/crispasr_run.cpp', '        per_slice[i] = std::move(segs);',
             '''        per_slice[i] = std::move(segs);
-        if (hikaru_qwen::parakeet())
+        if (hikaru_qwen::parakeet_family())
             fprintf(stderr, "hikaru_slice: completed=%zu total=%zu\\n", i + 1, slices.size());''')
 
     # Mark the exact fallback branch, without changing its grouping algorithm.
@@ -295,7 +451,8 @@ def adapt(root):
             !crispasr_write_json(out_path(".json"), {}, backend.name(), params.model, params.language,
                                 params.output_jsn_full, nullptr, &empty_display, false, true)) return 42;
         return 0;''')
-    changes['examples/cli/crispasr_run.cpp'] = '#include "core/hikaru_qwen_device.h"\n' + changes['examples/cli/crispasr_run.cpp']
+    changes['examples/cli/crispasr_run.cpp'] = ('#include "core/hikaru_qwen_device.h"\n'
+        '#include "hikaru_reazonspeech_pcm.h"\n' + changes['examples/cli/crispasr_run.cpp'])
     for file, content in changes.items():
         (root / file).write_text(content, encoding='utf-8', newline='\n')
     shutil.copyfile(Path(__file__).with_name('hikaru_qwen_device.h'), root / 'src/core/hikaru_qwen_device.h')

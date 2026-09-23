@@ -33,10 +33,10 @@
         "pytorchCudaFindLinksUrl": null,
         "huggingfaceEndpoint": null,
         "crispasrCuda": {
-          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip",
+          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip",
           "archive": "zip",
-          "sha256": "23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d",
-          "sizeBytes": 719774286
+          "sha256": "5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0",
+          "sizeBytes": 719771622
         }
       },
       "china": {
@@ -71,10 +71,10 @@
         "pytorchCudaFindLinksUrl": "https://mirrors.aliyun.com/pytorch-wheels/cu126/",
         "huggingfaceEndpoint": "https://hf-mirror.com",
         "crispasrCuda": {
-          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip",
+          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip",
           "archive": "zip",
-          "sha256": "23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d",
-          "sizeBytes": 719774286
+          "sha256": "5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0",
+          "sizeBytes": 719771622
         }
       }
     }

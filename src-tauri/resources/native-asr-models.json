@@ -426,6 +426,44 @@
           }
         }
       }
+    },
+    {
+      "logicalId": "reazonspeech-nemo/reazon-research/reazonspeech-nemo-v2",
+      "engine": "reazonspeech-nemo",
+      "model": "reazon-research/reazonspeech-nemo-v2",
+      "backend": "crispasr",
+      "format": "gguf",
+      "repository": "cstr/reazonspeech-nemo-v2-GGUF",
+      "revision": "22799a5919ea26e3c5293fe0e68846fe7918a234",
+      "license": {
+        "spdx": "Apache-2.0",
+        "attribution": "Original ReazonSpeech NeMo v2 model: Reazon Human Interaction Lab; GGUF conversion: CrispStrobe/CrispASR. Publisher declares NeMo-to-GGUF format conversion and Q8_0 quantization; no training or fine-tuning.",
+        "source": "https://huggingface.co/cstr/reazonspeech-nemo-v2-GGUF/resolve/22799a5919ea26e3c5293fe0e68846fe7918a234/README.md"
+      },
+      "postMvpUnavailable": false,
+      "files": [
+        {
+          "role": "model",
+          "path": "reazonspeech-nemo-v2-q8_0.gguf",
+          "sizeBytes": 667147072,
+          "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2"
+        }
+      ],
+      "requiredVad": {
+        "role": "vad",
+        "path": "ggml-silero-v6.2.0.bin",
+        "sizeBytes": 885098,
+        "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+        "source": {
+          "repository": "ggml-org/whisper-vad",
+          "revision": "9ffd54a1e1ee413ddf265af9913beaf518d1639b",
+          "license": {
+            "spdx": "MIT",
+            "attribution": "Silero VAD v6.2.0; ggml-org/whisper-vad distribution",
+            "source": "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/README.md"
+          }
+        }
+      }
     }
   ]
 }

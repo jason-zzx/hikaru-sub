@@ -26,7 +26,9 @@ def validate(raw, duration_ms, stderr, device, silence=False, backend='qwen3'):
     # JSON escapes can hide unpaired surrogates even when the document bytes
     # themselves are UTF-8. Validate every string, including nested word text.
     json.dumps(result, ensure_ascii=False).encode('utf-8', errors='strict')
-    require(backend in ('qwen3', 'parakeet') and result['crispasr']['backend'] == backend, 'backend')
+    require(backend in ('qwen3', 'parakeet', 'reazonspeech'), 'backend')
+    expected_backend = 'parakeet' if backend == 'reazonspeech' else backend
+    require(result['crispasr']['backend'] == expected_backend, 'backend')
     require(result['displayFallback'] is False, 'display_fallback')
     require(result['vadSilence'] is silence, 'silence_state')
     display = result['displaySegments']
@@ -71,7 +73,7 @@ def validate(raw, duration_ms, stderr, device, silence=False, backend='qwen3'):
     require(compact(''.join(all_text)) == compact(''.join(source_text)), 'text_conservation')
     require(not source and not display if silence else bool(source) and bool(display), 'empty_state')
     require(b'hikaru_error:' not in stderr, 'device_error')
-    if backend == 'parakeet':
+    if backend in ('parakeet', 'reazonspeech'):
         require(not any(message in stderr for message in [b'parakeet: failed to alloc encoder graph',
                     b'crispasr[parakeet]: single-pass encode failed', b'parakeet: encoder graph compute failed']),
                 'encoder_failure')
@@ -85,9 +87,11 @@ def validate(raw, duration_ms, stderr, device, silence=False, backend='qwen3'):
                     {'parakeet-encoder', 'parakeet-predictor', 'parakeet-joint'} if device == 'cuda' else
                     {'parakeet-encoder'})
         require(roles == expected, 'missing_graph_roles')
-        if backend == 'parakeet':
-            decodes = re.findall(rb'hikaru_tdt: decoder=(cpu|cuda) host_projection=cpu frames=([1-9][0-9]*) steps=([1-9][0-9]*) completed=1', stderr)
-            require(decodes and all(row[0].decode() == device for row in decodes), 'tdt_execution')
+        if backend in ('parakeet', 'reazonspeech'):
+            marker = b'hikaru_tdt' if backend == 'parakeet' else b'hikaru_rnnt'
+            decodes = re.findall(marker + rb': decoder=(cpu|cuda) host_projection=cpu frames=([1-9][0-9]*) steps=([1-9][0-9]*) completed=1', stderr)
+            require(decodes and all(row[0].decode() == device for row in decodes),
+                    'tdt_execution' if backend == 'parakeet' else 'rnnt_execution')
     if device == 'cpu':
         require(b'ggml_cuda_init:' not in stderr, 'cpu_initialized_cuda')
     return {'displayCount': len(display), 'sourceCount': len(source), 'graphRoles': sorted(roles),

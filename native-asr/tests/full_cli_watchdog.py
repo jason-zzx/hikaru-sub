@@ -19,7 +19,7 @@ def check(case):
             out.writeframes(b'\0' * 96000)
         (root / 'asr-jobs/watchdog-cli').mkdir(parents=True)
         models = []
-        for role in (['model', 'vad'] if engine == 'parakeet' else ['model', 'aligner', 'vad']):
+        for role in (['model', 'vad'] if engine in ('parakeet', 'reazonspeech-nemo') else ['model', 'aligner', 'vad']):
             path = root / (role + '.bin'); path.write_text(scenario)
             models.append(dict(role=role, path=str(path)))
         request = dict(protocolVersion=1, jobId='watchdog', engine=engine, backend='crispasr',
@@ -35,19 +35,22 @@ def check(case):
             assert run.returncode == 20
             assert [e['event'] for e in events] == ['ready', 'progress', 'error'], events
             assert events[1]['processedMs'] == 1500
-            assert events[-1]['code'] == 'parakeet_cli_no_progress_timeout', events[-1]
+            prefix = 'reazonspeech' if engine == 'reazonspeech-nemo' else 'parakeet'
+            assert events[-1]['code'] == f'{prefix}_cli_no_progress_timeout', events[-1]
         else:
             assert 125 <= elapsed < 140, elapsed
             assert run.returncode == 0 and events[-1]['event'] == 'completed', events
             progress = [e['processedMs'] for e in events if e['event'] == 'progress']
             # Qwen has no slice progress source; it must not acquire a false
             # 120s total-runtime limit. Parakeet advances real fixture slices.
-            assert progress == ([1500, 3000] if engine == 'parakeet' else []), events
+            assert progress == ([1500, 3000] if engine in ('parakeet', 'reazonspeech-nemo') else []), events
         return f'{engine}/{scenario}: {elapsed:.3f}s, expected terminal and progress'
 
 
 # Only independent, model-free fixture processes overlap (not ASR inference).
-with ThreadPoolExecutor(max_workers=3) as pool:
+with ThreadPoolExecutor(max_workers=4) as pool:
     for result in pool.map(check, [('parakeet', 'stall-progress'),
-                                    ('parakeet', 'slow-success'), ('qwen3-asr', 'slow-success')]):
+                                    ('parakeet', 'slow-success'),
+                                    ('reazonspeech-nemo', 'slow-success'),
+                                    ('qwen3-asr', 'slow-success')]):
         print(result)

@@ -46,7 +46,7 @@ Windows 构建目前未做代码签名，首次运行时可能出现 Microsoft S
 
 发布包会携带经过校验的 Native ASR CPU runtime，但不会捆绑 FFmpeg、Python sidecar、venv、Python packages 或模型权重。首次触发 FFmpeg 或模型下载时，Hikaru Sub 会显示下载内容、大小、来源和保存位置并请求确认。
 
-使用转录前，确认所选模型已就绪或按提示下载。当前源码支持 CT2 的原八条路线：Faster-Whisper `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo` 与 Kotoba `kotoba-tech/kotoba-whisper-v2.0-faster`；另支持 CrispASR 的 exact `Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`，Qwen 固定使用必需 CPU Silero VAD。设备为 `auto|CPU|CUDA`，新会话默认仍为 `faster-whisper / large-v3`。两种 backend 的 CPU 随包、已发布 CUDA 依赖包按需下载且根目录独立；显式 CUDA 失败不回退 CPU，`auto` 只在启动前选设备。另支持 exact `nvidia/parakeet-tdt_ctc-0.6b-ja`（F16 + 同一必需 CPU Silero），复用 shared-v2 CPU/CUDA runtime；ReazonSpeech、其他引擎/通用 VAD 尚未实现；本说明不宣称已发布包含这些源码变更的新应用。CUDA 仅在 RTX 3070 真机验证，架构覆盖不等于所有 GPU 已实测。使用翻译前，需要配置翻译提供商的地址、模型和凭据。
+使用转录前，确认所选模型已就绪或按提示下载。当前源码支持 CT2 的原八条路线：Faster-Whisper `tiny / base / small / medium / large-v2 / large-v3 / large-v3-turbo` 与 Kotoba `kotoba-tech/kotoba-whisper-v2.0-faster`；另支持 CrispASR 的 exact `Qwen/Qwen3-ASR-1.7B` + `Qwen/Qwen3-ForcedAligner-0.6B`、exact `nvidia/parakeet-tdt_ctc-0.6b-ja`（F16）与 exact `reazon-research/reazonspeech-nemo-v2`（Q8_0），三者固定使用同一必需 CPU Silero VAD 并复用 shared-v3 CPU/CUDA runtime。设备为 `auto|CPU|CUDA`，新会话默认仍为 `faster-whisper / large-v3`。两种 backend 的 CPU 随包、已发布 CUDA 依赖包按需下载且根目录独立；显式 CUDA 失败不回退 CPU，`auto` 只在启动前选设备。其他引擎/通用 VAD 尚未实现；本说明只描述当前源码与依赖 authority，不宣称已发布新的 Hikaru Sub 应用。CUDA 仅在 RTX 3070 真机验证，架构覆盖不等于所有 GPU 已实测。使用翻译前，需要配置翻译提供商的地址、模型和凭据。
 
 日语 ASR 在本机运行；翻译会把字幕文本发送到用户配置的 API 服务。视频、转录字幕和翻译字幕保存在用户选择的位置或视频同目录，临时音频与代理视频位于应用缓存。
 

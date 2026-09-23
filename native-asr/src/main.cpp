@@ -666,11 +666,16 @@ int run_full_cli(const WorkerRequestV1& request) {
     return emitter.emit(completed) ? 0 : 74;
   } catch (const qwen_cli::Error& error) {
     std::string code = error.what();
-    if (request.engine == Engine::Parakeet && code.rfind("qwen_cli_", 0) == 0)
-      code.replace(0, 9, "parakeet_cli_");
+    if (code.rfind("qwen_cli_", 0) == 0) {
+      if (request.engine == Engine::Parakeet) code.replace(0, 9, "parakeet_cli_");
+      if (request.engine == Engine::ReazonSpeechNemo) code.replace(0, 9, "reazonspeech_cli_");
+    }
     return emitter.emit(error_event(code, "Native pipeline failed safely")) ? 20 : 74;
   } catch (const std::exception&) {
-    return emitter.emit(error_event(request.engine == Engine::Parakeet ? "parakeet_cli_internal_failed" : "qwen_cli_internal_failed", "Native pipeline failed safely")) ? 20 : 74;
+    const char* code = request.engine == Engine::Parakeet ? "parakeet_cli_internal_failed"
+        : request.engine == Engine::ReazonSpeechNemo ? "reazonspeech_cli_internal_failed"
+        : "qwen_cli_internal_failed";
+    return emitter.emit(error_event(code, "Native pipeline failed safely")) ? 20 : 74;
   }
 }
 #endif

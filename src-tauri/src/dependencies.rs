@@ -45,7 +45,7 @@ pub(crate) fn crispasr_engine_capabilities(
     let cuda = serde_json::json!({"device":"cuda", "available":item.as_ref().is_some_and(|item| item.status == RuntimeDependencyStatus::Available),
         "downloadRequired":item.as_ref().is_some_and(|item| item.expected_download_bytes.is_some()),
         "reason":item.and_then(|item| item.reason)});
-    ["qwen3-asr", "parakeet"]
+    ["qwen3-asr", "parakeet", "reazonspeech-nemo"]
         .into_iter()
         .filter(|engine| crispasr_supports_engine(engine))
         .map(|engine| (engine.to_string(), (cpu, cuda.clone())))

@@ -12,6 +12,7 @@ const availability = vi.hoisted(() => ({
     { value: "kotoba-faster-whisper", label: "kotoba-faster-whisper" },
     { value: "qwen3-asr", label: "qwen3" },
     { value: "parakeet", label: "parakeet" },
+    { value: "reazonspeech-nemo", label: "ReazonSpeech NeMo" },
   ],
   modelOptions: [
     {
@@ -98,12 +99,14 @@ describe("SettingsTranscriptionPanel Native availability", () => {
     expect(screen.queryByText(/Python|虚拟环境|配置当前引擎依赖/)).toBeNull();
     expect(screen.getByRole("button", { name: "下载模型" })).toBeTruthy();
     expect((screen.getByRole("option", { name: "qwen3" }) as HTMLOptionElement).disabled).toBe(false);
+    expect((screen.getByRole("option", { name: "ReazonSpeech NeMo" }) as HTMLOptionElement).disabled).toBe(false);
     expect(update).not.toHaveBeenCalled();
   });
 
   it.each([
     ["kotoba-faster-whisper", "kotoba-tech/kotoba-whisper-v2.0-faster"],
     ["parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja"],
+    ["reazonspeech-nemo", "reazon-research/reazonspeech-nemo-v2"],
   ])("selects %s and its exact default model when backend readiness allows it", async (engine, model) => {
     const user = userEvent.setup();
     const update = vi.fn();

@@ -17,10 +17,13 @@ void source_interval(const Json& offsets, std::int64_t duration) {
 }
 }
 
-std::vector<Segment> parse_result(const std::string& bytes, std::int64_t duration_ms, bool& silence) {
+std::vector<Segment> parse_result(const std::string& bytes, std::int64_t duration_ms, bool& silence,
+                                  const std::string& expected_model) {
   try {
     const auto root = document(bytes, duration_ms);
-    require(root.at("crispasr").at("backend") == "parakeet"
+    const auto& identity = root.at("crispasr");
+    require(identity.at("backend") == "parakeet"
+        && (expected_model.empty() || text(identity.at("model")) == expected_model)
         && root.at("displayFallback").is_boolean() && root.at("displayFallback") == false
         && root.at("vadSilence").is_boolean());
     silence = root.at("vadSilence").get<bool>();
@@ -59,6 +62,8 @@ std::vector<Segment> parse_result(const std::string& bytes, std::int64_t duratio
     ProtocolError error; std::string line;
     require(validate_event(state, event, error) && serialize_event(event, line, error));
     return std::move(event.segments);
-  } catch (const std::exception&) { throw Error("parakeet_cli_output_invalid"); }
+  } catch (const std::exception&) {
+    throw Error(expected_model.empty() ? "parakeet_cli_output_invalid" : "reazonspeech_cli_output_invalid");
+  }
 }
 }  // namespace hikaru_asr::parakeet_cli

@@ -52,8 +52,10 @@ impl ArtifactLock {
         if !self
             .artifact_id
             .starts_with(&format!("hikaru-asr-crispasr-windows-x64-{device}-"))
-            || (engines != ["qwen3-asr"] && engines != ["qwen3-asr", "parakeet"])
-            || (engines.len() == 2
+            || (engines != ["qwen3-asr"]
+                && engines != ["qwen3-asr", "parakeet"]
+                && engines != ["qwen3-asr", "parakeet", "reazonspeech-nemo"])
+            || (engines.len() >= 2
                 && !self
                     .artifact_id
                     .starts_with(&format!("hikaru-asr-crispasr-windows-x64-{device}-shared-")))
@@ -315,8 +317,8 @@ mod tests {
         let published: ProductLock = serde_json::from_str(PUBLISHED_LOCK_JSON).unwrap();
         assert!(published.supports_engine("qwen3-asr"));
         assert!(published.supports_engine("parakeet"));
-        assert!(!published.supports_engine("reazonspeech-nemo"));
-        // Retained published v1 remains valid rollback authority, not Parakeet support.
+        assert!(published.supports_engine("reazonspeech-nemo"));
+        // Retained published v1 remains valid rollback authority, not Parakeet/ReazonSpeech support.
         let mut lock: ProductLock = serde_json::from_str(include_str!(
             "../../native-asr/runtime/crispasr-product-lock-v1.json"
         ))
@@ -329,14 +331,19 @@ mod tests {
         ] {
             artifact.artifact_id =
                 format!("hikaru-asr-crispasr-windows-x64-{device}-shared-fixture");
-            artifact.engines = Some(vec!["qwen3-asr".into(), "parakeet".into()]);
+            artifact.engines = Some(vec![
+                "qwen3-asr".into(),
+                "parakeet".into(),
+                "reazonspeech-nemo".into(),
+            ]);
         }
         lock.external_stable_asset_published = false;
         assert!(lock.supports_engine("parakeet"));
         assert!(lock.supports_engine("qwen3-asr"));
-        assert!(!lock.supports_engine("reazonspeech-nemo"));
+        assert!(lock.supports_engine("reazonspeech-nemo"));
         lock.cuda.as_mut().unwrap().engines = None;
         assert!(!lock.supports_engine("parakeet"));
+        assert!(!lock.supports_engine("reazonspeech-nemo"));
         assert!(lock.supports_engine("qwen3-asr"));
         lock.cuda = None;
         assert!(!lock.supports_engine("parakeet"));

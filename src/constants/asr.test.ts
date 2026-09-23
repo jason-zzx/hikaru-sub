@@ -67,6 +67,7 @@ describe("reazonspeech-nemo constants", () => {
       },
     ]);
     expect(defaultAsrModel(REAZON_ENGINE)).toBe(REAZON_MODEL);
-    expect(REAZONSPEECH_NEMO_DESCRIPTION).toContain("分块转录");
+    expect(REAZONSPEECH_NEMO_DESCRIPTION).toContain("Native CPU/CUDA");
+    expect(REAZONSPEECH_NEMO_DESCRIPTION).toContain("Silero VAD");
   });
 });

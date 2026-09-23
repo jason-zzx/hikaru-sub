@@ -8,6 +8,7 @@ import subprocess
 from validate import validate
 from vad_failure_check import check_vad_failure
 from audio_failure_check import check_audio_failure
+from rnnt_endpoint_check import check as check_rnnt_endpoints
 
 
 def rejected(raw, stderr):
@@ -66,6 +67,7 @@ def main():
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
     here = Path(__file__).resolve().parent
+    check_rnnt_endpoints(source / 'src/parakeet.cpp')
     # Developer-prompt cl + real upstream output translation unit, no fake writer.
     command = ['cl', '/nologo', '/std:c++17', '/EHsc', '/utf-8', '/O2', '/Gy',
                '/I' + str(source / 'examples/cli'), '/I' + str(source / 'examples'),
@@ -140,7 +142,20 @@ def main():
                 pass
             else:
                 raise AssertionError('invalid Parakeet evidence accepted')
-    print('PASS: actual writer, Qwen/Parakeet device/output mutations, monotonic watchdog progress')
+        reazon = copy.deepcopy(para)
+        reazon_raw = json.dumps(reazon).encode()
+        rnnt_proof = proof.replace(b'hikaru_tdt:', b'hikaru_rnnt:')
+        validate(reazon_raw, 2000, rnnt_proof, device, backend='reazonspeech')
+        check_consumed_fields(reazon, rnnt_proof, device, 'reazonspeech')
+        for bad_proof in [proof, rnnt_proof.replace(b'completed=1', b'completed=0'),
+                          rnnt_proof.replace(b'other=0', b'other=1')]:
+            try:
+                validate(reazon_raw, 2000, bad_proof, device, backend='reazonspeech')
+            except (ValueError, KeyError, TypeError):
+                pass
+            else:
+                raise AssertionError('invalid ReazonSpeech evidence accepted')
+    print('PASS: RNNT endpoints, actual writer, Qwen/Parakeet/Reazon device/output mutations, monotonic watchdog progress')
     check_vad_failure(source, out)
     check_audio_failure(source, out / 'audio-reader')
     from encoder_failure_check import check_encoder_failure

@@ -6,7 +6,8 @@ import { assertSafeArchivePath, extractZipSafely, listZipEntries, sha256File } f
 const check = (condition) => { if (!condition) throw new Error("CrispASR runtime identity/closure invalid"); };
 export function verifyCrispasrTree(root, artifact, device) {
   const engines = artifact?.engines ?? ["qwen3-asr"];
-  const shared = JSON.stringify(engines) === JSON.stringify(["qwen3-asr", "parakeet"]);
+  const shared = JSON.stringify(engines) === JSON.stringify(["qwen3-asr", "parakeet"])
+    || JSON.stringify(engines) === JSON.stringify(["qwen3-asr", "parakeet", "reazonspeech-nemo"]);
   check(shared
     ? new RegExp(`^hikaru-asr-crispasr-windows-x64-${device}-shared-[a-z0-9]+(?:-[a-z0-9]+)*$`).test(artifact?.artifactId)
     : JSON.stringify(engines) === '["qwen3-asr"]' && artifact?.artifactId === `hikaru-asr-crispasr-windows-x64-${device}-v1`);
@@ -54,8 +55,12 @@ export function verifyCrispasrTree(root, artifact, device) {
   const models = JSON.parse(readFileSync(join(root, "licenses/MODEL-SOURCES.json"), "utf8"));
   check(models.weightsBundled === false);
   if (shared) {
-    const model = models.assets.find(row => row.logicalModel === "nvidia/parakeet-tdt_ctc-0.6b-ja");
-    check(model?.license === "CC-BY-4.0" && model.attribution && model.modificationNotice && model.licenseUrl === "https://creativecommons.org/licenses/by/4.0/");
+    const parakeet = models.assets.find(row => row.logicalModel === "nvidia/parakeet-tdt_ctc-0.6b-ja");
+    check(parakeet?.license === "CC-BY-4.0" && parakeet.attribution && parakeet.modificationNotice && parakeet.licenseUrl === "https://creativecommons.org/licenses/by/4.0/");
+    if (engines.includes("reazonspeech-nemo")) {
+      const reazon = models.assets.find(row => row.logicalModel === "reazon-research/reazonspeech-nemo-v2");
+      check(reazon?.license === "Apache-2.0" && reazon.modificationNotice && reazon.provenanceLimit);
+    }
   }
   return { runtimeRoot: root, artifactId: artifact.artifactId };
 }
@@ -68,7 +73,10 @@ export function verifyCrispasrArchive({ root, device = "cpu", extractTo, candida
     check(/^shared-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(lock.candidateId) && lock.externalStableAssetPublished === false);
     for (const kind of ["cpu", "cuda"]) {
       check(lock[kind]?.artifactId === `hikaru-asr-crispasr-windows-x64-${kind}-${lock.candidateId}`);
-      check(JSON.stringify(lock[kind]?.engines) === '["qwen3-asr","parakeet"]');
+      check([
+        '["qwen3-asr","parakeet"]',
+        '["qwen3-asr","parakeet","reazonspeech-nemo"]',
+      ].includes(JSON.stringify(lock[kind]?.engines)));
     }
   }
   const artifact = lock[device], archive = artifact?.archive;

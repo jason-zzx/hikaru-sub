@@ -365,7 +365,7 @@ mod tests {
         } else {
             local_archive.map(PathBuf::from).unwrap_or_else(|| {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("../native-asr/artifacts/crispasr-cuda-shared-v2.zip")
+                    .join("../native-asr/artifacts/crispasr-cuda-shared-v3.zip")
             })
         };
         let deps = resources.as_ref().unwrap_or(&root).join("deps");
@@ -389,7 +389,7 @@ mod tests {
                 let runtime = verify_at(&resources, &deps, device, &lock).unwrap();
                 runtime.require_engine("qwen3-asr").unwrap();
                 runtime.require_engine("parakeet").unwrap();
-                assert!(runtime.require_engine("reazonspeech-nemo").is_err());
+                runtime.require_engine("reazonspeech-nemo").unwrap();
                 let dll = runtime.root.join("vcomp140.dll");
                 let original = fs::read(&dll).unwrap();
                 fs::remove_file(&dll).unwrap();
@@ -409,8 +409,14 @@ mod tests {
             assert_eq!(failed_device[1].status, RuntimeDependencyStatus::Missing);
             assert_eq!(
                 failed_device[1].expected_download_bytes,
-                download_available
-                    .then(|| lock.cuda.as_ref().unwrap().archive.as_ref().unwrap().size_bytes)
+                download_available.then(|| lock
+                    .cuda
+                    .as_ref()
+                    .unwrap()
+                    .archive
+                    .as_ref()
+                    .unwrap()
+                    .size_bytes)
             );
             assert_eq!(fs::read(prior).unwrap(), b"preserve prior ASS");
             fs::write(
@@ -421,7 +427,7 @@ mod tests {
                     "exactClosure":true,"cudaComputeProbe":true,"missingAndCorruptRejected":true,"managedRootAdjacent":true,
                     "syntheticDeviceFailureIsolated":true,"priorAssPreserved":true,
                     "externalStableAssetPublished":lock.external_stable_asset_published,
-                    "downloadAvailable":download_available,"bothEnginesAuthorized":true,"manualInstallOrUi":false
+                    "downloadAvailable":download_available,"allEnginesAuthorized":true,"manualInstallOrUi":false
                 }))
                 .unwrap(),
             )
@@ -436,13 +442,13 @@ mod tests {
         assert!(published(&lock, &sources));
         let official = sources.official.crispasr_cuda.as_ref().unwrap();
         let china = sources.china.crispasr_cuda.as_ref().unwrap();
-        assert_eq!(official.url, "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v2.zip");
+        assert_eq!(official.url, "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip");
         assert_eq!(china.url, format!("https://ghfast.top/{}", official.url));
         assert_eq!(
             official.sha256,
-            "23a3c4082a520d3c0e4698a229bd4767a7f5a10f2bc1c7d45235f379c5ee292d"
+            "5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0"
         );
-        assert_eq!(official.size_bytes, 719_774_286);
+        assert_eq!(official.size_bytes, 719_771_622);
         let temp = tempfile::tempdir().unwrap();
         let items = items_at(
             &temp.path().join("resources"),
@@ -453,7 +459,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(items[1].status, RuntimeDependencyStatus::Missing);
-        assert_eq!(items[1].expected_download_bytes, Some(719_774_286));
+        assert_eq!(items[1].expected_download_bytes, Some(719_771_622));
         assert_ne!(items[1].reason.as_deref(), Some(PENDING));
         assert!(items[0].expected_download_bytes.is_none());
         lock.external_stable_asset_published = false;

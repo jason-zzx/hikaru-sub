@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "purpose": "ReazonSpeech shared-runtime acquisition authority; not publication authority",
+  "models": [
+    {
+      "logicalModel": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+      "repository": "cstr/parakeet-tdt-0.6b-ja-GGUF",
+      "revision": "d9e3ba65a6579796389ea89e5939509ed257f972",
+      "file": "parakeet-tdt-0.6b-ja.gguf",
+      "sizeBytes": 1246932800,
+      "sha256": "374eb0132eebaec4df77a9631cbbeb03790be48a4a517f6cc8e8bdb38fe9a584",
+      "license": "CC-BY-4.0",
+      "format": "GGUF",
+      "url": "https://huggingface.co/cstr/parakeet-tdt-0.6b-ja-GGUF/resolve/d9e3ba65a6579796389ea89e5939509ed257f972/parakeet-tdt-0.6b-ja.gguf",
+      "modelCard": "https://huggingface.co/cstr/parakeet-tdt-0.6b-ja-GGUF/resolve/d9e3ba65a6579796389ea89e5939509ed257f972/README.md",
+      "licenseDeclaredByModelCard": "cc-by-4.0",
+      "attribution": "Original Japanese Parakeet model: NVIDIA NeMo team; GGUF conversion: CrispStrobe/CrispASR.",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "modificationNotice": "Publisher declares NeMo-to-GGUF format conversion; no training or fine-tuning.",
+      "converterCommit": null,
+      "provenanceLimit": "Publisher card does not identify the converter commit or original checkpoint revision used."
+    },
+    {
+      "logicalModel": "reazon-research/reazonspeech-nemo-v2",
+      "upstreamRepository": "reazon-research/reazonspeech-nemo-v2",
+      "upstreamRevision": "33693408be76b7cba9fd4a7546a0a8772430211b",
+      "upstreamModelCard": "https://huggingface.co/reazon-research/reazonspeech-nemo-v2/resolve/33693408be76b7cba9fd4a7546a0a8772430211b/README.md",
+      "repository": "cstr/reazonspeech-nemo-v2-GGUF",
+      "revision": "22799a5919ea26e3c5293fe0e68846fe7918a234",
+      "file": "reazonspeech-nemo-v2-q8_0.gguf",
+      "sizeBytes": 667147072,
+      "sha256": "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2",
+      "license": "Apache-2.0",
+      "format": "GGUF Q8_0",
+      "url": "https://huggingface.co/cstr/reazonspeech-nemo-v2-GGUF/resolve/22799a5919ea26e3c5293fe0e68846fe7918a234/reazonspeech-nemo-v2-q8_0.gguf",
+      "modelCard": "https://huggingface.co/cstr/reazonspeech-nemo-v2-GGUF/resolve/22799a5919ea26e3c5293fe0e68846fe7918a234/README.md",
+      "licenseDeclaredByModelCard": "apache-2.0",
+      "modificationNotice": "Publisher declares NeMo-to-GGUF conversion and Q8_0 quantization; no training or fine-tuning.",
+      "converterCommit": null,
+      "provenanceLimit": "Publisher card does not identify the converter commit or exact original checkpoint revision used."
+    }
+  ],
+  "vad": {
+    "logicalModel": "Silero VAD v6.2.0",
+    "repository": "ggml-org/whisper-vad",
+    "revision": "9ffd54a1e1ee413ddf265af9913beaf518d1639b",
+    "file": "ggml-silero-v6.2.0.bin",
+    "sizeBytes": 885098,
+    "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+    "licenseDeclaredByModelCard": "mit",
+    "device": "cpu",
+    "required": true
+  }
+}

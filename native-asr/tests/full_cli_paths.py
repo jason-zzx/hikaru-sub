@@ -13,11 +13,12 @@ with tempfile.TemporaryDirectory(prefix='hikaru-cli-path-') as temp:
     # IDs to disguise the separate upstream long-audio-path limitation.
     job_id = 'native-12345-1788278400000000000-0'
     for length in (200, 272):
-        for engine in ('qwen3-asr', 'parakeet'):
+        for engine in ('qwen3-asr', 'parakeet', 'reazonspeech-nemo'):
             for device in ('cpu', 'cuda'):
                 # Rust canonical paths have the extended spelling. Count ordinary
                 # private-cwd characters separately from that four-character prefix.
-                root = Path(temp) / f'{length}-{engine}-{device}' / '日本 音声'
+                tag = {'qwen3-asr': 'q', 'parakeet': 'p', 'reazonspeech-nemo': 'r'}[engine]
+                root = Path(temp) / f'{length}-{tag}-{device}' / '日本 音声'
                 suffix = Path('asr-jobs') / (job_id + '-cli')
                 while len(str(root / suffix)) < length:
                     remaining = length - len(str(root / suffix)) - 1
@@ -79,7 +80,8 @@ with tempfile.TemporaryDirectory(prefix='hikaru-cli-path-') as temp:
                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
                     events = [json.loads(line) for line in run.stdout.splitlines()]
                     assert run.returncode == 20 and not run.stderr and len(events) == 1, events
-                    assert events[0]['code'] == ('qwen_cli_path_invalid' if engine == 'qwen3-asr' else 'parakeet_cli_path_invalid'), events
+                    prefix = {'qwen3-asr': 'qwen', 'parakeet': 'parakeet', 'reazonspeech-nemo': 'reazonspeech'}[engine]
+                    assert events[0]['code'] == f'{prefix}_cli_path_invalid', events
                     assert not list(work.iterdir())
                     work.rmdir()
                     print(f'PASS deep runtime {engine}: structured rejection, no result')

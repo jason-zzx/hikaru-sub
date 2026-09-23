@@ -27,10 +27,7 @@ use tokio::sync::{Mutex, OwnedRwLockWriteGuard, RwLock};
 const MANIFEST_JSON: &str = include_str!("../resources/native-asr-models.json");
 const OFFICIAL_ENDPOINT: &str = "https://huggingface.co";
 const REQUIRED_ROLES: [&str; 4] = ["model-config", "model-weights", "tokenizer", "vocabulary"];
-const POST_MVP_MODELS: [(&str, &str); 2] = [
-    ("parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja"),
-    ("reazonspeech-nemo", "reazon-research/reazonspeech-nemo-v2"),
-];
+const POST_MVP_MODELS: [(&str, &str); 1] = [("parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja")];
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -628,16 +625,28 @@ fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
                 return Err("Qwen pair 身份或角色无效".into());
             }
         } else if crispasr {
-            if model.engine != "parakeet"
-                || model.model != "nvidia/parakeet-tdt_ctc-0.6b-ja"
-                || model.repository != "cstr/parakeet-tdt-0.6b-ja-GGUF"
+            let valid = match model.engine.as_str() {
+                "parakeet" => {
+                    model.model == "nvidia/parakeet-tdt_ctc-0.6b-ja"
+                        && model.repository == "cstr/parakeet-tdt-0.6b-ja-GGUF"
+                        && model.license.spdx == "CC-BY-4.0"
+                        && model.files[0].path == "parakeet-tdt-0.6b-ja.gguf"
+                }
+                "reazonspeech-nemo" => {
+                    model.model == "reazon-research/reazonspeech-nemo-v2"
+                        && model.repository == "cstr/reazonspeech-nemo-v2-GGUF"
+                        && model.license.spdx == "Apache-2.0"
+                        && model.files[0].path == "reazonspeech-nemo-v2-q8_0.gguf"
+                }
+                _ => false,
+            };
+            if !valid
                 || model.format != "gguf"
-                || model.license.spdx != "CC-BY-4.0"
                 || roles != HashSet::from(["model".to_string()])
-                || model.files[0].path != "parakeet-tdt-0.6b-ja.gguf"
+                || model.files.len() != 1
                 || model.files[0].source.is_some()
             {
-                return Err("Parakeet 日语 F16 模型身份或角色无效".into());
+                return Err("Parakeet-family 日语模型身份或角色无效".into());
             }
         } else {
             if model.backend != "ctranslate2"
@@ -2141,7 +2150,7 @@ mod tests {
     }
 
     #[test]
-    fn manifest_backed_engines_are_supported_and_unmigrated_routes_stay_deferred() {
+    fn manifest_backed_engines_follow_embedded_runtime_capabilities() {
         let manifest = load_manifest().unwrap();
         for model in [
             "tiny",
@@ -2179,11 +2188,34 @@ mod tests {
             crate::dependencies::crispasr_supports_engine("parakeet"),
             Some("crispasr".into())
         )));
-        for engine in ["reazonspeech-nemo"] {
-            assert!(engines
-                .iter()
-                .any(|(name, enabled, _)| name == engine && !enabled));
-        }
+        let reazon = find_model(
+            &manifest,
+            "reazonspeech-nemo",
+            "reazon-research/reazonspeech-nemo-v2",
+        )
+        .unwrap();
+        assert!(!reazon.post_mvp_unavailable);
+        let reazon_supported = crate::dependencies::crispasr_supports_engine("reazonspeech-nemo");
+        assert_eq!(model_supported(reazon), reazon_supported);
+        assert_eq!(
+            downloadable_entry(
+                &manifest,
+                "reazonspeech-nemo",
+                "reazon-research/reazonspeech-nemo-v2"
+            )
+            .is_ok(),
+            reazon_supported
+        );
+        assert!(engines.contains(&(
+            "reazonspeech-nemo".into(),
+            reazon_supported,
+            Some("crispasr".into())
+        )));
+        assert_eq!(
+            unavailable_status("reazonspeech-nemo", "reazon-research/reazonspeech-nemo-v2")
+                .disposition,
+            NativeAsrModelDisposition::Unsupported
+        );
         assert_eq!(
             unavailable_status("parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja").disposition,
             NativeAsrModelDisposition::PostMvpUnavailable
@@ -2192,6 +2224,35 @@ mod tests {
             unavailable_status("other", "thing").disposition,
             NativeAsrModelDisposition::Unsupported
         );
+    }
+
+    #[tokio::test]
+    async fn reazonspeech_status_is_gated_by_embedded_runtime_before_storage_readiness() {
+        let dir = tempdir().unwrap();
+        let status = NativeAsrModelManager::default()
+            .status_with_roots(
+                ManagedModelRoots::below(dir.path()),
+                "reazonspeech-nemo",
+                "reazon-research/reazonspeech-nemo-v2",
+            )
+            .await
+            .unwrap();
+        if crate::dependencies::crispasr_supports_engine("reazonspeech-nemo") {
+            assert_eq!(
+                status.disposition,
+                NativeAsrModelDisposition::SupportedMissing
+            );
+            assert_eq!(status.backend.as_deref(), Some("crispasr"));
+            assert_eq!(
+                status.revision.as_deref(),
+                Some("22799a5919ea26e3c5293fe0e68846fe7918a234")
+            );
+        } else {
+            assert_eq!(status.disposition, NativeAsrModelDisposition::Unsupported);
+            assert!(status.backend.is_none());
+            assert!(status.revision.is_none());
+        }
+        assert!(status.resolved_path.is_none());
     }
 
     async fn wait_terminal(manager: &NativeAsrModelManager, id: &str) -> ModelDownloadSnapshot {

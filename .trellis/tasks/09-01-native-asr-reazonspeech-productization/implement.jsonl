@@ -1,0 +1,8 @@
+{"file": ".trellis/tasks/09-01-native-asr-reazonspeech-productization/prd.md", "reason": "ReazonSpeech exact identity, CPU/CUDA functional-only acceptance and release boundaries"}
+{"file": ".trellis/tasks/09-01-native-asr-reazonspeech-productization/design.md", "reason": "Approved implementation shape: pinned full CLI, model+VAD roles, fixed Q8_0/runtime/delivery gates"}
+{"file": ".trellis/tasks/09-01-native-asr-reazonspeech-productization/implement.md", "reason": "Ordered phases, validation, publication checkpoint and rollback points"}
+{"file": ".trellis/tasks/09-01-native-asr-reazonspeech-productization/research/planning-evidence.md", "reason": "Historical R2 failure, current upstream route, exact model repository metadata and reuse seams"}
+{"file": ".trellis/spec/asr/index.md", "reason": "Native ASR specifications, evidence and sibling-engine boundaries"}
+{"file": "native-asr/runtime/full-cli/README.md", "reason": "Pinned source/build/package authority and current shared runtime contracts"}
+{"file": ".trellis/spec/tauri/index.md", "reason": "Tauri routing; read applicable media-ffmpeg-asr and paths-runtime-deps sections before editing"}
+{"file": ".trellis/spec/frontend/services-and-tauri-bridge.md", "reason": "Existing model status, Tauri invoke and UI flow boundaries"}

@@ -173,7 +173,7 @@ no source reports unavailable and `downloadRequired: false`; this does not disab
 CPU or the pair + required VAD model download. Existing `useVad: false` / null
 frontend requests are intentional: Rust's Qwen qualified launch supplies mandatory
 default CPU VAD with all three verified roles. This is not general VAD UI support.
-Parakeet/Reazon remain deferred. Manual UI and release acceptance are separate.
+Parakeet and ReazonSpeech now use the same availability owner, with exact model/VAD readiness and embedded CPU-and-CUDA engine authority gating selection and start. General VAD UI and application release acceptance remain separate.
 
 ### 4. Validation & Error Matrix
 

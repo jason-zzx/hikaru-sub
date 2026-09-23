@@ -24,5 +24,6 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
 }  // namespace hikaru_asr::full_cli
 
 namespace hikaru_asr::parakeet_cli {
-std::vector<Segment> parse_result(const std::string& bytes, std::int64_t duration_ms, bool& silence);
+std::vector<Segment> parse_result(const std::string& bytes, std::int64_t duration_ms, bool& silence,
+                                  const std::string& expected_model = {});
 }

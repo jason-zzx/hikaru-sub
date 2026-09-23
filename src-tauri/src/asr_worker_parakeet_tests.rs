@@ -1,7 +1,7 @@
 // Included only by asr_worker::tests; no product availability/configuration switch.
 fn full_cli_fixture_roles(engine: &str, temp: &TempDir, scenario: &str) -> Vec<(String, PathBuf)> {
     let mut roles = qwen_fixture_roles(temp, scenario);
-    if engine == "parakeet" {
+    if matches!(engine, "parakeet" | "reazonspeech-nemo") {
         roles.retain(|(role, _)| role != "aligner");
     }
     roles
@@ -21,7 +21,7 @@ fn parakeet_cli_route_roles_and_workspace_are_explicit() {
         assert!(validate_route("parakeet", "crispasr", "cpu", &invalid, &limits).is_err());
     }
     assert!(validate_route("parakeet", "ctranslate2", "cpu", &roles, &limits).is_err());
-    assert!(validate_route("reazonspeech-nemo", "crispasr", "cpu", &roles, &limits).is_err());
+    assert!(validate_route("reazonspeech-nemo", "crispasr", "cpu", &roles, &limits).is_ok());
     for (device, vad, config) in [
         ("cpu", false, None),
         ("vulkan", true, None),
@@ -150,6 +150,63 @@ fn parakeet_cli_fixture_atomic_ass_and_failure_preservation() {
                 );
             } else {
                 assert_eq!(ass, "preserve previous ASS");
+            }
+            assert!(!work.exists() && !gate.has_active());
+        }
+    }
+}
+
+#[test]
+fn reazonspeech_cli_short_success_and_invalid_timeline_preserve_ass() {
+    let _guard = FAKE_WORKER_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let Some(worker) = std::env::var_os("HIKARU_ASR_QWEN_CLI_FIXTURE_WORKER") else {
+        return;
+    };
+    for device in ["cpu", "cuda"] {
+        for scenario in ["zero-duration", "unordered", "out-of-audio", "success"] {
+            let temp = tempfile::tempdir().unwrap();
+            let gate = Arc::new(ActiveJobGate::default());
+            let host =
+                NativeAsrHost::new(PathBuf::from(&worker), vec![], Arc::clone(&gate)).unwrap();
+            let job_id = format!("reazon-{device}-{scenario}");
+            let launch = full_cli_launch(
+                &temp,
+                &job_id,
+                "reazonspeech-nemo",
+                full_cli_fixture_roles("reazonspeech-nemo", &temp, scenario),
+                None,
+                device,
+            );
+            let work = launch.cli_work_dir.clone().unwrap();
+            let output = launch.output_ass_path.clone();
+            fs::write(&output, "preserve previous ASS").unwrap();
+            host.start(launch, gate.reserve().unwrap()).unwrap();
+            let result = wait_terminal(&host, &job_id);
+            let success = scenario == "success";
+            assert_eq!(
+                result["status"],
+                if success { "completed" } else { "failed" },
+                "{device}/{scenario}: {result}"
+            );
+            let trace = host.event_trace(&job_id);
+            if success {
+                assert_eq!(trace.replacement_events, 1);
+                assert_eq!(result["segments"].as_array().unwrap().len(), 1);
+                assert!(fs::read_to_string(&output)
+                    .unwrap()
+                    .contains("合成テスト。"));
+            } else {
+                assert_eq!(trace.replacement_events, 0);
+                assert!(result["error"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("[reazonspeech_cli_output_invalid]"));
+                assert_eq!(
+                    fs::read_to_string(&output).unwrap(),
+                    "preserve previous ASS"
+                );
             }
             assert!(!work.exists() && !gate.has_active());
         }

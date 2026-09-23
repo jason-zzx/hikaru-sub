@@ -30,6 +30,7 @@ describe("ModelManager Native dispositions", () => {
   it.each([
     ["qwen3-asr", "Qwen/Qwen3-ASR-1.7B"],
     ["parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja"],
+    ["reazonspeech-nemo", "reazon-research/reazonspeech-nemo-v2"],
   ])("uses the existing compound download/readiness UI for %s", (engine, model) => {
     const props = {
       engine, model,
@@ -48,8 +49,14 @@ describe("ModelManager Native dispositions", () => {
   });
 
   it("renders deferred, unsupported, and failed checks without Python setup copy", () => {
-    const { rerender } = render(<ModelManager engine="faster-whisper" model="large-v3-turbo" status={makeStatus("postMvpUnavailable", "后续版本支持") } checking={false} checkError={null} refreshStatus={refreshStatus} />);
+    const deferred = {
+      ...makeStatus("postMvpUnavailable", "后续版本支持"),
+      engine: "future-native-engine",
+      model: "future/model",
+    };
+    const { rerender } = render(<ModelManager engine={deferred.engine} model={deferred.model} status={deferred} checking={false} checkError={null} refreshStatus={refreshStatus} />);
     expect(screen.getByText(/后续版本支持/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "下载模型" })).toBeNull();
     rerender(<ModelManager engine="unknown" model="unknown" status={makeStatus("unsupported", "不支持该模型") } checking={false} checkError={null} refreshStatus={refreshStatus} />);
     expect(screen.getByText(/当前版本不支持/)).toBeTruthy();
     rerender(<ModelManager engine="faster-whisper" model="large-v3" status={null} checking={false} checkError="synthetic failure" refreshStatus={refreshStatus} />);
