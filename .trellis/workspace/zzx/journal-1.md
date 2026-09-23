@@ -1316,3 +1316,38 @@ Delivered and archived exact Native Parakeet support with shared CrispASR CPU/CU
 ### Next Steps
 
 - Await explicit owner direction before planning or starting the ReazonSpeech child.
+
+
+## Session 39: Completed Native ReazonSpeech productization
+<!-- trellis-session: v=2 fp=5cf9fc0717fdf278 -->
+
+**Date**: 2026-09-23
+**Task**: Completed Native ReazonSpeech productization
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Delivered exact Native ReazonSpeech Q8_0 through the shared CrispASR CPU/CUDA full CLI, published and verified shared-v3 CUDA dependency, passed CPU/CUDA functional and app tests, and archived the child task without an application release.
+
+### Main Changes
+
+- Implemented owner-approved pure-RNNT endpoint and exact same-invocation PCM-support intersection, managed model/VAD readiness, strict fail-closed worker/ASS handling and UI availability.
+- Published immutable shared-v3 CUDA dependency; kept shared-v2 rollback, separate CT2 root and on-demand model weights.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bded0da` | feat(asr): Productize Native ReazonSpeech |
+
+### Testing
+
+- [OK] Owner confirmed application behavior; CPU/CUDA short/medium/long matrix and local app flows passed. pnpm test, pnpm build, cargo test (serial), focused RNNT endpoint and Trellis validation passed before bded0da.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Native VAD child remains planning; implementation, versioning and application release need separate decisions.
