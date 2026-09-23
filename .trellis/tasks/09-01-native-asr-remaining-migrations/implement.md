@@ -8,9 +8,9 @@ Functionality/delivery and owner CPU/CUDA application runs are accepted; CUDA
 publication review was owner-closed, not independently executed by the timed-out
 reviewer. Cleanup/timeline retirement and exact-byte lock relocation to stable
 scratch are accepted; the owner waived further review and the Qwen child was
-archived on 2026-09-09. Parakeet is archived; ReazonSpeech implementation, local
+archived on 2026-09-09. Parakeet and ReazonSpeech are archived; ReazonSpeech
 qualification and owner-authorized shared-v3 dependency/default enablement are
-complete, and its child awaits archive; general VAD has not started.
+complete. General VAD has not started.
 
 - [x] Freeze the parent device-coverage decision: Qwen3, Parakeet and ReazonSpeech must each support production CPU and CUDA.
 - [x] Review the new integration-first design and curated context for `08-20-native-asr-qwen3-aligner`; user explicitly instructed 开始实施 and task.py start activated the child.
@@ -38,7 +38,7 @@ complete, and its child awaits archive; general VAD has not started.
 - [x] Preserve exact upstream identity and freeze the registry-recommended Q8_0 artifact/source/license without subtitle-quality or F16/Q4_K competition.
 - [x] Reuse shared CPU/on-demand CUDA runtime contracts and exact CPU Silero through pinned full-CLI `model + vad`; complete model delivery, CPU/CUDA execution, frontend availability and lifecycle integration without general VAD settings.
 - [x] Complete CPU/CUDA short/medium/long functional, resolved-device, exact PCM-support endpoint, output-safety, download/offline/cancel/recovery/cleanup and local product-delivery checks without quality/performance qualification.
-- [ ] Complete final child review and archive before starting general VAD; the independent owner checkpoint has published/verified shared-v3 and preserved shared-v2 rollback.
+- [x] Complete final child review and archive before starting general VAD; the independent owner checkpoint published/verified shared-v3, preserved shared-v2 rollback, and the child was archived.
 
 ### Phase 4 - General Native VAD (Qwen prerequisite already owned by Phase 1)
 

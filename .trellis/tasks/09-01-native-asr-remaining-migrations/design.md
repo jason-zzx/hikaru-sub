@@ -2,7 +2,7 @@
 
 ## Boundary
 
-Qwen 已完成固定完整 CLI、默认 Q4_K pair、必需 CPU VAD、LIS/word display 与批准的相邻展示异常合并；双设备功能/交付工程复核和用户 CPU/CUDA 应用确认已接受。独立 CUDA 包已发布，发布复核项由用户接受关闭（非超时独立代理通过）。Qwen 清理已接受；child 保持 in_progress 完成新授权的 build lock 原字节迁至 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json` 和 `native-asr/build/full-cli` scratch 解耦，离线独立复核后才由父会话归档。非 Qwen CLI 实现被编译不等于对应模型产品化；Parakeet 已完成独立实施、默认双设备启用、依赖分发和最终复核，用户确认最终应用 CPU/CUDA 均可运行，并于 2026-09-15 完成 owner-authorized commit/archive。ReazonSpeech 已完成三引擎产品接线、CPU/CUDA 短中长功能矩阵、本地应用验证及 owner-authorized shared-v3 dependency/default authority 切换；shared-v2 保留回滚，child 待最终 review/归档，通用 VAD 尚未实施。Parakeet 采用完整上游集成；ReazonSpeech 采用 owner-approved NeMo pure-RNNT `[t,t+1)` 并只与同一次 parent/gap decode 的精确实际 PCM support 求交。两者均执行功能/设备/输出安全/生命周期/交付验收，不做质量评分、性能阈值资格、量化竞赛、自研对齐或 CPU 质量继承。
+Qwen 已完成固定完整 CLI、默认 Q4_K pair、必需 CPU VAD、LIS/word display 与批准的相邻展示异常合并；双设备功能/交付工程复核和用户 CPU/CUDA 应用确认已接受。独立 CUDA 包已发布，发布复核项由用户接受关闭（非超时独立代理通过）。Qwen 清理已接受；child 已完成 build lock 原字节迁至 `native-asr/runtime/full-cli/upstream-engineering-baseline-lock.json` 和 `native-asr/build/full-cli` scratch 解耦，并已归档。非 Qwen CLI 实现被编译不等于对应模型产品化；Parakeet 已完成独立实施、默认双设备启用、依赖分发和最终复核，用户确认最终应用 CPU/CUDA 均可运行，并于 2026-09-15 完成 owner-authorized commit/archive。ReazonSpeech 已完成三引擎产品接线、CPU/CUDA 短中长功能矩阵、本地应用验证及 owner-authorized shared-v3 dependency/default authority 切换；shared-v2 保留回滚，child 已完成最终 review 并归档，通用 VAD 尚未实施。Parakeet 采用完整上游集成；ReazonSpeech 采用 owner-approved NeMo pure-RNNT `[t,t+1)` 并只与同一次 parent/gap decode 的精确实际 PCM support 求交。两者均执行功能/设备/输出安全/生命周期/交付验收，不做质量评分、性能阈值资格、量化竞赛、自研对齐或 CPU 质量继承。
 
 父任务不实现统一的新 backend，也不把不同模型强行塞进 CTranslate2。它只固定顺序和共享生产合同；每个子任务复用现有 Native worker protocol、Rust host、job lifecycle、模型管理和前端可用性流程，并为实际 backend 提供最小必要扩展。
 
