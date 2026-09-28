@@ -1351,3 +1351,26 @@ Delivered exact Native ReazonSpeech Q8_0 through the shared CrispASR CPU/CUDA fu
 ### Next Steps
 
 - Native VAD child remains planning; implementation, versioning and application release need separate decisions.
+
+
+## Session 40: Native ASR safeguard cleanup and runtime delivery
+<!-- trellis-session: v=2 fp=0240bf7be084e43e -->
+
+**Date**: 2026-09-28
+**Task**: Native ASR safeguard cleanup and runtime delivery
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+Completed four approved safeguard-cleanup batches, preserving model/runtime integrity and process lifecycle contracts. Qwen CPU/CUDA transcription and cancel-reopen passed; Kotoba CPU/CUDA and 75-second multi-window same-device old/new comparisons passed. Corrected the generic cancellation test entry guard, not product cancellation logic; retained the observed CUDA private-result cleanup error and successful existing retry. Subsequently, under separate owner authorization, published CT2 CUDA v2 and CrispASR CUDA shared-v4 assets to the existing dependency Release, retained old assets, and synchronized CT2 CPU v4/CrispASR CPU shared-v4 plus source profiles and locks. CT2 final package combinations passed CPU/CUDA host-to-ASS; CrispASR reused tested candidate bytes. Final verification: 897 frontend tests, pnpm build, 303 Cargo tests (3 existing ignored), archive/resource checks and git diff check passed. Mirror full-download verification was not run. No app version/CHANGELOG change, installer release or branch push. Archived only the completed safeguard task; Kotoba K3 and general Native VAD remain pending.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6489cb5` | refactor(asr): simplify native ASR safeguards |
+| `1daf86b` | build(asr): update CPU runtimes and CUDA distribution packages |
+
+### Status
+
+[OK] **Completed**
