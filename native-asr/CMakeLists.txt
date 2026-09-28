@@ -11,16 +11,7 @@ string(JSON NLOHMANN_VERSION GET "${NLOHMANN_PROVENANCE}" version)
 if(NOT NLOHMANN_VERSION STREQUAL "3.11.3")
   message(FATAL_ERROR "Expected vendored nlohmann/json 3.11.3, found ${NLOHMANN_VERSION}")
 endif()
-foreach(file_name IN ITEMS json.hpp LICENSE.MIT)
-  string(JSON expected_hash GET "${NLOHMANN_PROVENANCE}" files "${file_name}" sha256)
-  string(JSON expected_size GET "${NLOHMANN_PROVENANCE}" files "${file_name}" sizeBytes)
-  file(SHA256 "${NLOHMANN_DIR}/${file_name}" actual_hash)
-  file(SIZE "${NLOHMANN_DIR}/${file_name}" actual_size)
-  if(NOT actual_hash STREQUAL expected_hash OR NOT actual_size EQUAL expected_size)
-    message(FATAL_ERROR "Vendored nlohmann/json file failed offline identity check: ${file_name}")
-  endif()
-endforeach()
-message(STATUS "Verified offline nlohmann/json ${NLOHMANN_VERSION}")
+message(STATUS "Using vendored nlohmann/json ${NLOHMANN_VERSION}")
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/protocol-v1-limits.json" LIMITS_JSON)
 function(read_positive_limit key variable)
@@ -107,19 +98,14 @@ option(
   HIKARU_ASR_CUDA_RUNTIME
   "Build the optional release CUDA worker/runtime"
   OFF)
-set(HIKARU_ASR_CRISPASR_RUNTIME_FILE "" CACHE FILEPATH "Locked CrispASR development runtime")
-set(HIKARU_ASR_CRISPASR_RUNTIME_SIZE "" CACHE STRING "Locked CrispASR development runtime size")
-set(HIKARU_ASR_CRISPASR_RUNTIME_SHA256 "" CACHE STRING "Locked CrispASR development runtime SHA-256")
+set(HIKARU_ASR_CRISPASR_RUNTIME_FILE "" CACHE FILEPATH "CrispASR development runtime")
 set(HIKARU_ASR_CT2_SOURCE_DIR "" CACHE PATH "Pinned CTranslate2 4.8.0 source")
 set(HIKARU_ASR_CUDA_TOOLKIT_ROOT "" CACHE PATH "Pinned CUDA 12.9 Update 1 toolkit overlay root")
 set(HIKARU_ASR_REAL_NVCC "" CACHE FILEPATH "Pinned CUDA 12.9 Update 1 real nvcc executable")
 set(HIKARU_ASR_REAL_NVCC_SIZE "" CACHE STRING "Pinned real nvcc size")
 set(HIKARU_ASR_REAL_NVCC_SHA256 "" CACHE STRING "Pinned real nvcc SHA-256")
 set(HIKARU_ASR_NVCC_LAUNCHER "" CACHE FILEPATH "Pinned deterministic per-source NVCC launcher")
-set(HIKARU_ASR_NVCC_LAUNCHER_SIZE "" CACHE STRING "Pinned NVCC launcher size")
-set(HIKARU_ASR_NVCC_LAUNCHER_SHA256 "" CACHE STRING "Pinned NVCC launcher SHA-256")
 set(HIKARU_ASR_CUDA_SEED_MANIFEST "" CACHE FILEPATH "Locked CTranslate2 4.8.0 CUDA source seed manifest")
-set(HIKARU_ASR_CUDA_SEED_MANIFEST_SHA256 "" CACHE STRING "Locked CUDA source seed manifest SHA-256")
 set(HIKARU_ASR_CT2_SOURCE_REVISION "" CACHE STRING "Pinned CTranslate2 source revision")
 set(HIKARU_ASR_POCKETFFT_SOURCE_DIR "" CACHE PATH "Pinned pocketfft source")
 set(HIKARU_ASR_DNNL_ROOT "" CACHE PATH "Pinned oneDNN 3.1.1 static install")
@@ -208,37 +194,14 @@ add_library(hikaru-asr-wav-audio STATIC src/wav_audio.cpp)
 target_include_directories(hikaru-asr-wav-audio PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_features(hikaru-asr-wav-audio PUBLIC cxx_std_17)
 
-set(CRISPASR_GENERATED_INCLUDE_DIR "${GENERATED_INCLUDE_DIR}")
-set(CRISPASR_RUNTIME_IDENTITY_SIZE 0)
-set(CRISPASR_RUNTIME_IDENTITY_SHA256 "")
-if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
-  if(NOT HIKARU_ASR_CRISPASR_RUNTIME_FILE OR NOT EXISTS "${HIKARU_ASR_CRISPASR_RUNTIME_FILE}")
-    message(FATAL_ERROR "T09 requires a reviewed CrispASR runtime file")
-  endif()
-  string(LENGTH "${HIKARU_ASR_CRISPASR_RUNTIME_SHA256}" CRISPASR_RUNTIME_SHA256_LENGTH)
-  if(NOT "${HIKARU_ASR_CRISPASR_RUNTIME_SIZE}" MATCHES "^[0-9]+$"
-      OR NOT "${HIKARU_ASR_CRISPASR_RUNTIME_SHA256}" MATCHES "^[0-9a-f]+$"
-      OR NOT CRISPASR_RUNTIME_SHA256_LENGTH EQUAL 64)
-    message(FATAL_ERROR "T09 requires a reviewed CrispASR runtime size/SHA-256")
-  endif()
-  file(SIZE "${HIKARU_ASR_CRISPASR_RUNTIME_FILE}" CRISPASR_RUNTIME_ACTUAL_SIZE)
-  file(SHA256 "${HIKARU_ASR_CRISPASR_RUNTIME_FILE}" CRISPASR_RUNTIME_ACTUAL_SHA256)
-  if(NOT CRISPASR_RUNTIME_ACTUAL_SIZE EQUAL HIKARU_ASR_CRISPASR_RUNTIME_SIZE
-      OR NOT CRISPASR_RUNTIME_ACTUAL_SHA256 STREQUAL HIKARU_ASR_CRISPASR_RUNTIME_SHA256)
-    message(FATAL_ERROR "Reviewed CrispASR runtime identity drifted")
-  endif()
-  set(CRISPASR_RUNTIME_IDENTITY_SIZE "${HIKARU_ASR_CRISPASR_RUNTIME_SIZE}")
-  set(CRISPASR_RUNTIME_IDENTITY_SHA256 "${HIKARU_ASR_CRISPASR_RUNTIME_SHA256}")
+if(HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT
+    AND (NOT HIKARU_ASR_CRISPASR_RUNTIME_FILE
+         OR NOT EXISTS "${HIKARU_ASR_CRISPASR_RUNTIME_FILE}"))
+  message(FATAL_ERROR "CrispASR development requires a runtime file")
 endif()
-file(WRITE "${CRISPASR_GENERATED_INCLUDE_DIR}/hikaru_asr/crispasr_runtime_identity.hpp"
-"#pragma once\n\n#include <cstdint>\n\nnamespace hikaru_asr::crisp::runtime_identity {\n"
-"inline constexpr std::uintmax_t size_bytes = ${CRISPASR_RUNTIME_IDENTITY_SIZE};\n"
-"inline constexpr const char* sha256 = \"${CRISPASR_RUNTIME_IDENTITY_SHA256}\";\n"
-"}  // namespace hikaru_asr::crisp::runtime_identity\n")
 
 add_library(hikaru-asr-crispasr STATIC src/crispasr_backend.cpp)
-target_include_directories(hikaru-asr-crispasr
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CRISPASR_GENERATED_INCLUDE_DIR}")
+target_include_directories(hikaru-asr-crispasr PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(hikaru-asr-crispasr PUBLIC hikaru-asr-protocol hikaru-asr-wav-audio PRIVATE bcrypt)
 
 add_library(hikaru-asr-parakeet-family-policy STATIC src/parakeet_family_policy.cpp)
@@ -246,12 +209,11 @@ target_include_directories(hikaru-asr-parakeet-family-policy PUBLIC "${CMAKE_CUR
 target_link_libraries(hikaru-asr-parakeet-family-policy PUBLIC hikaru-asr-protocol)
 
 add_library(hikaru-asr-crispasr-test-adapter STATIC src/crispasr_backend.cpp)
-target_include_directories(hikaru-asr-crispasr-test-adapter
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CRISPASR_GENERATED_INCLUDE_DIR}")
+target_include_directories(hikaru-asr-crispasr-test-adapter PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(hikaru-asr-crispasr-test-adapter
   PUBLIC hikaru-asr-protocol hikaru-asr-wav-audio PRIVATE bcrypt)
 target_compile_definitions(hikaru-asr-crispasr-test-adapter PRIVATE
-  HIKARU_ASR_CRISPASR_TEST_RUNTIME_IDENTITY_BYPASS=1
+  HIKARU_ASR_CRISPASR_TEST_CUDA_MODULE_BYPASS=1
   HIKARU_ASR_CRISPASR_TEST_VAD_IDENTITY_BYPASS=1)
 
 add_library(hikaru-asr-fake-crispasr-abi SHARED tests/fake_crispasr_abi.cpp)
@@ -365,50 +327,20 @@ function(require_pinned_file path expected_size expected_sha256 label)
     message(FATAL_ERROR "Pinned T06 input failed identity check: ${label}")
   endif()
 endfunction()
-require_pinned_file(
-  "${CT2_SOURCE_DIR}/include/ctranslate2/models/whisper.h"
-  6025
-  ee3ae7a77c107fa8a6756dfa32340f3d4e1cc1d6e247786580d40dd810058312
-  "CTranslate2 whisper.h")
-require_pinned_file(
-  "${POCKETFFT_SOURCE_DIR}/pocketfft_hdronly.h"
-  120735
-  3e9a05318d8e3b1446bda1c4617e6a103cdd23599ae0a776a92a6e8800e92fdc
-  "pocketfft header")
-if(NOT HIKARU_ASR_CT2_PREBUILT_ROOT)
-  require_pinned_file(
-    "${DNNL_ROOT}/include/dnnl.h"
-    826
-    23e40186069086c288f70b397485a20b59a8fedce33194ea70e107d91fddaae4
-    "oneDNN header")
-  if(HIKARU_ASR_DNNL_LIBRARY_SIZE OR HIKARU_ASR_DNNL_LIBRARY_SHA256)
-    if(NOT HIKARU_ASR_DNNL_LIBRARY_SIZE OR NOT HIKARU_ASR_DNNL_LIBRARY_SHA256)
-      message(FATAL_ERROR "Both oneDNN static library size and SHA-256 are required together")
-    endif()
-    require_pinned_file(
-      "${DNNL_ROOT}/lib/dnnl.lib"
-      "${HIKARU_ASR_DNNL_LIBRARY_SIZE}"
-      "${HIKARU_ASR_DNNL_LIBRARY_SHA256}"
-      "oneDNN static library")
+if(NOT HIKARU_ASR_CT2_PREBUILT_ROOT
+    AND (HIKARU_ASR_DNNL_LIBRARY_SIZE OR HIKARU_ASR_DNNL_LIBRARY_SHA256))
+  if(NOT HIKARU_ASR_DNNL_LIBRARY_SIZE OR NOT HIKARU_ASR_DNNL_LIBRARY_SHA256)
+    message(FATAL_ERROR "Both oneDNN static library size and SHA-256 are required together")
   endif()
+  require_pinned_file(
+    "${DNNL_ROOT}/lib/dnnl.lib"
+    "${HIKARU_ASR_DNNL_LIBRARY_SIZE}"
+    "${HIKARU_ASR_DNNL_LIBRARY_SHA256}"
+    "oneDNN static library")
 endif()
 
 if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT)
   require_pinned_file("${ORT_ARCHIVE}" 78796801 abef733dacbe2f571547a7150b479b5cb9cc0df22f96c24983a42cadb1b4f8bc "official ONNX Runtime archive")
-require_pinned_file("${ORT_ROOT}/VERSION_NUMBER" 8 b056072036db8b4f37fbdb84a6c45992ceea413fd481b7a0489288c0708f2fae "ONNX Runtime version identity")
-require_pinned_file("${ORT_ROOT}/GIT_COMMIT_ID" 43 c7b502512e05a29cca9fb4e220d5d847e67075173fdce3a125166fc60bfe4491 "ONNX Runtime commit identity")
-require_pinned_file("${ORT_ROOT}/include/cpu_provider_factory.h" 416 e2f658eeace78d79a8df82f233dcdeea135db498a77766156054bfc0d1d06c21 "ONNX Runtime CPU provider header")
-require_pinned_file("${ORT_ROOT}/include/onnxruntime_c_api.h" 403673 e3a01cdb382b2ba52267bf8a1a40d60b1197a1bac4da55667fe4d84e244f589a "ONNX Runtime C API header")
-require_pinned_file("${ORT_ROOT}/include/onnxruntime_cxx_api.h" 172735 0765fc56924999b06b4c01f665d8fbd368582fed7a856a22ce1ed686a73e8be2 "ONNX Runtime C++ API header")
-require_pinned_file("${ORT_ROOT}/include/onnxruntime_cxx_inline.h" 161868 e6c0478ab86467cfb4ac8694df3081ad1d42585c16f024d107638fb197e92f4a "ONNX Runtime C++ inline header")
-require_pinned_file("${ORT_ROOT}/include/onnxruntime_ep_c_api.h" 156087 612dd6c3b5c7fa8f936fe07e1d8da4dc4727890011305b4f67279b132aa1c8e0 "ONNX Runtime EP API header")
-require_pinned_file("${ORT_ROOT}/include/onnxruntime_error_code.h" 2873 6690bf0df3f7a7a9c4f38597dc3232042e432b48ea166cb5672f72a49d32b742 "ONNX Runtime error header")
-require_pinned_file("${ORT_ROOT}/include/onnxruntime_float16.h" 18528 9b45e1bc0fe19d9d53f272b168f5cab616e26eb00136c3a1b78f394c9b1b6757 "ONNX Runtime float16 header")
-require_pinned_file("${ORT_ROOT}/lib/onnxruntime.lib" 2124 b9fc3cd678257d88a111b0773ede4bfceaf0fe95daab4379f2b2b37348a68781 "ONNX Runtime import library")
-require_pinned_file("${ORT_ROOT}/lib/onnxruntime.dll" 15809848 18370c375f07357fa5874344a9d9ac17e6b6fe1eb18b1dd209d79483b4470257 "ONNX Runtime DLL")
-require_pinned_file("${ORT_ROOT}/lib/onnxruntime_providers_shared.dll" 21856 599629fa643707defe9156140ae5edd73531f221aa97b7585b1c9bb0a93586f8 "ONNX Runtime providers shared DLL")
-require_pinned_file("${ORT_ROOT}/LICENSE" 1094 c250d6278f0b47a6439fb7592b08b58a55eb9f535aa49a1db63211c3f982b674 "ONNX Runtime license")
-require_pinned_file("${ORT_ROOT}/ThirdPartyNotices.txt" 331175 fb0af774b4d7cffc5b9d046f2aaeade2f37df2f80abf8033c95dfffcc77a8866 "ONNX Runtime notices")
   require_pinned_file("${VAD_MODEL_SOURCE}" 1245151 4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2 "faster-whisper Silero V6 model")
 endif()
 if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
@@ -423,19 +355,6 @@ if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
     1512791
     9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
     "official zlib 1.3.1 archive")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/LICENSE" 1002 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243 "zlib 1.3.1 license")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/zlib.h" 96829 8a5579af72ea4f427ff00a4150f0ccb3fc5c1e4379f726e101133b1ab9fc600c "zlib 1.3.1 header")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/zconf.h" 16500 f5134250a67d57459234b63858f0d9d3ef8dcc48e9e1028d3f4fdcf6eae677ae "zlib 1.3.1 config header")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/adler32.c" 4964 9cd1443a24ff2a3053961695bd432035c58347386a420d3388232376ebabe211 "zlib 1.3.1 adler32")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/compress.c" 2613 86f802c16a965e7a28737e3730b4e576c5ba40981753967e3e30916f4dc1b4b1 "zlib 1.3.1 compress")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/crc32.c" 31605 8fd16f0a7714d51c89c2eb37eb98ec15e8a4dc57ba343e7b7398b19144039fda "zlib 1.3.1 crc32")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/deflate.c" 81731 3b956337350f94c34987750f785587ef33d9c89ceaebb7c2afb189c956360cbe "zlib 1.3.1 deflate")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/trees.c" 40937 f63c68c16c05fcd196050529d1a0e7657960e4136b9987d90a6ac3e58a964b0f "zlib 1.3.1 trees")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/zutil.c" 7179 8ced40d8c88588811edd2bdb35b7439983d5e1f8e9e32b8a3b244731f3c317b7 "zlib 1.3.1 zutil")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/zutil.h" 6677 dddb2dc7a1dc339ecf2c8e089b366f08bb731c0839c7110240d17ce731bb4fea "zlib 1.3.1 zutil header")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/deflate.h" 14041 48baf016326d8d5e3e32ac8153cc7e22f854b8e6834830b167b998a7fb1e7989 "zlib 1.3.1 deflate header")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/trees.h" 8472 bb0a9d3ca88ee00c81adb7c636e73b97085f6ef1b52d6d58edbe2b6dc3adeb4d "zlib 1.3.1 trees header")
-  require_pinned_file("${HIKARU_ASR_ZLIB_SOURCE_DIR}/crc32.h" 591749 9a2223575183ac2ee8a247f20bf3ac066e8bd0140369556bdbdffc777435749e "zlib 1.3.1 crc32 table")
   add_library(hikaru-asr-zlib-static STATIC
     "${HIKARU_ASR_ZLIB_SOURCE_DIR}/adler32.c"
     "${HIKARU_ASR_ZLIB_SOURCE_DIR}/compress.c"
@@ -447,38 +366,14 @@ if(HIKARU_ASR_ENABLE_WHISPER_FALLBACK_PARITY)
 endif()
 if(HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT)
   file(READ "${ORT_ROOT}/VERSION_NUMBER" ORT_VERSION_NUMBER)
-  file(READ "${ORT_ROOT}/GIT_COMMIT_ID" ORT_GIT_COMMIT_ID)
   file(STRINGS "${ORT_ROOT}/include/onnxruntime_c_api.h" ORT_API_LINE REGEX "^#define ORT_API_VERSION 28$")
   string(STRIP "${ORT_VERSION_NUMBER}" ORT_VERSION_NUMBER)
-  string(STRIP "${ORT_GIT_COMMIT_ID}" ORT_GIT_COMMIT_ID)
   if(NOT ORT_VERSION_NUMBER STREQUAL "1.28.0"
-      OR NOT ORT_GIT_COMMIT_ID STREQUAL "da9b5e364c465de65c49d91e696cd6485270757f"
       OR NOT ORT_API_LINE STREQUAL "#define ORT_API_VERSION 28")
-    message(FATAL_ERROR "ONNX Runtime source/API identity drifted from Candidate B lock")
+    message(FATAL_ERROR "ONNX Runtime version/API is incompatible with Candidate B")
   endif()
 endif()
 
-if(EXISTS "${CT2_SOURCE_DIR}/.git")
-  find_package(Git REQUIRED)
-  execute_process(
-    COMMAND "${GIT_EXECUTABLE}" -C "${CT2_SOURCE_DIR}" rev-parse HEAD
-    RESULT_VARIABLE CT2_GIT_RESULT
-    OUTPUT_VARIABLE CT2_GIT_COMMIT
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(
-    COMMAND "${GIT_EXECUTABLE}" -C "${CT2_SOURCE_DIR}" status --porcelain --untracked-files=no
-    RESULT_VARIABLE CT2_STATUS_RESULT
-    OUTPUT_VARIABLE CT2_GIT_STATUS
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT CT2_GIT_RESULT EQUAL 0
-      OR NOT CT2_STATUS_RESULT EQUAL 0
-      OR NOT CT2_GIT_COMMIT STREQUAL HIKARU_ASR_CT2_SOURCE_REVISION
-      OR NOT CT2_GIT_STATUS STREQUAL "")
-    message(FATAL_ERROR "CTranslate2 source is not the clean pinned 4.8.0 commit")
-  endif()
-endif()
 
 set(WITH_MKL OFF CACHE BOOL "" FORCE)
 set(WITH_DNNL ON CACHE BOOL "" FORCE)
@@ -499,10 +394,7 @@ if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT OR HIKARU_ASR_CUDA_RUNTIME)
         HIKARU_ASR_REAL_NVCC_SIZE
         HIKARU_ASR_REAL_NVCC_SHA256
         HIKARU_ASR_NVCC_LAUNCHER
-        HIKARU_ASR_NVCC_LAUNCHER_SIZE
-        HIKARU_ASR_NVCC_LAUNCHER_SHA256
-        HIKARU_ASR_CUDA_SEED_MANIFEST
-        HIKARU_ASR_CUDA_SEED_MANIFEST_SHA256)
+        HIKARU_ASR_CUDA_SEED_MANIFEST)
       if("${${required_cuda_build_input}}" STREQUAL "")
         message(FATAL_ERROR "${required_cuda_build_input} is required for the release CUDA runtime")
       endif()
@@ -524,15 +416,6 @@ if(HIKARU_ASR_ENABLE_CT2_CUDA_DEVELOPMENT OR HIKARU_ASR_CUDA_RUNTIME)
       "${HIKARU_ASR_REAL_NVCC_SIZE}"
       "${HIKARU_ASR_REAL_NVCC_SHA256}"
       "official real nvcc")
-    require_pinned_file(
-      "${CUDA_NVCC_LAUNCHER}"
-      "${HIKARU_ASR_NVCC_LAUNCHER_SIZE}"
-      "${HIKARU_ASR_NVCC_LAUNCHER_SHA256}"
-      "deterministic NVCC launcher")
-    file(SHA256 "${CUDA_SEED_MANIFEST}" CUDA_SEED_MANIFEST_ACTUAL_SHA256)
-    if(NOT CUDA_SEED_MANIFEST_ACTUAL_SHA256 STREQUAL HIKARU_ASR_CUDA_SEED_MANIFEST_SHA256)
-      message(FATAL_ERROR "CUDA seed manifest identity drifted")
-    endif()
     execute_process(
       COMMAND "${CUDA_REAL_NVCC}" --version
       RESULT_VARIABLE CUDA_NVCC_VERSION_RESULT
@@ -991,31 +874,17 @@ endif()
 # Independent application-worker target: full CLI orchestration, no CT2 imports
 # and no historical CrispAsrBackend/session/timeline linkage.
 option(HIKARU_ASR_BUILD_QWEN_CLI_WORKER "Build the full-CLI Qwen application worker" OFF)
-set(HIKARU_QWEN_CLI_FILE "" CACHE FILEPATH "Reviewed full crispasr.exe")
-set(HIKARU_QWEN_CLI_SHA256 "" CACHE STRING "Reviewed full CLI SHA-256")
-set(HIKARU_QWEN_CLI_SIZE "" CACHE STRING "Reviewed full CLI size")
+set(HIKARU_QWEN_CLI_FILE "" CACHE FILEPATH "Full crispasr.exe to copy beside the worker")
 if(HIKARU_ASR_BUILD_QWEN_CLI_WORKER)
   if(NOT WIN32 OR HIKARU_ASR_BUILD_CT2_WORKER OR HIKARU_ASR_ENABLE_CRISPASR_DEVELOPMENT)
     message(FATAL_ERROR "Full CLI worker requires its independent Windows runtime root")
   endif()
-  file(SHA256 "${HIKARU_QWEN_CLI_FILE}" cli_hash)
-  file(SIZE "${HIKARU_QWEN_CLI_FILE}" cli_size)
-  if(NOT cli_hash STREQUAL HIKARU_QWEN_CLI_SHA256 OR NOT cli_size EQUAL HIKARU_QWEN_CLI_SIZE)
-    message(FATAL_ERROR "Full CLI identity drift")
+  if(NOT EXISTS "${HIKARU_QWEN_CLI_FILE}" OR IS_DIRECTORY "${HIKARU_QWEN_CLI_FILE}")
+    message(FATAL_ERROR "HIKARU_QWEN_CLI_FILE must be a full crispasr.exe")
   endif()
-  file(WRITE "${GENERATED_INCLUDE_DIR}/hikaru_asr/qwen_cli_identity.hpp"
-    "#pragma once
-#include <cstdint>
-namespace hikaru_asr::qwen_cli::identity {
-"
-    "inline constexpr std::uintmax_t size_bytes = ${cli_size};
-"
-    "inline constexpr const char* sha256 = \"${cli_hash}\";
-}
-")
   add_executable(hikaru-asr-qwen-cli-worker src/main.cpp src/qwen_cli.cpp src/full_cli.cpp src/parakeet_cli.cpp)
   target_compile_definitions(hikaru-asr-qwen-cli-worker PRIVATE HIKARU_ASR_QWEN_CLI_WORKER=1)
-  target_link_libraries(hikaru-asr-qwen-cli-worker PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio bcrypt)
+  target_link_libraries(hikaru-asr-qwen-cli-worker PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio)
   target_include_directories(hikaru-asr-qwen-cli-worker SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
   target_compile_options(hikaru-asr-qwen-cli-worker PRIVATE /W4 /permissive- /utf-8)
   add_custom_command(TARGET hikaru-asr-qwen-cli-worker POST_BUILD
@@ -1026,9 +895,8 @@ endif()
 include(CTest)
 if(BUILD_TESTING AND HIKARU_ASR_BUILD_QWEN_CLI_WORKER)
   add_executable(hikaru-asr-qwen-cli-fixture-worker src/main.cpp src/qwen_cli.cpp src/full_cli.cpp src/parakeet_cli.cpp)
-  target_compile_definitions(hikaru-asr-qwen-cli-fixture-worker PRIVATE
-    HIKARU_ASR_QWEN_CLI_WORKER=1 HIKARU_QWEN_CLI_FIXTURE=1)
-  target_link_libraries(hikaru-asr-qwen-cli-fixture-worker PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio bcrypt)
+  target_compile_definitions(hikaru-asr-qwen-cli-fixture-worker PRIVATE HIKARU_ASR_QWEN_CLI_WORKER=1)
+  target_link_libraries(hikaru-asr-qwen-cli-fixture-worker PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio)
   add_executable(hikaru-asr-fake-qwen-cli tests/fake_qwen_cli.cpp)
   target_link_libraries(hikaru-asr-fake-qwen-cli PRIVATE hikaru-asr-protocol hikaru-asr-wav-audio)
   set_target_properties(hikaru-asr-fake-qwen-cli PROPERTIES OUTPUT_NAME crispasr)

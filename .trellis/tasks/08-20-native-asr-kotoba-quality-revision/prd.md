@@ -15,21 +15,21 @@
 - 依赖归档 T07 development CTranslate2 CUDA seam 和归档 T08 K2 的 bounded-stride、latest-start ownership、exact-dedup、progress、cache compatibility 合同。
 - K2 历史 disposition 保持 `stop-revise`，不得改写。
 - 未来模型交付依赖 T12 的 post-MVP Kotoba manifest/readiness expansion。
-- 字幕质量比较继续遵循用户 benchmark 和 identity-bound Python legacy evidence；这些门禁只决定 Kotoba 是否可独立启用，不影响已发布 MVP。
+- 字幕质量判断只以用户提供的 WAV+ASS 真值和已批准门槛为准；Python legacy 输出仅作非门禁历史诊断。模型/分发资源仍遵守产品完整性校验，不以临时 runner、日志或结果哈希决定 K3 可用性。
 
 ## Requirements
 
-1. 冻结新的 K3 candidate/algorithm/config/binary/model identity，不覆盖 K2。
+1. 明确 K3 模型、算法和配置及其产品资源完整性边界，不覆盖 K2；本地脚本或构建字节变化不要求重建证据身份链。
 2. 保留 K2 的 bounded stride、ownership、exact tuple dedup 和 monotonic progress，除非新 identity 经过独立评审。
 3. 不得 reference-match、reference-based dedup、backfill、gap fill、fuzzy merge、clip/stretch 或 synthetic timing。
-4. 同一冻结 K3 identity 完成 short-v1、medium-v1、long-v2；单 case 失败不截断矩阵。
+4. 同一 K3 模型/算法/配置完成 short-v1、medium-v1、long-v2；单 case 失败不截断矩阵。
 5. 保持 Kotoba-only preprocessor、128-mel、window 和 cache readiness 合同，不改变 ordinary Whisper MVP。
 6. 只有 qualified K3 才能在后续版本启用；失败时保持 visible/unavailable。
 
 ## Acceptance Criteria
 
-- [ ] K3 identity 与 raw/runner/worker/runtime/model hashes 冻结，K2 evidence 无修改。
-- [ ] 三个 case 均有 identity-valid completed 或 structured-failure row，最终 disposition 来自完整矩阵。
+- [ ] K3 模型及分发资源通过现有完整性校验；记录实际算法/配置/设备与直接运行结果，K2 归档证据无修改。不冻结临时 raw/runner/worker/log 哈希。
+- [ ] 三个 case 均有可核对的 completed 或 structured-failure 结果，最终 disposition 来自完整矩阵。
 - [ ] stride、ownership、dedup、progress、text conservation、timeline 和 protocol tests 通过。
 - [ ] 每个 case 的质量和独立工程门禁满足该 post-MVP task 的冻结标准后，才可发布 Kotoba accepted handoff。
 - [ ] 失败时发布 truthful non-qualified disposition，无 reference repair、伪时间轴或 silent Python fallback。

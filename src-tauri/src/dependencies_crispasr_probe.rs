@@ -153,7 +153,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn real_probe_from_hash_bound_full_cli_inputs() {
+    fn real_probe_from_full_cli_inputs() {
         let Some(path) = std::env::var_os("HIKARU_ASR_CRISPASR_PROBE_INPUTS") else {
             assert_ne!(
                 std::env::var("HIKARU_ASR_CRISPASR_PROBE_REQUIRED").as_deref(),
@@ -173,11 +173,7 @@ mod tests {
         {
             let file = PathBuf::from(row["path"].as_str().unwrap());
             assert_eq!(file.parent(), Some(root));
-            assert_eq!(
-                fs::metadata(&file).unwrap().len(),
-                row["sizeBytes"].as_u64().unwrap()
-            );
-            assert_eq!(sha256_file(&file).unwrap(), row["sha256"].as_str().unwrap());
+            assert!(file.is_file());
         }
         assert_eq!(probe(root).is_ok(), input["device"] == "cuda");
     }

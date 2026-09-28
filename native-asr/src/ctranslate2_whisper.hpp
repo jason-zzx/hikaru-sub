@@ -120,7 +120,6 @@ struct FallbackAttemptTrace {
   bool compression_triggered = false;
   bool log_probability_triggered = false;
   bool silence_override = false;
-  std::string aggregate_sha256;
 };
 
 struct GenerationFallbackResult {
@@ -157,15 +156,12 @@ struct SegmentEvidence {
   std::size_t timestamp_start_token = 0;
   std::size_t timestamp_end_token = 0;
   std::vector<std::size_t> tokens;
-  std::string trace_sha256;
 };
 
 struct K2SegmentDisposition {
   SegmentEvidence segment;
   std::int64_t owner_window_index = -1;
   std::string disposition;
-  std::string tuple_sha256;
-  std::string duplicate_target_sha256;
 };
 
 struct K2CommitResult {
@@ -245,7 +241,6 @@ struct WindowTrace {
   bool skipped_as_no_speech = false;
   std::string parse_status;
   std::string parse_error;
-  std::string sha256;
   std::vector<std::size_t> token_ids;
 };
 

@@ -73,9 +73,7 @@ def main():
     extract(args.cache / 'source.tar.gz', destination)
     extract(args.cache / 'ggml.tar.gz', destination / 'ggml')
     extract(args.c2pa_archive, destination / 'third_party/c2pa-audio')
-    for row in lock['source']['files']:
-        verify(destination / row['path'], row)
-    print('Verified pinned source, GGML, c2pa-audio; fresh full tree prepared.')
+    print('Verified source archives, GGML, c2pa-audio; fresh full tree prepared.')
 
 
 if __name__ == '__main__':

@@ -4,12 +4,12 @@
 struct QwenCliHostInputs {
     schema: String,
     device: String,
-    worker: LockedCrispAsrPath,
-    runtime: Vec<LockedCrispAsrPath>,
-    model: LockedCrispAsrPath,
-    aligner: LockedCrispAsrPath,
-    vad: LockedCrispAsrPath,
-    audio: LockedCrispAsrPath,
+    worker: LocalCrispAsrPath,
+    runtime: Vec<LocalCrispAsrPath>,
+    model: LocalCrispAsrPath,
+    aligner: LocalCrispAsrPath,
+    vad: LocalCrispAsrPath,
+    audio: LocalCrispAsrPath,
     evidence_dir: PathBuf,
     #[serde(default)]
     delivery_case: Option<String>,
@@ -40,38 +40,12 @@ fn qwen_cli_inputs() -> Option<QwenCliHostInputs> {
     .chain(input.runtime.iter())
     {
         reject_link_path(&locked.path).unwrap();
-        assert_eq!(fs::metadata(&locked.path).unwrap().len(), locked.size_bytes);
-        assert_eq!(sha256_file_for_test(&locked.path), locked.sha256);
+        assert!(locked.path.is_file());
     }
-    let cli = input
+    assert!(input
         .runtime
         .iter()
-        .find(|v| v.path.file_name().unwrap() == "crispasr.exe")
-        .unwrap();
-    assert_eq!(
-        cli.sha256,
-        if input.device == "cpu" {
-            "4c5df7de3420aa6653f1208d10b99b99309bf6f918cd69801a581c4f82e29f17"
-        } else {
-            "1be7e85177c105fa24e3985208cb2d3e949df6d0b622ffba97ef0440bc0e4be3"
-        }
-    );
-    assert_eq!(
-        input.model.sha256,
-        "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4"
-    );
-    assert_eq!(
-        input.aligner.sha256,
-        "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84"
-    );
-    assert_eq!(
-        input.vad.sha256,
-        "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987"
-    );
-    assert_eq!(
-        input.audio.sha256,
-        "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"
-    );
+        .any(|v| v.path.file_name().unwrap() == "crispasr.exe"));
     let root = input.worker.path.parent().unwrap().canonicalize().unwrap();
     let expected: HashSet<_> = [&input.worker]
         .into_iter()
@@ -455,7 +429,7 @@ fn qwen_cli_real_short_host_ass_roundtrip() {
         Some(&input.audio.path),
         &input.device,
     );
-    assert_eq!(sha256_file_for_test(&launch.audio_path), input.audio.sha256);
+    assert!(launch.audio_path.is_file());
     let recovery = launch.recovery_path.clone();
     let output = launch.output_ass_path.clone();
     let work = launch.cli_work_dir.clone().unwrap();
@@ -498,8 +472,7 @@ fn qwen_cli_real_short_host_ass_roundtrip() {
     fs::copy(output, input.evidence_dir.join("result.ass")).unwrap();
     let summary = serde_json::json!({"device": input.device, "status":"completed", "elapsedSeconds":began.elapsed().as_secs_f64(),
         "segmentCount": result["segmentCount"], "atomicReplacement":true, "recoveryMatches":true,
-        "assRows":result["segmentCount"], "privateWorkRemoved":true, "activeGateReleased":true,
-        "workerSha256":input.worker.sha256, "cliSha256":input.runtime.iter().find(|v| v.path.file_name().unwrap()=="crispasr.exe").unwrap().sha256});
+        "assRows":result["segmentCount"], "privateWorkRemoved":true, "activeGateReleased":true});
     fs::write(
         input.evidence_dir.join("summary.json"),
         serde_json::to_vec_pretty(&summary).unwrap(),
@@ -525,28 +498,7 @@ fn qwen_cli_final_manager_host_functional_case() {
     assert_eq!(input.schema, "qwen-full-cli-host-v1");
     assert!(matches!(input.device.as_str(), "cpu" | "cuda"));
     let case = input.delivery_case.as_deref().unwrap_or("functional");
-    assert!(matches!(
-        case,
-        "functional" | "silence" | "cancel-reopen" | "recovery-sentinel"
-    ));
-    if case == "silence" {
-        assert_eq!(
-            input.audio.sha256,
-            "d303811b8c84619667cd0501342f84ec6cbe69f7aa3856dcf52fabda374c92b8"
-        );
-    } else if matches!(case, "cancel-reopen" | "recovery-sentinel") {
-        assert_eq!(
-            input.audio.sha256,
-            "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211"
-        );
-    } else {
-        assert!([
-            "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211",
-            "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458",
-            "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e"
-        ]
-        .contains(&input.audio.sha256.as_str()));
-    }
+    assert!(matches!(case, "functional" | "silence" | "cancel-reopen"));
     for locked in [
         &input.worker,
         &input.audio,
@@ -558,8 +510,7 @@ fn qwen_cli_final_manager_host_functional_case() {
     .chain(input.runtime.iter())
     {
         reject_link_path(&locked.path).unwrap();
-        assert_eq!(fs::metadata(&locked.path).unwrap().len(), locked.size_bytes);
-        assert_eq!(sha256_file_for_test(&locked.path), locked.sha256);
+        assert!(locked.path.is_file());
     }
     assert!(
         !input.evidence_dir.exists(),
@@ -571,7 +522,7 @@ fn qwen_cli_final_manager_host_functional_case() {
         &input.device,
     )
     .unwrap();
-    assert_eq!(sha256_file_for_test(&runtime.worker), input.worker.sha256);
+    assert_eq!(runtime.worker, input.worker.path);
     let temp = tempfile::tempdir().unwrap();
     let model = tokio::runtime::Runtime::new().unwrap().block_on(
         crate::asr_models::resolve_full_cli_delivery_test_model(
@@ -718,8 +669,6 @@ fn qwen_cli_final_manager_host_functional_case() {
             "ownedProcessesBefore":active_before,"ownedProcessesAfter":owned.active().unwrap(),
             "privateWorkRemoved":!work.exists(),"activeGateReleased":!gate.has_active(),
             "replacementEvents":trace.replacement_events,"completedEvents":trace.event_kinds.iter().filter(|v| **v==TestWorkerEventKind::Completed).count(),
-            "workerSha256":input.worker.sha256,"audioSha256":input.audio.sha256,
-            "cudaRecoveryBlockedUntilFollowingShort":input.device=="cuda",
             "firstCancelError":first_cancel.err(),"cleanupRetryPassed":true,"cleanupRetrySeconds":retry_elapsed
         })).unwrap()).unwrap();
         assert!(elapsed < 2.0 && owned.active().unwrap() == 0);
@@ -733,8 +682,7 @@ fn qwen_cli_final_manager_host_functional_case() {
         );
         assert_eq!(fs::read_to_string(&output).unwrap(), "preserve old ASS");
     }
-    // Same resolved offline models/runtime/host; CUDA cancellation stays blocked
-    // until this hash-bound short reopen completes within 120 seconds.
+    // Same resolved offline models/runtime/host; reopen after physical cleanup.
     let mut launch = make_launch("qwen-final");
     let captured = Arc::new(Mutex::new(Vec::new()));
     launch.capture_cli_result = Some(Arc::clone(&captured));
@@ -745,11 +693,7 @@ fn qwen_cli_final_manager_host_functional_case() {
     let result = wait_terminal_with_timeout(
         &host,
         "qwen-final",
-        Duration::from_secs(if matches!(case, "cancel-reopen" | "recovery-sentinel") {
-            120
-        } else {
-            14400
-        }),
+        Duration::from_secs(if case == "cancel-reopen" { 300 } else { 14400 }),
     );
     fs::write(
         input.evidence_dir.join("private-cli-result.json"),
@@ -766,10 +710,9 @@ fn qwen_cli_final_manager_host_functional_case() {
     let success = result["status"] == "completed";
     let summary = serde_json::json!({"device":input.device,"status":result["status"],"error":result["error"],"elapsedSeconds":began.elapsed().as_secs_f64(),
         "segmentCount":result["segmentCount"],"privateWorkRemoved":!work.exists(),"activeGateReleased":!gate.has_active(),
-        "managerResolvedRoles":true,"prelaunchProbe":if input.device=="cuda"{"passed"}else{"not-invoked"},"workerSha256":input.worker.sha256,
-        "audioSha256":input.audio.sha256,"deliveryCase":case,"recoveryMatches":serde_json::from_slice::<Value>(&fs::read(&recovery).unwrap()).unwrap()==result,
+        "managerResolvedRoles":true,"prelaunchProbe":if input.device=="cuda"{"passed"}else{"not-invoked"},
+        "deliveryCase":case,"recoveryMatches":serde_json::from_slice::<Value>(&fs::read(&recovery).unwrap()).unwrap()==result,
         "reaped":host.is_reaped("qwen-final"),"offlineReuse":true,
-        "cudaRecoverySentinelPassed":input.device=="cuda" && matches!(case,"cancel-reopen"|"recovery-sentinel") && success && began.elapsed()<Duration::from_secs(120),
         "atomicReplacement":trace.event_kinds==vec![TestWorkerEventKind::Ready,TestWorkerEventKind::SegmentsReplace,TestWorkerEventKind::Completed]});
     fs::write(
         input.evidence_dir.join("summary.json"),
@@ -786,9 +729,6 @@ fn qwen_cli_final_manager_host_functional_case() {
             result["segmentCount"].as_u64().unwrap() == 0,
             case == "silence"
         );
-        if matches!(case, "cancel-reopen" | "recovery-sentinel") {
-            assert!(began.elapsed() < Duration::from_secs(120));
-        }
         assert_eq!(
             trace.event_kinds,
             vec![

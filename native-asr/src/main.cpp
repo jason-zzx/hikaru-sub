@@ -193,16 +193,14 @@ Json source_segment_evidence(const crisp::NativeSegment& segment) {
   return Json{
       {"startMs", segment.raw_start_ms},
       {"endMs", segment.raw_end_ms},
-      {"textBytes", segment.text.size()},
-      {"textSha256", crisp::sha256_text(segment.text)}};
+      {"textBytes", segment.text.size()}};
 }
 
 Json final_segment_evidence(const Segment& segment) {
   return Json{
       {"startMs", segment.start_ms},
       {"endMs", segment.end_ms},
-      {"textBytes", segment.text.size()},
-      {"textSha256", crisp::sha256_text(segment.text)}};
+      {"textBytes", segment.text.size()}};
 }
 #endif
 
@@ -432,8 +430,7 @@ int run_crispasr(const WorkerRequestV1& request) {
           {"windowEndMs", attempted_window->end_ms},
           {"localStartMs", result_failure->local_start_ms},
           {"localEndMs", result_failure->local_end_ms},
-          {"segmentIndex", result_failure->segment_index},
-          {"resultTraceSha256", result_failure->result_trace_sha256}};
+          {"segmentIndex", result_failure->segment_index}};
     }
     emit_r2_evidence(std::move(failure));
   };

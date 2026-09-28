@@ -19,7 +19,6 @@ struct ResultFailureDetail {
   int segment_index = 0;
   std::int64_t local_start_ms = 0;
   std::int64_t local_end_ms = 0;
-  std::string result_trace_sha256;
 };
 
 class BackendError : public std::runtime_error {

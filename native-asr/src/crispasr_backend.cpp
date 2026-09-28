@@ -22,7 +22,6 @@
 #include <sstream>
 #include <utility>
 
-#include <hikaru_asr/crispasr_runtime_identity.hpp>
 
 namespace hikaru_asr::crisp {
 namespace {
@@ -364,16 +363,11 @@ std::vector<NativeSegment> copy_source_segments(
         std::optional<ResultFailureDetail> detail;
         if (!segment.text.empty() && segment.raw_start_ms >= 0
             && segment.raw_end_ms == segment.raw_start_ms) {
-          const std::string trace = "segmentIndex=" + std::to_string(index)
-              + "\nlocalStartMs=" + std::to_string(segment.raw_start_ms)
-              + "\nlocalEndMs=" + std::to_string(segment.raw_end_ms)
-              + "\nwindowDurationMs=" + std::to_string(duration_ms);
           detail = ResultFailureDetail{
               "zero_duration_top_level_result",
               index,
               segment.raw_start_ms,
-              segment.raw_end_ms,
-              sha256_bytes(trace)};
+              segment.raw_end_ms};
         }
         throw BackendError(
             "crispasr_result_invalid",
@@ -613,14 +607,6 @@ class CrispAsrBackend::Impl {
     } catch (const wav::AudioError& error) {
       throw BackendError(error.code(), error.what());
     }
-#ifndef HIKARU_ASR_CRISPASR_TEST_RUNTIME_IDENTITY_BYPASS
-    if (!runtime_identity_matches(
-            config.library_path,
-            runtime_identity::size_bytes,
-            runtime_identity::sha256)) {
-      throw BackendError("crispasr_abi_mismatch", "CrispASR runtime identity is not permitted");
-    }
-#endif
     module = LoadLibraryExW(
         fs::absolute(config.library_path).c_str(),
         nullptr,
@@ -655,7 +641,7 @@ class CrispAsrBackend::Impl {
       if (opened == nullptr || expected != opened) {
         throw BackendError("crispasr_backend_mismatch", "CrispASR opened a different logical backend");
       }
-#ifndef HIKARU_ASR_CRISPASR_TEST_RUNTIME_IDENTITY_BYPASS
+#ifndef HIKARU_ASR_CRISPASR_TEST_CUDA_MODULE_BYPASS
       if (config.device == Device::Cuda) require_cuda_runtime_modules();
 #else
       if (config.device == Device::Cuda && !module_loaded(L"hikaru-asr-fake-crispasr-cuda-marker.dll")) {

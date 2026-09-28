@@ -5,7 +5,6 @@ Build-time Python tooling only; not a worker, downloader or production dependenc
 import argparse
 import ctypes as c
 from ctypes import wintypes as w
-import hashlib
 import json
 import msvcrt
 import os
@@ -14,13 +13,8 @@ import subprocess
 import time
 import wave
 
-from prepare import REPO, LOCAL, LOCK, verify
+from prepare import REPO, LOCAL
 from validate import validate, require
-
-
-def identity(path):
-    with path.open('rb') as stream:
-        return {'sizeBytes': path.stat().st_size, 'sha256': hashlib.file_digest(stream, 'sha256').hexdigest()}
 
 
 def loaded_modules(process):
@@ -118,20 +112,14 @@ def main():
             require(not before, 'task_model_process_already_running')
             supplied = [args.asr, args.aligner, args.vad]
             require(not any(supplied) or all(supplied), 'supply_all_model_roles')
-            models = ([{'role': role, 'path': str(path.resolve()), **identity(path)}
+            models = ([{'role': role, 'path': str(path.resolve())}
                        for role, path in zip(['asr', 'aligner', 'vad'], supplied, strict=True)] if all(supplied)
                       else json.loads((LOCAL / 'models-verified.json').read_text()))
-            locked = json.loads(LOCK.read_text(encoding='utf-8'))['models']
-            paths = {}
-            for row, lock in zip(models, locked, strict=True):
-                require(row['role'] == lock['role'], 'role_order')
-                verify(Path(row['path']), {'sizeBytes': lock['publicationSizeBytes'], 'sha256': lock['publicationSha256']})
-                paths[row['role']] = row['path']
-            audio = ({'path': str(args.audio.resolve()), **identity(args.audio)} if args.audio
-                     else json.loads((LOCAL / 'audio-verified.json').read_text()))
-            require(audio['sha256'] == '4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211', 'short_identity')
-            audio_path = Path(audio['path'])
-            verify(audio_path, audio)
+            require([row['role'] for row in models] == ['asr', 'aligner', 'vad'], 'role_order')
+            paths = {row['role']: row['path'] for row in models}
+            require(all(Path(path).is_file() for path in paths.values()), 'missing_model')
+            audio_path = args.audio.resolve() if args.audio else Path(json.loads((LOCAL / 'audio-verified.json').read_text())['path'])
+            require(audio_path.is_file(), 'missing_audio')
             if args.case == 'silence':
                 audio_path = out / 'silence.wav'
                 with wave.open(str(audio_path), 'wb') as wav:
@@ -140,6 +128,7 @@ def main():
             with wave.open(str(audio_path)) as wav:
                 require((wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) == (1, 2, 16000), 'audio_shape')
                 duration = wav.getnframes() * 1000 // wav.getframerate()
+                require(0 < duration <= 30000, 'short_audio_duration')
             if args.unicode_paths:
                 for role, path in paths.items():
                     link = out / Path(path).name
@@ -173,12 +162,9 @@ def main():
             if args.case == 'missing-cuda':
                 require(args.device == 'cuda', 'cuda_negative_device')
                 env['CUDA_VISIBLE_DEVICES'] = '-1'
+            require(exe.is_file(), 'missing_cli')
             record = {'ownerPid': os.getpid(), 'device': args.device, 'case': args.case,
-                      'argv': command, 'executable': identity(exe), 'models': models, 'audio': identity(audio_path),
-                      'path': env['PATH'], 'state': 'starting',
-                      'tooling': {file.name: identity(file) for file in Path(__file__).parent.iterdir()
-                                  if file.suffix in ('.py', '.h', '.cmd', '.cpp')},
-                      'inputLock': identity(LOCK)}
+                      'argv': command, 'state': 'starting'}
             owner = out / 'ownership.json'
             owner.write_text(json.dumps(record, indent=2))
             job = Job()
@@ -229,16 +215,10 @@ def main():
                             [b'downloading', b'winhttp', b'download now?', b'model_download_forbidden']),
                     'download_entry_reached')
             result = out / 'result.json'
-            if checkpoints:
-                unique_modules = sorted({path for paths in checkpoints.values() for path in paths})
-                (out / 'loaded-module-identities.json').write_text(json.dumps(
-                    [{'path': path, **identity(Path(path))} for path in unique_modules], indent=2))
-            summary = {'device': args.device, 'case': args.case, 'exitCode': rc, 'processReaped': True,
-                       'executable': record['executable'], 'stderr': identity(out / 'stderr.log')}
+            summary = {'device': args.device, 'case': args.case, 'exitCode': rc, 'processReaped': True}
             if args.case in ('short', 'silence'):
                 require(rc == 0, 'cli_failed')
                 summary['validation'] = validate(result.read_bytes(), duration, stderr, args.device, args.case == 'silence')
-                summary['result'] = identity(result)
             else:
                 require(rc != 0 and not result.exists(), 'negative_did_not_fail_closed')
                 expected = (b'cuda_unavailable' if args.case == 'missing-cuda' else

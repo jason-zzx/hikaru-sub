@@ -176,7 +176,7 @@ Good: shared embedded authority, verified model+VAD and local CUDA → normal Pa
 
 ### 6. Tests Required
 
-`build_engine_support_requires_both_devices_not_cuda_publication`, `selected_engine_is_authorized_before_host_cache_or_launch`, shared closure/capability rejection, and model-manager public/default/candidate support checks must cover both authorities. Retained complete Cargo runs are 301 passed/3 ignored per authority. Real CPU/CUDA short UI evidence is reproduced by the task's `research/local_app_publish.py --check`; keep CPU functional success separate from its historical outer shutdown diagnostic. No inference rerun for harness-only changes.
+`build_engine_support_requires_both_devices_not_cuda_publication`, `selected_engine_is_authorized_before_host_cache_or_launch`, shared closure/capability rejection, and model-manager public/default/candidate support checks must cover both authorities. Retained complete Cargo runs are 301 passed/3 ignored per authority. Historical Parakeet UI evidence remains in its archived task; `research/local_app_publish.py --check` is not a current build or UI verification gate. For new behavior, exercise the actual current UI/device flow; a harness-only change needs no inference rerun.
 
 ### 7. Wrong vs Correct
 

@@ -1111,13 +1111,6 @@ void run_fallback_self_check() {
   check(below_compression_preference.selected_attempt_index == 1
             && below_compression_preference.selected_temperature == 1.0,
         "fallback below-compression-threshold preference drift");
-  check(std::all_of(
-            all_failed.attempts.begin(),
-            all_failed.attempts.end(),
-            [](const FallbackAttemptTrace& attempt) {
-              return attempt.aggregate_sha256.size() == 64;
-            }),
-        "fallback sanitized attempt identity drift");
 
   CandidateAConfig open_config = upstream_generation_fallback_config();
   open_config.beam_size = 1;
@@ -1843,8 +1836,7 @@ Json segment_json(const SegmentEvidence& segment) {
       {"vadTimestampRestored", segment.vad_timestamp_restored},
       {"timestampStartToken", segment.timestamp_start_token},
       {"timestampEndToken", segment.timestamp_end_token},
-      {"tokenIds", segment.tokens},
-      {"traceSha256", segment.trace_sha256}};
+      {"tokenIds", segment.tokens}};
 }
 
 Json k2_disposition_json(const K2SegmentDisposition& disposition) {
@@ -1853,14 +1845,9 @@ Json k2_disposition_json(const K2SegmentDisposition& disposition) {
       {"endMs", disposition.segment.segment.end_ms},
       {"text", disposition.segment.segment.text},
       {"tokenIds", disposition.segment.tokens},
-      {"traceSha256", disposition.segment.trace_sha256},
-      {"tupleSha256", disposition.tuple_sha256},
       {"ownerWindowIndex", disposition.owner_window_index},
       {"ownershipAnchor", "startMs"},
-      {"disposition", disposition.disposition},
-      {"duplicateTargetSha256", disposition.duplicate_target_sha256.empty()
-           ? Json(nullptr)
-           : Json(disposition.duplicate_target_sha256)}};
+      {"disposition", disposition.disposition}};
 }
 
 Json fallback_attempt_json(const FallbackAttemptTrace& attempt) {
@@ -1884,8 +1871,7 @@ Json fallback_attempt_json(const FallbackAttemptTrace& attempt) {
       {"compressionRatio", attempt.compression_ratio},
       {"compressionTriggered", attempt.compression_triggered},
       {"logProbabilityTriggered", attempt.log_probability_triggered},
-      {"silenceOverride", attempt.silence_override},
-      {"aggregateSha256", attempt.aggregate_sha256}};
+      {"silenceOverride", attempt.silence_override}};
 }
 
 Json trace_json(const WindowTrace& trace) {
@@ -1913,7 +1899,6 @@ Json trace_json(const WindowTrace& trace) {
       {"skippedAsNoSpeech", trace.skipped_as_no_speech},
       {"parseStatus", trace.parse_status},
       {"parseError", trace.parse_error.empty() ? Json(nullptr) : Json(trace.parse_error)},
-      {"sha256", trace.sha256},
       {"tokenIds", trace.token_ids}};
   if (trace.generation_fallback_enabled) {
     Json attempts = Json::array();
@@ -2148,7 +2133,6 @@ Json diagnostic_cell(
       {"totals", Json{
            {"windowCount", result.traces.size()},
            {"segmentCount", result.segments.size()},
-           {"firstWindowTraceSha256", result.traces.front().sha256},
            {"generatedTokenCount", generated_tokens},
            {"prefixForwardTokenCount", prefix_tokens},
            {"sourceOverlapMs", overlap_ms},

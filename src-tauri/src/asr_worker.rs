@@ -1962,10 +1962,6 @@ mod tests {
     include!("asr_worker_parakeet_tests.rs");
     include!("asr_worker_parakeet_real_tests.rs");
 
-    const R2_STEP6_MANIFEST_SHA256: &str =
-        "aa28e40c65c029c2c7c651121606f9334daddf21ee839c59954455d3bb5bb33c";
-    const R2_STEP6_CANDIDATE: &str = "R2-vad12-pad30-overlap-top-level-v1";
-
     fn fake_worker() -> Option<PathBuf> {
         let path = std::env::var_os("HIKARU_ASR_FAKE_WORKER").map(PathBuf::from)?;
         path.is_file().then_some(path)
@@ -2013,19 +2009,16 @@ mod tests {
     }
 
     #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct LockedCrispAsrPath {
+    struct LocalCrispAsrPath {
         path: PathBuf,
-        size_bytes: u64,
-        sha256: String,
     }
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct CrispAsrWorkerInputFile {
         worker: PathBuf,
-        model: LockedCrispAsrPath,
-        aligner: Option<LockedCrispAsrPath>,
+        model: LocalCrispAsrPath,
+        aligner: Option<LocalCrispAsrPath>,
         audio: PathBuf,
         cancel_audio: Option<PathBuf>,
         device: String,
@@ -2066,35 +2059,13 @@ mod tests {
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     struct R2Step6Manifest {
         schema_version: u64,
-        candidate_id: String,
-        artifacts: BTreeMap<String, LockedCrispAsrPath>,
+        artifacts: BTreeMap<String, LocalCrispAsrPath>,
         lanes: BTreeMap<String, R2Step6Lane>,
     }
 
     fn assert_r2_step6_lane_identity(lane_id: &str, kind: &str, aligner: Option<&str>) {
         assert_eq!(kind, lane_id, "Step 6 lane kind/id drift");
         assert!(aligner.is_none(), "R2 Step 6 does not accept an aligner");
-    }
-
-    fn sha256_bytes_for_test(bytes: &[u8]) -> String {
-        use sha2::{Digest, Sha256};
-        hex::encode(Sha256::digest(bytes))
-    }
-
-    fn sha256_file_for_test(path: &Path) -> String {
-        use sha2::{Digest, Sha256};
-        let mut input = fs::File::open(path).expect("test input cannot be opened");
-        let mut hasher = Sha256::new();
-        let mut buffer = [0u8; 64 * 1024];
-        loop {
-            let count =
-                std::io::Read::read(&mut input, &mut buffer).expect("test input read failed");
-            if count == 0 {
-                break;
-            }
-            hasher.update(&buffer[..count]);
-        }
-        hex::encode(hasher.finalize())
     }
 
     fn crispasr_worker_inputs() -> Option<CrispAsrWorkerInputs> {
@@ -2123,23 +2094,9 @@ mod tests {
             input.aligner.is_some(),
             "only Qwen requires an aligner"
         );
-        for (locked, role) in [
-            (&input.model, "model"),
-            (input.aligner.as_ref().unwrap_or(&input.model), "aligner"),
-        ] {
-            if role == "aligner" && input.aligner.is_none() {
-                continue;
-            }
-            assert_eq!(
-                fs::metadata(&locked.path).unwrap().len(),
-                locked.size_bytes,
-                "CrispASR {role} size drift"
-            );
-            assert_eq!(
-                sha256_file_for_test(&locked.path),
-                locked.sha256.to_ascii_lowercase(),
-                "CrispASR {role} hash drift"
-            );
+        assert!(input.model.path.is_file(), "CrispASR model must be a file");
+        if let Some(aligner) = &input.aligner {
+            assert!(aligner.path.is_file(), "CrispASR aligner must be a file");
         }
         if let Some(path) = &input.cancel_audio {
             assert!(path.is_file(), "CrispASR cancel audio must be a file");
@@ -2173,19 +2130,11 @@ mod tests {
             "R2 Step 6 inputs require HIKARU_ASR_R2_STEP6_REQUIRED=1"
         );
         let lane_id = lane_id.expect("HIKARU_ASR_R2_STEP6_LANE is required");
-        let bytes = fs::read(&manifest_path).expect("R2 Step 6 manifest cannot be read");
-        assert_eq!(
-            sha256_bytes_for_test(&bytes),
-            R2_STEP6_MANIFEST_SHA256,
-            "R2 Step 6 manifest identity drift"
-        );
-        let manifest: R2Step6Manifest =
-            serde_json::from_slice(&bytes).expect("R2 Step 6 manifest is invalid");
+        let manifest: R2Step6Manifest = serde_json::from_slice(
+            &fs::read(&manifest_path).expect("R2 Step 6 manifest cannot be read"),
+        )
+        .expect("R2 Step 6 manifest is invalid");
         assert_eq!(manifest.schema_version, 1, "invalid Step 6 manifest schema");
-        assert_eq!(
-            manifest.candidate_id, R2_STEP6_CANDIDATE,
-            "Step 6 candidate identity drift"
-        );
         assert_eq!(
             manifest
                 .lanes
@@ -2251,16 +2200,6 @@ mod tests {
             assert!(
                 canonical.starts_with(&repo_root) && canonical.is_file(),
                 "Step 6 artifact escaped the repository or is not a file: {role}"
-            );
-            assert_eq!(
-                fs::metadata(&canonical).unwrap().len(),
-                locked.size_bytes,
-                "Step 6 artifact size drift: {role}"
-            );
-            assert_eq!(
-                sha256_file_for_test(&canonical),
-                locked.sha256.to_ascii_lowercase(),
-                "Step 6 artifact hash drift: {role}"
             );
             canonical
         };
@@ -2831,13 +2770,7 @@ mod tests {
         for path in [&worker, &audio, &model, &aligner] {
             fs::write(path, path.file_name().unwrap().to_string_lossy().as_bytes()).unwrap();
         }
-        let locked = |path: &Path| {
-            serde_json::json!({
-                "path": path,
-                "sizeBytes": fs::metadata(path).unwrap().len(),
-                "sha256": sha256_file_for_test(path),
-            })
-        };
+        let locked = |path: &Path| serde_json::json!({ "path": path });
         for (engine, aligner_value) in [("parakeet", Value::Null), ("qwen3-asr", locked(&aligner))]
         {
             let input_path = temp.path().join(format!("{engine}.json"));

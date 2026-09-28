@@ -17,7 +17,7 @@
 | Guide | Description |
 |---|---|
 | [Native Qwen CLI Output](./qwen-cli-output.md) | Current full-CLI output/adjacent-merge/strict protocol/host-ASS contract |
-| [Quality Guidelines](./quality-guidelines.md) | Current Qwen scope; other Native absolute qualification; historical sidecar tests |
+| [Quality Guidelines](./quality-guidelines.md) | Current Native functional checks, Kotoba quality boundary, historical sidecar tests |
 | [Directory Structure](./directory-structure.md) | Historical sidecar `server.py`, `jobs.py`, `engines/`, schemas/tests |
 | [Engine Plugins](./engine-plugins.md) | Historical Python registry, optional engines and Kotoba cache |
 | [API and Jobs](./api-and-jobs.md) | Historical sidecar HTTP/snapshots/diagnostics |

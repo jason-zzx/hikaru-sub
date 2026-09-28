@@ -44,17 +44,6 @@ function Assert-FileIdentity {
   }
 }
 
-function Assert-FileSha256 {
-  param([string]$Path, [string]$Sha256, [string]$Label)
-  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-    throw "$Label is missing: $Path"
-  }
-  $actualHash = Get-Sha256 $Path
-  if ($actualHash -ne $Sha256) {
-    throw "$Label SHA-256 mismatch: $actualHash"
-  }
-}
-
 function Assert-NoPrivateBuildPath {
   param([string]$Path, [string]$Label)
   $bytes = [System.IO.File]::ReadAllBytes($Path)
@@ -107,10 +96,7 @@ function Import-VisualStudioEnvironment {
   return $vsRoot
 }
 
-function Assert-Toolchain([string]$VsRoot) {
-  if ((Split-Path $VsRoot -Leaf) -ne "Community" -or $env:VSCMD_VER -ne $lock.toolchain.visualStudioVersion) {
-    throw "Visual Studio identity drifted: root=$VsRoot version=$env:VSCMD_VER"
-  }
+function Get-Toolchain([string]$VsRoot) {
   $cmake = Join-Path $VsRoot "Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
   $ninja = Join-Path $VsRoot "Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe"
   if (-not (Test-Path -LiteralPath $cmake) -or -not (Test-Path -LiteralPath $ninja)) {
@@ -118,41 +104,7 @@ function Assert-Toolchain([string]$VsRoot) {
   }
   $env:Path = "$(Split-Path $cmake);$(Split-Path $ninja);$env:Path"
 
-  $clOutput = (& cl 2>&1 | Out-String)
-  if ($clOutput -notmatch "19\.50\.35722") {
-    throw "MSVC compiler identity drifted: $clOutput"
-  }
-  if ($env:VCToolsVersion.TrimEnd("\") -ne $lock.toolchain.msvcToolsVersion) {
-    throw "MSVC tools version drifted: $env:VCToolsVersion"
-  }
-  if ($env:WindowsSDKVersion.TrimEnd("\") -ne $lock.toolchain.windowsSdkVersion) {
-    throw "Windows SDK version drifted: $env:WindowsSDKVersion"
-  }
-  $cmakeVersion = (& $cmake --version | Select-Object -First 1) -replace "^cmake version ", ""
-  if ($cmakeVersion -ne $lock.toolchain.cmakeVersion) {
-    throw "CMake version drifted: $cmakeVersion"
-  }
-  $ninjaVersion = (& $ninja --version).Trim()
-  if ($ninjaVersion -ne $lock.toolchain.ninjaVersion) {
-    throw "Ninja version drifted: $ninjaVersion"
-  }
-  $rust = & rustc -Vv
-  $rustRelease = (($rust | Where-Object { $_ -like "release:*" }) -split ":", 2)[1].Trim()
-  $rustCommit = (($rust | Where-Object { $_ -like "commit-hash:*" }) -split ":", 2)[1].Trim()
-  if ($rustRelease -ne $lock.toolchain.rustcVersion -or $rustCommit -ne $lock.toolchain.rustcCommit) {
-    throw "Rust toolchain identity drifted: release=$rustRelease commit=$rustCommit"
-  }
-  $cargoVersion = ((& cargo --version) -split ' ')[1]
-  if ($cargoVersion -ne $lock.toolchain.cargoVersion) {
-    throw "Cargo version drifted: $cargoVersion"
-  }
-  $nodeVersion = (& node --version).Trim().TrimStart("v")
-  if ($nodeVersion -ne $lock.toolchain.nodeVersion) {
-    throw "Node version drifted: $nodeVersion"
-  }
-  if ($PSVersionTable.PSVersion.ToString() -ne $lock.toolchain.powershellVersion) {
-    throw "PowerShell version drifted: $($PSVersionTable.PSVersion)"
-  }
+  Write-Host "Using Visual Studio $env:VSCMD_VER, MSVC $env:VCToolsVersion, SDK $env:WindowsSDKVersion, $(& $cmake --version | Select-Object -First 1), Ninja $(& $ninja --version), $(& rustc --version), $(& cargo --version), $(& node --version), PowerShell $($PSVersionTable.PSVersion)"
   return @{ cmake = $cmake; ninja = $ninja }
 }
 
@@ -301,16 +253,12 @@ if ($IsWindows -ne $true) {
 }
 
 $vsRoot = Import-VisualStudioEnvironment
-$tools = Assert-Toolchain $vsRoot
+$tools = Get-Toolchain $vsRoot
 Invoke-Checked "node.exe" @(
   (Join-Path $repoRoot "scripts/verify-native-asr-runtime.mjs"),
   "--lock", $lockPath,
   "--lock-only"
 )
-Assert-FileIdentity (Join-Path $repoRoot "native-asr/tokenizer-ffi/Cargo.lock") $lock.sources.tokenizer.cargoLockSizeBytes $lock.sources.tokenizer.cargoLockSha256 "tokenizer Cargo.lock"
-Assert-FileSha256 (Join-Path $repoRoot "native-asr/third_party/nlohmann/provenance.json") $lock.sources.nlohmannJson.provenanceSha256 "nlohmann/json provenance"
-Assert-FileSha256 (Join-Path $repoRoot "native-asr/third_party/nlohmann/json.hpp") $lock.sources.nlohmannJson.headerSha256 "nlohmann/json header"
-Assert-FileSha256 (Join-Path $repoRoot "native-asr/third_party/nlohmann/LICENSE.MIT") $lock.sources.nlohmannJson.licenseSha256 "nlohmann/json license"
 $msRuntimeLicense = Get-LockedArchive $lock.sources.microsoftVisualCppRuntimeLicense
 
 if (-not $Resume) {
@@ -345,7 +293,6 @@ if (-not $Resume) {
   Move-Item -LiteralPath $cpuFeaturesSource -Destination (Join-Path $ct2Source "third_party/cpu_features")
   Move-Item -LiteralPath $spdlogSource -Destination (Join-Path $ct2Source "third_party/spdlog")
 }
-Assert-FileIdentity (Join-Path $pocketfftSource "pocketfft_hdronly.h") 120735 $lock.sources.pocketfft.headerSha256 "pocketfft header"
 
 $nativeBuild = Join-Path $buildRoot "native-asr"
 $configureArgs = @(

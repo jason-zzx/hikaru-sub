@@ -440,13 +440,10 @@ void run_tests(
     const auto& detail = error.result_failure();
     check(error.code() == "crispasr_result_invalid" && detail.has_value(),
           "zero-duration result did not retain structured failure detail");
-    const std::string trace = "segmentIndex=0\nlocalStartMs=2160\nlocalEndMs=2160"
-        "\nwindowDurationMs=1000";
     check(detail->subtype == "zero_duration_top_level_result"
               && detail->segment_index == 0
               && detail->local_start_ms == 2160
-              && detail->local_end_ms == 2160
-              && detail->result_trace_sha256 == sha256_text(trace),
+              && detail->local_end_ms == 2160,
           "zero-duration result fingerprint drifted");
   }
   check_counts(counters, {1, 1, 1, 1, 0, 0, 1, 1, 1, 1}, "zero-duration result");

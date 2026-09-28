@@ -69,20 +69,13 @@ def package(args):
         engines.append('reazonspeech-nemo')
     # Fresh output preserves every prior runtime/evidence byte.
     args.output.mkdir(parents=True, exist_ok=False)
-    source_files = [{'path': p.relative_to(args.source).as_posix(), **identity(p)}
-                    for p in sorted(args.source.rglob('*')) if p.is_file()]
     source = {'repository': 'CrispStrobe/CrispASR', 'commit': 'e2a356146e36bc1cc0410edefb01990448766979',
               'ggmlCommit': '5049ebb8472fdc965eb3fb72c1cb111260726186',
-              'c2paCommit': 'e40329b83f16f67bb5ddc7bb13ae18de0a9376fc',
-              'preparedFilesSha256': hashlib.sha256(json.dumps(source_files, sort_keys=True).encode()).hexdigest(),
-              'adaptations': [{'path': p.name, **identity(p)} for p in sorted(Path(__file__).parent.iterdir())
-                              if p.suffix in ('.py', '.h', '.cmake', '.cmd')]}
-    write_json(args.output / 'source-identities.json', source_files)
+              'c2paCommit': 'e40329b83f16f67bb5ddc7bb13ae18de0a9376fc'}
     lock = {'schemaVersion': 1, 'status': 'qwen-application-enabled-owner-manual-verification-pending',
             'productEnablementAllowed': True, 'externalStableAssetPublished': False}
     if candidate:
-        lock.update(status='local-shared-candidate-not-published', candidateId=candidate,
-                    acquisitionLock=identity(acquisition_path))
+        lock.update(status='local-shared-candidate-not-published', candidateId=candidate)
     for device in ('cpu', 'cuda'):
         build = getattr(args, device + '_build')
         worker = getattr(args, device + '_worker')
@@ -156,7 +149,7 @@ def package(args):
             files.append({'path':f.relative_to(root).as_posix(),**identity(f)})
         manifest={'schemaVersion':1,'artifactId':f'hikaru-asr-crispasr-windows-x64-{device}-{candidate or "v1"}','platform':'windows-x64','arch':'x64','protocolVersion':1,
                   'capabilities':{'backend':'crispasr','device':device,'engines':engines,'vad':True,'crispasr':True,'cuda':device=='cuda','vulkan':False,'modelsBundled':False},
-                  'source':source,'build':{'target':'crispasr-cli','cmakeCacheSha256':identity(build/'CMakeCache.txt')['sha256'],
+                  'source':source,'build':{'target':'crispasr-cli',
                     'cudaArchitectures': '50-virtual;61-virtual;70-virtual;75-virtual;80-virtual;86-real;89-real;90-virtual;120a-real' if device=='cuda' else None,
                     'cudaToolchain':'CUDA 12.8 + MSVC 14.50 -allow-unsupported-compiler; locally tested, not vendor-supported toolchain' if device=='cuda' else None},'files':files}
         write_json(root/'runtime-manifest.json',manifest)

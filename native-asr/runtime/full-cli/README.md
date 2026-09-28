@@ -66,18 +66,15 @@ download/upload, compilation or packaging is part of this closure.
   a newly released app or evidence of later installer interaction. Only RTX3070 was
   tested; manual installation/uninstallation and release readiness remain separate.
 
-Stable build/model metadata authority: `upstream-engineering-baseline-lock.json`
-in this directory. `prepare.py`, `package.py`, and `smoke.py` consume this same
-relocated file, independent of any active or archived Trellis task. Its original
-**10,312 bytes**, **236 CRLF lines**, SHA-256
-`4fd2ffdd79f553005551308d5f7f8cdef3e155dca96feca4c240ee8f57fef28a`
-and acquisition-time verification flags are unchanged, not relabeled.
+`upstream-engineering-baseline-lock.json` supplies verified external source archives
+and model attribution to `prepare.py` and `package.py`. Local smoke runs do not
+require this file's byte layout, source-file hashes or any frozen runner identity.
 The historical Qwen task retains `research/upstream-rebuild-sources.json` and
 `research/upstream-rebuild-research.md` as source rationale, not build inputs. The unused trimmed
 target and abandoned experiments are retired. The old Qwen development timeline
 library/table/dedicated tests are also retired as a unit; the generic development
-worker retains its original structured-failure seam. Current full-CLI code/tests,
-shared backend ABI and sibling development targets remain unchanged.
+worker retains its original structured-failure seam. Current full-CLI smoke and packaging scripts no longer use intermediate evidence hashes;
+the shared backend ABI and sibling development targets remain available.
 
 ## Pinned source and redistribution
 
@@ -110,8 +107,10 @@ shared backend ABI and sibling development targets remain unchanged.
 ## Build and focused reproduction commands
 
 These are retained engineering commands, **not cleanup actions or authorization to
-rerun models**. Use an x64 Visual Studio Developer prompt (VS18.2/MSVC14.50.35717,
-SDK10.0.26100, VS CMake/Ninja, installed CUDA12.8 in the accepted environment).
+rerun models**. Use an x64 Visual Studio Developer prompt with CMake/Ninja and a compatible
+compiler/SDK. CUDA builds additionally need the supported toolkit and a compatible
+host compiler (the locally tested CUDA12.8/MSVC19.50 pairing required
+`-allow-unsupported-compiler`; this does not establish vendor support).
 
 Run from the repository root. `LOCAL` is the fixed ignored
 `native-asr/build/full-cli/` scratch root shared by prepare and smoke.
@@ -137,15 +136,15 @@ python native-asr/runtime/full-cli/smoke.py --device cpu --name cpu-new --asr "%
 python native-asr/runtime/full-cli/smoke.py --device cuda --name cuda-new --cuda-bin "%CUDA_ROOT%/bin" --asr "%ASR%" --aligner "%ALIGNER%" --vad "%VAD%" --audio "%SHORT_WAV%"
 ```
 
-Run serially and stop on any nonzero exit. Each run name must be new. Models/audio
-may alternatively resolve from ignored `LOCAL/models-verified.json`/`LOCAL/audio-verified.json`;
-all actual hashes are checked. Short input is the authorized mono PCM16/16kHz,
-385637-frame WAV SHA `4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211`.
+Run serially and stop on any nonzero exit. Use a fresh run name for distinct local outputs. Models/audio
+may alternatively resolve paths from ignored `LOCAL/models-verified.json`/`LOCAL/audio-verified.json`.
+The smoke checks existing files and mono PCM16/16kHz audio of at most 30 seconds;
+it does not rehash local model weights or require a particular WAV byte identity.
 No reference ASS is read. `--unicode-paths` exercises Chinese/spaced hardlink paths;
 `--case silence|missing-vad|invalid-vad|missing-asr|missing-aligner|auto-asr|auto-aligner|auto-vad|missing-cuda`
 selects focused real CLI cases (`missing-cuda` requires CUDA). These are not mocks.
 `git unknown` in the archive-built banner avoids claiming the application HEAD as
-upstream version; the source lock is authority.
+upstream version; the verified upstream source revision identifies the source.
 
 ## Adaptation and regression boundaries
 
@@ -178,7 +177,7 @@ availability switch. Outside it, ordinary upstream behavior remains.
   endpoints and ordered text; generic protocol validation remains unchanged.
   See `.trellis/spec/asr/qwen-cli-output.md` and `native-asr/docs/protocol-v1.md`.
 - Smoke uses the shared scratch mutex/process inventory, suspended Job assignment before resume,
-  restricted PATH, module/hash checks and bounded private diagnostics. It does
+  restricted PATH, module path checks and bounded private diagnostics. It does
   not infer forward progress from arbitrary stderr or kill normal CPU loading
   after a fixed 120s silence. Product host owns cancellation/recovery/reap;
   physical exit and retryable private-file cleanup are distinct.
@@ -224,15 +223,11 @@ actual-audio gap retranscription and display grouping are unchanged.
 
 `parakeet_smoke.py` reuses existing Job/module/inventory helpers, but has its own
 bounded stderr reader, 120-second monotonic stage/completed-slice watchdog,
-restricted environment, case-correct own-root module checks and hash-bound CUDA
-recovery sentinel. A flushed hash-bound CUDA attempt/gate is persisted before
-process creation, shared by the Parakeet and task Qwen callers. Physical reap does
-not imply success: external nonzero exit and interrupted ownership retain the
-blocker. Reconciliation under the task mutex checks PID+creation time, refuses
-live owners/unreaped children and requires identical runtime/model/harness/backend
-short evidence (<=120 seconds after an unfinished attempt). Only the matching gate
-is cleared after durable validated completion; no different live owner is killed.
-Repeated graph/stderr lines do not extend the deadline.
+restricted environment and case-correct own-root module path checks. The task-wide
+nonblocking model mutex and process inventory prevent concurrent runs; the Windows
+Job owns child cleanup. An abnormal exit remains a failed run, but after physical
+cleanup a new run needs no hash-bound CUDA sentinel. Repeated graph/stderr lines
+do not extend the deadline.
 It checks the **actual full-CLI closure**: four CPU DLLs, seven CUDA DLLs, plus
 its statically linked CLI executable; the older six-DLL shared-library assumption
 does not describe this full-CLI layout. Qwen's original `smoke.py` loop is not
@@ -240,7 +235,7 @@ used as the P1 execution watchdog.
 
 P1 local short proof: Parakeet CPU/CUDA each produced 9 legal display rows;
 Qwen shared-candidate CPU/CUDA each produced 8. This remains RTX 3070-only CUDA
-hardware evidence. Later host/ASS evidence above has its own hash-bound lock;
+hardware evidence. Historical host/ASS evidence above used its own lock;
 neither stage establishes final package or release acceptance.
 An initial compiler timeout and original case-sensitive harness failure remain
 retained; neither was relabeled. Accepted review corrections R1–R3 received fresh
@@ -255,27 +250,25 @@ Focused model-free correction checks (new output directories; Developer prompt
 for `check.py`):
 
 ```bat
-python -B native-asr/runtime/full-cli/check.py --source native-asr/build/full-cli/source-parakeet-p1 --output native-asr/build/full-cli/output-check-new
+python -B native-asr/runtime/full-cli/check.py --source native-asr/build/full-cli/source-new --output native-asr/build/full-cli/output-check-new
 python -B native-asr/runtime/full-cli/recovery_check.py --output native-asr/build/full-cli/recovery-check-new
 ```
 
 The encoder regression extracts the complete native function and real fatal
-helper, with allocator/compute data stand-ins. Recovery tests actually terminate
-owned Python fixture processes, never ASR models; fixtures use isolated gates.
+helper, with allocator/compute data stand-ins. Recovery tests terminate task-owned
+Python fixture processes, then verify physical cleanup and a fresh retry; never
+ASR models.
 
-With the task's verified acquisition inputs and locally built/staged CPU/CUDA
-closures present, use a **fresh** lock/run name (never overwrite retained locks):
+With locally built/staged CPU/CUDA closures and existing model inputs, use fresh
+run names and pass the paths directly (no runtime-freeze step):
 
 ```bat
-set "ACQUISITION=.trellis/tasks/09-01-native-asr-parakeet-productization/research/p1-acquisition-lock.json"
-python -B native-asr/runtime/full-cli/parakeet_smoke.py --freeze-runtime --runtime-lock native-asr/build/full-cli/parakeet-runtime-new.json --acquisition-lock "%ACQUISITION%"
-python -B native-asr/runtime/full-cli/parakeet_smoke.py --device cpu --name parakeet-cpu-new --runtime-lock native-asr/build/full-cli/parakeet-runtime-new.json --acquisition-lock "%ACQUISITION%" --audio "%SHORT_WAV%"
-python -B native-asr/runtime/full-cli/parakeet_smoke.py --device cuda --name parakeet-cuda-new --runtime-lock native-asr/build/full-cli/parakeet-runtime-new.json --acquisition-lock "%ACQUISITION%" --audio "%SHORT_WAV%"
+python -B native-asr/runtime/full-cli/parakeet_smoke.py --device cpu --name parakeet-cpu-new --model "%PARAKEET%" --vad "%VAD%" --audio "%SHORT_WAV%"
+python -B native-asr/runtime/full-cli/parakeet_smoke.py --device cuda --name parakeet-cuda-new --model "%PARAKEET%" --vad "%VAD%" --audio "%SHORT_WAV%"
 ```
 
-Run serially and stop on failure. `research/p1_publish.py --check` is the offline
-retained-evidence reproduction/mutation check; it runs no model and publishes no
-transcript, quality score or GPU-inherited qualification label.
+Run serially and stop on failure. The archived `research/p1_publish.py` checked
+historical evidence only; it is not a prerequisite for current builds or smoke runs.
 
 ### Local package input and verification
 
@@ -290,8 +283,7 @@ hashes and `externalStableAssetPublished=false`, never modifies published author
 For local application packaging, set the **build-time only**
 `HIKARU_CRISPASR_CANDIDATE_LOCK` to the absolute generated lock path, then run
 `pnpm release:local`. The existing resource preparer, Rust build embedding and
-portable preparer consume that same input. Unset means the unchanged published
-Qwen lock. The running app reads neither this environment variable nor a mutable
+portable preparer consume that same input. Unset means the unchanged published shared-v3 lock. The running app reads neither this environment variable nor a mutable
 external authority; there is no model-availability override. Current candidate
 builds permit normal Parakeet selection/download/start only through embedded
 CPU-and-CUDA engine support, exact model/VAD readiness and verified per-device
@@ -310,8 +302,9 @@ manual install/uninstall, WebView interaction, all-GPU qualification or publicat
 
 ### Retained local application UI follow-up
 
-The task's `research/local_app_publish.py --check` reproduces hash-bound current
-application/package/source/UI evidence offline. It does not launch inference.
+The archived task's `research/local_app_publish.py --check` reproduces its
+historical application/package/source/UI record offline. It does not launch
+inference or gate current application builds.
 The exact portable executable is retained at ignored `.local/parakeet-app/hikaru-sub.exe`
 (SHA-256 `b516277031322220fb4188bfba4c1be07b87400ff3cefcde0c64fbccbf366788`).
 Both real short UI selections completed and the frontend saved 9 exact ASS rows:

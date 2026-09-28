@@ -1,17 +1,13 @@
 #include "full_cli.hpp"
 #include "qwen_cli.hpp"
 #include "wav_audio.hpp"
-#include <hikaru_asr/qwen_cli_identity.hpp>
 #include <nlohmann/json.hpp>
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <bcrypt.h>
 #include <algorithm>
-#include <array>
 #include <chrono>
-#include <fstream>
 #include <map>
 #include <regex>
 #include <set>
@@ -63,43 +59,21 @@ std::string text(const Json& v) {
   return v.get<std::string>();
 }
 
-// Pin each ancestor against rename/reparse replacement for the complete child
-// lifetime. File handles deny writes/deletion while the CLI reads exact inputs.
 namespace {
-class PinnedPaths {
- public:
-  ~PinnedPaths() { for (HANDLE h : handles_) CloseHandle(h); }
-  void add(const fs::path& path, bool directory = false) {
-    require(path.is_absolute(), "qwen_cli_path_not_absolute");
-    for (const auto& part : path) {
-      require(part != L"." && part != L"..", "qwen_cli_path_invalid");
-    }
-    // parent_path preserves extended Windows roots; joining relative_path's
-    // drive component with /= would silently discard the extended prefix.
-    std::vector<fs::path> ancestors;
-    for (auto at = path; at != at.root_path(); at = at.parent_path()) {
-      const auto spelling = at.wstring();
-      if (spelling.size() == 6 && spelling.rfind(L"\\\\?\\", 0) == 0 && spelling[5] == L':') break;
-      ancestors.push_back(at);
-    }
-    std::reverse(ancestors.begin(), ancestors.end());
-    for (const auto& at : ancestors) {
-      const bool dir = at != path || directory;
-      HANDLE h = CreateFileW(at.c_str(), dir ? FILE_READ_ATTRIBUTES : GENERIC_READ,
-          dir ? FILE_SHARE_READ | FILE_SHARE_WRITE : FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-          FILE_FLAG_OPEN_REPARSE_POINT | (dir ? FILE_FLAG_BACKUP_SEMANTICS : 0), nullptr);
-      require(h != INVALID_HANDLE_VALUE, "qwen_cli_path_open_failed");
-      handles_.push_back(h);
-      BY_HANDLE_FILE_INFORMATION info{};
-      require(GetFileInformationByHandle(h, &info)
-          && !(info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
-          && bool(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == dir,
-          "qwen_cli_path_attributes_invalid");
-    }
+void check_path(const fs::path& path, bool directory = false) {
+  require(path.is_absolute(), "qwen_cli_path_not_absolute");
+  for (const auto& part : path) require(part != L"." && part != L"..", "qwen_cli_path_invalid");
+  // Preserve the existing path-type boundary without retaining handles during inference.
+  for (auto at = path; at != at.root_path(); at = at.parent_path()) {
+    const auto spelling = at.wstring();
+    if (spelling.size() == 6 && spelling.rfind(L"\\\\?\\", 0) == 0 && spelling[5] == L':') break;
+    const auto attributes = GetFileAttributesW(at.c_str());
+    require(attributes != INVALID_FILE_ATTRIBUTES, "qwen_cli_path_open_failed");
+    require(!(attributes & FILE_ATTRIBUTE_REPARSE_POINT)
+        && bool(attributes & FILE_ATTRIBUTE_DIRECTORY) == (at != path || directory),
+        "qwen_cli_path_attributes_invalid");
   }
- private:
-  std::vector<HANDLE> handles_;
-};
+}
 std::wstring quote(const std::wstring& arg) {
   std::wstring out = L"\"";
   std::size_t slashes = 0;
@@ -118,37 +92,6 @@ fs::path executable_root() {
   require(n && n < value.size(), "qwen_cli_runtime_invalid");
   value.resize(n);
   return fs::path(value).parent_path();
-}
-void verify_cli(const fs::path& path) {
-#ifndef HIKARU_QWEN_CLI_FIXTURE
-  require(fs::file_size(path) == qwen_cli::identity::size_bytes, "qwen_cli_runtime_invalid");
-  BCRYPT_ALG_HANDLE algorithm = nullptr;
-  BCRYPT_HASH_HANDLE hash = nullptr;
-  require(BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) == 0,
-          "qwen_cli_runtime_invalid");
-  struct Cleanup {
-    BCRYPT_ALG_HANDLE& a; BCRYPT_HASH_HANDLE& h;
-    ~Cleanup() { if (h) BCryptDestroyHash(h); if (a) BCryptCloseAlgorithmProvider(a, 0); }
-  } cleanup{algorithm, hash};
-  require(BCryptCreateHash(algorithm, &hash, nullptr, 0, nullptr, 0, 0) == 0,
-          "qwen_cli_runtime_invalid");
-  std::ifstream input(path, std::ios::binary);
-  std::array<char, 65536> buffer{};
-  while (input) {
-    input.read(buffer.data(), buffer.size());
-    require(BCryptHashData(hash, reinterpret_cast<PUCHAR>(buffer.data()),
-                          static_cast<ULONG>(input.gcount()), 0) == 0, "qwen_cli_runtime_invalid");
-  }
-  require(input.eof(), "qwen_cli_runtime_invalid");
-  std::array<unsigned char, 32> digest{};
-  require(BCryptFinishHash(hash, digest.data(), static_cast<ULONG>(digest.size()), 0) == 0,
-          "qwen_cli_runtime_invalid");
-  std::string hex;
-  for (auto c : digest) { hex += "0123456789abcdef"[c >> 4]; hex += "0123456789abcdef"[c & 15]; }
-  require(hex == qwen_cli::identity::sha256, "qwen_cli_runtime_invalid");
-#else
-  (void)path;  // Only the separate fixture target accepts its tiny fake CLI.
-#endif
 }
 struct Execution {
   bool error = false, vad = false, cpu_cuda = false, tdt = false, rnnt = false;
@@ -227,20 +170,19 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
   }), "qwen_cli_path_invalid");
   std::map<ModelRole, fs::path> models;
-  PinnedPaths pins;
   for (const auto& model : request.model_paths) {
-    const fs::path path(wide(model.path)); pins.add(path); models.emplace(model.role, path);
+    const fs::path path(wide(model.path)); check_path(path); models.emplace(model.role, path);
   }
   require(models.size() == request.model_paths.size() && models.count(ModelRole::Model)
       && models.count(ModelRole::Aligner) == (parakeet_family ? 0 : 1) && models.count(ModelRole::Vad), "qwen_cli_request_invalid");
-  const fs::path audio(wide(request.audio_path)); pins.add(audio);
+  const fs::path audio(wide(request.audio_path)); check_path(audio);
 
   const fs::path work = audio.parent_path() / "asr-jobs" / (request.job_id + "-cli");
-  pins.add(work, true);
+  check_path(work, true);
   require(fs::is_empty(work), "qwen_cli_work_not_empty");
-  const fs::path cli = executable_root() / "crispasr.exe"; pins.add(cli); verify_cli(cli);
+  const fs::path cli = executable_root() / "crispasr.exe"; check_path(cli);
   // CreateProcessW limits lpCurrentDirectory even with extended spelling. The
-  // verified CLI root is already first in DLL search order; a writable workspace
+  // CLI root is already first in DLL search order; a writable workspace
   // ancestor would add an unsafe search directory. Never relocate private data.
   const auto cwd = work.wstring().size() < MAX_PATH ? work : cli.parent_path();
   require(cwd.wstring().size() < MAX_PATH, "qwen_cli_path_invalid");
@@ -270,7 +212,7 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
   require(GetSystemDirectoryW(system, 32768) != 0, "qwen_cli_runtime_invalid");
   const auto root = fs::path(system).parent_path().wstring();
   // No inherited PATH, model cache, loader or device knobs. All non-system DLLs
-  // must be beside the pinned CLI; final artifact closure remains packaging's job.
+  // must be beside the CLI; the host verifies the distributed file set.
   const std::map<std::wstring, std::wstring> env = {
       {parakeet ? L"HIKARU_PARAKEET_DEVICE" : reazonspeech ? L"HIKARU_REAZONSPEECH_DEVICE" : L"HIKARU_QWEN_DEVICE", wide(to_string(request.device))},
       {L"PATH", cli.parent_path().wstring() + L";" + system},
@@ -287,7 +229,7 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
                           &security, OPEN_EXISTING, 0, nullptr));
   require(null.value != INVALID_HANDLE_VALUE, "qwen_cli_process_failed");
   // Only these handles cross the boundary, never protocol stdout or job handles.
-  // Relative audio is derived from and checked against the exact pinned request.
+  // Relative audio is derived from and checked against the canonical request.
   // This avoids miniaudio's extended-path failure without changing the decoder.
   // Controlled-mode CLI decoding fails before any alternate decoder/subprocess.
   SIZE_T size = 0;

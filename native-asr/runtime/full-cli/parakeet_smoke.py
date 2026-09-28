@@ -1,7 +1,6 @@
-"""Serial P1 full-CLI proof; no quality scoring or production dependency.
+"""Serial local full-CLI smoke; no quality scoring or production dependency.
 
-Uses the existing Windows Job/module/mutex helpers, not the unbounded legacy
-Qwen stderr loop. Freeze both local runtime closures before the first run.
+Uses the existing Windows Job/module/mutex helpers and a bounded progress loop.
 """
 import argparse
 import ctypes as c
@@ -17,24 +16,18 @@ import threading
 import time
 import wave
 
-from prepare import LOCAL, REPO, LOCK, verify
-from smoke import Job, identity, inventory, loaded_modules
+from prepare import LOCAL, REPO
+from smoke import Job, inventory, loaded_modules
 from validate import require, validate
 
-RUNTIME_LOCK = LOCAL / 'parakeet-runtime-lock.json'
 DLLS = ['msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'vcomp140.dll']
 CUDA_DLLS = ['cudart64_12.dll', 'cublas64_12.dll', 'cublasLt64_12.dll']
-SHORT_SHA = '4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211'
 
 
 def write(path, data):
-    # Same-volume atomic, flushed state: an interrupted runner must leave either
-    # the old blocker or the complete new one, never a truncated success record.
+    # Fixture and diagnostics readers may observe this file while the worker runs.
     temp = path.with_name(path.name + '.tmp')
-    with temp.open('w', encoding='utf-8', newline='\n') as stream:
-        stream.write(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
-        stream.flush()
-        os.fsync(stream.fileno())
+    temp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     os.replace(temp, path)
 
 
@@ -64,87 +57,11 @@ def process_stamp(pid):
         kernel.CloseHandle(handle)
 
 
-def begin_cuda(out, device, binding, command, env):
-    """Called only under model.lock, BEFORE even suspended process creation.
-
-    One task-wide blocker covers both callers. An unfinished owner is unscored,
-    even if its process physically exited. Never kill a different/live owner.
-    """
-    for old in ['parakeet-cuda-recovery-required.json', 'qwen-cuda-recovery-required.json']:
-        require(not (LOCAL / old).exists(), 'legacy_cuda_recovery_required')
-    gate = LOCAL / 'cuda-ownership.json'
-    previous = None
-    if gate.exists():
-        previous = json.loads(gate.read_bytes())
-        path = (LOCAL / previous['attempt']).resolve()
-        require(path.is_relative_to(LOCAL.resolve()) and path.name == 'cuda-attempt.json', 'recovery_path')
-        verify(path, previous['identity'])
-        pending = json.loads(path.read_bytes())
-        owner = pending['owner']
-        require(process_stamp(owner['pid']) != owner['created'], 'cuda_owner_still_live')
-        record_path = path.parent / 'ownership.json'
-        if record_path.exists():
-            record = json.loads(record_path.read_bytes())
-            if 'pid' in record:
-                live = process_stamp(record['pid'])
-                require(live is None or live != record['pidCreated'], 'cuda_process_unreaped')
-        require(device == 'cuda' and pending['binding'] == binding, 'cuda_recovery_identity_drift')
-        write(out / 'cuda-reconciliation.json', {'unfinished': previous,
-              'ownership': identity(record_path) if record_path.exists() else None,
-              'ownerExitConfirmed': True, 'disposition': 'unfinished-unscored'})
-    if device != 'cuda':
-        return None
-    require(binding['backend'] in ('parakeet', 'qwen3') and binding['audio']['sha256'] == SHORT_SHA,
-            'cuda_short_binding')
-    attempt = {'binding': binding, 'owner': {'pid': os.getpid(), 'created': process_stamp(os.getpid())},
-               'argv': command, 'environment': env, 'recoveryOf': previous}
-    path = out / 'cuda-attempt.json'
-    require(not path.exists(), 'cuda_attempt_exists')
-    write(path, attempt)
-    pointer = {'attempt': path.relative_to(LOCAL).as_posix(), 'identity': identity(path)}
-    write(gate, pointer)
-    return pointer
-
-
-def complete_cuda(out, summary):
-    """Clear only this hash-bound attempt after output/module AND physical proof."""
-    if summary['device'] != 'cuda':
-        return
-    gate = LOCAL / 'cuda-ownership.json'
-    path = out / 'cuda-attempt.json'
-    pointer = {'attempt': path.relative_to(LOCAL).as_posix(), 'identity': identity(path)}
-    require(json.loads(gate.read_bytes()) == pointer, 'cuda_blocker_changed')
-    attempt = json.loads(path.read_bytes())
-    record = json.loads((out / 'ownership.json').read_bytes())
-    require(summary['status'] == 'passed' and summary['backend'] == attempt['binding']['backend']
-            and summary['runtimeLock'] == attempt['binding']['runtimeLock']
-            and record['cudaAttempt'] == pointer and record['exitCode'] == 0
-            and record['outcome'] == 'exited-zero' and record['processExitConfirmed']
-            and record['activeJobProcesses'] == 0, 'cuda_completion_invalid')
-    if attempt['recoveryOf'] is not None:
-        require(record['elapsedSeconds'] <= 120, 'cuda_recovery_sentinel_deadline')
-    # Publish the proof before unlink, so interruption never removes the only
-    # evidence of a verified sentinel. A crash before unlink stays conservative.
-    write(out / 'cuda-completion.json', {'attempt': pointer, 'recoveryOf': attempt['recoveryOf'],
-          'summary': summary, 'evidence': {p.name: identity(p) for p in sorted(out.iterdir()) if p.is_file()}})
-    require(json.loads(gate.read_bytes()) == pointer, 'cuda_blocker_changed')
-    gate.unlink()
-
-
-def runtime_identity(device):
-    root = LOCAL / device / 'bin'
-    names = ['crispasr.exe'] + DLLS + (CUDA_DLLS if device == 'cuda' else [])
-    require(sorted(p.name for p in root.glob('*.dll')) == sorted(names[1:]), 'runtime_closure')
-    return {'files': {name: identity(root / name) for name in names},
-            'cmakeCache': identity(LOCAL / device / 'CMakeCache.txt')}
-
-
 def verify_loaded_runtime(modules, root, files):
-    # Windows loader spelling is case-insensitive (e.g. VCOMP140.DLL). Compare
-    # canonical Windows paths, not strings, while retaining exact byte hashes.
-    canonical = {Path(path).resolve(): row for path, row in modules.items()}
-    for name, row in files.items():
-        require(canonical.get((root / name).resolve()) == row, 'runtime_module_missing_or_drift')
+    # Windows loader spelling is case-insensitive (e.g. VCOMP140.DLL).
+    canonical = {os.path.normcase(str(Path(path).resolve())) for path in modules}
+    for name in files:
+        require(os.path.normcase(str((root / name).resolve())) in canonical, 'runtime_module_missing')
 
 
 class Progress:
@@ -173,12 +90,11 @@ class Progress:
         return False
 
 
-def execute(command, env, out, device, binding):
+def execute(command, env, out, device):
     """Suspend→assign Job→resume; bounded diagnostics and real no-progress deadline."""
-    attempt = begin_cuda(out, device, binding, command, env)
     job, process = Job(), None
-    record = {'argv': command, 'environment': env, 'state': 'starting', 'ownerPid': os.getpid(),
-              'cudaAttempt': attempt, 'outcome': 'unfinished'}
+    record = {'argv': command, 'state': 'starting', 'ownerPid': os.getpid(),
+              'outcome': 'unfinished'}
     write(out / 'ownership.json', record)
     checkpoints, failure = {}, None
     started = time.monotonic()
@@ -272,60 +188,32 @@ def execute(command, env, out, device, binding):
         record['elapsedSeconds'] = round(time.monotonic() - started, 3)
         write(out / 'ownership.json', record)
         write(out / 'loaded-modules.json', checkpoints)
-        paths = sorted({p for values in checkpoints.values() for p in values})
-        write(out / 'loaded-module-identities.json', {p: identity(Path(p)) for p in paths})
     return record, failure
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--freeze-runtime', action='store_true')
-    parser.add_argument('--runtime-lock', type=Path, default=RUNTIME_LOCK)
-    parser.add_argument('--device', choices=['cpu', 'cuda'])
-    parser.add_argument('--name')
-    parser.add_argument('--acquisition-lock', type=Path, required=True)
-    parser.add_argument('--audio', type=Path)
+    parser.add_argument('--device', choices=['cpu', 'cuda'], required=True)
+    parser.add_argument('--name', required=True)
+    parser.add_argument('--model', type=Path, required=True)
+    parser.add_argument('--vad', type=Path, required=True)
+    parser.add_argument('--audio', type=Path, required=True)
     args = parser.parse_args()
-    runtime_lock = args.runtime_lock.resolve()
-    require(runtime_lock.is_relative_to(LOCAL.resolve()), 'runtime_lock_outside_scratch')
-    lock = json.loads(args.acquisition_lock.read_bytes())
-    require(lock['model']['logicalModel'] == 'nvidia/parakeet-tdt_ctc-0.6b-ja', 'logical_model')
-    if args.freeze_runtime:
-        source = LOCAL / 'source-parakeet-p1'
-        sources = {p.relative_to(source).as_posix(): identity(p) for p in sorted(source.rglob('*')) if p.is_file()}
-        write(LOCAL / 'parakeet-source-files.json', sources)
-        for name, target in [('hikaru_qwen_device.h', 'src/core/hikaru_qwen_device.h'),
-                             ('hikaru_cuda_probe.h', 'examples/cli/hikaru_cuda_probe.h')]:
-            require(identity(Path(__file__).parent / name) == sources[target], 'source_header_drift')
-        value = {'sourceLock': identity(LOCK), 'acquisitionLock': identity(args.acquisition_lock),
-                 'preparedSources': identity(LOCAL / 'parakeet-source-files.json'),
-                 'devices': {d: runtime_identity(d) for d in ['cpu', 'cuda']},
-                 'adaptations': {p.name: identity(p) for p in sorted(Path(__file__).parent.iterdir())
-                                 if p.suffix in ['.py', '.h', '.cmd', '.cmake', '.cpp']}}
-        require(not runtime_lock.exists(), 'runtime_lock_already_exists')
-        write(runtime_lock, value)
-        print('PASS: local runtime identity frozen; no product/publication authority')
-        return
-    require(args.device and args.name and args.audio, 'run_inputs')
     require(args.name.isascii() and all(x.isalnum() or x in '-_' for x in args.name), 'run_name')
     out = LOCAL / args.name
     subprocess.run(['git', 'check-ignore', '--quiet', str(out)], cwd=REPO, check=True)
     out.mkdir(exist_ok=False)
-    frozen = json.loads(runtime_lock.read_bytes())
-    require(frozen['acquisitionLock'] == identity(args.acquisition_lock), 'acquisition_lock_drift')
-    require(frozen['preparedSources'] == identity(LOCAL / 'parakeet-source-files.json'), 'source_manifest_drift')
-    require(frozen['devices'][args.device] == runtime_identity(args.device), 'runtime_drift')
-    for name, row in frozen['adaptations'].items():
-        verify(Path(__file__).parent / name, row)
-    inputs = {role: LOCAL / 'acquisition' / lock[role]['file'] for role in ['model', 'vad']}
-    for role, path in inputs.items():
-        verify(path, lock[role])
+    inputs = {'model': args.model.resolve(), 'vad': args.vad.resolve()}
     audio = args.audio.resolve()
-    require(identity(audio)['sha256'] == SHORT_SHA, 'short_audio_identity')
-    with wave.open(str(audio)) as wav:
-        require((wav.getnchannels(), wav.getsampwidth(), wav.getframerate(), wav.getnframes()) == (1, 2, 16000, 385637), 'audio_shape')
-        duration = wav.getnframes() * 1000 // wav.getframerate()
     exe = (LOCAL / args.device / 'bin/crispasr.exe').resolve()
+    root = exe.parent
+    names = ['crispasr.exe'] + DLLS + (CUDA_DLLS if args.device == 'cuda' else [])
+    require(exe.is_file() and all(path.is_file() for path in inputs.values()), 'missing_model_or_cli')
+    require(sorted(p.name.lower() for p in root.glob('*.dll')) == sorted(n.lower() for n in names[1:]), 'runtime_closure')
+    with wave.open(str(audio)) as wav:
+        require((wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) == (1, 2, 16000), 'audio_shape')
+        duration = wav.getnframes() * 1000 // wav.getframerate()
+        require(0 < duration <= 30000, 'short_audio_duration')
     command = [str(exe), '--backend', 'parakeet', '-m', str(inputs['model'].resolve()), '--vad',
                '-vm', str(inputs['vad'].resolve()), '--strict-pipeline', '--require-vad', '--require-word-timestamps',
                '-l', 'ja', '--split-on-punct', '-ojf', '-of', str((out / 'result').resolve()), '-f', os.path.relpath(audio, out),
@@ -344,30 +232,23 @@ def main():
             before = inventory()
             write(out / 'process-before.json', before)
             require(not before, 'model_process_already_running')
-            input_record = {'runtimeLock': identity(runtime_lock), 'acquisitionLock': identity(args.acquisition_lock),
-                            'audio': identity(audio), 'models': {r: identity(p) for r, p in inputs.items()}}
-            write(out / 'inputs.json', input_record)
-            binding = {**input_record, 'backend': 'parakeet', 'tool': identity(Path(__file__))}
-            record, error = execute(command, env, out, args.device, binding)
+            record, error = execute(command, env, out, args.device)
             after = inventory()
             write(out / 'process-after.json', after)
-            summary = {'device': args.device, 'backend': 'parakeet', 'case': 'short-v1', 'status': 'failed',
-                       'runtimeLock': identity(runtime_lock), 'inputs': identity(out / 'inputs.json'),
-                       'ownership': identity(out / 'ownership.json'), 'elapsedSeconds': record['elapsedSeconds']}
+            summary = {'device': args.device, 'backend': 'parakeet', 'case': 'short', 'status': 'failed',
+                       'elapsedSeconds': record['elapsedSeconds']}
             try:
                 require(not error and record.get('exitCode') == 0, 'cli_failed')
                 require(not after and record.get('activeJobProcesses') == 0 and record.get('processExitConfirmed'), 'reap_failed')
                 raw = (out / 'result.json').read_bytes()
                 stderr = (out / 'stderr.log').read_bytes()
                 summary['validation'] = validate(raw, duration, stderr, args.device, backend='parakeet')
-                modules = json.loads((out / 'loaded-module-identities.json').read_bytes())
-                verify_loaded_runtime(modules, exe.parent, frozen['devices'][args.device]['files'])
+                modules = {p for paths in json.loads((out / 'loaded-modules.json').read_bytes()).values() for p in paths}
+                verify_loaded_runtime(modules, root, names)
                 summary['status'] = 'passed'
-                complete_cuda(out, summary)
             except (ValueError, KeyError, TypeError, OSError) as exc:
                 summary['status'] = 'failed'
                 summary['error'] = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
-            summary['rawEvidence'] = {p.name: identity(p) for p in sorted(out.iterdir()) if p.is_file()}
             write(out / 'summary.json', summary)
             print(json.dumps(summary))
             return 0 if summary['status'] == 'passed' else 1

@@ -62,8 +62,8 @@ with tempfile.TemporaryDirectory(prefix='hikaru-cli-path-') as temp:
                 assert events[0]['durationMs'] == 3000 and len(events[1]['segments']) == 1
                 result = work / 'result.json'
                 assert json.loads(result.read_bytes())['crispasr']['backend'] == ('qwen3' if engine == 'qwen3-asr' else 'parakeet')
-                # Standalone worker leaves deletion to its host. Prove all pins /
-                # child I/O handles have closed and the original result is removable.
+                # Standalone worker leaves deletion to its host. Prove child I/O
+                # handles have closed and the original result is removable.
                 result.unlink()
                 work.rmdir()
                 assert not work.exists() and audio.is_file()

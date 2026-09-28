@@ -269,27 +269,6 @@ std::string digest_hex(const unsigned char* digest, std::size_t size) {
   return output.str();
 }
 
-std::string sha256_text(const std::string& text) {
-  BCRYPT_ALG_HANDLE algorithm = nullptr;
-  if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) != 0) {
-    throw BackendError("hash_failed", "SHA-256 provider is unavailable");
-  }
-  std::array<unsigned char, 32> digest{};
-  const NTSTATUS status = BCryptHash(
-      algorithm,
-      nullptr,
-      0,
-      reinterpret_cast<PUCHAR>(const_cast<char*>(text.data())),
-      static_cast<ULONG>(text.size()),
-      digest.data(),
-      static_cast<ULONG>(digest.size()));
-  BCryptCloseAlgorithmProvider(algorithm, 0);
-  if (status != 0) {
-    throw BackendError("hash_failed", "SHA-256 calculation failed");
-  }
-  return digest_hex(digest.data(), digest.size());
-}
-
 #ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
 static_assert(ORT_API_VERSION == 28, "Candidate B requires ONNX Runtime C API 28");
 #endif
@@ -743,17 +722,6 @@ CandidateBVadResult run_vad_session(
   return result;
 }
 #endif
-
-std::string token_trace(const std::vector<std::size_t>& ids) {
-  std::ostringstream output;
-  for (std::size_t index = 0; index < ids.size(); ++index) {
-    if (index != 0) {
-      output << ',';
-    }
-    output << ids[index];
-  }
-  return output.str();
-}
 
 bool has_text(const std::string& text) {
   return text.find_first_not_of(" \t\r\n") != std::string::npos;
@@ -1250,31 +1218,6 @@ GenerationFallbackResult run_upstream_generation_fallback(
     if (!trace.compression_triggered) {
       below_compression_threshold.push_back(result.attempts.size());
     }
-    std::ostringstream identity;
-    identity << std::setprecision(17)
-             << temperature << '\n'
-             << options.beam_size << '\n'
-             << options.patience << '\n'
-             << options.num_hypotheses << '\n'
-             << (options.sampling_topk
-                     ? std::to_string(*options.sampling_topk)
-                     : std::string("default")) << '\n';
-    if (options.sampling_temperature) {
-      identity << *options.sampling_temperature;
-    } else {
-      identity << "default";
-    }
-    identity << '\n'
-             << options.sampling << '\n'
-             << trace.average_log_probability << '\n'
-             << trace.compression_ratio << '\n'
-             << generated.no_speech_probability << '\n'
-             << trace.compression_triggered << '\n'
-             << trace.log_probability_triggered << '\n'
-             << trace.silence_override << '\n'
-             << sha256_text(token_trace(generated.token_ids)) << '\n'
-             << sha256_text(generated.decoded_text);
-    trace.aggregate_sha256 = sha256_text(identity.str());
     result.attempts.push_back(std::move(trace));
 
     const FallbackAttemptTrace& current = result.attempts.back();
@@ -1570,10 +1513,6 @@ K2CommitResult commit_kotoba_k2_window(
   for (const SegmentEvidence& segment : parsed_segments) {
     K2SegmentDisposition disposition;
     disposition.segment = segment;
-    disposition.tuple_sha256 = sha256_text(
-        std::to_string(segment.segment.start_ms) + "\n"
-        + std::to_string(segment.segment.end_ms) + "\n"
-        + segment.segment.text);
     const bool owned = segment.segment.start_ms >= ownership_start_ms
         && segment.segment.start_ms < ownership_end_ms;
     if (!owned) {
@@ -1597,14 +1536,7 @@ K2CommitResult commit_kotoba_k2_window(
         result.emitted.end(),
         [&](const SegmentEvidence& existing) { return same_segment(existing, segment); });
     if (duplicate != already_emitted.end() || current_duplicate != result.emitted.end()) {
-      const SegmentEvidence& target = duplicate != already_emitted.end()
-          ? *duplicate
-          : *current_duplicate;
       disposition.disposition = "exact-duplicate";
-      disposition.duplicate_target_sha256 = sha256_text(
-          std::to_string(target.segment.start_ms) + "\n"
-          + std::to_string(target.segment.end_ms) + "\n"
-          + target.segment.text);
       ++result.exact_duplicate_discarded_count;
       result.dispositions.push_back(std::move(disposition));
       continue;
@@ -2066,7 +1998,6 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     }
     trace.token_ids = generated.sequences_ids.front();
     trace.generated_token_count = trace.token_ids.size();
-    trace.sha256 = sha256_text(token_trace(trace.token_ids));
     trace.no_speech_probability = generated.no_speech_prob;
     if (!trace.generation_fallback_enabled) {
       trace.average_log_probability = average_log_probability(
@@ -2129,7 +2060,6 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
           source_duration_ms,
           decode_duration_ms);
       for (SegmentEvidence& segment : parsed.segments) {
-        segment.trace_sha256 = trace.sha256;
         if (result.vad_enabled) {
           segment.compressed_start_ms = segment.raw_start_ms;
           segment.compressed_end_ms = segment.raw_end_ms;
@@ -2404,7 +2334,6 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe_precomputed_mel_for_te
   }
   trace.token_ids = generated.sequences_ids.front();
   trace.generated_token_count = trace.token_ids.size();
-  trace.sha256 = sha256_text(token_trace(trace.token_ids));
   trace.no_speech_probability = generated.no_speech_prob;
   trace.average_log_probability = average_log_probability(
       generated,
@@ -2433,7 +2362,6 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe_precomputed_mel_for_te
         audio_duration_ms,
         audio_duration_ms);
     for (SegmentEvidence& segment : parsed.segments) {
-      segment.trace_sha256 = trace.sha256;
       if (!has_text(segment.segment.text)
           || segment.segment.start_ms < 0
           || segment.segment.end_ms <= segment.segment.start_ms

@@ -111,7 +111,7 @@ struct ResolvedNativeLaunch {
 - Recovery/stderr artifact job IDs must use the host-safe generated character set, not merely the protocol's byte/control-character rules; otherwise separators can escape managed directories.
 - `HIKARU_ASR_FAKE_WORKER` and `HIKARU_ASR_FAKE_SCENARIO` are debug/test-only host-injection inputs. `#[cfg(not(debug_assertions))]` ignores them, while Release/default remains Native and resolves only the packaged runtime.
 - Model-backed worker compatibility tests use required `HIKARU_ASR_PRODUCTION_WORKER`, `HIKARU_ASR_CT2_MODEL_PATH`, and `HIKARU_ASR_CT2_AUDIO_PATH` only inside `asr_worker.rs`'s test module. All three must be set together; optional `HIKARU_ASR_CT2_DEVICE` is exactly `cpu|cuda`, optional `HIKARU_ASR_CT2_ENGINE` is exactly `faster-whisper|kotoba-faster-whisper` (default ordinary), and optional `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH` selects a longer cancellation input. Kotoba tests require the exact immutable Hugging Face snapshot revision directory. CUDA mode additionally requires `HIKARU_ASR_CT2_CPU_WORKER` so the same suite can deterministically prove pre-ready `cuda_not_built` without damaging the machine CUDA environment. The test copies every exercised audio into a temporary managed workspace before `ResolvedNativeLaunch::resolve(...)`. Product/Release code never reads these keys. Run one real test with `cargo test --lib asr_worker::tests::<name> -- --exact --test-threads=1 --nocapture`; broad name filters can build/enumerate unrelated Tauri targets and make an external harness report a false timeout.
-- Keep the generic CrispASR real-worker input contract (`HIKARU_ASR_CRISPASR_INPUTS`) available for T09/T10 Parakeet/Qwen/Reazon compatibility tests. A task-specific lifecycle matrix must use separate test-only keys rather than replacing or reinterpreting that decoder. Reazon R2 uses `HIKARU_ASR_R2_STEP6_MANIFEST`, `HIKARU_ASR_R2_STEP6_REQUIRED=1`, and `HIKARU_ASR_R2_STEP6_LANE`; the reviewed manifest bytes are source/lock-bound and required mode fails instead of skipping. Each decoder reads only its own keys, and bytes from the generic config cannot satisfy the R2 manifest contract or vice versa.
+- Keep the generic CrispASR real-worker input contract (`HIKARU_ASR_CRISPASR_INPUTS`) available for T09/T10 Parakeet/Qwen/Reazon compatibility tests. A task-specific lifecycle matrix must use separate test-only keys rather than replacing or reinterpreting that decoder. The retained Reazon R2 test seam uses `HIKARU_ASR_R2_STEP6_MANIFEST`, `HIKARU_ASR_R2_STEP6_REQUIRED=1`, and `HIKARU_ASR_R2_STEP6_LANE`; it checks safe contained artifact paths and required lane expectations, not frozen manifest/worker/log hashes. Required mode fails instead of skipping. Each decoder reads only its own keys, and bytes from the generic config cannot satisfy the R2 manifest contract or vice versa.
 
 ### Validation & Error Matrix
 
@@ -130,9 +130,9 @@ struct ResolvedNativeLaunch {
 | CUDA mode lacks the CPU-only worker or dedicated cancel audio | Fail test setup; do not weaken the negative/cancel coverage |
 | CPU-only worker receives the CUDA request | Preserve structured `cuda_not_built` in recovery; accept no `ready`/completed snapshot |
 | Generic `HIKARU_ASR_CRISPASR_INPUTS` is absent | Ordinary optional generic tests may skip according to the existing contract |
-| R2 Step 6 required mode lacks manifest/lane/hash/artifact | Fail test setup; never silently skip or fall back to generic inputs |
+| R2 Step 6 required mode lacks manifest/lane/artifact | Fail test setup; never silently skip or fall back to generic inputs |
 | Generic and R2-specific keys are simultaneously present | Decode each contract independently from its own keys; neither authorizes the other |
-| Generic config bytes are supplied as the R2 manifest, or R2 bytes are interpreted as generic inputs | Reject the mismatched schema/hash before launch |
+| Generic config bytes are supplied as the R2 manifest, or R2 bytes are interpreted as generic inputs | Reject the mismatched schema before launch |
 | Rust supplies a canonical extended Windows model path to CT2 4.8.0 | Worker normalizes only the `\\?\` spelling at the inference boundary; host validation remains canonical |
 
 ### Good/Base/Bad Cases
@@ -149,7 +149,7 @@ struct ResolvedNativeLaunch {
 - Persistence/security: partial recovery after failure/cancel/crash, minimal ASS only after non-empty completion, safe artifact job IDs, canonical path containment, and stderr byte/retention bounds.
 - Compatibility: Release cargo check with malicious debug/test env values, full Rust tests, and `pnpm build` without frontend contract changes.
 - Real worker: with the required three production-worker test env keys set, use exact lib-only Cargo test names and assert selected-device success/recovery/fallback ASS, structured pre-ready failure/recovery, cancellation with no completed snapshot, managed audio copy, and active-gate release. CUDA mode also sets `HIKARU_ASR_CT2_CPU_WORKER`, `HIKARU_ASR_CT2_CANCEL_AUDIO_PATH`, and `HIKARU_ASR_CT2_DEVICE=cuda`, then asserts `durationMs > 0` before cancellation and `cuda_not_built` from the CPU-only negative. Without the required triple, ordinary test runs skip only when no optional model-backed keys are present.
-- CrispASR regression: decode representative generic Parakeet and Qwen `HIKARU_ASR_CRISPASR_INPUTS` configurations after adding any task-local suite. Prove the separate R2 required decoder rejects missing manifest/lane/required state and cross-decoded manifest bytes, binds each lane's command/environment/log digest, and leaves the generic decoder available.
+- CrispASR regression: decode representative generic Parakeet and Qwen `HIKARU_ASR_CRISPASR_INPUTS` configurations after adding any task-local suite. Prove the separate R2 required decoder rejects missing manifest/lane/required state and cross-decoded manifest input, checks each lane's requested device/outcome and leaves the generic decoder available.
 
 ### Wrong vs Correct
 
@@ -282,7 +282,7 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 - Final capability is exactly ordered engines `["faster-whisper", "kotoba-faster-whisper"]` through CTranslate2 on CPU. `useVad=true` returns `vad_not_built` at Tauri validation; direct Kotoba worker requests return `kotoba_vad_not_qualified`; GPU requests return `cuda_not_built`; CrispASR and other unreleased routes return a controlled route error. Missing DLLs are not capability control.
 - Runtime verification is closed-world: archive root/path safety, outer hash, manifest/checksum/file closure, source/toolchain/config equality, imports, license inventory, forbidden content, and ASCII/UTF-16 private build paths must all pass before extraction.
 - Resource preparation verifies the ZIP, extracts to a temporary sibling and verifies again, then replaces only its own `src-tauri/resources/native-asr/windows-x64/cpu/` subtree. Independent CrispASR CPU preparation owns `windows-x64/crispasr/cpu/`; neither may replace the whole shared `native-asr/` root. NSIS/portable consume both verified CPU subtrees.
-- If any runtime payload byte, runtime-manifest field, or target graph changes, rebuild two independent roots to a byte-identical complete ZIP, rerun model-backed installed/portable smoke against the final worker SHA, rebuild NSIS/portable packages, and refresh the handoff. Evidence for an older worker is invalid even if source code is unchanged.
+- A changed worker or runtime is a new local candidate, not the verified original artifact. Exercise affected CTests and real host/device paths against the newly built bytes. Updating any distributed ZIP, product lock, NSIS or portable package requires a separately authorized verification and distribution decision; do not present old-package smoke as proof of new code.
 - A change to `src-tauri/resources/native-asr-models.json` also invalidates application package evidence even when runtime bytes are unchanged. Rerun `pnpm release:local`, extract/audit NSIS, and inspect the portable executable/ZIP for all current immutable model identities; do not reuse a package built from an older support manifest.
 - The CT2 CPU archive includes no model weights, Python sidecar/runtime/venv/packages, ORT/Silero VAD, CrispASR, CUDA/Vulkan runtime, PDB or development/test executable. The application may bundle the separately verified CrispASR CPU archive (including CPU Silero implementation, never weights). CUDA packs remain on-demand and outside NSIS/portable. Resource preparation removes stale packaged `src-tauri/resources/asr-service`, not user data.
 - Bundled VC145 DLLs come unmodified from VS18 `VC/Redist`, are excluded from Hikaru Sub's Apache-2.0 project license, and are governed by the official **Microsoft Visual C++ V14 Redistributable and Runtime 2026** terms. Package the unchanged official DOCX locally, lock its immutable URL/size/SHA-256, record `https://aka.ms/vs/18/redistribution`, and preserve Microsoft's `BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS` statement; do not substitute the VS2022 terms or invent a custom EULA.
@@ -292,14 +292,14 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 | Condition | Result |
 |---|---|
 | Archive/build-input size or SHA-256 differs from lock | Fail before extraction/build |
-| Tokenizer lock, nlohmann source, toolchain version, or required license inventory drifts | Fail before compilation/package acceptance |
+| Tokenizer dependency lock, required external binary input, or license inventory is invalid | Reject the relevant build/package step; do not demand exact local tool editions or extracted-source bytes |
 | Microsoft Runtime terms URL/version/local path/use-acceptance/project-license exclusion/DLL list or official DOCX bytes drift | Fail before compilation/package acceptance |
 | ZIP contains absolute/drive/`..` path, missing/extra file, undeclared DLL, model, ORT/VAD/GPU/CrispASR file, or private build path | Verifier rejects it |
 | Manifest source/toolchain/config/capability/import/license data differs from outer lock or payload bytes | Verifier rejects it |
 | Final preset enables a development capability or default-builds a development-only target | CMake configure/check fails; artifact is not releasable |
 | `useVad=true` on bundled CPU worker | Structured `vad_not_built` before model loading |
 | Non-CPU or unreleased backend/engine request | Structured controlled route error; no fallback |
-| Prepared runtime differs from tracked ZIP, or NSIS/portable embeds a stale runtime or model manifest | Packaging/evidence gate fails; rebuild and re-audit both packages |
+| Prepared runtime differs from tracked ZIP, or NSIS/portable embeds a stale runtime or model manifest | Packaging verification fails; require an authorized new artifact before adoption |
 | Setup `>80 MiB`, portable ZIP `>90 MiB`, unpacked runtime `>250 MiB`, or model count `>0` | Release blocker |
 
 ### Good/Base/Bad Cases
@@ -312,15 +312,15 @@ The extracted Tauri resource is generated and ignored. End-user packaging never 
 
 - Verifier mutation tests: outer/file/manifest hash drift, missing/extra/wrong DLL, traversal/absolute paths, forbidden capability/file, private-path leakage, source/toolchain/config mismatch, incomplete/duplicate license inventory, and Microsoft Runtime notice/document identity drift.
 - Final CMake/CTest: protocol core, CT2 core (ordinary + Kotoba K2), CrispASR-route rejection, and release-route contract (Kotoba available/no-VAD + unreleased route rejection); final default target graph must not build development-only workers/tests.
-- Build gate: two independent roots, complete ZIP byte comparison, restricted PATH launch, import closure, and non-system module containment under the artifact root.
-- Model-backed gate against the final worker SHA: seven Faster-Whisper short smokes plus exact Kotoba short smoke, `large-v2` and Kotoba `>10` minute smoke, `large-v3` regression, installed-like/portable-like representative smokes, UTF-8 JSONL-only output, non-empty ordered positive-duration audio-bounded segments, normal completion, controlled unsupported request, host recovery/active-gate, and cancel within two seconds.
+- When assessing a new distribution candidate, verify its complete ZIP, restricted PATH launch, import closure, and non-system module containment under its own root; normal source tests do not require reproducible-ZIP identity proof.
+- Real-model checks for changed inference paths use the newly built worker, including affected Faster-Whisper/Kotoba short and multi-window cases when model assets are available; record unrun cases explicitly. Verify UTF-8 JSONL output, ordered positive-duration audio-bounded segments, normal completion, controlled unsupported requests, host recovery/active-gate, and cancellation.
 - Release gate: `pnpm asr:prepare-resource`, full tests/build/Cargo tests, `pnpm release:local`, runtime identity equality plus eight-model identity closure in extracted NSIS and portable output, package sizes, model count zero, forbidden-file count zero, `git diff --check`, and no staged files unless the user explicitly authorizes commit preparation.
 
 ### Wrong vs Correct
 
 ```text
 Wrong:   change worker bytes -> keep previous smoke/package evidence -> claim the new artifact passed
-Correct: freeze final worker SHA -> rerun model/host smoke -> rebuild NSIS/portable -> record matching hashes
+Correct: test the newly built worker directly; separately verify any owner-authorized new distribution rather than reusing old package proof
 
 Wrong:   add a model manifest row -> reuse packages built before that row existed
 Correct: rerun release:local -> extract NSIS + inspect portable output -> prove all current model identities are embedded
@@ -379,7 +379,7 @@ TimestampParseResult parse_timestamp_tokens(
 - C++ core: legal fallback, bounded end, positive seek, zero retained production history, non-leading timestamp rejection, timestamp/EOT-only rejection, and out-of-range rejection.
 - Model-backed: exact `large-v2` short and `>10` minute worker smoke, all seven short smokes, and existing `large-v3` regressions.
 - Host: exact lib-only success and cancel/reap tests through `ResolvedNativeLaunch`.
-- Any worker byte change requires runtime v2+ successor identity, CTest, reproducible archive, package rebuild, and installed/portable evidence refresh.
+- Any worker behavior change requires affected CTests and real-model host checks. A separately authorized distribution replacement requires a new verified artifact and package checks; a local source edit alone does not change the published archive.
 
 ### 7. Wrong vs Correct
 

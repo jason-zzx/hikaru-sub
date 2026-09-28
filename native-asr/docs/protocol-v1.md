@@ -279,9 +279,9 @@ No binary or build directory is tracked. T12 owns packaged runtime provenance; T
 `hikaru-asr-qwen-cli-worker` from the existing `main.cpp`/emitter, protocol and
 shared WAV reader plus `qwen_cli.cpp`. It has no CTranslate2 or historical
 `CrispAsrBackend`/Qwen timeline linkage. The option is off by default and rejects
-mixed CT2/development builds. `HIKARU_QWEN_CLI_FILE`, `_SIZE` and `_SHA256` must
-identify the reviewed complete `crispasr.exe`; CMake checks them and the worker
-rechecks the same-root executable with a held read-only handle before launch.
+mixed CT2/development builds. `HIKARU_QWEN_CLI_FILE` selects the full
+`crispasr.exe` copied beside the worker. The host verifies the distributed
+runtime file set before launching it; the worker does not rehash the CLI.
 The worker target itself does not own model-manager readiness, downloads or
 packaging authority. Current production Qwen is enabled through the existing
 manager and independent CrispASR runtime lock; the manager supplies all three
@@ -318,12 +318,13 @@ This capability does not open the separate product/publication gates.
   its CLI/descendants; the host verifies zero active processes before releasing
   the existing gate and publishing `reaped`.
 - UTF-8 request paths are converted with strict Windows Unicode APIs. Input and
-  runtime ancestors are opened without delete sharing and reject reparse points.
-  The exclusive results file is created with `CREATE_NEW` and held without delete
+  runtime paths are checked for existence, type and reparse ancestors at launch;
+  no input/ancestor handles are held during inference. The exclusive results
+  file is created with `CREATE_NEW` and held without delete
   sharing, so a concurrent symlink/rename cannot redirect the CLI output.
 - CLI argv is fixed file-mode Qwen/ja/default-thread/default-upstream-pipeline
   options, explicit ASR/aligner/VAD files, and no server/download/auto model.
-  Audio's relative argv is derived from the exact validated canonical request
+  Audio's relative argv is derived from the validated canonical request
   and checked against the owned UTF-16 cwd, not guessed from a basename. This
   preserves extended/CJK/spaced managed paths despite miniaudio's extended
   absolute-path limitation; an alternative basename is covered by CTest.

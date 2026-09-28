@@ -48,42 +48,6 @@ std::optional<std::string> optional_arg(const std::vector<std::string>& args, co
   return found == args.end() ? std::nullopt : std::optional<std::string>(*std::next(found));
 }
 
-std::string digest_hex(const unsigned char* digest, std::size_t size) {
-  std::ostringstream output;
-  for (std::size_t index = 0; index < size; ++index) {
-    output << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(digest[index]);
-  }
-  return output.str();
-}
-
-std::string sha256_file(const fs::path& path) {
-  std::ifstream input(path, std::ios::binary);
-  check(static_cast<bool>(input), "cannot hash input");
-  BCRYPT_ALG_HANDLE algorithm = nullptr;
-  BCRYPT_HASH_HANDLE hash = nullptr;
-  ULONG object_length = 0;
-  ULONG returned = 0;
-  check(BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) == 0, "SHA-256 provider failed");
-  check(BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&object_length), sizeof(object_length), &returned, 0) == 0,
-        "SHA-256 property failed");
-  std::vector<unsigned char> object(object_length);
-  check(BCryptCreateHash(algorithm, &hash, object.data(), object_length, nullptr, 0, 0) == 0, "SHA-256 create failed");
-  std::vector<unsigned char> buffer(1 << 20);
-  while (input) {
-    input.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
-    if (input.gcount() > 0) check(BCryptHashData(hash, buffer.data(), static_cast<ULONG>(input.gcount()), 0) == 0, "SHA-256 update failed");
-  }
-  std::array<unsigned char, 32> digest{};
-  check(BCryptFinishHash(hash, digest.data(), static_cast<ULONG>(digest.size()), 0) == 0, "SHA-256 finish failed");
-  BCryptDestroyHash(hash);
-  BCryptCloseAlgorithmProvider(algorithm, 0);
-  return digest_hex(digest.data(), digest.size());
-}
-
-Json file_identity(const fs::path& path) {
-  return Json{{"sizeBytes", fs::file_size(path)}, {"sha256", sha256_file(path)}};
-}
-
 bool is_under(const fs::path& path, const fs::path& root) {
   std::error_code error;
   const fs::path canonical_path = fs::weakly_canonical(path, error);
@@ -147,7 +111,7 @@ Json loaded_modules(
     }
     if (role.empty()) continue;
     output.push_back(Json{{"name", path.filename().u8string()}, {"rootRole", role},
-                          {"relativePath", relative.generic_u8string()}, {"identity", file_identity(path)}});
+                          {"relativePath", relative.generic_u8string()}});
   }
   std::sort(output.begin(), output.end(), [](const Json& left, const Json& right) { return left["name"] < right["name"]; });
   return output;
@@ -185,17 +149,6 @@ Json cuda_device_identity() {
               {"driverApiVersion", version}};
 }
 
-std::string sha256_text(const std::string& value) {
-  BCRYPT_ALG_HANDLE algorithm = nullptr;
-  std::array<unsigned char, 32> digest{};
-  check(BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) == 0, "SHA-256 provider failed");
-  check(BCryptHash(algorithm, nullptr, 0, reinterpret_cast<PUCHAR>(const_cast<char*>(value.data())),
-                   static_cast<ULONG>(value.size()), digest.data(), static_cast<ULONG>(digest.size())) == 0,
-        "SHA-256 failed");
-  BCryptCloseAlgorithmProvider(algorithm, 0);
-  return digest_hex(digest.data(), digest.size());
-}
-
 bool privacy_passes(const fs::path& stderr_path, const std::vector<fs::path>& private_paths) {
   std::ifstream input(stderr_path, std::ios::binary);
   if (!input) return false;
@@ -214,11 +167,9 @@ bool privacy_passes(const fs::path& stderr_path, const std::vector<fs::path>& pr
   return true;
 }
 
-void validate_identity(const fs::path& path, std::uintmax_t size, const char* hash, const char* role) {
-  check(fs::is_regular_file(path) && fs::file_size(path) == size && sha256_file(path) == hash,
-        std::string(role) + " identity drifted");
+void require_file(const fs::path& path, const char* role) {
+  check(fs::is_regular_file(path), std::string(role) + " is missing");
 }
-
 void atomic_json(const fs::path& path, const Json& value) {
   fs::create_directories(path.parent_path());
   const fs::path temporary = path.string() + ".tmp";
@@ -250,8 +201,6 @@ void run_t10(const std::vector<std::string>& args) {
   check(device_name == "cpu" || device_name == "cuda", "invalid T10 device");
   check(run_kind == "cold" || run_kind == "warm" || run_kind == "measured", "invalid T10 run kind");
   check(repeat_index >= 0, "invalid T10 repeat index");
-  const fs::path lock = fs::u8path(required_arg(args, "--input-lock"));
-  const fs::path expected_lock = fs::u8path(T10_LOCAL_ROOT).parent_path() / "t10-input-lock.md";
   const fs::path library = fs::u8path(required_arg(args, "--library"));
   const fs::path worker = fs::u8path(required_arg(args, "--worker"));
   const fs::path model = fs::u8path(required_arg(args, "--model"));
@@ -260,21 +209,13 @@ void run_t10(const std::vector<std::string>& args) {
   check(output.extension() == ".json"
             && is_under_declared_local_root(output, fs::u8path(T10_LOCAL_ROOT)),
         "T10 output escapes the canonical task-local ignored root");
-  check(fs::is_regular_file(lock) && fs::equivalent(lock, expected_lock), "T10 input lock path drifted");
   check(fs::is_regular_file(library) && fs::is_regular_file(worker), "T10 runtime/worker missing");
   const Engine engine = t10_engine(engine_name);
-  if (engine == Engine::Parakeet) {
-    validate_identity(model, 673554880, "5a61e6c7d956c3c72a76fafcd798cac0c9ea66d0e29b3910cd04865a1e42cc17", "Parakeet model");
-  } else {
-    validate_identity(model, 667147072, "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2", "Reazon model");
-  }
-  const std::map<std::string, std::tuple<std::uintmax_t, const char*, std::int64_t>> cases{
-      {"short-v1", {771728, "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211", 24102}},
-      {"medium-v1", {15963982, "6870afe1daa4579c885294b6b9a0031f35c195883e5af3bdab967b6178c9a458", 498872}},
-      {"long-v2", {132615588, "af0eafc9355bfb1a3749e986645b7bfb016beaa03880920c8c09af9645c29b3e", 4144235}},
-  };
-  const auto& [audio_size, audio_hash, declared_duration] = cases.at(case_id);
-  validate_identity(audio, audio_size, audio_hash, "T10 audio");
+  require_file(model, engine == Engine::Parakeet ? "Parakeet model" : "Reazon model");
+  const std::map<std::string, std::int64_t> cases{
+      {"short-v1", 24102}, {"medium-v1", 498872}, {"long-v2", 4144235}};
+  const std::int64_t declared_duration = cases.at(case_id);
+  require_file(audio, "T10 audio");
   const Device device = device_name == "cuda" ? Device::Cuda : Device::Cpu;
   const fs::path runtime_bin = current_executable().parent_path();
   const fs::path runtime_root = library.parent_path();
@@ -287,9 +228,6 @@ void run_t10(const std::vector<std::string>& args) {
       {"caseId", case_id}, {"device", device_name},
       {"runKind", run_kind}, {"repeatIndex", repeat_index},
       {"candidateId", engine == Engine::Parakeet ? "P1-window15s-native-word-v1" : "R1-window15s-top-level-v1"},
-      {"inputLock", file_identity(lock)}, {"runner", file_identity(current_executable())},
-      {"worker", file_identity(worker)}, {"library", file_identity(library)},
-      {"model", file_identity(model)}, {"audio", file_identity(audio)},
       {"windowDurationMs", parakeet_family::window_duration_ms}, {"overlapMs", 0},
       {"maxCueCodePoints", parakeet_family::max_cue_code_points},
       {"maxCueDurationMs", parakeet_family::max_cue_duration_ms},
@@ -389,8 +327,6 @@ void run(const std::vector<std::string>& args) {
   check(phase == "discovery" || phase == "formal", "invalid phase");
   check(device_name == "cpu" || device_name == "cuda", "invalid device");
   check(sample == "short-v1" || sample == "medium-v1-first-120s", "invalid sample");
-  const fs::path lock = fs::u8path(required_arg(args, "--input-lock"));
-  const fs::path expected_lock = fs::u8path(T09_LOCAL_ROOT).parent_path() / "crispasr-development-lock.md";
   const fs::path library = fs::u8path(required_arg(args, "--library"));
   const fs::path model = fs::u8path(required_arg(args, "--model"));
   const auto aligner_arg = optional_arg(args, "--aligner");
@@ -408,22 +344,16 @@ void run(const std::vector<std::string>& args) {
     std::ofstream(stderr_log, std::ios::binary);
   }
   check(fs::is_regular_file(stderr_log), "stderr log is missing");
-  check(fs::is_regular_file(lock) && fs::equivalent(lock, expected_lock), "input lock path is not the tracked T09 lock");
   check(fs::is_regular_file(library), "runtime missing");
   const Engine engine = family_engine(family);
+  require_file(model, family == "parakeet-family" ? "Reazon model" : "Qwen model");
   if (family == "parakeet-family") {
-    validate_identity(model, 667147072, "20b828d05f859a4b0ea0bdcc232cb6e02543d6ddd0b3a1ad1ce37aa56fd7cfd2", "Reazon model");
     check(!aligner, "parakeet family does not accept aligner");
   } else {
-    validate_identity(model, 1490915200, "ec197cef7ccc589fdcae1becc3f4a3de119d0a41e790b898b519b1a048dad8d4", "Qwen model");
     check(aligner.has_value(), "Qwen aligner missing");
-    validate_identity(*aligner, 529001216, "a7bb4cbeacc6414f11a5d23dc7661a51a941a71e6d559dc7b408b52473f2ae84", "Qwen aligner");
+    require_file(*aligner, "Qwen aligner");
   }
-  if (sample == "short-v1") {
-    validate_identity(audio, 771728, "4d6759ae9b48863490d0e4033ebd20a0c4eb503b454501e566eaff294f814211", "short audio");
-  } else {
-    validate_identity(audio, 3840044, "d7b8c62d1358eee4f7ca40596ec424e91cde6992654add5c0219cdeed3907b42", "120-second audio");
-  }
+  require_file(audio, "audio");
 
   const Device device = device_name == "cuda" ? Device::Cuda : Device::Cpu;
   const fs::path runtime_bin = current_executable().parent_path();
@@ -432,25 +362,19 @@ void run(const std::vector<std::string>& args) {
   const fs::path runtime_root = library.parent_path();
   const fs::path cuda_bin = fs::u8path(R"(C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\bin)");
   const fs::path system32 = fs::path(std::getenv("SystemRoot")) / "System32";
-  const std::string path_identity = runtime_bin.u8string() + ";" + cuda_bin.u8string() + ";" + system32.u8string();
   check(privacy_passes(stderr_log, {model, aligner.value_or(model), audio}), "stderr privacy scan failed");
   Json raw{
       {"schema", "hikaru-crispasr-development-row-v1"},
       {"phase", phase}, {"family", family}, {"device", device_name}, {"sample", sample},
       {"attemptId", std::to_string(GetCurrentProcessId()) + "-" + std::to_string(Clock::now().time_since_epoch().count())},
-      {"inputLock", file_identity(lock)}, {"runner", file_identity(current_executable())},
-      {"worker", file_identity(worker)}, {"library", file_identity(library)},
-      {"model", file_identity(model)}, {"audio", file_identity(audio)},
       {"openParams", Json{{"abiVersion", 2}, {"threads", 16}, {"useGpu", device == Device::Cuda ? 1 : 0},
                            {"verbosity", 0}, {"flashAttn", 0}, {"gpuLayers", device == Device::Cuda ? -1 : 0},
                            {"preference", device == Device::Cuda ? "cuda" : "none"}}},
       {"resolvedComputeDeviceAvailable", false},
-      {"restrictedPath", Json{{"roles", Json::array({"runtime-bin", "cuda-bin", "system32"})},
-                                {"sha256", sha256_text(path_identity)}}},
+      {"restrictedPath", Json{{"roles", Json::array({"runtime-bin", "cuda-bin", "system32"})}}},
       {"stderr", Json{{"relativePath", fs::weakly_canonical(stderr_log).lexically_relative(fs::weakly_canonical(fs::u8path(T09_LOCAL_ROOT))).generic_u8string()},
-                       {"sizeBytes", fs::file_size(stderr_log)}, {"sha256", sha256_file(stderr_log)}, {"privacyPass", true}}},
+                       {"privacyPass", true}}},
       {"generations", Json::array()}, {"moduleCheckpoints", Json::array()}};
-  if (aligner) raw["aligner"] = file_identity(*aligner);
   if (device == Device::Cuda) raw["cudaDevice"] = cuda_device_identity();
 
   try {

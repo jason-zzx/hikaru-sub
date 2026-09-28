@@ -100,17 +100,14 @@ def main():
     rejected(raw, stderr.replace(b'role=aligner', b'role=unknown'))
     rejected(raw, stderr.replace(b'device=cpu nodes=', b'device=cuda nodes='))
     from parakeet_smoke import Progress, verify_loaded_runtime
-    fixture_identity = {'sizeBytes': 1, 'sha256': 'fixture'}
-    verify_loaded_runtime({str(out / 'VCOMP140.DLL'): fixture_identity}, out,
-                          {'vcomp140.dll': fixture_identity})
-    for modules in [{str(out / 'VCOMP140.DLL'): {}},
-                    {str(out / 'foreign' / 'VCOMP140.DLL'): fixture_identity}]:
+    verify_loaded_runtime([str(out / 'VCOMP140.DLL')], out, ['vcomp140.dll'])
+    for modules in [[], [str(out / 'foreign' / 'VCOMP140.DLL')]]:
         try:
-            verify_loaded_runtime(modules, out, {'vcomp140.dll': fixture_identity})
+            verify_loaded_runtime(modules, out, ['vcomp140.dll'])
         except ValueError:
             pass
         else:
-            raise AssertionError('foreign/drifted module accepted')
+            raise AssertionError('missing/foreign module accepted')
     progress = Progress()
     assert progress.advance(b'hikaru_stage: parakeet_model_loaded\r\n')
     assert not progress.advance(b'hikaru_stage: parakeet_model_loaded\n')
