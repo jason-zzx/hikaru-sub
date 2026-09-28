@@ -3,14 +3,10 @@
   "status": "shared-qwen-parakeet-reazonspeech-dependency-published",
   "productEnablementAllowed": true,
   "externalStableAssetPublished": true,
-  "candidateId": "shared-reazonspeech-final-r1",
-  "acquisitionLock": {
-    "sizeBytes": 3009,
-    "sha256": "8b4b54883801c4df2d44c88c281f5ca092918aabf0a9f6aab18fda9d66999e98"
-  },
+  "candidateId": "shared-simplify-b3-local",
   "cpu": {
-    "artifactId": "hikaru-asr-crispasr-windows-x64-cpu-shared-reazonspeech-final-r1",
-    "manifestSha256": "e5a94747856abfff6bc07000cddcfd07a9e8ca75f2b46e5a5fdd0e949642753e",
+    "artifactId": "hikaru-asr-crispasr-windows-x64-cpu-shared-simplify-b3-local",
+    "manifestSha256": "9246580a3aadfe4345331276018a7c6d9dd18c745e58b322e2a73a74af4131d7",
     "files": [
       {
         "path": "crispasr.exe",
@@ -19,8 +15,8 @@
       },
       {
         "path": "hikaru-asr-worker.exe",
-        "sizeBytes": 375808,
-        "sha256": "3cedc3f6f551ab98191af1ac0e23b9e53ad9ad312f3bba627bc07782cba88e4c"
+        "sizeBytes": 370688,
+        "sha256": "6e2797cffe2c06bdedaf77643f58fce65ebe5c31be2587118cb3df89c173c069"
       },
       {
         "path": "licenses/Apache-2.0.txt",
@@ -124,10 +120,10 @@
       }
     ],
     "archive": {
-      "path": "native-asr/artifacts/crispasr-cpu-shared-v3.zip",
+      "path": "native-asr/artifacts/crispasr-cpu-shared-v4.zip",
       "root": "windows-x64/crispasr/cpu/",
-      "sizeBytes": 7668105,
-      "sha256": "8d895f011004124562057d7a3614933fbb806807058036a3348ad036e426306a"
+      "sizeBytes": 7665052,
+      "sha256": "57164cb7c4aaef92b60e7b81556399342a47ede8412f2fe9d3e0af87b4e682ce"
     },
     "engines": [
       "qwen3-asr",
@@ -136,8 +132,8 @@
     ]
   },
   "cuda": {
-    "artifactId": "hikaru-asr-crispasr-windows-x64-cuda-shared-reazonspeech-final-r1",
-    "manifestSha256": "0d28e59a977de0085ac0b6fee6d62ad5f3d09ead250ce5b2d9bc3e0a8de9199c",
+    "artifactId": "hikaru-asr-crispasr-windows-x64-cuda-shared-simplify-b3-local",
+    "manifestSha256": "6b4b6cb13c9f47e897751a138e8ddc720fe8e683150f78ef05a69aa2e7bb2155",
     "files": [
       {
         "path": "crispasr.exe",
@@ -161,8 +157,8 @@
       },
       {
         "path": "hikaru-asr-worker.exe",
-        "sizeBytes": 375808,
-        "sha256": "8b61e34a535d7500b2e8150d4afd2071dd70d635da15ac1f3515482e602e8baa"
+        "sizeBytes": 370688,
+        "sha256": "0686539ad2961e511b44171e963d45c7ef46d3b67f62fc47a28b8b3a1ee68b14"
       },
       {
         "path": "licenses/Apache-2.0.txt",
@@ -276,10 +272,10 @@
       }
     ],
     "archive": {
-      "path": "native-asr/artifacts/crispasr-cuda-shared-v3.zip",
+      "path": "native-asr/artifacts/crispasr-cuda-shared-v4.zip",
       "root": "windows-x64/crispasr/cuda/",
-      "sizeBytes": 719771622,
-      "sha256": "5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0"
+      "sizeBytes": 719768554,
+      "sha256": "bb0ed0634322c29a19f7bdb1fec749e2a7b9f0b550de485f25e76a69caea2672"
     },
     "engines": [
       "qwen3-asr",

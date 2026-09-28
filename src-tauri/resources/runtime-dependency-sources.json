@@ -13,10 +13,10 @@
           "sizeBytes": 109728040
         },
         "nativeAsrCuda": {
-          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip",
+          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v2.zip",
           "archive": "zip",
-          "sha256": "9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4",
-          "sizeBytes": 571034856
+          "sha256": "42f00870df2826982f98016c69b5e73ca9a6da2d27ae11a6aa2dd15a870d766e",
+          "sizeBytes": 571028843
         },
         "python311": {
           "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
@@ -33,10 +33,10 @@
         "pytorchCudaFindLinksUrl": null,
         "huggingfaceEndpoint": null,
         "crispasrCuda": {
-          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip",
+          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v4.zip",
           "archive": "zip",
-          "sha256": "5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0",
-          "sizeBytes": 719771622
+          "sha256": "bb0ed0634322c29a19f7bdb1fec749e2a7b9f0b550de485f25e76a69caea2672",
+          "sizeBytes": 719768554
         }
       },
       "china": {
@@ -49,10 +49,10 @@
           "sizeBytes": 157680916
         },
         "nativeAsrCuda": {
-          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v1.zip",
+          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v2.zip",
           "archive": "zip",
-          "sha256": "9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4",
-          "sizeBytes": 571034856
+          "sha256": "42f00870df2826982f98016c69b5e73ca9a6da2d27ae11a6aa2dd15a870d766e",
+          "sizeBytes": 571028843
         },
         "python311": {
           "url": "https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
@@ -71,10 +71,10 @@
         "pytorchCudaFindLinksUrl": "https://mirrors.aliyun.com/pytorch-wheels/cu126/",
         "huggingfaceEndpoint": "https://hf-mirror.com",
         "crispasrCuda": {
-          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip",
+          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v4.zip",
           "archive": "zip",
-          "sha256": "5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0",
-          "sizeBytes": 719771622
+          "sha256": "bb0ed0634322c29a19f7bdb1fec749e2a7b9f0b550de485f25e76a69caea2672",
+          "sizeBytes": 719768554
         }
       }
     }

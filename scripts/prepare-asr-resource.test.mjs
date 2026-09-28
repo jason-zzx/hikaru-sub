@@ -64,7 +64,7 @@ describe("ASR release resource preparation", () => {
     expect(existsSync(crispasr)).toBe(true);
 
     expect(prepared.archiveSha256).toBe(
-      "5177c87160e7b8e78685b7d61c99acf29f740071c7cbe79fdae2ba9d5cb1fbcf",
+      "31607037de21bfb541c993023e0597b23a3a3b321ec3bb1d33e2d056b29c60e9",
     );
     expect(existsSync(join(root, "src-tauri", "resources", "asr-service"))).toBe(
       false,

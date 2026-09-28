@@ -365,7 +365,7 @@ mod tests {
         } else {
             local_archive.map(PathBuf::from).unwrap_or_else(|| {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("../native-asr/artifacts/crispasr-cuda-shared-v3.zip")
+                    .join("../native-asr/artifacts/crispasr-cuda-shared-v4.zip")
             })
         };
         let deps = resources.as_ref().unwrap_or(&root).join("deps");
@@ -442,13 +442,13 @@ mod tests {
         assert!(published(&lock, &sources));
         let official = sources.official.crispasr_cuda.as_ref().unwrap();
         let china = sources.china.crispasr_cuda.as_ref().unwrap();
-        assert_eq!(official.url, "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip");
+        assert_eq!(official.url, "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v4.zip");
         assert_eq!(china.url, format!("https://ghfast.top/{}", official.url));
         assert_eq!(
             official.sha256,
-            "5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0"
+            "bb0ed0634322c29a19f7bdb1fec749e2a7b9f0b550de485f25e76a69caea2672"
         );
-        assert_eq!(official.size_bytes, 719_771_622);
+        assert_eq!(official.size_bytes, 719_768_554);
         let temp = tempfile::tempdir().unwrap();
         let items = items_at(
             &temp.path().join("resources"),
@@ -459,7 +459,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(items[1].status, RuntimeDependencyStatus::Missing);
-        assert_eq!(items[1].expected_download_bytes, Some(719_771_622));
+        assert_eq!(items[1].expected_download_bytes, Some(719_768_554));
         assert_ne!(items[1].reason.as_deref(), Some(PENDING));
         assert!(items[0].expected_download_bytes.is_none());
         lock.external_stable_asset_published = false;

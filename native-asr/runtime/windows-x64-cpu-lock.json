@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "artifact": {
-    "id": "hikaru-asr-windows-x64-cpu-v3",
+    "id": "hikaru-asr-windows-x64-cpu-v4",
     "path": "native-asr/artifacts/windows-x64-cpu.zip",
     "root": "windows-x64/cpu/",
-    "sizeBytes": 6860684,
-    "sha256": "5177c87160e7b8e78685b7d61c99acf29f740071c7cbe79fdae2ba9d5cb1fbcf",
+    "sizeBytes": 6856800,
+    "sha256": "31607037de21bfb541c993023e0597b23a3a3b321ec3bb1d33e2d056b29c60e9",
     "sourceDateEpoch": 1788048000
   },
   "buildInput": {
@@ -127,7 +127,9 @@
     "rustcCommit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
     "cargoVersion": "1.96.0",
     "nodeVersion": "22.22.0",
-    "powershellVersion": "7.6.5"
+    "powershellVersion": "7.6.5",
+    "workerMsvcCompilerVersion": "19.50.35722",
+    "workerMsvcToolsVersion": "14.50.35717"
   },
   "licenseInventory": {
     "components": [

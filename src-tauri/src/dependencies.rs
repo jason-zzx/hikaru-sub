@@ -63,10 +63,10 @@ const LOG_TAIL_LIMIT: usize = 200;
 const MANIFEST_JSON: &str = include_str!("../resources/runtime-dependency-sources.json");
 const NATIVE_ASR_CUDA_LOCK_JSON: &str =
     include_str!("../../native-asr/runtime/windows-x64-cuda-lock.json");
-const NATIVE_ASR_CPU_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cpu-v3";
+const NATIVE_ASR_CPU_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cpu-v4";
 const NATIVE_ASR_CPU_RESOURCE_PATH: [&str; 3] = ["native-asr", "windows-x64", "cpu"];
 const NATIVE_ASR_CPU_WORKER: &str = "hikaru-asr-worker.exe";
-const NATIVE_ASR_CUDA_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cuda-v1";
+const NATIVE_ASR_CUDA_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cuda-v2";
 const NATIVE_ASR_CUDA_REQUIRED_ENTRIES: &[&str] = &[
     NATIVE_ASR_CPU_WORKER,
     "ctranslate2.dll",

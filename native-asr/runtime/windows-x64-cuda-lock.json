@@ -7,14 +7,11 @@
     "runtimeDependencySourceRowPresent": true
   },
   "artifact": {
-    "id": "hikaru-asr-windows-x64-cuda-v1",
-    "path": ".trellis/tasks/08-31-native-asr-gpu-mode/research/local/artifacts/windows-x64-cuda-final-a.zip",
-    "reproductionPath": ".trellis/tasks/08-31-native-asr-gpu-mode/research/local/artifacts/windows-x64-cuda-final-b.zip",
+    "id": "hikaru-asr-windows-x64-cuda-v2",
+    "path": "native-asr/artifacts/windows-x64-cuda-v2.zip",
     "root": "windows-x64/cuda/",
-    "sizeBytes": 571034856,
-    "sha256": "9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4",
-    "unpackedBytes": 843553473,
-    "byteIdenticalIndependentPackages": true,
+    "sizeBytes": 571028843,
+    "sha256": "42f00870df2826982f98016c69b5e73ca9a6da2d27ae11a6aa2dd15a870d766e",
     "sourceDateEpoch": 1788048000
   },
   "platform": "windows-x64",
@@ -202,109 +199,9 @@
     "rustcCommit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
     "cargoVersion": "1.96.0",
     "nodeVersion": "22.22.0",
-    "powershellVersion": "7.6.5"
-  },
-  "finalBuildIdentity": {
-    "independentRoots": [
-      ".trellis/tasks/08-31-native-asr-gpu-mode/research/local/build/windows-x64-ct2-cuda-final-a",
-      ".trellis/tasks/08-31-native-asr-gpu-mode/research/local/build/windows-x64-ct2-cuda-final-b"
-    ],
-    "byteIdentical": true,
-    "ctranslate2ObjectSet": {
-      "count": 156,
-      "totalBytes": 133579526,
-      "canonicalManifestSha256": "f89590f9cf584281dd3e62d6652b9a2e6ef8aeee12a5c119d4d6966df815dc95"
-    },
-    "outputs": [
-      {
-        "path": "bin/ctranslate2.dll",
-        "sizeBytes": 68624896,
-        "sha256": "d0c3c0041426afcc4f21dcbd56c5af251d63af949599529dd2a1b2a8a36a2a76"
-      },
-      {
-        "path": "ctranslate2/ctranslate2.lib",
-        "sizeBytes": 51321322,
-        "sha256": "fd18883a8fee176d6af504227e80d461c6604eb9e03f3ec2d88a30b9e43f5603"
-      },
-      {
-        "path": "bin/hikaru-asr-worker.exe",
-        "sizeBytes": 504832,
-        "sha256": "3179ab970e42735f3c42dc13267bbaa372e5d50a7404e4f6069372a997081ac6"
-      },
-      {
-        "path": "bin/hikaru_asr_tokenizer.dll",
-        "sizeBytes": 2139136,
-        "sha256": "8971a5d90287e636bc5cbcf33b1c3173fba3f73fb0a91bdbc6aebb6f88ce672b"
-      },
-      {
-        "path": "tokenizer/release/hikaru_asr_tokenizer.dll.lib",
-        "sizeBytes": 45560,
-        "sha256": "b00175ba4698011ca3667cbcb993147d754d1181fa24f8600e04187e5c9d0ab2"
-      }
-    ]
-  },
-  "finalRuntimeIdentity": {
-    "normalizationPolicy": [
-      "Replace the unique oneDNN private diagnostic source prefix with source\\oneDNN-3.1.1 and underscore padding.",
-      "Replace the unique Cargo registry private prefix with cargo\\registry\\src\\index.crates.io and underscore padding."
-    ],
-    "files": [
-      {
-        "path": "hikaru-asr-worker.exe",
-        "sizeBytes": 504832,
-        "sha256": "3179ab970e42735f3c42dc13267bbaa372e5d50a7404e4f6069372a997081ac6"
-      },
-      {
-        "path": "ctranslate2.dll",
-        "sizeBytes": 68624896,
-        "sha256": "550ba82825f747abc0fd00ea7a58cc28993c8b542c3d5a30faf1dee89bafd6cf"
-      },
-      {
-        "path": "hikaru_asr_tokenizer.dll",
-        "sizeBytes": 2139136,
-        "sha256": "587d0518fb0fea58ef3acb72a284b823abfc39de2ee13f5dcda5b6d278c7286c"
-      },
-      {
-        "path": "cublas64_12.dll",
-        "sizeBytes": 102518272,
-        "sha256": "90052a83efd1b57a8e3616a6590b335855f81b814a4f16eecb7b5bf6d1b1d4eb"
-      },
-      {
-        "path": "cublasLt64_12.dll",
-        "sizeBytes": 668669952,
-        "sha256": "c3a05ea244c937314afec09f87b91f814c7e27977681f6c67eb51bb06ced3a4a"
-      },
-      {
-        "path": "runtime-manifest.json",
-        "sizeBytes": 13468,
-        "sha256": "9f2ff545c125c531dcb3d4fa0637edc1170c611daa9d698eb68883b2ba4d7adf"
-      },
-      {
-        "path": "SHA256SUMS",
-        "sizeBytes": 2053,
-        "sha256": "df380e65771a99703a1be77611e0dc0c5543fae77004fd0a55282b613e95814f"
-      },
-      {
-        "path": "cuda-fatbin.json",
-        "sizeBytes": 560,
-        "sha256": "dd3dcceff808ef37394ef100e6329760e2c6dc7ee5d4191b64a4c46778a27780"
-      },
-      {
-        "path": "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt",
-        "sizeBytes": 67876,
-        "sha256": "72c22161fc1ebf242443d45158a7dd382d68597b00eeb7a7f539be5c6114be33"
-      },
-      {
-        "path": "licenses/NVIDIA-CUDA-Runtime.txt",
-        "sizeBytes": 403,
-        "sha256": "0a7bc6c7ac0ef7fdb9e8f87f7eb3e6d181acb16b29e1a808b04a3768f6b11107"
-      },
-      {
-        "path": "licenses/THIRD-PARTY-NOTICES.json",
-        "sizeBytes": 17050,
-        "sha256": "a905d6f29304dba41f8a79036a3526394154af1f25215fdcb06986e2547c987f"
-      }
-    ]
+    "powershellVersion": "7.6.5",
+    "workerMsvcCompilerVersion": "19.50.35722",
+    "workerMsvcToolsVersion": "14.50.35717"
   },
   "cudaModules": {
     "probeRequiredRuntimeRoot": [
@@ -514,28 +411,94 @@
     }
   ],
   "requiredFiles": [
-    { "path": "hikaru-asr-worker.exe", "role": "worker" },
-    { "path": "ctranslate2.dll", "role": "runtime" },
-    { "path": "hikaru_asr_tokenizer.dll", "role": "runtime" },
-    { "path": "cublas64_12.dll", "role": "nvidia-runtime" },
-    { "path": "cublasLt64_12.dll", "role": "nvidia-runtime" },
-    { "path": "msvcp140.dll", "role": "microsoft-runtime" },
-    { "path": "vcomp140.dll", "role": "microsoft-runtime" },
-    { "path": "vcruntime140.dll", "role": "microsoft-runtime" },
-    { "path": "vcruntime140_1.dll", "role": "microsoft-runtime" },
-    { "path": "cuda-fatbin.json", "role": "cuda-attestation" },
-    { "path": "licenses/THIRD-PARTY-NOTICES.json", "role": "license-inventory" },
-    { "path": "licenses/CTranslate2-MIT.txt", "role": "license" },
-    { "path": "licenses/oneDNN-Apache-2.0.txt", "role": "license" },
-    { "path": "licenses/pocketfft-BSD-3-Clause.txt", "role": "license" },
-    { "path": "licenses/nlohmann-json-MIT.txt", "role": "license" },
-    { "path": "licenses/tokenizers-Apache-2.0.txt", "role": "license" },
-    { "path": "licenses/onig-MIT.txt", "role": "license" },
-    { "path": "licenses/onig-sys-MIT.txt", "role": "license" },
-    { "path": "licenses/NVIDIA-CUDA-Runtime.txt", "role": "license" },
-    { "path": "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt", "role": "license" },
-    { "path": "licenses/Microsoft-Visual-Cpp-Runtime.txt", "role": "license" },
-    { "path": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx", "role": "license" }
+    {
+      "path": "hikaru-asr-worker.exe",
+      "role": "worker"
+    },
+    {
+      "path": "ctranslate2.dll",
+      "role": "runtime"
+    },
+    {
+      "path": "hikaru_asr_tokenizer.dll",
+      "role": "runtime"
+    },
+    {
+      "path": "cublas64_12.dll",
+      "role": "nvidia-runtime"
+    },
+    {
+      "path": "cublasLt64_12.dll",
+      "role": "nvidia-runtime"
+    },
+    {
+      "path": "msvcp140.dll",
+      "role": "microsoft-runtime"
+    },
+    {
+      "path": "vcomp140.dll",
+      "role": "microsoft-runtime"
+    },
+    {
+      "path": "vcruntime140.dll",
+      "role": "microsoft-runtime"
+    },
+    {
+      "path": "vcruntime140_1.dll",
+      "role": "microsoft-runtime"
+    },
+    {
+      "path": "cuda-fatbin.json",
+      "role": "cuda-attestation"
+    },
+    {
+      "path": "licenses/THIRD-PARTY-NOTICES.json",
+      "role": "license-inventory"
+    },
+    {
+      "path": "licenses/CTranslate2-MIT.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/oneDNN-Apache-2.0.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/pocketfft-BSD-3-Clause.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/nlohmann-json-MIT.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/tokenizers-Apache-2.0.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/onig-MIT.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/onig-sys-MIT.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/NVIDIA-CUDA-Runtime.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/Microsoft-Visual-Cpp-Runtime.txt",
+      "role": "license"
+    },
+    {
+      "path": "licenses/Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx",
+      "role": "license"
+    }
   ],
   "importOwners": [
     "hikaru-asr-worker.exe",

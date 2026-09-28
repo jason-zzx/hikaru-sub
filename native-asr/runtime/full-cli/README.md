@@ -9,7 +9,7 @@ Official GitHub and normal `https://ghfast.top/` source downloads both match and
 isolated closure, three-engine authorization and CUDA probe checks. Default
 `../crispasr-product-lock.json` embeds Qwen+Parakeet+ReazonSpeech on both devices with
 truthful publication flags. Ordinary builds require no candidate environment input.
-CPU archive is `native-asr/artifacts/crispasr-cpu-shared-v3.zip`; CUDA remains separate/on-demand.
+CPU archive is `native-asr/artifacts/crispasr-cpu-shared-v4.zip`; CUDA remains separate/on-demand.
 Exact shared-v2 rollback authority is retained at `../crispasr-product-lock-v2.json`;
 Qwen-only v1, old remote assets and historical proofs are untouched. This dependency
 publication is not an application release. A candidate build still uses its explicit
