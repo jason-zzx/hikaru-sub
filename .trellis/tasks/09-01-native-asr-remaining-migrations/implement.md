@@ -45,7 +45,7 @@ complete. General VAD has not started.
 - [x] Freeze VAD device policy: VAD always runs on CPU; the selected device controls only the main ASR model.
 - [ ] Reuse the frozen Qwen CPU VAD dependency and inventory the additional VAD behavior required by other production routes; do not redesign Qwen's fixed pipeline.
 - [ ] Refine `09-01-native-asr-vad-migration` with exact applicability, model asset, CPU runtime and failure policy.
-- [ ] Implement the minimum shared CPU VAD mechanism required by those routes without adding VAD device UI or CUDA pack content.
+- [ ] Implement the minimum shared CPU VAD mechanism required by those routes without adding VAD device UI, a VAD CUDA runtime, or bundled/per-device VAD weights; preserve the existing CPU Silero implementation/support inside the full CrispASR CUDA CLI.
 - [ ] Validate both `CPU VAD -> CPU ASR` and `CPU VAD -> CUDA ASR`, then complete the child quality check and archive it.
 
 ### Phase 5 - Parent integration check

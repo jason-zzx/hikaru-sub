@@ -26,6 +26,6 @@
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Qwen full-CLI functionality/delivery and owner CPU/CUDA application runs accepted; CUDA publication review owner-closed, independent review not executed. Cleanup/timeline retirement accepted. Qwen remains in_progress for owner-authorized exact-byte stable build-lock relocation and scratch decoupling, followed by offline checks and independent review before parent-owned archive; no premature completion count. Parakeet, ReazonSpeech and general VAD remain pending; no sibling start or application release authorized.",
+  "notes": "Three of four children are completed and archived: Qwen on 2026-09-09, Parakeet on 2026-09-15, and ReazonSpeech on 2026-09-23. Qwen cleanup/build-lock relocation and scratch decoupling were accepted; the owner waived further independent review, which was not executed. All three routes include mandatory CPU Silero; ReazonSpeech shared-v3 dependency/default enablement is complete, with shared-v2 retained for rollback. General Native VAD is the next child but remains planning and has not been authorized for implementation. Parent cross-route integration acceptance remains pending. Application release/versioning and Git history operations remain outside this task.",
   "meta": {}
 }

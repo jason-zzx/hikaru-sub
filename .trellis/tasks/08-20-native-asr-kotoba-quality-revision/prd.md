@@ -2,19 +2,20 @@
 
 ## Goal
 
-在 Native MVP 发布后，建立新的 Kotoba K3 candidate，继承 K2 已审查的长音频安全机制并改善字幕质量。该任务是 post-MVP engine expansion，不阻塞、撤销或改变首版 `faster-whisper / large-v3 / CPU` 路线。
+为已接入生产 Native ASR 的 Kotoba 建立新的 K3 candidate，继承 K2 已审查的长音频安全机制并改善字幕质量。该任务是独立的后续质量修订，不是 Kotoba 首次产品接入，也不阻塞、撤销或改变现有 Faster-Whisper/Kotoba CPU/CUDA 路线。
 
 ## Priority And Release Role
 
 - Priority: P3。
 - Post-MVP、non-blocking。
-- 默认在 T18 和 P1 `08-26-native-asr-whisper-model-expansion` 完成后启动；只有用户再次明确调高优先级时提前。
+- 原前置 T18（`08-28-native-asr-release-cutover`）和 `08-26-native-asr-whisper-model-expansion` 已分别于 2026-08-29、2026-08-30 完成归档，不再是待完成依赖。
+- Kotoba 已通过独立产品接入任务交付，K3 不属于 `09-01-native-asr-remaining-migrations`；仍保持 planning/P3，启动或调高优先级须由用户明确批准。
 
 ## Authority And Dependencies
 
 - 依赖归档 T07 development CTranslate2 CUDA seam 和归档 T08 K2 的 bounded-stride、latest-start ownership、exact-dedup、progress、cache compatibility 合同。
 - K2 历史 disposition 保持 `stop-revise`，不得改写。
-- 未来模型交付依赖 T12 的 post-MVP Kotoba manifest/readiness expansion。
+- exact Kotoba manifest/readiness 已由归档 `08-30-native-asr-kotoba-integration` 接通现有模型管理器，不再等待 T12 扩展；未来 K3 候选复用该交付体系，不覆盖已交付路线。
 - 字幕质量判断只以用户提供的 WAV+ASS 真值和已批准门槛为准；Python legacy 输出仅作非门禁历史诊断。模型/分发资源仍遵守产品完整性校验，不以临时 runner、日志或结果哈希决定 K3 可用性。
 
 ## Requirements
@@ -24,7 +25,7 @@
 3. 不得 reference-match、reference-based dedup、backfill、gap fill、fuzzy merge、clip/stretch 或 synthetic timing。
 4. 同一 K3 模型/算法/配置完成 short-v1、medium-v1、long-v2；单 case 失败不截断矩阵。
 5. 保持 Kotoba-only preprocessor、128-mel、window 和 cache readiness 合同，不改变 ordinary Whisper MVP。
-6. 只有 qualified K3 才能在后续版本启用；失败时保持 visible/unavailable。
+6. 只有 qualified K3 才能作为后续候选启用；失败时不提升 K3，不得因此把现有已交付 Kotoba 路线改为 unavailable。
 
 ## Acceptance Criteria
 

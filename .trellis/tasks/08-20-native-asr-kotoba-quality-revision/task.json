@@ -2,7 +2,7 @@
   "id": "native-asr-kotoba-quality-revision",
   "name": "native-asr-kotoba-quality-revision",
   "title": "Revise native Kotoba K3 quality",
-  "description": "Post-MVP: create a Kotoba K3 identity that preserves K2 safety mechanics while improving subtitle quality without blocking the released large-v3 CPU route.",
+  "description": "Independent follow-up quality revision for the already integrated Native Kotoba route: create a K3 candidate preserving K2 safety mechanics without blocking or disabling existing Faster-Whisper/Kotoba CPU/CUDA routes.",
   "status": "planning",
   "dev_type": null,
   "scope": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Original T18 and Faster-Whisper expansion prerequisites are completed and archived; exact Kotoba model delivery was completed separately by 08-30-native-asr-kotoba-integration. K3 remains planning/P3 and is not a child or acceptance gate of remaining Native ASR migrations. No implementation or priority change is authorized; historical K2 stop-revise evidence remains unchanged.",
   "meta": {}
 }

@@ -21,6 +21,6 @@
   "children": [],
   "parent": "09-01-native-asr-remaining-migrations",
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Qwen, Parakeet and ReazonSpeech prerequisites are completed and archived; all three already use the frozen mandatory CPU Silero dependency. This child remains planning for additional route applicability and general VAD configuration, not reimplementation of those pipelines. PRD exists, design.md/implement.md are pending, and implement.jsonl/check.jsonl are empty. No implementation start is authorized; VAD stays CPU-only for both CPU and CUDA ASR.",
   "meta": {}
 }

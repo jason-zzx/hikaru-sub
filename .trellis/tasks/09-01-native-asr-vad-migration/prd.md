@@ -6,9 +6,10 @@
 
 ## Background
 
-- v0.4.1 的 Python 路线曾使用 Silero VAD 或引擎专用分块策略；当前 Qwen 已交付必需 CPU Silero，其他引擎/通用 Native VAD 尚未实现。
-- Qwen child 的固定前处理/依赖交付与 CPU/CUDA 功能已接受，用户确认双设备应用成功；本 child 复用冻结合同，不重新实现或验收该前置部分。
-- 其他引擎与通用 VAD 会改变模型输入、进度和取消边界，仍须晚于三条模型路线完成，并复用已经冻结的 Qwen 依赖；不改变 Qwen 已批准的上游 LIS/插值，不重新引入其字幕质量研究。
+- v0.4.1 的 Python 路线曾使用 Silero VAD 或引擎专用分块策略；当前 Qwen、Parakeet 与 ReazonSpeech 均已交付必需 CPU Silero。Faster-Whisper/Kotoba 的额外 VAD 需求与通用配置仍待本 child 盘点，不默认所有引擎采用同一策略。
+- 三条前置模型 child 均已完成并归档：Qwen 于 2026-09-09、Parakeet 于 2026-09-15、ReazonSpeech 于 2026-09-23。本 child 复用已冻结的模型/runtime/交付与失败合同，不重新实现或重复验收已交付的必需 VAD。
+- 前置顺序条件已满足，但本 child 仍处于 planning，尚未获准实施；现有 implement.jsonl/check.jsonl 为空，design.md/implement.md 尚未编写。后续须先明确适用矩阵与配置语义，再经用户批准启动。
+- 通用 VAD 会改变模型输入、进度和取消边界；不改变 Qwen 已批准的 LIS/插值、Parakeet 上游切片/实际音频再次转录或 ReazonSpeech pure-RNNT endpoint/PCM-support 合同，不重新引入已完成模型的字幕质量研究。
 
 ## Requirements
 
@@ -25,7 +26,7 @@
 ## Acceptance Criteria
 
 - [ ] VAD 适用矩阵和每条路线的启用/禁用语义被冻结并写入后端权威能力；VAD device 固定为 CPU。
-- [ ] exact VAD model/CPU-runtime identity、来源、哈希和许可证合同完整，CUDA pack 中不存在 VAD runtime/model 副本。
+- [ ] exact VAD model/CPU-runtime identity、来源、哈希和许可证合同完整；不新增独立 VAD CUDA runtime，不捆绑或按设备复制 VAD 权重。现有 CrispASR CUDA CLI 中在 CPU 执行的 Silero 实现与 CPU 支撑代码不属于 VAD GPU 路线。
 - [ ] `CPU VAD -> CPU ASR` 与 `CPU VAD -> CUDA ASR` 均通过 short/medium/long、静音、leading/trailing silence、无语音、碎片语音和取消门禁。
 - [ ] 所有 accepted cue 时间轴可追溯到合法 VAD window + 模型输出，不新增 synthetic repair；Qwen 沿用用户已批准的上游 LIS/插值，不将旧 raw-only 规则套回该路线。
 - [ ] 无 Python、venv、PyTorch 或 sidecar fallback。

@@ -1,13 +1,10 @@
 # Complete remaining Native ASR migrations
 
-> **Narrow owner-authorized dependency exception:** ReazonSpeech may publish the exact
-> reviewed three-engine CUDA archive as one new immutable shared-v3 asset on the existing
-> `native-asr-cuda-v1` dependency release, verify official/China bytes, update default
-> build/download and bundled CPU authority, and run targeted local packaging validation.
-> Earlier blanket publication exclusions below remain for application releases, not this
-> exact dependency action. Preserve shared-v2 assets/lock/evidence; no tag/release creation,
-> app upload/version/CHANGELOG, Git staging/history, archive or next-engine work.
-> Minimal scope and stop/escalation boundaries are in the child’s latest authorization.
+> **已完成的依赖发布例外（历史授权，不得重用）：** ReazonSpeech child 已按用户单独授权，在既有
+> `native-asr-cuda-v1` dependency release 发布并验证 shared-v3 三引擎 CUDA 资产，完成默认
+> build/download、随包 CPU authority 切换及定向本地包装验证；shared-v2 保留回滚。
+> 该授权不允许本轮再次发布、创建 tag/release、上传应用、修改版本/CHANGELOG 或操作 Git 历史。
+> ReazonSpeech 随后已完成最终 review 并归档；通用 VAD 不自动开始。
 
 > **Qwen 当前状态**：完整 CLI + 默认 Q4_K pair + 必需 CPU Silero + 上游 LIS/word display（含批准的有界相邻异常合并）已完成双设备功能、交付和本地包装检查，工程复核接受，用户确认应用 CPU/CUDA 成功。选择/下载/启动及独立 CrispASR CUDA 源保持启用；CUDA 发布复核项由用户接受关闭，超时独立代理没有执行该次复核。Qwen 清理/开发 timeline 退休已接受；构建锁精确迁移和稳定 scratch 解耦已落盘；用户免除进一步复核后，child 于 2026-09-09 归档至 `.trellis/tasks/archive/2026-09/08-20-native-asr-qwen3-aligner/`，迁移独立复核未执行。Parakeet 已完成独立实施、shared-v2 依赖分发、默认双设备启用和最终复核，用户确认最终应用 CPU/CUDA 均可运行，并于 2026-09-15 归档至 `.trellis/tasks/archive/2026-09/09-01-native-asr-parakeet-productization/`。ReazonSpeech 已完成三引擎产品接线、双设备 short/medium/long functional matrix、本地 CPU/CUDA 应用验证及 owner-authorized shared-v3 dependency/default authority 切换；shared-v2 保留回滚，child 已完成最终 review 并归档，通用 VAD 不自动开始。Qwen、Parakeet 与 ReazonSpeech 均采用各自 CPU/CUDA functional-only 验收，不恢复旧字幕质量矩阵、量化竞赛或 CPU 质量继承。证据与限制见各 child 规划。
 
@@ -69,8 +66,8 @@
 
 ### R4 - Qwen prerequisite first; general VAD last; always CPU
 
-- Qwen 必需的最小 CPU VAD 由 Qwen child 前置接入并冻结，为固定前处理，不开放全局 UI；Qwen 下载总进度和启动 readiness 必须覆盖该依赖。
-- Parakeet 已按其完整上游日语流程复用已冻结 Silero。ReazonSpeech child 同样仅可把该 exact CPU Silero 作为 pinned 完整 CLI 的必需 `model + vad` 依赖，覆盖逻辑下载/readiness、失败不降级与共享资产清理保护；这不是通用 VAD 产品化，不开放设置或设备选择。其余引擎/通用 Native VAD 仍在三条模型路线完成后实现，不重新设计 Qwen 行为。
+- Qwen 必需的最小 CPU VAD 已由 Qwen child 前置接入并冻结，为固定前处理，不开放全局 UI；Qwen 下载总进度和启动 readiness 覆盖该依赖。
+- Parakeet 已按其完整上游日语流程复用已冻结 Silero。ReazonSpeech 也已将该 exact CPU Silero 作为 pinned 完整 CLI 的必需 `model + vad` 依赖，覆盖逻辑下载/readiness、失败不降级与共享资产清理保护；这不是通用 VAD 产品化，不开放设置或设备选择。三条模型前置均已完成，其余引擎/通用 Native VAD 仍待独立规划与实施批准，不重新设计已交付路线。
 - VAD 模型与推理固定使用 CPU，即使主 ASR 模型选择 CUDA；不提供 VAD CUDA runtime、设备选择或 GPU 资格声明。
 - 请求中的 `cpu|cuda|auto` 只决定主 ASR 模型设备。CUDA ASR 路线启用 VAD 时，先在 CPU 完成 VAD window 计算，再将窗口交给 CUDA ASR。
 - VAD 子任务负责明确适用引擎、协议参数、模型资产、CPU runtime 依赖、时间轴影响和失败策略。
@@ -84,6 +81,8 @@
 - 版本号、CHANGELOG、安装包发布、GitHub Release、合并、提交和推送不属于本任务。
 
 ## Acceptance Criteria
+
+前三个模型 child 的完成状态由 AC1–AC3 记录；AC5–AC9 保留为父任务最终跨路线集成检查，未勾选不表示已归档模型需要重新迁移，也不表示本轮已完成这些检查。
 
 - [x] AC1: Qwen3-ASR 与 exact ForcedAligner companion 功能迁移及清理已接受，构建锁迁移已落盘；用户明确免除进一步复核后，子任务于 2026-09-09 归档。迁移独立复核未执行，未新增提交或发布。
 - [x] AC2: Parakeet exact 日语模型完成生产 Native ASR 迁移，并于 2026-09-15 归档对应子任务。

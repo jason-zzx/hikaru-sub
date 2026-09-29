@@ -21,7 +21,7 @@ parent integration check
 ```
 
 - 各 child 拥有 exact 模型 identity、算法和双设备 runtime 合同；Qwen、Parakeet 与 ReazonSpeech 均按各自 upstream pipeline 完成 functional-only 验证。
-- Qwen 必需 CPU VAD 在 Qwen child 冻结；Parakeet 已按批准的完整上游日语流程复用该依赖。ReazonSpeech child 仅可把同一 exact Silero 作为 pinned 完整 CLI 的必需 `model + vad` 依赖并覆盖下载/readiness/失败与共享资产保护；这不提前开放通用 VAD。其余引擎与通用 VAD 最后处理，不反向改写 Qwen 流程。
+- Qwen 必需 CPU VAD 已在 Qwen child 冻结；Parakeet 已按批准的完整上游日语流程复用该依赖。ReazonSpeech 也已将同一 exact Silero 作为 pinned 完整 CLI 的必需 `model + vad` 依赖，覆盖下载/readiness/失败与共享资产保护；三者均已完成归档，但不代表通用 VAD 已交付。其余引擎与通用 VAD 最后处理，不反向改写已完成路线。
 - 父任务只在所有 child 完成后执行跨路线一致性检查，不包含应用发布。
 
 ## Shared contracts
@@ -73,7 +73,7 @@ parent integration check
 - CPU ASR 数据流为 `CPU VAD -> CPU ASR`；CUDA ASR 数据流为 `CPU VAD -> CUDA ASR`。
 - VAD window 必须携带原始音频偏移并在主 ASR 输出后只加一次，避免 CPU/GPU 数据流产生不同时间轴。
 - 显式启用 VAD 后，VAD model/runtime 缺失、损坏或执行失败都结构化失败；不得自动改为 no-VAD 重跑。
-- VAD 不提供独立 CUDA runtime pack、不声明 CUDA 加速，模型权重不随 runtime 捆绑或因设备复制。Qwen 完整 CUDA CLI 可包含实际在 CPU 执行的 Silero 实现及 CPU 支撑代码，这不是 VAD GPU 路线。Qwen 必需依赖先冻结，Parakeet 已复用；ReazonSpeech 仅在自己的 functional-only child 中复用同一 exact Silero 与 pinned CLI orchestration，通用 VAD 后续再扩展适用范围。不得重开已完成模型的质量实验或改变既有 Qwen/Parakeet 输入合同。
+- VAD 不提供独立 CUDA runtime pack、不声明 CUDA 加速，模型权重不随 runtime 捆绑或因设备复制。Qwen 完整 CUDA CLI 可包含实际在 CPU 执行的 Silero 实现及 CPU 支撑代码，这不是 VAD GPU 路线。Qwen 必需依赖已冻结，Parakeet 与 ReazonSpeech 均已在各自完成的 functional-only child 中复用同一 exact Silero 与 pinned CLI orchestration，通用 VAD 后续再扩展适用范围。不得重开已完成模型的质量实验或改变既有 Qwen/Parakeet/ReazonSpeech 输入合同。
 
 ## Compatibility
 

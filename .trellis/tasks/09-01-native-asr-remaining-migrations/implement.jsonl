@@ -1,4 +1,4 @@
-{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Shared Native ASR evidence, timing, quality and no-synthetic-repair contracts for all children."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Shared Native ASR functional validation, output safety and approved model-specific timing contracts; no subtitle-quality or performance-threshold qualification."}
 {"file":".trellis/spec/tauri/media-ffmpeg-asr.md","reason":"Shared Tauri Native worker, runtime, model delivery, job lifecycle and packaging contracts."}
 {"file":".trellis/tasks/archive/2026-09/08-20-native-asr-qwen3-aligner/prd.md","reason":"Completed first-child scope and ForcedAligner-derived timing requirements."}
 {"file":".trellis/tasks/archive/2026-09/09-01-native-asr-parakeet-productization/prd.md","reason":"Completed second-child scope and final Parakeet productization contract."}
