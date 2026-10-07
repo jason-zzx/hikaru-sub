@@ -1374,3 +1374,25 @@ Completed four approved safeguard-cleanup batches, preserving model/runtime inte
 ### Status
 
 [OK] **Completed**
+
+
+## Session 41: Native ASR optional VAD migration
+<!-- trellis-session: v=2 fp=81ebe9a702143a31 -->
+
+**Date**: 2026-10-07
+**Task**: Native ASR optional VAD migration
+**Branch**: `dev-crisp-asr`
+
+### Summary
+
+为七个 Faster-Whisper 模型与 Kotoba 新增默认关闭的可选 CPU Silero VAD（CT2 worker → CrispASR CPU standalone VAD export → 同一解码主体按原 PCM 区间逐段解码，偏移仅应用一次）；开放阈值/最短静音时长两个非持久参数，mandatory 三路线不受影响；修复长样本 0ms 尾窗与 EOF 后缀 timestamp 失败；全部短/中/长 CPU/CUDA 矩阵、生命周期与静音保护通过，用户手动验收通过；发布 CT2 CPU v6 / CUDA v4（CUDA 经官方+ghfast 双源完整校验与后端实际下载/安装/probe），CrispASR 不变；清理 88GiB 中间产物并按 ponytail-review 净减 61 行；应用保持 0.4.1，未推送分支或发布应用。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d35375b` | feat(asr): Add optional CPU VAD for CT2 routes with published CUDA v4 runtime |
+
+### Status
+
+[OK] **Completed**
