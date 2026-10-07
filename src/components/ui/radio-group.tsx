@@ -25,7 +25,7 @@ function RadioGroupItem({
       data-slot="radio-group-item"
       className={cn(
         // 外圈浅底 + 选中时主色边框；内点用主色实心，避免浅色模式下白点贴白底看不清
-        "group/radio-group-item peer relative flex aspect-square size-4 shrink-0 items-center justify-center rounded-full border-2 border-input bg-background outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 data-checked:border-primary",
+        "group/radio-group-item peer relative flex aspect-square size-4 shrink-0 items-center justify-center rounded-full border-2 border-input bg-background outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 data-[state=checked]:border-primary",
         className
       )}
       {...props}
