@@ -20,7 +20,6 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Select } from "../ui/select-adapter";
 import { ModelManager, type ModelManagerHandle } from "./ModelManager";
 import { defaultAsrModel } from "../../constants/asr";
-import { RUNTIME_DEPENDENCY_LABEL } from "../../constants/runtimeDependencies";
 import { useAsrAvailability } from "../../hooks/useAsrAvailability";
 import {
   cancelAsr,
@@ -565,7 +564,7 @@ export function TranscribeView() {
 
   const handleTranscribe = async () => {
     if (availabilityPending) {
-      setAsrError("正在检测 Native ASR 可用性，请稍后重试。");
+      setAsrError("正在检测转录环境，请稍后重试。");
       return;
     }
     if (!vadConfigValid) return;
@@ -761,29 +760,37 @@ export function TranscribeView() {
           </Labeled>
         </div>
         {optionalVadRoute && (
-          <div className="flex flex-col gap-3">
-            <label className="flex items-center gap-2 text-sm">
-              <Switch checked={useVad} onCheckedChange={setUseVad} disabled={settingsLocked} />
-              CPU VAD（跳过无语音区间）
-            </label>
-            {selectedUseVad && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Labeled label="语音阈值（0–1）">
-                  <Input type="number" min={0} max={1} step={0.01} value={vadThreshold}
-                    onChange={(event) => setVadThreshold(event.target.value)} disabled={settingsLocked}
-                    aria-invalid={!thresholdValid} aria-describedby="vad-threshold-help" />
-                  <span id="vad-threshold-help" className="text-xs text-text-muted">阈值越高越严格</span>
-                </Labeled>
-                <Labeled label="最短静音时长（ms）">
-                  <Input type="number" min={0} max={60000} step={1} value={vadMinSilence}
-                    onChange={(event) => setVadMinSilence(event.target.value)} disabled={settingsLocked}
-                    aria-invalid={!minSilenceValid} aria-describedby="vad-silence-help" />
-                  <span id="vad-silence-help" className="text-xs text-text-muted">连续静音达到该时长后结束语音段（0–60000，整数）</span>
-                </Labeled>
-              </div>
-            )}
-            {!vadConfigValid && <p role="alert" className="text-sm text-danger">请输入 0–1 的语音阈值和 0–60000 ms 的整数静音时长。</p>}
-          </div>
+          <details className="rounded-lg border border-border bg-surface">
+            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-text">
+              VAD 语音检测配置（高级）
+            </summary>
+            <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={useVad} onCheckedChange={setUseVad} disabled={settingsLocked} />
+                启用 VAD 预处理
+              </label>
+              <p className="text-xs text-text-muted">
+                对 Faster-Whisper 与 Kotoba 引擎生效：先用语音检测切分语音段、跳过无语音区间，再逐段转录，可缓解长音频遗漏。
+              </p>
+              {selectedUseVad && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Labeled label="语音阈值（0–1）">
+                    <Input type="number" min={0} max={1} step={0.01} value={vadThreshold}
+                      onChange={(event) => setVadThreshold(event.target.value)} disabled={settingsLocked}
+                      aria-invalid={!thresholdValid} aria-describedby="vad-threshold-help" />
+                    <span id="vad-threshold-help" className="text-xs text-text-muted">阈值越高越严格</span>
+                  </Labeled>
+                  <Labeled label="最短静音时长（ms）">
+                    <Input type="number" min={0} max={60000} step={1} value={vadMinSilence}
+                      onChange={(event) => setVadMinSilence(event.target.value)} disabled={settingsLocked}
+                      aria-invalid={!minSilenceValid} aria-describedby="vad-silence-help" />
+                    <span id="vad-silence-help" className="text-xs text-text-muted">连续静音达到该时长后结束语音段（0–60000，整数）</span>
+                  </Labeled>
+                </div>
+              )}
+              {!vadConfigValid && <p role="alert" className="text-sm text-danger">请输入 0–1 的语音阈值和 0–60000 ms 的整数静音时长。</p>}
+            </div>
+          </details>
         )}
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
           <span
@@ -794,12 +801,12 @@ export function TranscribeView() {
             }
           >
             {availabilityPending
-              ? "正在检测 Native ASR 可用性…"
+              ? "正在检测可用性…"
               : !availability.routeAvailable
                 ? availability.unavailableReason || "当前转录路线不可用"
                 : availability.deviceDownloadRequired
-                  ? "CUDA 运行时尚未安装，开始转录时可按提示下载"
-                  : "Native ASR 路线可用"}
+                  ? "CUDA 运行依赖尚未安装，开始转录时可按提示下载"
+                  : "当前转录路线可用"}
           </span>
           <Button
             variant="outline"
@@ -850,10 +857,10 @@ export function TranscribeView() {
               percent={hasMeasuredProgress ? percent : null}
               label={
                 !job
-                  ? "正在启动 Native ASR…"
+                  ? "正在启动转录…"
                   : !hasMeasuredProgress
                     ? job.status === "pending"
-                      ? "正在加载 Native ASR 模型…"
+                      ? "正在加载模型…"
                       : "正在处理首个音频片段…"
                     : `转录中 ${percent}%`
               }
@@ -970,7 +977,7 @@ export function TranscribeView() {
       <RuntimeDependencyDialog
         open={cudaPreparation.open}
         kind={cudaKind}
-        reason={`显式 CUDA 转录需要下载可选的 ${RUNTIME_DEPENDENCY_LABEL[cudaKind]}。安装后将继续检查模型并转录，不会回退 CPU。`}
+        reason="使用 CUDA 设备转录需要先下载 CUDA 运行依赖。安装后将继续检查模型并转录，不会回退 CPU。"
         sizeBytes={cudaPreparation.item?.expectedDownloadBytes ?? 0}
         targetPath={
           cudaPreparation.item?.path ?? (cudaKind === "crispasrCuda"

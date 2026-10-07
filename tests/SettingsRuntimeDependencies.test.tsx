@@ -14,13 +14,13 @@ describe("RuntimeDependenciesPanel", () => {
       { kind: "crispasrCpu", status: "available", managed: false },
       { kind: "crispasrCuda", status: "needsSetup", managed: true, reason: "外部分发与产品启用待确认" },
     ] }} />);
-    expect(screen.getByText("内置 CrispASR CPU 运行时")).toBeTruthy();
+    expect(screen.getByText("CPU 运行依赖")).toBeTruthy();
     expect(screen.getByText("外部分发与产品启用待确认")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "下载" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /下载/ })).toBeNull();
     rerender(<RuntimeDependenciesPanel {...props} probe={{ sourceMode: "official", items: [
       { kind: "crispasrCuda", status: "missing", managed: true, expectedDownloadBytes: 1024 },
     ] }} />);
-    await userEvent.click(screen.getByRole("button", { name: "下载" }));
+    await userEvent.click(screen.getByRole("button", { name: "下载（1.00 KB）" }));
     expect(prepare).toHaveBeenCalledWith("crispasrCuda");
   });
 
@@ -176,7 +176,7 @@ describe("RuntimeDependenciesPanel", () => {
     ] }} storage={null} onChangeSourceMode={vi.fn()} onMeasureStorage={vi.fn()}
       onCleanup={vi.fn()} onPrepareDependency={vi.fn()} onConfigureAsr={vi.fn()} />);
     expect(screen.getByText("FFmpeg")).toBeTruthy();
-    expect(screen.getByText("内置 Native ASR CPU 运行时")).toBeTruthy();
+    expect(screen.getByText("CPU 运行依赖")).toBeTruthy();
     expect(screen.queryByText(/Python|虚拟环境/)).toBeNull();
     expect(screen.queryByText("临时下载缓存")).toBeNull();
   });
@@ -220,7 +220,7 @@ describe("RuntimeDependenciesPanel", () => {
     );
 
     expect(screen.queryByText(verboseReason)).toBeNull();
-    expect(screen.getByRole("button", { name: "下载" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /下载/ })).toBeTruthy();
   });
 
   it("shows FFmpeg download progress", () => {

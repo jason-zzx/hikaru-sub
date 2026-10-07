@@ -1,9 +1,11 @@
 import type {
+  RuntimeDependencyItem,
   RuntimeDependencyKind,
   RuntimeDependencyProbe,
   RuntimeDependencySnapshot,
   RuntimeDependencySourceMode,
   RuntimeDependencyStorage,
+  RuntimeDependencyStorageItem,
 } from "../../types";
 import { Button } from "../ui/button";
 import { Select } from "../ui/select-adapter";
@@ -18,6 +20,39 @@ const STATUS_LABEL: Record<string, string> = {
   missing: "未安装",
   needsSetup: "需配置",
 };
+
+// CPU/CUDA 运行依赖在 UI 上按设备合并展示，不再暴露具体后端路线。
+const GROUP_KINDS = {
+  cpu: ["nativeAsrCpu", "crispasrCpu"],
+  cuda: ["nativeAsrCuda", "crispasrCuda"],
+} as const satisfies Record<string, RuntimeDependencyKind[]>;
+
+type RuntimeGroup = keyof typeof GROUP_KINDS;
+
+type Row<T> = { key: string; group?: RuntimeGroup; items: T[] };
+
+function groupRows<T extends { kind: RuntimeDependencyKind }>(items: T[]): Row<T>[] {
+  const rows: Row<T>[] = [];
+  for (const item of items) {
+    const group = (Object.keys(GROUP_KINDS) as RuntimeGroup[]).find((key) =>
+      (GROUP_KINDS[key] as readonly RuntimeDependencyKind[]).includes(item.kind),
+    );
+    if (!group) {
+      rows.push({ key: item.kind, items: [item] });
+      continue;
+    }
+    const existing = rows.find((row) => row.group === group);
+    if (existing) existing.items.push(item);
+    else rows.push({ key: `${group}Runtime`, group, items: [item] });
+  }
+  return rows;
+}
+
+function combinedStatus(items: { status: string }[]): string {
+  if (items.every((item) => item.status === "available")) return "available";
+  if (items.some((item) => item.status === "needsSetup")) return "needsSetup";
+  return "missing";
+}
 
 interface RuntimeDependenciesPanelProps {
   probe: RuntimeDependencyProbe | null;
@@ -56,10 +91,287 @@ export function RuntimeDependenciesPanel({
   const isActivePreparation = (snapshot?: RuntimeDependencySnapshot) =>
     snapshot?.status === "pending" || snapshot?.status === "running";
 
-  const downloadButtonText = (snapshot?: RuntimeDependencySnapshot) => {
-    if (!isActivePreparation(snapshot)) return "下载";
-    const progress = preparationProgress(snapshot);
-    return progress === null ? "下载中…" : `下载中 ${progress}%`;
+  const downloadButtonText = (
+    snapshot: RuntimeDependencySnapshot | undefined,
+    item?: RuntimeDependencyItem,
+  ) => {
+    if (isActivePreparation(snapshot)) {
+      const progress = preparationProgress(snapshot);
+      return progress === null ? "下载中…" : `下载中 ${progress}%`;
+    }
+    // 合并行内可能同时出现两个 CUDA 依赖包，附大小以区分。
+    return item?.expectedDownloadBytes != null
+      ? `下载（${formatDependencyBytes(item.expectedDownloadBytes)}）`
+      : "下载";
+  };
+
+  // 每个条目一组 path/version 行；单行条目直接传 [item]。
+  const metaLines = (
+    items: { kind: string; path?: string | null; version?: string | null }[],
+  ) =>
+    (["path", "version"] as const).map((field) =>
+      items.map(
+        (item) =>
+          item[field] && (
+            <p
+              key={`${field}-${item.kind}`}
+              className={`mt-1 truncate text-xs text-text-muted${
+                field === "path" ? " font-mono" : ""
+              }`}
+              title={item[field] ?? undefined}
+            >
+              {item[field]}
+            </p>
+          ),
+      ),
+    );
+
+  const renderPreparation = (kind: RuntimeDependencyKind) => {
+    const preparation = preparations[kind];
+    if (!preparation) return null;
+    const progress = preparationProgress(preparation);
+    const isPreparing = isActivePreparation(preparation);
+    return (
+      <div key={kind} className="mt-2 rounded-md border border-border bg-surface-raised px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+          <span>{preparation.stage}</span>
+          {progress !== null && <span>{progress}%</span>}
+          {preparation.status === "completed" && (
+            <span className="text-success">已完成</span>
+          )}
+          {preparation.status === "failed" && (
+            <span className="text-danger">失败</span>
+          )}
+          {preparation.status === "cancelled" && (
+            <span className="text-warning">已取消</span>
+          )}
+        </div>
+        {isPreparing && (
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-overlay">
+            <div
+              className={`h-full rounded-full bg-accent transition-[width] duration-300 ${
+                progress === null ? "w-1/3 animate-pulse" : ""
+              }`}
+              style={progress === null ? undefined : { width: `${progress}%` }}
+            />
+          </div>
+        )}
+        {preparation.error && (
+          <p className="mt-2 text-xs text-danger">{preparation.error}</p>
+        )}
+        {preparation.logTail.length > 0 && (
+          <details open className="mt-2">
+            <summary className="cursor-pointer select-none text-xs font-medium text-text">
+              下载日志
+            </summary>
+            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-text-muted">
+              {preparation.logTail.join("\n")}
+            </pre>
+          </details>
+        )}
+      </div>
+    );
+  };
+
+  const renderSingleItem = (item: RuntimeDependencyItem) => {
+    const needsAction = item.status !== "available";
+    const canDownload = needsAction && item.kind === "ffmpeg";
+    const canConfigure = needsAction && item.kind === "asrModels";
+    const preparation = preparations[item.kind];
+    const isPreparing = isActivePreparation(preparation);
+
+    return (
+      <div
+        key={item.kind}
+        className="grid gap-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-text">
+              {RUNTIME_DEPENDENCY_LABEL[item.kind]}
+            </span>
+            <span className="text-xs text-text-muted">
+              {STATUS_LABEL[item.status] ?? item.status}
+            </span>
+          </div>
+          {metaLines([item])}
+          {item.reason && (
+            <p className="mt-1 text-xs text-warning">{item.reason}</p>
+          )}
+          {renderPreparation(item.kind)}
+        </div>
+        <div className="flex flex-wrap items-start gap-2 md:justify-end">
+          {canDownload && onPrepareDependency && (
+            <Button
+              type="button"
+              onClick={() => onPrepareDependency(item.kind)}
+              disabled={isPreparing}
+              className="px-3 py-2 text-sm"
+            >
+              {downloadButtonText(preparation)}
+            </Button>
+          )}
+          {canConfigure && onConfigureAsr && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onConfigureAsr}
+              className="px-3 py-2 text-sm"
+            >
+              去配置
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCpuGroup = (items: RuntimeDependencyItem[]) => {
+    const available = items.every((item) => item.status === "available");
+    return (
+      <div
+        key="cpuRuntime"
+        className="grid gap-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-text">CPU 运行依赖</span>
+            <span className="text-xs text-text-muted">
+              {STATUS_LABEL[combinedStatus(items)]}
+            </span>
+          </div>
+          {metaLines(items)}
+          <p
+            className={`mt-1 text-xs ${
+              available ? "text-text-muted" : "text-danger"
+            }`}
+          >
+            {available
+              ? "随应用内置，无需单独下载"
+              : "内置 CPU 运行依赖缺失或损坏，请重新安装应用"}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCudaGroup = (items: RuntimeDependencyItem[]) => {
+    const downloadable = items.filter(
+      (item) => item.status !== "available" && item.expectedDownloadBytes != null,
+    );
+    return (
+      <div
+        key="cudaRuntime"
+        className="grid gap-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-text">CUDA 运行依赖</span>
+            <span className="text-xs text-text-muted">
+              {STATUS_LABEL[combinedStatus(items)]}
+            </span>
+          </div>
+          {metaLines(items)}
+          {items.map(
+            (item) =>
+              item.reason &&
+              (item.kind !== "nativeAsrCuda" || item.status === "available") && (
+                <p key={`reason-${item.kind}`} className="mt-1 text-xs text-warning">
+                  {item.reason}
+                </p>
+              ),
+          )}
+          <p className="mt-1 text-xs text-text-muted">
+            可选受管运行时，不进入安装包；仅使用 NVIDIA 设备 0，模型是否能载入取决于显存。
+          </p>
+          {items.map((item) => renderPreparation(item.kind))}
+        </div>
+        <div className="flex flex-wrap items-start gap-2 md:justify-end">
+          {onPrepareDependency &&
+            downloadable.map((item) => (
+              <Button
+                key={item.kind}
+                type="button"
+                title={item.path ?? undefined}
+                onClick={() => onPrepareDependency(item.kind)}
+                disabled={isActivePreparation(preparations[item.kind])}
+                className="px-3 py-2 text-sm"
+              >
+                {downloadButtonText(preparations[item.kind], item)}
+              </Button>
+            ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderStorageItem = (item: RuntimeDependencyStorageItem) => (
+    <div
+      key={item.kind}
+      className="grid gap-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-text">
+            {RUNTIME_DEPENDENCY_LABEL[item.kind]}
+          </span>
+          <span className="text-xs text-text-muted">
+            {formatDependencyBytes(item.sizeBytes)}
+          </span>
+        </div>
+        {metaLines([item])}
+      </div>
+      <div className="flex flex-wrap items-start gap-2 md:justify-end">
+        {item.managed && item.sizeBytes > 0 && (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={cleanupDisabled}
+            onClick={() => onCleanup(item.kind)}
+          >
+            清理
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderCudaStorageGroup = (items: RuntimeDependencyStorageItem[]) => {
+    const totalBytes = items.reduce((sum, item) => sum + item.sizeBytes, 0);
+    return (
+      <div
+        key="cudaRuntime"
+        className="grid gap-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-text">CUDA 运行依赖</span>
+            <span className="text-xs text-text-muted">
+              {formatDependencyBytes(totalBytes)}
+            </span>
+          </div>
+          {metaLines(items)}
+        </div>
+        <div className="flex flex-wrap items-start gap-2 md:justify-end">
+          {items.map(
+            (item) =>
+              item.managed &&
+              item.sizeBytes > 0 && (
+                <Button
+                  key={item.kind}
+                  type="button"
+                  variant="destructive"
+                  title={item.path ?? undefined}
+                  disabled={cleanupDisabled}
+                  onClick={() => onCleanup(item.kind)}
+                >
+                  清理
+                </Button>
+              ),
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -93,130 +405,13 @@ export function RuntimeDependenciesPanel({
         )}
 
         <div className="mt-4 divide-y divide-border">
-          {(probe?.items ?? []).map((item) => {
-            const needsAction = item.status !== "available";
-            const canDownload =
-              needsAction &&
-              (item.kind === "ffmpeg" ||
-                ((item.kind === "nativeAsrCuda" || item.kind === "crispasrCuda") && item.expectedDownloadBytes != null));
-            const canConfigure = needsAction && item.kind === "asrModels";
-            const preparation = preparations[item.kind];
-            const progress = preparationProgress(preparation);
-            const isPreparing = isActivePreparation(preparation);
-
-            return (
-              <div
-                key={item.kind}
-                className="grid gap-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-text">
-                      {RUNTIME_DEPENDENCY_LABEL[item.kind]}
-                    </span>
-                    <span className="text-xs text-text-muted">
-                      {STATUS_LABEL[item.status] ?? item.status}
-                    </span>
-                  </div>
-                  {item.path && (
-                    <p
-                      className="mt-1 truncate font-mono text-xs text-text-muted"
-                      title={item.path}
-                    >
-                      {item.path}
-                    </p>
-                  )}
-                  {item.version && (
-                    <p className="mt-1 truncate text-xs text-text-muted" title={item.version}>
-                      {item.version}
-                    </p>
-                  )}
-                  {item.reason &&
-                    !(item.kind === "nativeAsrCuda" && item.status !== "available") && (
-                      <p className="mt-1 text-xs text-warning">{item.reason}</p>
-                    )}
-                  {(item.kind === "nativeAsrCpu" || item.kind === "crispasrCpu") && (
-                    <p
-                      className={`mt-1 text-xs ${
-                        item.status === "available" ? "text-text-muted" : "text-danger"
-                      }`}
-                    >
-                      {item.status === "available"
-                        ? "随应用内置，无需单独下载"
-                        : "内置 Native ASR CPU 运行时缺失或损坏，请重新安装应用"}
-                    </p>
-                  )}
-                  {(item.kind === "nativeAsrCuda" || item.kind === "crispasrCuda") && (
-                    <p className="mt-1 text-xs text-text-muted">
-                      可选受管运行时，不进入安装包；仅使用 NVIDIA 设备 0，模型是否能载入取决于显存。
-                    </p>
-                  )}
-                  {preparation && (
-                    <div className="mt-2 rounded-md border border-border bg-surface-raised px-3 py-2">
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
-                        <span>{preparation.stage}</span>
-                        {progress !== null && <span>{progress}%</span>}
-                        {preparation.status === "completed" && (
-                          <span className="text-success">已完成</span>
-                        )}
-                        {preparation.status === "failed" && (
-                          <span className="text-danger">失败</span>
-                        )}
-                        {preparation.status === "cancelled" && (
-                          <span className="text-warning">已取消</span>
-                        )}
-                      </div>
-                      {isPreparing && (
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-overlay">
-                          <div
-                            className={`h-full rounded-full bg-accent transition-[width] duration-300 ${
-                              progress === null ? "w-1/3 animate-pulse" : ""
-                            }`}
-                            style={progress === null ? undefined : { width: `${progress}%` }}
-                          />
-                        </div>
-                      )}
-                      {preparation.error && (
-                        <p className="mt-2 text-xs text-danger">{preparation.error}</p>
-                      )}
-                      {preparation.logTail.length > 0 && (
-                        <details open className="mt-2">
-                          <summary className="cursor-pointer select-none text-xs font-medium text-text">
-                            下载日志
-                          </summary>
-                          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-text-muted">
-                            {preparation.logTail.join("\n")}
-                          </pre>
-                        </details>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-start gap-2 md:justify-end">
-                  {canDownload && onPrepareDependency && (
-                    <Button
-                      type="button"
-                      onClick={() => onPrepareDependency(item.kind)}
-                      disabled={isPreparing}
-                      className="px-3 py-2 text-sm"
-                    >
-                      {downloadButtonText(preparation)}
-                    </Button>
-                  )}
-                  {canConfigure && onConfigureAsr && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={onConfigureAsr}
-                      className="px-3 py-2 text-sm"
-                    >
-                      去配置
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {groupRows(probe?.items ?? []).map((row) =>
+            row.group === "cpu"
+              ? renderCpuGroup(row.items)
+              : row.group === "cuda"
+                ? renderCudaGroup(row.items)
+                : renderSingleItem(row.items[0]),
+          )}
           {!probe && <p className="py-3 text-sm text-text-muted">检测运行时依赖中…</p>}
         </div>
       </div>
@@ -237,43 +432,11 @@ export function RuntimeDependenciesPanel({
 
         {storage && (
           <div className="mt-4 divide-y divide-border">
-            {storage.items.map((item) => (
-              <div
-                key={item.kind}
-                className="grid gap-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-text">
-                      {RUNTIME_DEPENDENCY_LABEL[item.kind]}
-                    </span>
-                    <span className="text-xs text-text-muted">
-                      {formatDependencyBytes(item.sizeBytes)}
-                    </span>
-                  </div>
-                  {item.path && (
-                    <p
-                      className="mt-1 truncate font-mono text-xs text-text-muted"
-                      title={item.path}
-                    >
-                      {item.path}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-start gap-2 md:justify-end">
-                  {item.managed && item.sizeBytes > 0 && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={cleanupDisabled}
-                      onClick={() => onCleanup(item.kind)}
-                    >
-                      清理
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+            {groupRows(storage.items).map((row) =>
+              row.group === "cuda"
+                ? renderCudaStorageGroup(row.items)
+                : renderStorageItem(row.items[0]),
+            )}
           </div>
         )}
       </div>

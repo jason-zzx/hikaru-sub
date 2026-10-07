@@ -29,7 +29,7 @@ export function SettingsTranscriptionPanel({
   return (
     <SettingsSection
       title="日语转录（ASR）默认"
-      desc="内置 Native CPU 运行时；CUDA 是否可用由已发布运行时与本机能力决定，模型共用现有缓存"
+      desc="内置 CPU 运行依赖；CUDA 运行依赖按需下载，模型共用现有缓存"
     >
       <SettingsField label="引擎">
         <Select
@@ -72,9 +72,9 @@ export function SettingsTranscriptionPanel({
           }
         >
           {availability.loading
-            ? "正在检测 Native ASR 可用性…"
+            ? "正在检测可用性…"
             : availability.deviceDownloadRequired
-              ? "CUDA 运行时尚未安装，可在运行时依赖中下载"
+              ? "CUDA 运行依赖尚未安装，可在运行时依赖中下载"
               : availability.routeAvailable
                 ? "当前路线可用"
                 : availability.unavailableReason || "当前路线不可用"}

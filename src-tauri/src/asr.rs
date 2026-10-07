@@ -284,12 +284,12 @@ fn resolve_optional_vad_cli(
         return Ok(None);
     }
     if !supports_vad {
-        return Err("[vad_not_built] 所选 Native ASR 运行时不支持可选 VAD".into());
+        return Err("[vad_not_built] 当前运行环境不支持 VAD 预处理".into());
     }
     resolve_cpu()?
         .vad_cli_path
         .map(Some)
-        .ok_or_else(|| "[vad_not_built] 内置 CPU VAD 运行时不支持独立语音检测".to_string())
+        .ok_or_else(|| "[vad_not_built] 内置语音检测组件不支持独立语音检测".to_string())
 }
 
 fn native_host_key(backend: &str, artifact: &str, device: &str) -> String {
@@ -989,9 +989,9 @@ fn optional_vad_capability(
     cpu_export_available: bool,
 ) -> serde_json::Value {
     let reason = if !worker_supported {
-        Some("所选 Native ASR 运行时不支持可选 VAD")
+        Some("当前运行环境不支持 VAD 预处理")
     } else if !cpu_export_available {
-        Some("内置 CPU VAD 运行时缺失、损坏或不支持独立语音检测")
+        Some("内置语音检测组件缺失或损坏")
     } else {
         None
     };
@@ -1011,11 +1011,11 @@ fn public_native_engine(
         "device":available.then_some("cpu"),
         "devices":supported.then(|| serde_json::json!([
             {"device":"cpu", "available":cpu_available,
-                "reason":(!cpu_available).then_some("内置 Native ASR CPU 运行时缺失或损坏")},
+                "reason":(!cpu_available).then_some("内置 CPU 运行依赖缺失或损坏")},
             cuda_capability
         ])),
         "reason":(!supported).then_some("该引擎将在后续版本支持")
-            .or_else(|| (!cpu_available).then_some("内置 Native ASR CPU 运行时缺失或损坏")),
+            .or_else(|| (!cpu_available).then_some("内置 CPU 运行依赖缺失或损坏")),
     })
 }
 

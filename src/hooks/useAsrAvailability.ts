@@ -136,7 +136,7 @@ function optionalVadReason(engine: AsrEngineInfo | null, device: string): string
   if (device === "cuda" && capability?.downloadRequired) return null;
   return capability?.optionalVad?.available
     ? null
-    : capability?.optionalVad?.reason?.trim() || "当前运行时不支持可选 CPU VAD";
+    : capability?.optionalVad?.reason?.trim() || "当前运行环境不支持 VAD 预处理";
 }
 
 export function asrDeviceSelectOptions(

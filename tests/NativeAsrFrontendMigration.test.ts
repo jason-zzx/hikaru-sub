@@ -19,7 +19,7 @@ describe("Native ASR frontend migration contract", () => {
     expect(transcribe).toContain("!availability.routeAvailable");
     expect(transcribe).toContain("useVad: selectedUseVad");
     expect(transcribe).toContain("vadConfig: selectedUseVad ? { threshold, minSilenceDurationMs } : null");
-    expect(transcribe).not.toMatch(/启用 VAD|配置当前引擎依赖|无法启动 sidecar/);
+    expect(transcribe).not.toMatch(/配置当前引擎依赖|无法启动 sidecar/);
   });
 
   it("preserves download, polling, cancellation, document, ASS, and translation seams", () => {

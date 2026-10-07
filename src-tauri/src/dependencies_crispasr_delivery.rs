@@ -1,6 +1,6 @@
 //! Same dependency jobs/HTTP/hash/staging surfaces; independent artifact and root.
 use super::*;
-const PENDING: &str = "CrispASR CUDA 运行时缺失、损坏或设备探测失败；下载源尚未发布，可使用 CPU";
+const PENDING: &str = "CUDA 运行依赖缺失、损坏或设备探测失败；下载源尚未发布，可使用 CPU";
 
 pub(in crate::dependencies) fn managed_root(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(deps_dir(app)?.join("asr-runtime/crispasr/cuda"))
@@ -94,7 +94,7 @@ fn items_at(
             reason: if !ready && device == "cuda" && !download_available {
                 Some(PENDING.into())
             } else if !ready {
-                Some("CrispASR 运行时缺失、损坏或设备探测失败".into())
+                Some("运行依赖缺失、损坏或设备探测失败".into())
             } else {
                 None
             },

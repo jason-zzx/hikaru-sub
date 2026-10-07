@@ -478,7 +478,7 @@ describe("TranscribeView Native ASR flow", () => {
     const { user } = await renderAndStart();
 
     await screen.findByRole("button", { name: "取消转录" });
-    expect(screen.getByText("正在启动 Native ASR…")).toBeTruthy();
+    expect(screen.getByText("正在启动转录…")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "取消转录" }));
     expect(
@@ -527,7 +527,7 @@ describe("TranscribeView Native ASR flow", () => {
     );
 
     await user.click(start);
-    await screen.findByText("正在启动 Native ASR…");
+    await screen.findByText("正在启动转录…");
     expect(screen.queryByRole("status")).toBeNull();
 
     await act(async () => {
@@ -571,7 +571,7 @@ describe("TranscribeView Native ASR flow", () => {
       });
     const { user } = await renderAndStart();
 
-    await screen.findByText("正在加载 Native ASR 模型…");
+    await screen.findByText("正在加载模型…");
     expect(screen.queryByText("转录中 0%")).toBeNull();
     await screen.findByText("正在处理首个音频片段…");
     expect(screen.queryByText("转录中 0%")).toBeNull();

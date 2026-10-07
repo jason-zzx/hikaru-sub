@@ -5,10 +5,10 @@ import type {
 
 export const RUNTIME_DEPENDENCY_LABEL: Record<RuntimeDependencyKind, string> = {
   ffmpeg: "FFmpeg",
-  nativeAsrCpu: "内置 Native ASR CPU 运行时",
-  nativeAsrCuda: "Native ASR CUDA 运行时",
-  crispasrCpu: "内置 CrispASR CPU 运行时",
-  crispasrCuda: "CrispASR CUDA 运行时",
+  nativeAsrCpu: "CPU 运行依赖",
+  nativeAsrCuda: "CUDA 运行依赖",
+  crispasrCpu: "CPU 运行依赖",
+  crispasrCuda: "CUDA 运行依赖",
   asrModels: "ASR 模型缓存",
   downloads: "临时下载缓存",
   appCache: "应用缓存",

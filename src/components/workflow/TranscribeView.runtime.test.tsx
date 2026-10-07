@@ -27,8 +27,8 @@ vi.mock("../../services/subtitleRecovery", () => ({
 }));
 
 const routes = [
-  { engine: "faster-whisper", model: "large-v3", backend: "ctranslate2", kind: "nativeAsrCuda", label: "Native ASR CUDA 运行时", size: 571_034_856, path: "C:/app/deps/asr-runtime/cuda/current" },
-  { engine: "qwen3-asr", model: "Qwen/Qwen3-ASR-1.7B", backend: "crispasr", kind: "crispasrCuda", label: "CrispASR CUDA 运行时", size: 719_774_409, path: "C:/app/deps/asr-runtime/crispasr/cuda/current" },
+  { engine: "faster-whisper", model: "large-v3", backend: "ctranslate2", kind: "nativeAsrCuda", label: "CUDA 运行依赖", size: 571_034_856, path: "C:/app/deps/asr-runtime/cuda/current" },
+  { engine: "qwen3-asr", model: "Qwen/Qwen3-ASR-1.7B", backend: "crispasr", kind: "crispasrCuda", label: "CUDA 运行依赖", size: 719_774_409, path: "C:/app/deps/asr-runtime/crispasr/cuda/current" },
 ] as const;
 
 let runtimeReady: boolean;
@@ -188,7 +188,7 @@ describe.each(routes)("$backend CUDA start dependency", (route) => {
   });
   it("opens the correct runtime confirmation from an actual Start click before consent", async () => {
     const { user, start } = await mountRoute(route);
-    expect(screen.getByText("CUDA 运行时尚未安装，开始转录时可按提示下载")).toBeTruthy();
+    expect(screen.getByText("CUDA 运行依赖尚未安装，开始转录时可按提示下载")).toBeTruthy();
     await user.click(start);
     expect(await screen.findByRole("button", { name: "下载并继续" })).toBeTruthy();
     expect(screen.getByText(route.label)).toBeTruthy();
