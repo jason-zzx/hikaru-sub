@@ -27,7 +27,9 @@ export function verifyCrispasrTree(root, artifact, device) {
   check(manifest.artifactId === artifact.artifactId && manifest.schemaVersion === 1 && manifest.protocolVersion === 1);
   check(manifest.platform === "windows-x64" && manifest.arch === "x64");
   check(JSON.stringify(manifest.files) === JSON.stringify(artifact.files));
-  check(JSON.stringify(manifest.capabilities) === JSON.stringify({ backend: "crispasr", device, engines, vad: true, crispasr: true, cuda: device === "cuda", vulkan: false, modelsBundled: false }));
+  const { vadExport = false, ...capabilities } = manifest.capabilities;
+  check(typeof vadExport === "boolean" && (!vadExport || device === "cpu"));
+  check(JSON.stringify(capabilities) === JSON.stringify({ backend: "crispasr", device, engines, vad: true, crispasr: true, cuda: device === "cuda", vulkan: false, modelsBundled: false }));
   const expected = [...artifact.files.map(f => f.path), "runtime-manifest.json", "SHA256SUMS"].sort();
   check(new Set(expected.map(p => p.toLowerCase())).size === expected.length);
   check(JSON.stringify(names.sort()) === JSON.stringify(expected));

@@ -183,6 +183,32 @@ Good: shared embedded authority, verified model+VAD and local CUDA → normal Pa
 Wrong: `verified Qwen backend -> Parakeet ready`, or `unpublished CUDA -> installed CUDA unusable`.
 Correct: `embedded both-device engine support -> exact payload verification -> selected-engine authorization -> existing cached host/start`; publication controls download only.
 
+## Optional CT2 VAD dependency and current runtime authority
+
+- See [Optional CPU VAD for CT2](./media-ffmpeg-asr.md#optional-cpu-vad-for-ct2)
+  for request/worker behavior. `useVad` on check/download defaults false. Enabled
+  CT2 requests reuse the manifest's identical shared `requiredVad` identity,
+  revision, license and managed `deps/models/shared/silero/vad/<revision>` root;
+  do not permanently add a required dependency to the eight CT2 model rows.
+- Reuse the existing manager's effective-entry cache, exact dependency hashing,
+  direct/legacy reuse, official/HF-mirror URLs, partial resume, atomic publication,
+  shared VAD mutex and storage lease. A same-model active download with a different
+  dependency set is an explicit conflict. Neither repair nor per-model staging
+  removes shared VAD or siblings; existing all-model cleanup remains the owner.
+- Current CT2 authority is CPU v6 / CUDA v4 with `vad:true`; standalone
+  `vadExport:true` belongs only to the separate CrispASR CPU `shared-vad-local`
+  artifact. Full distribution verification still covers licenses and DLL closure;
+  no models, CUDA, Python or extra VAD runtime are bundled in installers.
+- CT2 CUDA v4 is published as `hikaru-asr-windows-x64-cuda-v4.zip` on the existing
+  `native-asr-cuda-v1` dependency release. Official GitHub and the same URL prefixed
+  by `https://ghfast.top/` were fully verified against the locked 571,097,001 bytes
+  and SHA-256 `9057dabf8da5e868c58de1eb3624729befe20e25c183046584ef122f1281c786`.
+  Both matching source rows and publication flags permit download; exact installed
+  bytes remain usable independently after verification/probe. Old remote assets
+  and CrispASR shared-v4 CUDA bytes, authority, source rows and publication state
+  remain unchanged. Dependency publication/local packaging is not an application
+  release; original artifact contracts above remain historical.
+
 ## Anti-Patterns
 
 - Reintroducing `%APPDATA%` / `%LOCALAPPDATA%\com.hikaru.sub` as large managed dependency roots

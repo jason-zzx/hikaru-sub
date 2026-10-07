@@ -167,6 +167,7 @@ pub(crate) struct ResolvedNativeLaunch {
     stderr_log_path: PathBuf,
     use_vad: bool,
     vad_config: Option<VadConfig>,
+    vad_cli_path: Option<String>,
     cli_work_dir: Option<PathBuf>,
     #[cfg(test)]
     capture_cli_result: Option<Arc<Mutex<Vec<u8>>>>,
@@ -185,6 +186,7 @@ impl ResolvedNativeLaunch {
         cache_root: &Path,
         use_vad: bool,
         vad_config: Option<VadConfig>,
+        vad_cli_path: Option<PathBuf>,
     ) -> Result<Self, String> {
         let limits = ProtocolLimits::load()?;
         validate_job_id(&job_id, &limits)?;
@@ -193,10 +195,31 @@ impl ResolvedNativeLaunch {
             .ok_or_else(|| format!("native ASR 不支持引擎：{engine}"))?
             .to_string();
         validate_route(&engine, &backend, &device, &model_paths, &limits)?;
+        let optional_vad = backend == "ctranslate2" && use_vad;
+        if backend == "ctranslate2"
+            && model_paths.iter().any(|(role, _)| role == "vad") != optional_vad
+            || vad_cli_path.is_some() != optional_vad
+        {
+            return Err("Native ASR 可选 VAD 需要 model、vad 与已验证 CPU CLI".into());
+        }
+        let vad_cli_path = vad_cli_path
+            .map(|path| {
+                reject_link_path(&path)?;
+                let path = canonical_existing(&path, "CPU VAD CLI")?;
+                if !path.is_file() {
+                    return Err("CPU VAD CLI 文件不存在".into());
+                }
+                protocol_path(&path, &limits)
+            })
+            .transpose()?;
         if language != "ja" {
             return Err("native ASR 仅接受日语源语言".into());
         }
-        validate_vad(use_vad, vad_config.as_ref())?;
+        if optional_vad {
+            validate_optional_vad(vad_config.as_ref())?;
+        } else {
+            validate_vad(use_vad, vad_config.as_ref())?;
+        }
         let full_cli = matches!(
             engine.as_str(),
             "qwen3-asr" | "parakeet" | "reazonspeech-nemo"
@@ -205,7 +228,7 @@ impl ResolvedNativeLaunch {
             return Err("Native full CLI 需要必需 CPU VAD、固定默认配置与 CPU/CUDA".into());
         }
 
-        if full_cli {
+        if full_cli || optional_vad {
             reject_link_path(&audio_path)?;
             for (_, path) in &model_paths {
                 reject_link_path(path)?;
@@ -268,7 +291,8 @@ impl ResolvedNativeLaunch {
         }
         let stderr_log_path = canonical_stderr_dir.join(format!("{job_id}.stderr.log"));
 
-        let cli_work_dir = full_cli.then(|| canonical_recovery_dir.join(format!("{job_id}-cli")));
+        let cli_work_dir = (full_cli || optional_vad)
+            .then(|| canonical_recovery_dir.join(format!("{job_id}-cli")));
         Ok(Self {
             cli_work_dir,
             #[cfg(test)]
@@ -285,6 +309,7 @@ impl ResolvedNativeLaunch {
             stderr_log_path,
             use_vad,
             vad_config,
+            vad_cli_path,
         })
     }
 }
@@ -403,7 +428,9 @@ fn validate_route(
         if roles.len() != 2 || !roles.contains("vad") || roles.contains("aligner") {
             return Err("Parakeet-family full CLI 只接受 model 与必需 CPU vad".into());
         }
-    } else if roles.len() != 1 {
+    } else if roles.len() != 1
+        && !(backend == "ctranslate2" && roles.len() == 2 && roles.contains("vad"))
+    {
         return Err("当前 native ASR route 只接受 model role".into());
     }
     if roles
@@ -415,7 +442,19 @@ fn validate_route(
     Ok(())
 }
 
-fn validate_vad(use_vad: bool, config: Option<&VadConfig>) -> Result<(), String> {
+pub(crate) fn validate_optional_vad(config: Option<&VadConfig>) -> Result<(), String> {
+    validate_vad(true, config)?;
+    if config.is_some_and(|config| {
+        config.min_speech_duration_ms.is_some()
+            || config.speech_pad_ms.is_some()
+            || config.max_segment_duration_ms.is_some()
+    }) {
+        return Err("可选 CPU VAD 仅支持 threshold 与 minSilenceDurationMs".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_vad(use_vad: bool, config: Option<&VadConfig>) -> Result<(), String> {
     if !use_vad {
         return Ok(());
     }
@@ -1239,6 +1278,8 @@ struct WorkerRequestV1<'a> {
     use_vad: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     vad_config: Option<&'a VadConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vad_cli_path: Option<&'a str>,
 }
 
 impl<'a> WorkerRequestV1<'a> {
@@ -1256,6 +1297,7 @@ impl<'a> WorkerRequestV1<'a> {
             device: &launch.device,
             language: &launch.language,
             use_vad: launch.use_vad,
+            vad_cli_path: launch.vad_cli_path.as_deref(),
             vad_config: launch
                 .use_vad
                 .then_some(launch.vad_config.as_ref())
@@ -1975,6 +2017,7 @@ mod tests {
         cancel_audio: PathBuf,
         device: String,
         engine: String,
+        use_vad: bool,
     }
 
     struct CrispAsrWorkerInputs {
@@ -2246,23 +2289,6 @@ mod tests {
         })
     }
 
-    fn production_worker_supports_vad(worker: &Path) -> bool {
-        let Some(parent) = worker.parent() else {
-            return true;
-        };
-        let manifest = parent.join("runtime-manifest.json");
-        if !manifest.is_file() {
-            return true;
-        }
-        let value: Value = serde_json::from_slice(
-            &fs::read(&manifest).expect("packaged worker runtime manifest cannot be read"),
-        )
-        .expect("packaged worker runtime manifest is invalid");
-        value["capabilities"]["vad"]
-            .as_bool()
-            .expect("packaged worker runtime manifest is missing capabilities.vad")
-    }
-
     fn production_worker_inputs() -> Option<ProductionWorkerInputs> {
         let values = [
             std::env::var_os("HIKARU_ASR_PRODUCTION_WORKER"),
@@ -2274,6 +2300,9 @@ mod tests {
             std::env::var_os("HIKARU_ASR_CT2_CANCEL_AUDIO_PATH"),
             std::env::var_os("HIKARU_ASR_CT2_DEVICE"),
             std::env::var_os("HIKARU_ASR_CT2_ENGINE"),
+            std::env::var_os("HIKARU_ASR_CT2_VAD_PATH"),
+            std::env::var_os("HIKARU_ASR_CT2_VAD_CLI"),
+            std::env::var_os("HIKARU_ASR_CT2_CANCEL_STAGE"),
         ];
         if values.iter().all(Option::is_none) {
             assert!(
@@ -2333,7 +2362,16 @@ mod tests {
                 "CUDA host tests require HIKARU_ASR_CT2_CANCEL_AUDIO_PATH"
             );
         }
+        assert_eq!(
+            optional_values[4].is_some(),
+            optional_values[5].is_some(),
+            "CT2 VAD host tests require both model and verified CPU CLI"
+        );
+        for path in optional_values[4..6].iter().flatten() {
+            assert!(Path::new(path).is_file(), "CT2 VAD test input is missing");
+        }
         Some(ProductionWorkerInputs {
+            use_vad: optional_values[4].is_some(),
             worker,
             cpu_worker,
             model,
@@ -2361,6 +2399,20 @@ mod tests {
         fs::create_dir_all(&output).unwrap();
         let audio = workspace.join("audio.wav");
         fs::copy(source_audio, &audio).unwrap();
+        let mut model_paths = model_paths;
+        let vad_cli = if use_vad && matches!(engine, "faster-whisper" | "kotoba-faster-whisper") {
+            model_paths.push((
+                "vad".into(),
+                PathBuf::from(
+                    std::env::var_os("HIKARU_ASR_CT2_VAD_PATH").expect("CT2 VAD model missing"),
+                ),
+            ));
+            Some(PathBuf::from(
+                std::env::var_os("HIKARU_ASR_CT2_VAD_CLI").expect("CT2 VAD CLI missing"),
+            ))
+        } else {
+            None
+        };
         ResolvedNativeLaunch::resolve(
             job_id.into(),
             engine.into(),
@@ -2372,6 +2424,7 @@ mod tests {
             &cache,
             use_vad,
             vad_config,
+            vad_cli,
         )
         .unwrap()
     }
@@ -2562,7 +2615,6 @@ mod tests {
     }
 
     fn restricted_cuda_path(worker: &Path) -> EnvVarGuard {
-        let cuda_root = PathBuf::from(std::env::var_os("CUDA_PATH").expect("CUDA_PATH missing"));
         let system_root =
             PathBuf::from(std::env::var_os("SystemRoot").expect("SystemRoot missing"));
         let entries = [
@@ -2570,7 +2622,6 @@ mod tests {
                 .parent()
                 .expect("worker directory missing")
                 .to_path_buf(),
-            cuda_root.join("bin"),
             system_root.join("System32"),
         ];
         let value = std::env::join_paths(entries).expect("restricted CUDA PATH is invalid");
@@ -2624,6 +2675,7 @@ mod tests {
             &cache,
             false,
             None,
+            None,
         )
         .unwrap()
     }
@@ -2649,6 +2701,7 @@ mod tests {
             output.join("result.ass"),
             &cache,
             true,
+            None,
             None,
         )
         .unwrap()
@@ -2871,9 +2924,169 @@ mod tests {
             &cache,
             false,
             None,
+            None,
         )
         .unwrap_err();
         assert!(error.contains("workspace"));
+    }
+
+    fn optional_vad_fixture_launch(
+        temp: &TempDir,
+        job_id: &str,
+        engine: &str,
+        device: &str,
+    ) -> ResolvedNativeLaunch {
+        let base = fixture_launch(temp, job_id);
+        let vad = temp.path().join("vad.bin");
+        let cli = temp.path().join("crispasr.exe");
+        fs::write(&vad, b"fixture").unwrap();
+        fs::write(&cli, b"fixture").unwrap();
+        let model_id = if engine == "faster-whisper" {
+            "small"
+        } else {
+            "kotoba-tech/kotoba-whisper-v2.0-faster"
+        };
+        let args = serde_json::from_value(serde_json::json!({
+            "engine":engine, "model":model_id, "device":device,
+            "audioPath":base.audio_path, "outputAssPath":base.output_ass_path,
+            "useVad":true, "vadConfig":{"threshold":0.7,"minSilenceDurationMs":300}
+        }))
+        .unwrap();
+        let model = crate::asr_models::ResolvedNativeAsrModel {
+            logical_id: format!("{engine}/{model_id}"),
+            backend: "ctranslate2".into(),
+            revision: "synthetic".into(),
+            path: PathBuf::from(&base.model_paths[0].path),
+            roles: vec![
+                ("model".into(), PathBuf::from(&base.model_paths[0].path)),
+                ("vad".into(), vad),
+            ],
+            origin: crate::asr_models::NativeAsrModelOrigin::DirectInstall,
+        };
+        crate::asr::qualified_native_launch(
+            args,
+            model,
+            job_id.into(),
+            device.into(),
+            temp.path().join("cache"),
+            Some(cli),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn optional_vad_wire_roles_parameters_device_and_private_cleanup_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        let limits = ProtocolLimits::load().unwrap();
+        for engine in ["faster-whisper", "kotoba-faster-whisper"] {
+            for device in ["cpu", "cuda"] {
+                let launch = optional_vad_fixture_launch(&temp, "optional-vad", engine, device);
+                let request =
+                    serde_json::to_value(WorkerRequestV1::from_launch(&launch, &limits).unwrap())
+                        .unwrap();
+                assert_eq!(request["device"], device);
+                assert_eq!(request["backend"], "ctranslate2");
+                assert_eq!(request["useVad"], true);
+                assert!(
+                    (request["vadConfig"]["threshold"].as_f64().unwrap() - 0.7).abs() < 0.000001
+                );
+                assert_eq!(request["vadConfig"]["minSilenceDurationMs"], 300);
+                assert_eq!(request["modelPaths"][1]["role"], "vad");
+                assert!(Path::new(request["vadCliPath"].as_str().unwrap()).is_absolute());
+                assert_eq!(
+                    launch.cli_work_dir.unwrap(),
+                    launch
+                        .recovery_path
+                        .parent()
+                        .unwrap()
+                        .join("optional-vad-cli")
+                );
+            }
+        }
+        let mut off = fixture_launch(&temp, "off-vad");
+        off.vad_config = Some(
+            serde_json::from_value(serde_json::json!({"threshold":9,"speechPadMs":20000})).unwrap(),
+        );
+        let request =
+            serde_json::to_value(WorkerRequestV1::from_launch(&off, &limits).unwrap()).unwrap();
+        assert!(request.get("vadCliPath").is_none());
+        assert!(request.get("vadConfig").is_none());
+        assert!(off.cli_work_dir.is_none());
+        for (enabled, include_vad, include_cli) in [
+            (true, false, true),
+            (true, true, false),
+            (false, true, false),
+            (false, false, true),
+        ] {
+            let mut models = vec![("model".into(), PathBuf::from(&off.model_paths[0].path))];
+            if include_vad {
+                models.push(("vad".into(), temp.path().join("vad.bin")));
+            }
+            assert!(ResolvedNativeLaunch::resolve(
+                "bad-vad".into(),
+                "faster-whisper".into(),
+                models,
+                "cpu".into(),
+                "ja".into(),
+                off.audio_path.clone(),
+                off.output_ass_path.clone(),
+                &temp.path().join("cache"),
+                enabled,
+                None,
+                include_cli.then(|| temp.path().join("crispasr.exe"))
+            )
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn optional_vad_fake_host_uses_one_gate_reaps_tree_and_cleans_private_result() {
+        let _guard = FAKE_WORKER_TEST_LOCK.lock().unwrap();
+        let Some(worker) = fake_worker() else {
+            return;
+        };
+        for scenario in ["success", "structured-error", "child-process-hang"] {
+            let temp = tempfile::tempdir().unwrap();
+            let gate = Arc::new(ActiveJobGate::default());
+            let host = host_for(&worker, scenario, Arc::clone(&gate));
+            let launch =
+                optional_vad_fixture_launch(&temp, "optional-vad-host", "faster-whisper", "cpu");
+            let private = launch.cli_work_dir.clone().unwrap();
+            let output = launch.output_ass_path.clone();
+            fs::write(&output, "existing subtitles").unwrap();
+            host.start(launch, gate.reserve().unwrap()).unwrap();
+            if scenario == "child-process-hang" {
+                let deadline = Instant::now() + Duration::from_secs(2);
+                while host.snapshot("optional-vad-host", false).unwrap().unwrap()["status"]
+                    != "running"
+                {
+                    assert!(Instant::now() < deadline);
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                fs::write(private.join("vad.json"), "private partial result").unwrap();
+                assert!(gate.reserve().is_err());
+                host.cancel("optional-vad-host").unwrap();
+            }
+            let snapshot = wait_terminal(&host, "optional-vad-host");
+            assert_eq!(
+                snapshot["status"],
+                match scenario {
+                    "success" => "completed",
+                    "structured-error" => "failed",
+                    _ => "cancelled",
+                }
+            );
+            assert!(host.is_reaped("optional-vad-host"));
+            assert!(!private.exists());
+            assert!(gate.current().is_none());
+            if scenario != "success" {
+                assert_eq!(fs::read_to_string(&output).unwrap(), "existing subtitles");
+            }
+            let next = host_for(&worker, "success", Arc::clone(&gate));
+            next.start(fixture_launch(&temp, "after-vad"), gate.reserve().unwrap())
+                .unwrap();
+            assert_eq!(wait_terminal(&next, "after-vad")["status"], "completed");
+        }
     }
 
     #[test]
@@ -3374,23 +3587,6 @@ mod tests {
     }
 
     #[test]
-    fn packaged_cpu_runtime_manifest_disables_candidate_b_host_paths() {
-        let temp = tempfile::tempdir().unwrap();
-        let worker = temp.path().join("hikaru-asr-worker.exe");
-        fs::write(&worker, b"worker").unwrap();
-        assert!(production_worker_supports_vad(&worker));
-        fs::write(
-            temp.path().join("runtime-manifest.json"),
-            serde_json::to_vec(&serde_json::json!({
-                "capabilities": { "vad": false }
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-        assert!(!production_worker_supports_vad(&worker));
-    }
-
-    #[test]
     fn production_worker_runs_the_selected_device_through_the_native_host() {
         let _guard = FAKE_WORKER_TEST_LOCK
             .lock()
@@ -3400,17 +3596,7 @@ mod tests {
             return;
         };
         let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
-        let cases = if inputs.device == "cuda"
-            || inputs.engine == "kotoba-faster-whisper"
-            || !production_worker_supports_vad(&inputs.worker)
-        {
-            vec![("production-ct2-selected", false)]
-        } else {
-            vec![
-                ("production-ct2-no-vad", false),
-                ("production-ct2-candidate-b", true),
-            ]
-        };
+        let cases = [("production-ct2-selected", inputs.use_vad)];
         for (job_id, use_vad) in cases {
             let temp = tempfile::tempdir().unwrap();
             let gate = Arc::new(ActiveJobGate::default());
@@ -3431,13 +3617,23 @@ mod tests {
             let stderr_log = launch.stderr_log_path.clone();
             host.start(launch, gate.reserve().unwrap()).unwrap();
 
-            let deadline = Instant::now() + Duration::from_secs(180);
+            let mut last_progress = Instant::now();
+            let mut previous = (0, 0);
             let snapshot = loop {
                 let snapshot = host.snapshot(job_id, true).unwrap().unwrap();
-                if snapshot["status"] == "completed" && host.is_reaped(job_id) {
+                let progress = (
+                    snapshot["durationMs"].as_i64().unwrap_or(0),
+                    snapshot["processedMs"].as_i64().unwrap_or(0),
+                );
+                if progress > previous {
+                    previous = progress;
+                    last_progress = Instant::now();
+                }
+                if host.is_reaped(job_id) {
+                    assert_eq!(snapshot["status"], "completed", "real CT2 host failed");
                     break snapshot;
                 }
-                if Instant::now() >= deadline {
+                if last_progress.elapsed() >= Duration::from_secs(120) {
                     let trace = host.event_trace(job_id);
                     let stderr_bytes = fs::metadata(&stderr_log)
                         .map(|metadata| metadata.len())
@@ -3521,7 +3717,7 @@ mod tests {
     }
 
     #[test]
-    fn production_worker_rejects_candidate_b_config_identity_drift() {
+    fn production_worker_fails_closed_for_corrupt_optional_vad() {
         let _guard = FAKE_WORKER_TEST_LOCK
             .lock()
             .unwrap_or_else(|error| error.into_inner());
@@ -3532,13 +3728,13 @@ mod tests {
         let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
         let temp = tempfile::tempdir().unwrap();
         let gate = Arc::new(ActiveJobGate::default());
-        let expected_error = if inputs.engine == "kotoba-faster-whisper" {
-            "[kotoba_vad_not_qualified]"
-        } else if production_worker_supports_vad(&inputs.worker) {
-            "[vad_config_identity_mismatch]"
-        } else {
-            "[vad_not_built]"
-        };
+        if !inputs.use_vad {
+            return;
+        }
+        let corrupt = temp.path().join("corrupt-vad.bin");
+        fs::write(&corrupt, b"invalid VAD").unwrap();
+        let _vad = replace_env("HIKARU_ASR_CT2_VAD_PATH", corrupt.to_str());
+        let expected_error = "[qwen_cli_vad_failed]";
         let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
         let launch = production_launch(
             &temp,
@@ -3557,8 +3753,11 @@ mod tests {
             }),
         );
         let recovery = launch.recovery_path.clone();
+        let output = launch.output_ass_path.clone();
+        fs::write(&output, "preserve prior ASS").unwrap();
         host.start(launch, gate.reserve().unwrap()).unwrap();
         let snapshot = wait_terminal(&host, "production-ct2-vad-error");
+        assert_eq!(fs::read_to_string(output).unwrap(), "preserve prior ASS");
         assert_eq!(snapshot["status"], "failed");
         assert!(snapshot["error"]
             .as_str()
@@ -3640,36 +3839,64 @@ mod tests {
         let _path = (inputs.device == "cuda").then(|| restricted_cuda_path(&inputs.worker));
         let temp = tempfile::tempdir().unwrap();
         let gate = Arc::new(ActiveJobGate::default());
-        let use_vad = inputs.engine == "faster-whisper"
-            && inputs.device == "cpu"
-            && production_worker_supports_vad(&inputs.worker);
-        let host = NativeAsrHost::new(inputs.worker, vec![], Arc::clone(&gate)).unwrap();
+        let use_vad = inputs.use_vad;
+        let host = NativeAsrHost::new(inputs.worker.clone(), vec![], Arc::clone(&gate)).unwrap();
         let launch = production_launch(
             &temp,
             "production-ct2-cancel",
             &inputs.engine,
-            inputs.model,
+            inputs.model.clone(),
             &inputs.cancel_audio,
             &inputs.device,
             use_vad,
             None,
         );
         let output = launch.output_ass_path.clone();
+        let private_work = launch.cli_work_dir.clone();
+        fs::write(&output, "preserve prior ASS").unwrap();
         host.start(launch, gate.reserve().unwrap()).unwrap();
-        let deadline = Instant::now() + Duration::from_secs(60);
-        while host
-            .snapshot("production-ct2-cancel", false)
-            .unwrap()
-            .unwrap()["durationMs"]
-            .as_i64()
-            .unwrap_or(0)
-            <= 0
-        {
+        let stage = std::env::var("HIKARU_ASR_CT2_CANCEL_STAGE").unwrap_or_else(|_| "asr".into());
+        assert!(matches!(stage.as_str(), "vad" | "asr"));
+        assert!(stage != "vad" || use_vad);
+        let mut last = Instant::now();
+        let mut previous = (0, 0);
+        loop {
+            let snapshot = host
+                .snapshot("production-ct2-cancel", false)
+                .unwrap()
+                .unwrap();
+            let duration = snapshot["durationMs"].as_i64().unwrap_or(0);
+            let processed = snapshot["processedMs"].as_i64().unwrap_or(0);
+            // Stderr is deliberately persisted only at EOF. Observe the existing
+            // owned Job instead: CT2's only child here is the CPU VAD CLI.
+            let record = host
+                .inner
+                .jobs
+                .lock()
+                .unwrap()
+                .get("production-ct2-cancel")
+                .unwrap()
+                .clone();
+            let vad_child_active = record.process_job.as_ref().unwrap().active().unwrap() > 1;
+            let progress = (duration, processed);
+            if progress > previous {
+                previous = progress;
+                last = Instant::now();
+            }
+            if (stage == "vad" && duration > 0 && vad_child_active && processed == 0)
+                || (stage == "asr" && processed > 0)
+            {
+                break;
+            }
             assert!(
-                Instant::now() < deadline,
-                "real CT2 worker did not reach ready"
+                !host.is_reaped("production-ct2-cancel"),
+                "worker ended before cancellation stage"
             );
-            std::thread::sleep(Duration::from_millis(20));
+            assert!(
+                last.elapsed() < Duration::from_secs(120),
+                "real CT2 has no forward progress"
+            );
+            std::thread::sleep(Duration::from_millis(5));
         }
         let started = Instant::now();
         host.cancel("production-ct2-cancel").unwrap();
@@ -3677,9 +3904,47 @@ mod tests {
         let snapshot = wait_terminal(&host, "production-ct2-cancel");
         assert_eq!(snapshot["status"], "cancelled");
         assert!(snapshot["detectedLanguage"].is_null());
-        assert!(!output.exists());
+        assert_eq!(fs::read_to_string(output).unwrap(), "preserve prior ASS");
         assert!(host.is_reaped("production-ct2-cancel"));
         assert!(gate.current().is_none());
+        assert!(private_work.is_none_or(|work| !work.exists()));
+        let retry = production_launch(
+            &temp,
+            "production-ct2-retry",
+            &inputs.engine,
+            inputs.model,
+            &inputs.audio,
+            &inputs.device,
+            use_vad,
+            None,
+        );
+        host.start(retry, gate.reserve().unwrap()).unwrap();
+        let mut last = Instant::now();
+        let mut previous = (0, 0);
+        loop {
+            let result = host
+                .snapshot("production-ct2-retry", true)
+                .unwrap()
+                .unwrap();
+            let progress = (
+                result["durationMs"].as_i64().unwrap_or(0),
+                result["processedMs"].as_i64().unwrap_or(0),
+            );
+            if progress > previous {
+                previous = progress;
+                last = Instant::now();
+            }
+            if host.is_reaped("production-ct2-retry") {
+                assert_eq!(result["status"], "completed");
+                assert!(gate.current().is_none());
+                break;
+            }
+            assert!(
+                last.elapsed() < Duration::from_secs(120),
+                "retry has no forward progress"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 
     #[test]
@@ -3709,6 +3974,7 @@ mod tests {
                 output.join(format!("{job_id}.ass")),
                 &cache,
                 false,
+                None,
                 None,
             )
         };

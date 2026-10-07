@@ -5,18 +5,18 @@
   "externalStableAssetPublished": true,
   "candidateId": "shared-simplify-b3-local",
   "cpu": {
-    "artifactId": "hikaru-asr-crispasr-windows-x64-cpu-shared-simplify-b3-local",
-    "manifestSha256": "9246580a3aadfe4345331276018a7c6d9dd18c745e58b322e2a73a74af4131d7",
+    "artifactId": "hikaru-asr-crispasr-windows-x64-cpu-shared-vad-local",
+    "manifestSha256": "88dd3eb1ae444b2c80fd7e626da32479e496e8e9b1006d1c090fdfa8f94da74a",
     "files": [
       {
         "path": "crispasr.exe",
         "sizeBytes": 17153536,
-        "sha256": "613397e7cc6b4b6a3290dd4405a56bc453eddab3a29ceea6f56474390581fdfc"
+        "sha256": "2dac40bce50ff287e7c641a97173542c8b8c946834cdf6eddb0fe143eb1469f8"
       },
       {
         "path": "hikaru-asr-worker.exe",
-        "sizeBytes": 370688,
-        "sha256": "6e2797cffe2c06bdedaf77643f58fce65ebe5c31be2587118cb3df89c173c069"
+        "sizeBytes": 379904,
+        "sha256": "d8d5158167d073f54b2e2112cadc266c65657bb145023b9f1607b5103cc3eb78"
       },
       {
         "path": "licenses/Apache-2.0.txt",
@@ -119,17 +119,17 @@
         "sha256": "e6bfb3662ab4b1969a73441dbe35c96d51441b6bff8cf1fe7430bd5b246ca605"
       }
     ],
-    "archive": {
-      "path": "native-asr/artifacts/crispasr-cpu-shared-v4.zip",
-      "root": "windows-x64/crispasr/cpu/",
-      "sizeBytes": 7665052,
-      "sha256": "57164cb7c4aaef92b60e7b81556399342a47ede8412f2fe9d3e0af87b4e682ce"
-    },
     "engines": [
       "qwen3-asr",
       "parakeet",
       "reazonspeech-nemo"
-    ]
+    ],
+    "archive": {
+      "path": "native-asr/artifacts/crispasr-cpu-shared-vad-local.zip",
+      "root": "windows-x64/crispasr/cpu/",
+      "sizeBytes": 7668406,
+      "sha256": "70e6a67026107f0fcb2e5d249a8cebda3714b0233f2582b6d8bedfc5d562a087"
+    }
   },
   "cuda": {
     "artifactId": "hikaru-asr-crispasr-windows-x64-cuda-shared-simplify-b3-local",

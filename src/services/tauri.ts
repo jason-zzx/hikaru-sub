@@ -234,16 +234,18 @@ export async function cancelAsr(jobId: string): Promise<void> {
 export async function checkAsrModel(
   engine: string,
   model: string,
+  useVad = false,
 ): Promise<AsrModelStatus> {
-  return invoke<AsrModelStatus>("check_asr_model", { engine, model });
+  return invoke<AsrModelStatus>("check_asr_model", { engine, model, useVad });
 }
 
 /** 触发模型下载，返回下载任务 jobId。 */
 export async function downloadAsrModel(
   engine: string,
   model: string,
+  useVad = false,
 ): Promise<string> {
-  return invoke<string>("download_asr_model", { engine, model });
+  return invoke<string>("download_asr_model", { engine, model, useVad });
 }
 
 /** 查询模型下载进度。 */

@@ -463,6 +463,9 @@ bool parse_request_line(std::string_view line, WorkerRequestV1& request, Protoco
     // Retain model-only historical development requests. Full CLI requires VAD.
     if (roles.size() > 2 || roles.count(ModelRole::Aligner))
       return fail(error, "unexpected_model_role", "parakeet-family routes accept only model and vad roles");
+  } else if (parsed.use_vad) {
+    if (roles.size() != 2 || !roles.count(ModelRole::Vad))
+      return fail(error, "missing_model_role", "CT2 VAD requires model and vad roles");
   } else if (roles.size() != 1) {
     return fail(error, "unexpected_model_role", "this route accepts only the model role");
   }
@@ -472,6 +475,20 @@ bool parse_request_line(std::string_view line, WorkerRequestV1& request, Protoco
     VadConfig config;
     if (!validate_vad_config(*vad, config, error)) return false;
     parsed.vad_config = std::move(config);
+  }
+
+  const auto cli = root.find("vadCliPath");
+  if (parsed.backend == Backend::CTranslate2 && parsed.use_vad) {
+    std::string path;
+    if (!required_string(root, "vadCliPath", path, error)) return false;
+    if (!valid_local_absolute_path(path))
+      return fail(error, "invalid_local_path", "vadCliPath must be an absolute local Windows path");
+    parsed.vad_cli_path = std::move(path);
+    if (parsed.vad_config && (parsed.vad_config->min_speech_duration_ms ||
+        parsed.vad_config->speech_pad_ms || parsed.vad_config->max_segment_duration_ms))
+      return fail(error, "unsupported_vad_config", "CT2 VAD accepts only threshold and minSilenceDurationMs");
+  } else if (cli != root.end()) {
+    return fail(error, "unexpected_vad_cli", "vadCliPath is only accepted for CT2 VAD");
   }
 
   request = std::move(parsed);

@@ -127,6 +127,7 @@ fn parakeet_cli_real_host_case() {
         "p2-real".into(),
         input.device.clone(),
         cache,
+        None,
     )
     .unwrap();
     launch.capture_cli_result = Some(Arc::clone(&capture));
@@ -189,7 +190,7 @@ fn parakeet_cli_real_host_case() {
             break;
         }
         assert!(
-            last_progress.elapsed() < Duration::from_secs(130),
+            last_progress.elapsed() < Duration::from_secs(120),
             "outer runner/worker watchdog must bound execution"
         );
         std::thread::sleep(Duration::from_millis(5));

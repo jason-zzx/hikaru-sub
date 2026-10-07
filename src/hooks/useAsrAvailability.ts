@@ -19,6 +19,7 @@ export type AsrModelRefreshOutcome =
 
 type ModelAvailabilityState = {
   engine: string;
+  useVad: boolean;
   loading: boolean;
   statuses: Record<string, AsrModelStatus>;
   errors: Record<string, string>;
@@ -126,10 +127,23 @@ function deviceCapability(
   };
 }
 
+function optionalVadReason(engine: AsrEngineInfo | null, device: string): string | null {
+  // Match prelaunch auto selection; VAD cannot silently switch the ASR device.
+  const capability = device === "auto"
+    ? engine?.devices?.find((item) => item.device === "cuda" && item.available) ?? deviceCapability(engine, "cpu")
+    : deviceCapability(engine, device);
+  // Missing downloadable CUDA is checked again after installation.
+  if (device === "cuda" && capability?.downloadRequired) return null;
+  return capability?.optionalVad?.available
+    ? null
+    : capability?.optionalVad?.reason?.trim() || "当前运行时不支持可选 CPU VAD";
+}
+
 export function asrDeviceSelectOptions(
   engine: AsrEngineInfo | null,
   loading: boolean,
   error: string | null,
+  useVad = false,
 ): SelectOption[] {
   return ASR_DEVICE_OPTIONS.map((option) => {
     const capability = deviceCapability(engine, option.value);
@@ -140,7 +154,7 @@ export function asrDeviceSelectOptions(
         : !engine?.available
           ? engine?.reason?.trim() || "当前引擎不可用"
           : capability?.available
-            ? null
+            ? useVad ? optionalVadReason(engine, option.value) : null
             : capability?.downloadRequired
               ? capability.reason?.trim() || "需下载 CUDA 运行时"
               : capability?.reason?.trim() || "当前设备不可用";
@@ -173,6 +187,7 @@ function projectFreshRoute(
   selectedModelStatus: AsrModelStatus | null,
   selectedModelError: string | null,
   device: string,
+  useVad: boolean,
 ): AsrAvailabilityRefreshOutcome {
   const capability = deviceCapability(selectedEngine, device);
   const deviceAvailable = !!selectedEngine?.available && !!capability?.available;
@@ -190,22 +205,28 @@ function projectFreshRoute(
   } else if (!deviceAvailable && !deviceDownloadRequired) {
     unavailableReason = capability?.reason?.trim() || "当前设备不可用";
   }
+  const vadReason = useVad ? optionalVadReason(selectedEngine, device) : null;
   return {
     routeAvailable:
+      !vadReason &&
       !!selectedEngine?.available &&
       !selectedModelError &&
       modelRouteAvailable(selectedModelStatus) &&
       (deviceAvailable || deviceDownloadRequired),
-    unavailableReason,
+    unavailableReason: unavailableReason ?? vadReason,
     deviceDownloadRequired,
   };
 }
 
-export function useAsrAvailability(engine: string, model: string, device: string) {
+export function useAsrAvailability(engine: string, model: string, device: string, useVad = false) {
   const activeEngineRef = useRef(engine);
   activeEngineRef.current = engine;
   const activeModelRef = useRef(model);
   activeModelRef.current = model;
+  const activeVadRef = useRef(useVad);
+  activeVadRef.current = useVad;
+  const activeDeviceRef = useRef(device);
+  activeDeviceRef.current = device;
   const engineRequestRef = useRef(0);
   const modelRequestRef = useRef(0);
   const selectedModelRequestRef = useRef(0);
@@ -214,6 +235,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
   const [engineError, setEngineError] = useState<string | null>(null);
   const [modelState, setModelState] = useState<ModelAvailabilityState>({
     engine,
+    useVad,
     loading: true,
     statuses: {},
     errors: {},
@@ -241,6 +263,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
   const refreshModels = useCallback(async (
     requestedEngine: string,
     selectedModel: string,
+    requestedVad: boolean,
   ): Promise<ModelAvailabilityState | null> => {
     const requestId = ++modelRequestRef.current;
     // Hash only one model at a time, with the user's selection first.
@@ -252,8 +275,9 @@ export function useAsrAvailability(engine: string, model: string, device: string
     ];
     setModelState((current) => ({
       engine: requestedEngine,
+      useVad: requestedVad,
       loading: true,
-      statuses: current.engine === requestedEngine
+      statuses: current.engine === requestedEngine && current.useVad === requestedVad
         ? Object.fromEntries(
             Object.entries(current.statuses).filter(([key]) => key !== selectedModel),
           )
@@ -265,16 +289,18 @@ export function useAsrAvailability(engine: string, model: string, device: string
     for (const currentModel of models) {
       if (
         modelRequestRef.current !== requestId ||
-        activeEngineRef.current !== requestedEngine
+        activeEngineRef.current !== requestedEngine ||
+        activeVadRef.current !== requestedVad
       ) return null;
       try {
-        statuses[currentModel] = await checkAsrModel(requestedEngine, currentModel);
+        statuses[currentModel] = await checkAsrModel(requestedEngine, currentModel, requestedVad);
       } catch (error) {
         errors[currentModel] = String(error);
       }
       if (
         modelRequestRef.current !== requestId ||
-        activeEngineRef.current !== requestedEngine
+        activeEngineRef.current !== requestedEngine ||
+        activeVadRef.current !== requestedVad
       ) return null;
       // Publish each completed check; don't block the selected route on other weights.
       setModelState((current) => {
@@ -286,6 +312,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
         if (errors[currentModel]) nextErrors[currentModel] = errors[currentModel];
         return {
           engine: requestedEngine,
+          useVad: requestedVad,
           loading: true,
           statuses: nextStatuses,
           errors: nextErrors,
@@ -294,6 +321,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
     }
     const nextState = {
       engine: requestedEngine,
+      useVad: requestedVad,
       loading: false,
       statuses,
       errors,
@@ -305,34 +333,39 @@ export function useAsrAvailability(engine: string, model: string, device: string
   const refreshSelectedModel = useCallback(async (): Promise<AsrModelRefreshOutcome> => {
     const requestedEngine = engine;
     const requestedModel = model;
+    const requestedVad = useVad;
     // A targeted refresh must not cancel the remaining model-list scan.
     const requestId = ++selectedModelRequestRef.current;
     const batchId = modelRequestRef.current;
     setModelState((current) => ({
       engine: requestedEngine,
+      useVad: requestedVad,
       loading: true,
-      statuses: current.engine === requestedEngine
+      statuses: current.engine === requestedEngine && current.useVad === requestedVad
         ? Object.fromEntries(
             Object.entries(current.statuses).filter(([key]) => key !== requestedModel),
           )
         : {},
-      errors: current.engine === requestedEngine
+      errors: current.engine === requestedEngine && current.useVad === requestedVad
         ? Object.fromEntries(
             Object.entries(current.errors).filter(([key]) => key !== requestedModel),
           )
         : {},
     }));
     try {
-      const status = await checkAsrModel(requestedEngine, requestedModel);
+      const status = await checkAsrModel(requestedEngine, requestedModel, requestedVad);
       if (
         selectedModelRequestRef.current !== requestId ||
         modelRequestRef.current !== batchId ||
-        activeEngineRef.current !== requestedEngine
+        activeEngineRef.current !== requestedEngine ||
+        activeModelRef.current !== requestedModel ||
+        activeVadRef.current !== requestedVad
       ) {
         return { kind: "aborted" };
       }
       setModelState((current) => ({
         engine: requestedEngine,
+        useVad: requestedVad,
         loading: false,
         statuses: { ...current.statuses, [requestedModel]: status },
         errors: Object.fromEntries(
@@ -344,7 +377,9 @@ export function useAsrAvailability(engine: string, model: string, device: string
       if (
         selectedModelRequestRef.current !== requestId ||
         modelRequestRef.current !== batchId ||
-        activeEngineRef.current !== requestedEngine
+        activeEngineRef.current !== requestedEngine ||
+        activeModelRef.current !== requestedModel ||
+        activeVadRef.current !== requestedVad
       ) {
         return { kind: "aborted" };
       }
@@ -354,6 +389,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
         delete statuses[requestedModel];
         return {
           engine: requestedEngine,
+          useVad: requestedVad,
           loading: false,
           statuses,
           errors: { ...current.errors, [requestedModel]: message },
@@ -361,21 +397,21 @@ export function useAsrAvailability(engine: string, model: string, device: string
       });
       return { kind: "error", error: message };
     }
-  }, [engine, model]);
+  }, [engine, model, useVad]);
 
   useEffect(() => {
     void refreshEngines();
   }, [refreshEngines]);
 
   useEffect(() => {
-    void refreshModels(engine, activeModelRef.current);
-  }, [engine, refreshModels]);
+    void refreshModels(engine, activeModelRef.current, useVad);
+  }, [engine, useVad, refreshModels]);
 
   useEffect(() => {
-    if (modelState.engine !== engine || modelState.loading) return;
+    if (modelState.engine !== engine || modelState.useVad !== useVad || modelState.loading) return;
     if (modelState.statuses[model] || modelState.errors[model]) return;
     void refreshSelectedModel();
-  }, [engine, model, modelState, refreshSelectedModel]);
+  }, [engine, model, useVad, modelState, refreshSelectedModel]);
 
   useEffect(
     () => () => {
@@ -386,7 +422,7 @@ export function useAsrAvailability(engine: string, model: string, device: string
   );
 
   const selectedEngine = engines?.find((item) => item.name === engine) ?? null;
-  const currentModelState = modelState.engine === engine ? modelState : null;
+  const currentModelState = modelState.engine === engine && modelState.useVad === useVad ? modelState : null;
   const selectedModelStatus = currentModelState?.statuses[model] ?? null;
   const selectedModelError = currentModelState?.errors[model] ?? null;
   const modelLoading = !selectedModelStatus && selectedModelError === null;
@@ -395,12 +431,12 @@ export function useAsrAvailability(engine: string, model: string, device: string
     [engineError, engines],
   );
   const modelOptions = useMemo(
-    () => asrModelSelectOptions(engine, modelState),
-    [engine, modelState],
+    () => asrModelSelectOptions(engine, currentModelState ?? { engine, useVad, loading: true, statuses: {}, errors: {} }),
+    [engine, useVad, currentModelState],
   );
   const deviceOptions = useMemo(
-    () => asrDeviceSelectOptions(selectedEngine, engineLoading, engineError),
-    [engineError, engineLoading, selectedEngine],
+    () => asrDeviceSelectOptions(selectedEngine, engineLoading, engineError, useVad),
+    [engineError, engineLoading, selectedEngine, useVad],
   );
 
   const selectedDeviceCapability = deviceCapability(selectedEngine, device);
@@ -429,18 +465,22 @@ export function useAsrAvailability(engine: string, model: string, device: string
       selectedDeviceCapability?.reason?.trim() || "当前设备不可用";
   }
 
+  const vadReason = useVad ? optionalVadReason(selectedEngine, device) : null;
+
   const refresh = useCallback(async (): Promise<AsrAvailabilityRefreshOutcome> => {
     const requestedEngine = engine;
     const requestedModel = model;
     const [nextEngines, nextModelState] = await Promise.all([
       refreshEngines(),
-      refreshModels(requestedEngine, requestedModel),
+      refreshModels(requestedEngine, requestedModel, useVad),
     ]);
     if (
       !nextEngines ||
       !nextModelState ||
       activeEngineRef.current !== requestedEngine ||
-      activeModelRef.current !== requestedModel
+      activeModelRef.current !== requestedModel ||
+      activeVadRef.current !== useVad ||
+      activeDeviceRef.current !== device
     ) {
       return {
         routeAvailable: false,
@@ -455,8 +495,9 @@ export function useAsrAvailability(engine: string, model: string, device: string
       nextModelState.statuses[requestedModel] ?? null,
       nextModelState.errors[requestedModel] ?? null,
       device,
+      useVad,
     );
-  }, [device, engine, model, refreshEngines, refreshModels]);
+  }, [device, engine, model, useVad, refreshEngines, refreshModels]);
 
   return {
     engines,
@@ -470,10 +511,11 @@ export function useAsrAvailability(engine: string, model: string, device: string
     routeAvailable:
       !loading &&
       !error &&
+      !vadReason &&
       !!selectedEngine?.available &&
       modelRouteAvailable(selectedModelStatus) &&
       (deviceAvailable || deviceDownloadRequired),
-    unavailableReason: unavailableReasonText,
+    unavailableReason: unavailableReasonText ?? vadReason,
     selectedDeviceCapability,
     deviceDownloadRequired,
     engineOptions,

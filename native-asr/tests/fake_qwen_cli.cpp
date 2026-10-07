@@ -37,19 +37,61 @@ int wmain(int argc, wchar_t** argv) {
     std::cout << bytes << '\n';
     return scenario == "probe-nonzero" ? 43 : 0;
   }
-  fs::path model, result, audio;
+  fs::path model, result, audio, vad;
+  std::wstring threshold, min_silence;
   std::string device, backend;
   std::set<std::wstring> keys;
   for (int i = 1; i < argc; ++i) keys.insert(argv[i]);
   for (int i = 1; i + 1 < argc; ++i) {
     const std::wstring key(argv[i]);
     if (key == L"-m") model = argv[i+1];
+    if (key == L"-vm") vad = argv[i+1];
+    if (key == L"-vt") threshold = argv[i+1];
+    if (key == L"-vsd") min_silence = argv[i+1];
+    if (key == L"--vad-export-raw") result = argv[i+1];
     if (key == L"-f") audio = argv[i+1];
     if (key == L"-of") result = fs::path(std::wstring(argv[i+1]) + L".json");
     if (key == L"--gpu-backend") device = fs::path(argv[i+1]).string();
     if (key == L"--backend") backend = fs::path(argv[i+1]).string();
   }
-  std::string scenario; std::ifstream(model) >> scenario;
+  std::string scenario; std::ifstream(keys.count(L"--vad-export-raw") ? vad : model) >> scenario;
+  if (keys.count(L"--vad-export-raw")) {
+    wchar_t control[8]{}, failover[8]{};
+    GetEnvironmentVariableW(L"HIKARU_VAD_ONLY", control, 8);
+    GetEnvironmentVariableW(L"CRISPASR_VAD_FAILOVER", failover, 8);
+    if (std::wstring(control) != L"1" || std::wstring(failover) != L"0" || device != "cpu"
+        || !keys.count(L"--no-gpu") || keys.count(L"-m") || keys.count(L"-am")
+        || !keys.count(L"--strict-pipeline") || !keys.count(L"--require-vad")
+        || GetEnvironmentVariableW(L"HIKARU_QWEN_DEVICE", nullptr, 0)) return 46;
+    if (threshold != (scenario == "parameters" ? L"0.73" : L"0.5")
+        || min_silence != (scenario == "parameters" ? L"321" : L"100")) return 46;
+    const auto samples = hikaru_asr::wav::read_pcm16_mono_16khz(audio).samples.size();
+    if (scenario == "compute-failure") return 30;
+    if (scenario == "stall-progress") {
+      for (;;) {
+        std::cerr << "hikaru_vad_progress: completed=1 total=2\nrepeated diagnostic\n";
+        Sleep(100);
+      }
+    }
+    if (scenario == "slow-success") {
+      Sleep(65000);
+      std::cerr << "hikaru_vad_progress: completed=1 total=2\n";
+      Sleep(60000);
+    }
+    if (scenario != "no-progress") {
+      std::cerr << "hikaru_vad_progress: completed=1 total=2\n";
+      std::cerr << "hikaru_vad_progress: completed=2 total=2\n";
+    }
+    if (scenario != "no-completion") std::cerr << "hikaru_vad: device=cpu chunks=2 completed=1\n";
+    if (scenario == "cpu-cuda") std::cerr << "ggml_cuda_init: fixture\n";
+    std::ofstream out(result, std::ios::binary);
+    if (scenario == "half-file") { out << "{\"crispasr_vad\":"; return 0; }
+    Json spans = scenario == "silence" ? Json::array() : Json::array({
+        {{"start", 7}, {"end", 16007}}, {{"start", 32007}, {"end", samples}}});
+    out << Json{{"crispasr_vad", {{"version", 1}, {"kind", "vad_segments"}, {"sample_rate", 16000},
+        {"num_slices", spans.size()}, {"slices", spans}}}};
+    return 0;
+  }
   const bool parakeet = backend == "parakeet";
   const bool reazonspeech = backend == "reazonspeech";
   const bool parakeet_family = parakeet || reazonspeech;

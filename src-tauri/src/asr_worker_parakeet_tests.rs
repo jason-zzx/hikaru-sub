@@ -47,7 +47,8 @@ fn parakeet_cli_route_roles_and_workspace_are_explicit() {
             launch.output_ass_path.clone(),
             &temp.path().join("中文 缓存"),
             vad,
-            config
+            config,
+            None
         )
         .is_err());
     }
@@ -63,6 +64,7 @@ fn parakeet_cli_route_roles_and_workspace_are_explicit() {
         launch.output_ass_path,
         &temp.path().join("中文 缓存"),
         true,
+        None,
         None
     )
     .is_err());
@@ -251,6 +253,7 @@ fn parakeet_cli_reparse_roles_rejected_before_canonicalization() {
         launch.output_ass_path,
         &temp.path().join("中文 缓存"),
         true,
+        None,
         None,
     );
     fs::remove_dir(link).unwrap();

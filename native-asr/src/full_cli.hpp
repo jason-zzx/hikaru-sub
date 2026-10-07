@@ -17,6 +17,10 @@ std::wstring wide(const std::string& text);
 std::wstring compact(const std::string& text);
 std::int64_t integer(const Json& value);
 std::string text(const Json& value);
+struct SpeechSpan { std::int64_t start_sample, end_sample; };
+std::vector<SpeechSpan> parse_vad_result(const std::string& bytes, std::int64_t samples);
+std::vector<SpeechSpan> detect_speech(const WorkerRequestV1& request, std::int64_t samples,
+                                    const std::function<void(std::int64_t, std::int64_t)>& progress);
 Json document(const std::string& bytes, std::int64_t duration_ms);
 std::vector<Segment> transcribe(const WorkerRequestV1& request,
                                const std::function<void(std::int64_t)>& ready,

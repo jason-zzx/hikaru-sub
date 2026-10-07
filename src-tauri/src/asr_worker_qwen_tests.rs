@@ -120,6 +120,7 @@ fn full_cli_launch(
         &cache,
         true,
         None,
+        None,
     )
     .unwrap()
 }
@@ -565,6 +566,7 @@ fn qwen_cli_final_manager_host_functional_case() {
             id.into(),
             input.device.clone(),
             cache.clone(),
+            None,
         )
         .unwrap()
     };
@@ -837,6 +839,7 @@ fn qwen_cli_required_role_and_workspace_are_explicit() {
         launch.output_ass_path.clone(),
         &temp.path().join("中文 缓存"),
         false,
+        None,
         None
     )
     .is_err());
@@ -849,7 +852,7 @@ fn qwen_cli_required_role_and_workspace_are_explicit() {
         &ct2,
         &ProtocolLimits::load().unwrap()
     )
-    .is_err());
+    .is_ok());
 }
 
 #[cfg(windows)]
@@ -900,6 +903,7 @@ fn qwen_cli_host_rejects_reparse_role_paths_before_canonicalization() {
         launch.output_ass_path,
         &temp.path().join("中文 缓存"),
         true,
+        None,
         None
     )
     .is_err());

@@ -214,6 +214,7 @@ struct ResolvedNativeExecution {
     host: NativeAsrHost,
     device: &'static str,
     notice: Option<String>,
+    vad_cli_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize)]
@@ -273,6 +274,24 @@ fn select_native_runtime(
     Ok((resolve_device("cpu")?, "cpu", None))
 }
 
+fn resolve_optional_vad_cli(
+    backend: &str,
+    use_vad: bool,
+    supports_vad: bool,
+    resolve_cpu: impl FnOnce() -> Result<ResolvedNativeAsrCpuRuntime, String>,
+) -> Result<Option<PathBuf>, String> {
+    if backend != "ctranslate2" || !use_vad {
+        return Ok(None);
+    }
+    if !supports_vad {
+        return Err("[vad_not_built] 所选 Native ASR 运行时不支持可选 VAD".into());
+    }
+    resolve_cpu()?
+        .vad_cli_path
+        .map(Some)
+        .ok_or_else(|| "[vad_not_built] 内置 CPU VAD 运行时不支持独立语音检测".to_string())
+}
+
 fn native_host_key(backend: &str, artifact: &str, device: &str) -> String {
     format!("{backend}:{artifact}:{device}")
 }
@@ -283,7 +302,9 @@ async fn resolve_native_execution(
     backend: &str,
     engine: &str,
     requested: RequestedNativeDevice,
+    use_vad: bool,
 ) -> Result<ResolvedNativeExecution, String> {
+    let vad_app = app.clone();
     let app = app.clone();
     let selected_backend = backend.to_string();
     let selected_engine = engine.to_string();
@@ -301,6 +322,8 @@ async fn resolve_native_execution(
                                 root: runtime.root,
                                 worker: runtime.worker,
                                 artifact_id: runtime.artifact_id,
+                                supports_vad: runtime.supports_vad,
+                                vad_cli_path: None,
                                 // CT2 CUDA verification requires exactly these two engines.
                                 engines: vec![
                                     "faster-whisper".into(),
@@ -317,12 +340,22 @@ async fn resolve_native_execution(
     })
     .await
     .map_err(|_| "解析 Native ASR 运行时失败".to_string())??;
+    let supports_vad = runtime.supports_vad;
+    let selected_backend = backend.to_string();
+    let vad_cli_path = tauri::async_runtime::spawn_blocking(move || {
+        resolve_optional_vad_cli(&selected_backend, use_vad, supports_vad, || {
+            resolve_crispasr_runtime(&vad_app, "cpu")
+        })
+    })
+    .await
+    .map_err(|_| "解析 CPU VAD 运行时失败".to_string())??;
     let key = native_host_key(backend, &runtime.artifact_id, device);
     if let Some(host) = state.native_host(&key)? {
         return Ok(ResolvedNativeExecution {
             host,
             device,
             notice,
+            vad_cli_path,
         });
     }
     let active_job = Arc::clone(&state.active_job);
@@ -345,6 +378,7 @@ async fn resolve_native_execution(
         host: state.install_native_host(key, host)?,
         device,
         notice,
+        vad_cli_path,
     })
 }
 
@@ -471,7 +505,7 @@ fn validate_native_request(args: &StartAsrArgs) -> Result<(), String> {
             return Err("该模型使用固定默认 CPU VAD，不接受自定义配置".into());
         }
     } else if args.use_vad {
-        return Err("[vad_not_built] Native ASR 运行时未包含 VAD".into());
+        crate::asr_worker::validate_optional_vad(args.vad_config.as_ref())?;
     }
     if args
         .language
@@ -489,6 +523,7 @@ pub(crate) fn qualified_native_launch(
     job_id: String,
     device: String,
     cache_root: PathBuf,
+    vad_cli_path: Option<PathBuf>,
 ) -> Result<ResolvedNativeLaunch, String> {
     validate_native_request(&args)?;
     if model.logical_id != format!("{}/{}", args.engine, args.model)
@@ -514,6 +549,7 @@ pub(crate) fn qualified_native_launch(
         != match args.engine.as_str() {
             "qwen3-asr" => vec!["aligner", "model", "vad"],
             "parakeet" | "reazonspeech-nemo" => vec!["model", "vad"],
+            _ if args.use_vad => vec!["model", "vad"],
             _ => vec!["model"],
         }
     {
@@ -530,6 +566,7 @@ pub(crate) fn qualified_native_launch(
         &cache_root,
         full_cli || args.use_vad,
         if full_cli { None } else { args.vad_config },
+        vad_cli_path,
     )
 }
 
@@ -565,6 +602,7 @@ fn resolve_debug_native_launch(
         &cache_root,
         args.use_vad,
         args.vad_config,
+        None,
     )
 }
 
@@ -946,6 +984,20 @@ fn public_cuda_capability(
     value
 }
 
+fn optional_vad_capability(
+    worker_supported: bool,
+    cpu_export_available: bool,
+) -> serde_json::Value {
+    let reason = if !worker_supported {
+        Some("所选 Native ASR 运行时不支持可选 VAD")
+    } else if !cpu_export_available {
+        Some("内置 CPU VAD 运行时缺失、损坏或不支持独立语音检测")
+    } else {
+        None
+    };
+    serde_json::json!({"available":reason.is_none(), "reason":reason})
+}
+
 fn public_native_engine(
     name: String,
     supported: bool,
@@ -975,8 +1027,15 @@ pub async fn list_asr_engines(
     if state.route_policy.uses_native() {
         let probe_app = app.clone();
         let engines = tauri::async_runtime::spawn_blocking(move || {
-            let cpu_available = resolve_native_asr_cpu_runtime(&probe_app).is_ok();
-            let cuda_capability = public_cuda_capability(native_asr_cuda_capability(&probe_app));
+            let cpu = resolve_native_asr_cpu_runtime(&probe_app);
+            let cpu_available = cpu.is_ok();
+            let cpu_vad = cpu.as_ref().is_ok_and(|runtime| runtime.supports_vad);
+            let cuda = native_asr_cuda_capability(&probe_app);
+            let cuda_vad = cuda.available && cuda.supports_vad;
+            let cpu_export = (cpu_vad || cuda_vad)
+                && resolve_crispasr_runtime(&probe_app, "cpu")
+                    .is_ok_and(|runtime| runtime.vad_cli_path.is_some());
+            let cuda_capability = public_cuda_capability(cuda);
             let crispasr = crate::dependencies::crispasr_engine_capabilities(&probe_app);
             known_native_asr_engines()?
                 .into_iter()
@@ -991,7 +1050,17 @@ pub async fn list_asr_engines(
                     } else {
                         (false, serde_json::Value::Null)
                     };
-                    Ok(public_native_engine(name, supported, backend, cpu, cuda))
+                    let optional = backend.as_deref() == Some("ctranslate2");
+                    let mut value = public_native_engine(name, supported, backend, cpu, cuda);
+                    if optional {
+                        if let Some(devices) = value["devices"].as_array_mut() {
+                            devices[0]["optionalVad"] =
+                                optional_vad_capability(cpu_vad, cpu_export);
+                            devices[1]["optionalVad"] =
+                                optional_vad_capability(cuda_vad, cpu_export);
+                        }
+                    }
+                    Ok(value)
                 })
                 .collect::<Result<Vec<_>, String>>()
         })
@@ -1052,7 +1121,7 @@ pub async fn start_asr(
         validate_native_request(&args)?;
         let status = state
             .native_models
-            .status(&app, &args.engine, &args.model)
+            .status(&app, &args.engine, &args.model, args.use_vad)
             .await?;
         match status.disposition {
             NativeAsrModelDisposition::Ready => {}
@@ -1068,22 +1137,37 @@ pub async fn start_asr(
         };
         let model = state
             .native_models
-            .resolve_ready_model(&app, &args.engine, &args.model)
+            .resolve_ready_model(&app, &args.engine, &args.model, args.use_vad)
             .await?
             .ok_or_else(|| "Native ASR 模型或必需依赖不可用".to_string())?;
         let requested = RequestedNativeDevice::parse(&args.device)?;
-        let execution =
-            resolve_native_execution(&app, &state, &model.backend, &args.engine, requested).await?;
+        let execution = resolve_native_execution(
+            &app,
+            &state,
+            &model.backend,
+            &args.engine,
+            requested,
+            args.use_vad,
+        )
+        .await?;
         let ResolvedNativeExecution {
             host,
             device,
             notice,
+            vad_cli_path,
         } = execution;
         let resolved_device = device.to_string();
         let cache_root = work_cache_dir(&app)?;
         let job_id = native_job_id();
         let launch = tauri::async_runtime::spawn_blocking(move || {
-            qualified_native_launch(args, model, job_id, resolved_device, cache_root)
+            qualified_native_launch(
+                args,
+                model,
+                job_id,
+                resolved_device,
+                cache_root,
+                vad_cli_path,
+            )
         })
         .await
         .map_err(|error| format!("解析 native ASR 启动参数失败：{error}"))??;
@@ -1212,9 +1296,13 @@ pub async fn check_asr_model(
     state: State<'_, AsrState>,
     engine: String,
     model: String,
+    use_vad: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     if state.route_policy.uses_native() {
-        let status = state.native_models.status(&app, &engine, &model).await?;
+        let status = state
+            .native_models
+            .status(&app, &engine, &model, use_vad.unwrap_or(false))
+            .await?;
         return serde_json::to_value(public_asr_model_status(status)).map_err(|e| e.to_string());
     }
 
@@ -1237,11 +1325,12 @@ pub async fn download_asr_model(
     state: State<'_, AsrState>,
     engine: String,
     model: String,
+    use_vad: Option<bool>,
 ) -> Result<String, String> {
     if state.route_policy.uses_native() {
         return state
             .native_models
-            .start_download(&app, &engine, &model)
+            .start_download(&app, &engine, &model, use_vad.unwrap_or(false))
             .await;
     }
 
@@ -1420,6 +1509,7 @@ mod tests {
     #[test]
     fn public_cuda_capability_always_carries_the_cuda_device_discriminator() {
         let value = public_cuda_capability(crate::dependencies::NativeAsrCudaCapability {
+            supports_vad: false,
             available: false,
             download_required: true,
             code: Some("cuda_pack_missing".into()),
@@ -1490,6 +1580,8 @@ mod tests {
                                     shared_cuda
                                 };
                                 Ok(ResolvedNativeAsrCpuRuntime {
+                                    supports_vad: false,
+                                    vad_cli_path: None,
                                     root: PathBuf::from(device),
                                     worker: PathBuf::from("worker.exe"),
                                     artifact_id: format!(
@@ -1548,6 +1640,8 @@ mod tests {
                                 calls.push((selected.to_string(), device.to_string()));
                                 if if device == "cuda" { cuda_ok } else { cpu_ok } {
                                     Ok(ResolvedNativeAsrCpuRuntime {
+                                        supports_vad: false,
+                                        vad_cli_path: None,
                                         root: PathBuf::from(format!("{selected}/{device}")),
                                         worker: PathBuf::from(format!(
                                             "{selected}/{device}/worker.exe"
@@ -1653,7 +1747,8 @@ mod tests {
                 model.clone(),
                 "qualified-test".into(),
                 device.into(),
-                cache.clone()
+                cache.clone(),
+                None
             )
             .is_ok());
             let mut half = model.clone();
@@ -1663,7 +1758,8 @@ mod tests {
                 half,
                 "qualified-test".into(),
                 device.into(),
-                cache.clone()
+                cache.clone(),
+                None
             )
             .is_err());
             let mut wrong = model.clone();
@@ -1673,7 +1769,8 @@ mod tests {
                 wrong,
                 "qualified-test".into(),
                 device.into(),
-                cache.clone()
+                cache.clone(),
+                None
             )
             .is_err());
             let mut custom = args();
@@ -1684,7 +1781,8 @@ mod tests {
                 model.clone(),
                 "qualified-test".into(),
                 device.into(),
-                cache.clone()
+                cache.clone(),
+                None
             )
             .is_err());
             let mut language = args();
@@ -1694,7 +1792,8 @@ mod tests {
                 model.clone(),
                 "qualified-test".into(),
                 device.into(),
-                cache.clone()
+                cache.clone(),
+                None
             )
             .is_err());
         }
@@ -1741,6 +1840,135 @@ mod tests {
     }
 
     #[test]
+    fn optional_vad_is_independent_of_selected_asr_device_and_never_falls_back() {
+        for requested in [
+            RequestedNativeDevice::Cpu,
+            RequestedNativeDevice::Cuda,
+            RequestedNativeDevice::Auto,
+        ] {
+            for cuda_available in [false, true] {
+                let mut devices = Vec::new();
+                let selected = select_native_runtime(
+                    "ctranslate2",
+                    "faster-whisper",
+                    requested,
+                    |_, device| {
+                        devices.push(device.to_string());
+                        if device == "cuda" && !cuda_available {
+                            return Err("unavailable".into());
+                        }
+                        Ok(ResolvedNativeAsrCpuRuntime {
+                            root: PathBuf::new(),
+                            worker: PathBuf::new(),
+                            artifact_id: device.into(),
+                            engines: vec!["faster-whisper".into()],
+                            supports_vad: true,
+                            vad_cli_path: None,
+                        })
+                    },
+                );
+                if requested == RequestedNativeDevice::Cuda && !cuda_available {
+                    assert!(selected.is_err());
+                    assert_eq!(devices, ["cuda"]);
+                    continue;
+                }
+                let (runtime, device, _) = selected.unwrap();
+                assert_eq!(
+                    device,
+                    if requested != RequestedNativeDevice::Cpu && cuda_available {
+                        "cuda"
+                    } else {
+                        "cpu"
+                    }
+                );
+                if requested == RequestedNativeDevice::Cpu {
+                    assert_eq!(devices, ["cpu"]);
+                }
+                let cpu_runtime = |export: bool| ResolvedNativeAsrCpuRuntime {
+                    root: PathBuf::from("cpu-root"),
+                    worker: PathBuf::new(),
+                    artifact_id: "cpu".into(),
+                    engines: vec!["qwen3-asr".into()],
+                    supports_vad: true,
+                    vad_cli_path: export.then(|| PathBuf::from("cpu-root/crispasr.exe")),
+                };
+                assert!(
+                    resolve_optional_vad_cli("ctranslate2", false, false, || panic!(
+                        "off must not probe CPU VAD"
+                    ))
+                    .unwrap()
+                    .is_none()
+                );
+                for backend in ["crispasr"] {
+                    assert!(resolve_optional_vad_cli(backend, true, true, || panic!(
+                        "mandatory route must not run outer VAD"
+                    ))
+                    .unwrap()
+                    .is_none());
+                }
+                assert!(
+                    resolve_optional_vad_cli("ctranslate2", true, false, || panic!(
+                        "unsupported main worker"
+                    ))
+                    .is_err()
+                );
+                assert!(resolve_optional_vad_cli(
+                    "ctranslate2",
+                    true,
+                    runtime.supports_vad,
+                    || Ok(cpu_runtime(false))
+                )
+                .is_err());
+                assert!(resolve_optional_vad_cli(
+                    "ctranslate2",
+                    true,
+                    runtime.supports_vad,
+                    || Err("missing".into())
+                )
+                .is_err());
+                assert_eq!(
+                    resolve_optional_vad_cli("ctranslate2", true, runtime.supports_vad, || Ok(
+                        cpu_runtime(true)
+                    ))
+                    .unwrap(),
+                    Some(PathBuf::from("cpu-root/crispasr.exe"))
+                );
+            }
+        }
+        for (worker, export) in [(false, false), (true, false), (false, true), (true, true)] {
+            assert_eq!(
+                optional_vad_capability(worker, export)["available"],
+                worker && export
+            );
+        }
+    }
+
+    #[test]
+    fn optional_vad_validates_only_enabled_supported_parameters() {
+        for config in [
+            serde_json::json!({}),
+            serde_json::json!({"threshold":0,"minSilenceDurationMs":0}),
+            serde_json::json!({"threshold":1,"minSilenceDurationMs":60000}),
+        ] {
+            let config = serde_json::from_value(config).unwrap();
+            assert!(crate::asr_worker::validate_optional_vad(Some(&config)).is_ok());
+        }
+        for config in [
+            serde_json::json!({"threshold":1.1}),
+            serde_json::json!({"minSilenceDurationMs":60001}),
+            serde_json::json!({"speechPadMs":0}),
+            serde_json::json!({"minSpeechDurationMs":250}),
+            serde_json::json!({"maxSegmentDurationMs":12000}),
+        ] {
+            let config = serde_json::from_value(config).unwrap();
+            assert!(crate::asr_worker::validate_optional_vad(Some(&config)).is_err());
+            assert!(crate::asr_worker::validate_vad(false, Some(&config)).is_ok());
+        }
+        let args: StartAsrArgs = serde_json::from_value(serde_json::json!({"audioPath":"audio", "engine":"faster-whisper", "model":"small", "device":"cpu"})).unwrap();
+        assert!(!args.use_vad);
+    }
+
+    #[test]
     fn native_request_keeps_model_support_authoritative_in_the_manifest() {
         let args = |engine: &str, device: &str, use_vad: bool| StartAsrArgs {
             audio_path: "cache/workspace/abc/audio.wav".into(),
@@ -1757,11 +1985,7 @@ mod tests {
         assert!(validate_native_request(&args("qwen3-asr", "cpu", false)).is_ok());
         assert!(validate_native_request(&args("faster-whisper", "cuda", false)).is_ok());
         assert!(validate_native_request(&args("faster-whisper", "vulkan", false)).is_err());
-        assert!(
-            validate_native_request(&args("kotoba-faster-whisper", "cpu", true))
-                .unwrap_err()
-                .contains("vad_not_built")
-        );
+        assert!(validate_native_request(&args("kotoba-faster-whisper", "cpu", true)).is_ok());
     }
 
     #[test]

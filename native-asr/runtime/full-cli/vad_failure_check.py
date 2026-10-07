@@ -33,7 +33,10 @@ inline int compute_planned(ggml_cgraph*,ggml_cplan*,int) {
  return ++cpu_calls == fail_at ? -1 : GGML_STATUS_SUCCESS;
 }
 }
-namespace hikaru_qwen { inline const char* device() { return requested_device; } }
+namespace hikaru_qwen {
+inline const char* device() { return requested_device; }
+inline bool vad_only() { return std::strcmp(requested_device,"vad-only") == 0; }
+}
 struct whisper_vad_context {
  int n_window=1; void* buffer=nullptr; void* threadpool=nullptr;
  std::vector<float> probs,window_buf;
@@ -68,7 +71,10 @@ inline void whisper_vad_free_segments(whisper_vad_segments*) {}
 static std::mutex g_silero_cache_mtx;
 inline whisper_vad_context* silero_vad_get_cached_locked(const char*,int) { return &ctx; }
 struct crispasr_audio_slice { int start,end; int64_t t0_cs,t1_cs; };
+enum class crispasr_vad_post_merge_policy { offline, streaming_json };
 struct crispasr_vad_options {
+ crispasr_vad_post_merge_policy post_merge_policy=crispasr_vad_post_merge_policy::offline;
+ int stream_close_gap_ms=100;
  float threshold=0.5f; bool threshold_explicit=false;
  int min_speech_duration_ms=0,min_silence_duration_ms=0,speech_pad_ms=0,chunk_seconds=0,n_threads=1;
 };
@@ -156,7 +162,7 @@ def check_vad_failure(source: Path, out: Path):
     subprocess.run(['cl', '/nologo', '/EHsc', '/std:c++17', '/utf-8', str(test),
                     '/Fe:' + str(out / 'vad_failure_test.exe')], cwd=out, check=True)
     rows = []
-    for device in ['cpu', 'cuda']:
+    for device in ['cpu', 'cuda', 'vad-only']:
         for stage in ['detect', 'segments', 'slices', 'strict']:
             for failure in [1, 2, 0]:
                 result = subprocess.run([str(out / 'vad_failure_test.exe'), str(failure), device, stage],
@@ -165,7 +171,7 @@ def check_vad_failure(source: Path, out: Path):
                 (out / (name + '.log')).write_bytes(result.stdout + result.stderr)
                 expected = 30 if failure and stage == 'strict' else 0
                 passed = (result.returncode == expected and
-                          result.stderr.count(b'completed=1') == (0 if failure else 1))
+                          result.stderr.count(b'hikaru_vad: device=cpu chunks=3 completed=1') == (0 if failure else 1))
                 rows.append({'case': name, 'exitCode': result.returncode, 'expectedExitCode': expected, 'passed': passed})
                 print(f'{name}: {"PASS" if passed else "FAIL"} rc={result.returncode} expected={expected}')
     (out / 'vad-failure-result.json').write_text(json.dumps({

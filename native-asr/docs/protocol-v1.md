@@ -44,7 +44,8 @@ Required fields:
 | `device` | Host-resolved `cpu`, `cuda`, or `vulkan`; `auto` is invalid. |
 | `language` | Exact product source language `ja`. |
 | `useVad` | Boolean. |
-| `vadConfig` | Optional. Parsed only when `useVad=true`; ignored when VAD is disabled. |
+| `vadConfig` | Optional object. Parsed only when `useVad=true`; ignored when VAD is disabled. Omit rather than send null when enabled. |
+| `vadCliPath` | Internal optional absolute local Windows executable path; required only for CT2 + `useVad=true`, rejected on other combinations. Not a frontend argument. |
 
 Protocol path validation is syntax-only. Drive-rooted, UNC, and extended Windows file paths are accepted. Relative paths, URI schemes, Windows device namespaces, alternate data streams/wildcards, NUL/control characters, empty paths, and over-limit paths are rejected. The host remains responsible for canonical managed roots, hashes, readiness, permissions, and runtime choice.
 
@@ -52,8 +53,8 @@ Protocol path validation is syntax-only. Drive-rooted, UNC, and extended Windows
 
 | Engine | Backend | Required roles | Allowed devices |
 |---|---|---|---|
-| `faster-whisper` | `ctranslate2` | `model` | `cpu`, `cuda` |
-| `kotoba-faster-whisper` | `ctranslate2` | `model` | `cpu`, `cuda` |
+| `faster-whisper` | `ctranslate2` | `model`; exactly `model` + `vad` when enabled | `cpu`, `cuda` |
+| `kotoba-faster-whisper` | `ctranslate2` | `model`; exactly `model` + `vad` when enabled | `cpu`, `cuda` |
 | `parakeet` (generic historical protocol) | `crispasr` | `model`; additive `vad` permitted | `cpu`, `cuda`, `vulkan` |
 | `parakeet` (full-CLI application worker, availability gated) | `crispasr` | `model`, `vad` | `cpu`, `cuda` |
 | `reazonspeech-nemo` (generic historical protocol) | `crispasr` | `model` | `cpu`, `cuda`, `vulkan` |
@@ -71,8 +72,8 @@ Qwen, Parakeet, and ReazonSpeech full-CLI worker routes reject a missing explici
 pinned upstream default CPU VAD configuration. There is no guessed dependency
 path and no silent VAD disablement. Historical Parakeet/ReazonSpeech model-only
 syntax remains valid only at the generic protocol/development seam, not the full-CLI
-launch boundary. Neither route has an aligner role. CT2 still accepts only `model`;
-adding a `vad` role does not enable or change its VAD/device semantics.
+launch boundary. Neither route has an aligner role. CT2 with VAD disabled still
+accepts only `model` and does not consult a CLI or VAD dependency.
 Duplicate, unknown, or route-extra roles are rejected; array order has no meaning.
 
 ### VAD ranges
@@ -86,6 +87,45 @@ All VAD fields are optional within `vadConfig`; unknown additive fields are igno
 | `minSilenceDurationMs` | integer `[0, 60000]` |
 | `speechPadMs` | integer `[0, 10000]` |
 | `maxSegmentDurationMs` | integer `[1000, 600000]`, and not below supplied `minSpeechDurationMs` |
+
+### CT2 optional CPU VAD
+
+The host requires an explicit `vad` role and internally resolves `vadCliPath`
+from a separately verified **CPU** CrispASR runtime with `capabilities.vadExport`.
+The selected CT2 worker must advertise `capabilities.vad`; engine names or the
+mandatory CLI's `vad:true` alone do not authorize standalone VAD. Main `device`
+remains the CT2 CPU/CUDA choice; it never selects VAD's device. No VAD fields or
+outer pass are added to Qwen, Parakeet or ReazonSpeech's mandatory pipelines.
+
+Current local authority is CT2 CPU v5 / CUDA v3 plus CrispASR CPU
+`shared-vad-local`. CT2 CUDA v3 is unpublished: an exact verified local install is
+usable, but old remote source rows cannot offer this candidate. CrispASR CUDA
+bytes and publication authority are unchanged. Source/local packages do not
+establish application publication or completion of the long/GUI acceptance gates.
+
+Only `threshold` (default 0.5) and `minSilenceDurationMs` (default 100) are accepted
+known configuration fields. Supplying `minSpeechDurationMs`, `speechPadMs`, or
+`maxSegmentDurationMs` is rejected as `unsupported_vad_config`; pinned upstream
+min-speech 250ms and pad 30ms remain fixed. Disabled configuration is ignored.
+
+The worker runs the full CPU CLI with `HIKARU_VAD_ONLY=1`,
+`CRISPASR_VAD_FAILOVER=0`, raw export, strict required VAD and explicit local VAD
+path, without ASR/aligner arguments. Only this branch disables offline post-merge.
+Integer PCM `[start,end)` slices are bounded, ordered and non-overlapping; `t0_cs`
+and `t1_cs` are not execution inputs. Exit0, actual CPU VAD completion and complete
+bounded JSON are all required, including for empty success. VAD progress is
+monotonic completed chunks on stderr (120-second no-progress watchdog); source
+ASR progress stays at zero until decoding. Empty detection skips CT2 model loading.
+
+Nonempty spans use one CT2 backend and fresh per-span decoder state. Local times
+are offset once using the original sample origin, never concatenated speech.
+The existing CT2 parser's local audio boundary normalization is retained, including
+results marked `end_bounded_to_audio`; this diagnostic flag is not a VAD rejection.
+No decoder, padding or timestamp policy is changed by this integration. Invalid
+span decoding still fails rather than repairing timestamps or retrying without
+VAD. On completed CT2+VAD jobs the frontend preserves Native rows without short-cue
+merging across excluded gaps; truthful empty success, error and cancellation
+preserve the prior document, recovery snapshot and ASS save target.
 
 ## Events
 

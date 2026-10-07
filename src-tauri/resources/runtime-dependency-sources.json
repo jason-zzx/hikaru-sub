@@ -13,10 +13,10 @@
           "sizeBytes": 109728040
         },
         "nativeAsrCuda": {
-          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v2.zip",
+          "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v4.zip",
           "archive": "zip",
-          "sha256": "42f00870df2826982f98016c69b5e73ca9a6da2d27ae11a6aa2dd15a870d766e",
-          "sizeBytes": 571028843
+          "sha256": "9057dabf8da5e868c58de1eb3624729befe20e25c183046584ef122f1281c786",
+          "sizeBytes": 571097001
         },
         "python311": {
           "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
@@ -49,10 +49,10 @@
           "sizeBytes": 157680916
         },
         "nativeAsrCuda": {
-          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v2.zip",
+          "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-windows-x64-cuda-v4.zip",
           "archive": "zip",
-          "sha256": "42f00870df2826982f98016c69b5e73ca9a6da2d27ae11a6aa2dd15a870d766e",
-          "sizeBytes": 571028843
+          "sha256": "9057dabf8da5e868c58de1eb3624729befe20e25c183046584ef122f1281c786",
+          "sizeBytes": 571097001
         },
         "python311": {
           "url": "https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",

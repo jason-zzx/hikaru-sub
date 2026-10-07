@@ -1,0 +1,6 @@
+{"file":".trellis/spec/asr/index.md","reason":"Existing Native routes, CPU VAD and independent backend boundaries; this task changes CT2 optional VAD only."}
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Functional CPU/CUDA validation, privacy and separate Kotoba K3 scope; current no-VAD description is the baseline to extend."}
+{"file":".trellis/spec/tauri/index.md","reason":"Read linked media-ffmpeg-asr.md sections Audio Decode Timeline Contract, Native ASR Job Host and Native ASR Backend Routing on demand; that guide exceeds the automatic injection limit."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Managed model/runtime roots, exact distribution verification, shared Silero and publication separation."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"VAD is transient session/page state, not persisted settings; document preservation."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Typed command wrappers, model status/download/start integration and silence-safe completion."}

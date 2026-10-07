@@ -61,12 +61,14 @@ pub(crate) fn resolve_crispasr_runtime(
 
 const LOG_TAIL_LIMIT: usize = 200;
 const MANIFEST_JSON: &str = include_str!("../resources/runtime-dependency-sources.json");
+const NATIVE_ASR_CPU_LOCK_JSON: &str =
+    include_str!("../../native-asr/runtime/windows-x64-cpu-lock.json");
 const NATIVE_ASR_CUDA_LOCK_JSON: &str =
     include_str!("../../native-asr/runtime/windows-x64-cuda-lock.json");
-const NATIVE_ASR_CPU_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cpu-v4";
+const NATIVE_ASR_CPU_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cpu-v6";
 const NATIVE_ASR_CPU_RESOURCE_PATH: [&str; 3] = ["native-asr", "windows-x64", "cpu"];
 const NATIVE_ASR_CPU_WORKER: &str = "hikaru-asr-worker.exe";
-const NATIVE_ASR_CUDA_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cuda-v2";
+const NATIVE_ASR_CUDA_ARTIFACT_ID: &str = "hikaru-asr-windows-x64-cuda-v4";
 const NATIVE_ASR_CUDA_REQUIRED_ENTRIES: &[&str] = &[
     NATIVE_ASR_CPU_WORKER,
     "ctranslate2.dll",
@@ -102,6 +104,8 @@ pub(crate) struct ResolvedNativeAsrCpuRuntime {
     pub worker: PathBuf,
     pub artifact_id: String,
     pub engines: Vec<String>,
+    pub supports_vad: bool,
+    pub vad_cli_path: Option<PathBuf>,
 }
 
 impl ResolvedNativeAsrCpuRuntime {
@@ -171,12 +175,15 @@ pub(crate) struct ResolvedNativeAsrCudaRuntime {
     pub root: PathBuf,
     pub worker: PathBuf,
     pub artifact_id: String,
+    pub supports_vad: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NativeAsrCudaCapability {
     pub available: bool,
+    #[serde(skip)]
+    pub supports_vad: bool,
     #[serde(default)]
     pub download_required: bool,
     #[serde(default)]
@@ -226,6 +233,8 @@ struct NativeAsrCapabilities {
     device: String,
     engines: Vec<String>,
     vad: bool,
+    #[serde(default)]
+    vad_export: bool,
     crispasr: bool,
     cuda: bool,
     vulkan: bool,
@@ -985,6 +994,18 @@ pub fn resolve_ffmpeg_paths(app: &AppHandle, settings: &AppSettings) -> Resolved
     }
 }
 
+fn locked_ct2_vad(device: &str) -> bool {
+    let lock = if device == "cpu" {
+        NATIVE_ASR_CPU_LOCK_JSON
+    } else {
+        NATIVE_ASR_CUDA_LOCK_JSON
+    };
+    serde_json::from_str::<serde_json::Value>(lock)
+        .ok()
+        .and_then(|value| value["capabilities"]["vad"].as_bool())
+        .unwrap_or(false)
+}
+
 fn resolve_native_asr_cpu_runtime_at(
     resource_dir: &Path,
 ) -> Result<ResolvedNativeAsrCpuRuntime, String> {
@@ -1015,7 +1036,8 @@ fn resolve_native_asr_cpu_runtime_at(
     let capability_ok = manifest.capabilities.backend == "ctranslate2"
         && manifest.capabilities.device == "cpu"
         && manifest.capabilities.engines == ["faster-whisper", "kotoba-faster-whisper"]
-        && !manifest.capabilities.vad
+        && manifest.capabilities.vad == locked_ct2_vad(&manifest.capabilities.device)
+        && !manifest.capabilities.vad_export
         && !manifest.capabilities.crispasr
         && !manifest.capabilities.cuda
         && !manifest.capabilities.vulkan
@@ -1034,6 +1056,8 @@ fn resolve_native_asr_cpu_runtime_at(
         worker,
         artifact_id: manifest.artifact_id,
         engines: manifest.capabilities.engines,
+        supports_vad: manifest.capabilities.vad,
+        vad_cli_path: None,
     })
 }
 
@@ -1119,7 +1143,9 @@ fn collect_runtime_files(
     Ok(())
 }
 
-fn verify_native_asr_cuda_runtime_at(root: &Path) -> Result<(PathBuf, PathBuf, String), String> {
+fn verify_native_asr_cuda_runtime_at(
+    root: &Path,
+) -> Result<(PathBuf, PathBuf, String, bool), String> {
     let missing = NATIVE_ASR_CUDA_REQUIRED_ENTRIES
         .iter()
         .filter(|entry| !root.join(entry).is_file())
@@ -1140,7 +1166,8 @@ fn verify_native_asr_cuda_runtime_at(root: &Path) -> Result<(PathBuf, PathBuf, S
     let capability_ok = manifest.capabilities.backend == "ctranslate2"
         && manifest.capabilities.device == "cuda"
         && manifest.capabilities.engines == ["faster-whisper", "kotoba-faster-whisper"]
-        && !manifest.capabilities.vad
+        && manifest.capabilities.vad == locked_ct2_vad(&manifest.capabilities.device)
+        && !manifest.capabilities.vad_export
         && !manifest.capabilities.crispasr
         && manifest.capabilities.cuda
         && !manifest.capabilities.vulkan
@@ -1187,7 +1214,12 @@ fn verify_native_asr_cuda_runtime_at(root: &Path) -> Result<(PathBuf, PathBuf, S
         }
     }
     let worker = root.join(NATIVE_ASR_CPU_WORKER);
-    Ok((root.to_path_buf(), worker, manifest.artifact_id))
+    Ok((
+        root.to_path_buf(),
+        worker,
+        manifest.artifact_id,
+        manifest.capabilities.vad,
+    ))
 }
 
 fn cuda_restricted_path(root: &Path) -> Result<std::ffi::OsString, String> {
@@ -1241,7 +1273,7 @@ fn source_matches_cuda_artifact(
     })
 }
 
-fn native_asr_cuda_product_enabled_for(
+fn native_asr_cuda_download_enabled_for(
     lock: &NativeAsrCudaProductLock,
     sources: &RuntimeDependencyPlatformSources,
 ) -> bool {
@@ -1254,13 +1286,19 @@ fn native_asr_cuda_product_enabled_for(
 }
 
 fn native_asr_cuda_product_enabled() -> bool {
+    native_asr_cuda_product_lock().is_some_and(|lock| {
+        lock.product_enablement_allowed && lock.artifact.id == NATIVE_ASR_CUDA_ARTIFACT_ID
+    })
+}
+
+fn native_asr_cuda_download_enabled() -> bool {
     let Some(lock) = native_asr_cuda_product_lock() else {
         return false;
     };
     let Ok(sources) = platform_sources() else {
         return false;
     };
-    native_asr_cuda_product_enabled_for(&lock, &sources)
+    native_asr_cuda_download_enabled_for(&lock, &sources)
 }
 
 fn apply_cuda_support_evidence(capability: &mut NativeAsrCudaCapability) {
@@ -1289,10 +1327,11 @@ fn apply_cuda_support_evidence(capability: &mut NativeAsrCudaCapability) {
 pub(crate) fn native_asr_cuda_capability(app: &AppHandle) -> NativeAsrCudaCapability {
     if !native_asr_cuda_product_enabled() {
         return NativeAsrCudaCapability {
+            supports_vad: false,
             available: false,
             download_required: false,
             code: Some("cuda_artifact_not_qualified".into()),
-            reason: Some("CUDA 运行时尚未完成最终可复现构建与发布资格".into()),
+            reason: Some("当前构建未启用 CUDA 运行时".into()),
             device_index: None,
             device_name: None,
             visible_device_count: None,
@@ -1306,6 +1345,7 @@ pub(crate) fn native_asr_cuda_capability(app: &AppHandle) -> NativeAsrCudaCapabi
         Ok(root) => root,
         Err(error) => {
             return NativeAsrCudaCapability {
+                supports_vad: false,
                 available: false,
                 download_required: false,
                 code: Some("cuda_pack_path_failed".into()),
@@ -1321,10 +1361,11 @@ pub(crate) fn native_asr_cuda_capability(app: &AppHandle) -> NativeAsrCudaCapabi
         }
     };
     match verify_native_asr_cuda_runtime_at(&root) {
-        Ok((root, worker, _)) => {
+        Ok((root, worker, _, supports_vad)) => {
             let mut capability =
                 probe_native_asr_cuda_worker(&root, &worker).unwrap_or_else(|error| {
                     NativeAsrCudaCapability {
+                        supports_vad: false,
                         available: false,
                         download_required: false,
                         code: Some("cuda_probe_failed".into()),
@@ -1338,12 +1379,14 @@ pub(crate) fn native_asr_cuda_capability(app: &AppHandle) -> NativeAsrCudaCapabi
                         support_evidence: None,
                     }
                 });
+            capability.supports_vad = capability.available && supports_vad;
             apply_cuda_support_evidence(&mut capability);
             capability
         }
         Err(error) => NativeAsrCudaCapability {
+            supports_vad: false,
             available: false,
-            download_required: !root.exists(),
+            download_required: !root.exists() && native_asr_cuda_download_enabled(),
             code: Some(
                 if root.exists() {
                     "cuda_pack_corrupt"
@@ -1372,10 +1415,10 @@ pub(crate) fn resolve_native_asr_cuda_runtime(
     app: &AppHandle,
 ) -> Result<ResolvedNativeAsrCudaRuntime, String> {
     if !native_asr_cuda_product_enabled() {
-        return Err("CUDA 运行时尚未完成最终可复现构建与发布资格".into());
+        return Err("当前构建未启用 CUDA 运行时".into());
     }
     let root = managed_native_asr_cuda_dir(app)?;
-    let (root, worker, artifact_id) = verify_native_asr_cuda_runtime_at(&root)?;
+    let (root, worker, artifact_id, supports_vad) = verify_native_asr_cuda_runtime_at(&root)?;
     let capability = probe_native_asr_cuda_worker(&root, &worker)?;
     if !capability.available {
         return Err(capability
@@ -1387,6 +1430,7 @@ pub(crate) fn resolve_native_asr_cuda_runtime(
         root,
         worker,
         artifact_id,
+        supports_vad,
     })
 }
 
@@ -1900,8 +1944,8 @@ async fn prepare_native_asr_cuda(
     job: &Arc<StdMutex<RuntimeDependencyJob>>,
     profile: &RuntimeDependencySourceProfile,
 ) -> Result<String, String> {
-    if !native_asr_cuda_product_enabled() {
-        return Err("CUDA 运行时尚未完成最终可复现构建与发布资格".into());
+    if !native_asr_cuda_download_enabled() {
+        return Err("当前 CUDA 运行时尚无匹配的已发布下载包".into());
     }
     let source = profile
         .native_asr_cuda
@@ -2550,25 +2594,27 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
         (
             RuntimeDependencyStatus::Missing,
             None,
-            Some("CUDA 运行时尚未完成最终可复现构建与发布资格".into()),
+            Some("当前构建未启用 CUDA 运行时".into()),
         )
     } else {
         match cuda_verified {
-            Ok((root, worker, artifact_id)) => match probe_native_asr_cuda_worker(&root, &worker) {
-                Ok(capability) if capability.available => {
-                    (RuntimeDependencyStatus::Available, Some(artifact_id), None)
+            Ok((root, worker, artifact_id, _)) => {
+                match probe_native_asr_cuda_worker(&root, &worker) {
+                    Ok(capability) if capability.available => {
+                        (RuntimeDependencyStatus::Available, Some(artifact_id), None)
+                    }
+                    Ok(capability) => (
+                        RuntimeDependencyStatus::Available,
+                        Some(artifact_id),
+                        capability.reason.or(capability.code),
+                    ),
+                    Err(error) => (
+                        RuntimeDependencyStatus::Available,
+                        Some(artifact_id),
+                        Some(error),
+                    ),
                 }
-                Ok(capability) => (
-                    RuntimeDependencyStatus::Available,
-                    Some(artifact_id),
-                    capability.reason.or(capability.code),
-                ),
-                Err(error) => (
-                    RuntimeDependencyStatus::Available,
-                    Some(artifact_id),
-                    Some(error),
-                ),
-            },
+            }
             Err(error) => (RuntimeDependencyStatus::Missing, None, Some(error)),
         }
     };
@@ -2583,7 +2629,7 @@ fn probe_runtime_dependencies_inner(app: &AppHandle) -> Result<RuntimeDependency
             .as_ref()
             .and_then(|profile| profile.native_asr_cuda.as_ref())
             .map(|source| source.size_bytes)
-            .filter(|_| native_asr_cuda_product_enabled())
+            .filter(|_| native_asr_cuda_download_enabled())
             .filter(|_| cuda_status != RuntimeDependencyStatus::Available),
         reason: cuda_reason,
     });
@@ -2696,7 +2742,7 @@ pub async fn probe_runtime_dependencies(
             .map_err(|e| format!("探测运行时依赖失败：{e}"))??;
     let model_status = asr_state
         .native_models
-        .status(&app, "faster-whisper", "large-v3")
+        .status(&app, "faster-whisper", "large-v3", false)
         .await?;
     probe.items.push(native_model_dependency_item(
         &managed_models_dir(&app)?,
@@ -3044,7 +3090,7 @@ mod tests {
                     "backend": "ctranslate2",
                     "device": "cpu",
                     "engines": engines,
-                    "vad": false,
+                    "vad": locked_ct2_vad("cpu"),
                     "crispasr": false,
                     "cuda": false,
                     "vulkan": false,
@@ -3107,7 +3153,7 @@ mod tests {
                     "backend": "ctranslate2",
                     "device": "cuda",
                     "engines": ["faster-whisper", "kotoba-faster-whisper"],
-                    "vad": false,
+                    "vad": locked_ct2_vad("cuda"),
                     "crispasr": false,
                     "cuda": true,
                     "vulkan": false,
@@ -3121,12 +3167,22 @@ mod tests {
     }
 
     #[test]
-    fn native_cuda_product_gate_requires_matching_published_sources() {
-        let lock = native_asr_cuda_product_lock().unwrap();
-        let sources = platform_sources().unwrap();
+    fn native_cuda_local_use_is_independent_of_matching_published_downloads() {
+        let mut lock = native_asr_cuda_product_lock().unwrap();
+        let mut sources = platform_sources().unwrap();
 
-        assert!(native_asr_cuda_product_enabled_for(&lock, &sources));
         assert!(native_asr_cuda_product_enabled());
+        assert!(native_asr_cuda_download_enabled_for(&lock, &sources));
+        assert!(native_asr_cuda_download_enabled());
+        lock.publication_gate.external_stable_asset_published = false;
+        assert!(!native_asr_cuda_download_enabled_for(&lock, &sources));
+        assert!(native_asr_cuda_product_enabled());
+        lock.publication_gate.external_stable_asset_published = true;
+        lock.publication_gate.runtime_dependency_source_row_present = false;
+        assert!(!native_asr_cuda_download_enabled_for(&lock, &sources));
+        lock.publication_gate.runtime_dependency_source_row_present = true;
+        sources.china.native_asr_cuda.as_mut().unwrap().size_bytes += 1;
+        assert!(!native_asr_cuda_download_enabled_for(&lock, &sources));
 
         let mut wrong_source = sources.official.native_asr_cuda.unwrap();
         wrong_source.sha256 = "0".repeat(64);
@@ -3139,8 +3195,9 @@ mod tests {
     }
 
     #[test]
-    fn exact_rtx_3070_capability_is_labeled_real_tested_from_the_artifact_lock() {
+    fn a_new_cuda_artifact_does_not_inherit_old_hardware_qualification() {
         let mut capability = NativeAsrCudaCapability {
+            supports_vad: false,
             available: true,
             download_required: false,
             code: None,
@@ -3154,12 +3211,69 @@ mod tests {
             support_evidence: Some("theoretical".into()),
         };
         apply_cuda_support_evidence(&mut capability);
-        assert_eq!(capability.support_evidence.as_deref(), Some("realTested"));
+        assert_eq!(capability.support_evidence.as_deref(), Some("theoretical"));
 
         capability.device_name = Some("NVIDIA GeForce RTX 4070".into());
         capability.support_evidence = Some("theoretical".into());
         apply_cuda_support_evidence(&mut capability);
         assert_eq!(capability.support_evidence.as_deref(), Some("theoretical"));
+    }
+
+    #[test]
+    fn actual_ct2_package_roots_support_cuda_and_cpu_vad() {
+        let Some(root) = std::env::var_os("HIKARU_ASR_CT2_PACKAGE_TEST_RESOURCES") else {
+            return;
+        };
+        let root = PathBuf::from(root);
+        let cpu = resolve_native_asr_cpu_runtime_at(&root).unwrap();
+        assert!(cpu.supports_vad);
+        let cuda = root.join("deps/asr-runtime/cuda/current");
+        if let Ok(profile) = std::env::var("HIKARU_ASR_CT2_PACKAGE_TEST_SOURCE") {
+            // Opt-in real delivery check: use the app's downloader and verifier,
+            // not a pre-extracted archive. No WebView/AppHandle command is run.
+            assert!(native_asr_cuda_download_enabled());
+            assert!(!cuda.exists());
+            let sources = platform_sources().unwrap();
+            let source = match profile.as_str() {
+                "official" => sources.official.native_asr_cuda.unwrap(),
+                "china" => sources.china.native_asr_cuda.unwrap(),
+                _ => panic!("expected official or china"),
+            };
+            let downloads = root.join("deps/downloads/native-asr-cuda");
+            assert!(!downloads.exists());
+            let job = Arc::new(StdMutex::new(RuntimeDependencyJob::new(
+                "ct2-package-delivery".into(),
+                RuntimeDependencyKind::NativeAsrCuda,
+            )));
+            let archive = tauri::async_runtime::block_on(download_binary_source_to_dir(
+                downloads.clone(),
+                &job,
+                &source,
+                "native-asr-cuda-runtime.zip",
+            ))
+            .unwrap();
+            let extract = downloads.join("extract");
+            extract_archive(&archive, &extract, source.archive).unwrap();
+            let payload = extract.join("windows-x64/cuda");
+            verify_native_asr_cuda_runtime_at(&payload).unwrap();
+            fs::create_dir_all(cuda.parent().unwrap()).unwrap();
+            fs::rename(payload, &cuda).unwrap();
+            fs::remove_dir_all(extract).unwrap();
+            fs::remove_file(archive).unwrap();
+            eprintln!(
+                "CT2 {profile} managed download/install: {} bytes / {}",
+                source.size_bytes, source.sha256
+            );
+        }
+        let (cuda, worker, _, supports_vad) = verify_native_asr_cuda_runtime_at(&cuda).unwrap();
+        assert!(supports_vad && native_asr_cuda_product_enabled());
+        assert!(native_asr_cuda_download_enabled());
+        let capability = probe_native_asr_cuda_worker(&cuda, &worker).unwrap();
+        assert!(capability.available);
+        eprintln!(
+            "CT2 installed capability: {}",
+            serde_json::to_string(&capability).unwrap()
+        );
     }
 
     #[test]
@@ -3436,7 +3550,7 @@ mod tests {
             );
         }
         let stage = std::time::Instant::now();
-        let (root, worker, _) =
+        let (root, worker, _, _) =
             verify_native_asr_cuda_runtime_at(&deps.join("asr-runtime/cuda/current")).unwrap();
         eprintln!("CT2 CUDA file verification: {:?}", stage.elapsed());
         let stage = std::time::Instant::now();

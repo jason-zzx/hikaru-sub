@@ -9,14 +9,22 @@
 #include <fstream>
 
 namespace hikaru_qwen {
+inline bool vad_only() { return std::getenv("HIKARU_VAD_ONLY") != nullptr; }
 inline bool parakeet() { return std::getenv("HIKARU_PARAKEET_DEVICE") != nullptr; }
 inline bool reazonspeech() { return std::getenv("HIKARU_REAZONSPEECH_DEVICE") != nullptr; }
 inline bool parakeet_family() { return parakeet() || reazonspeech(); }
 inline const char* device() {
     const char* value = std::getenv("HIKARU_QWEN_DEVICE");
-    if ((value ? 1 : 0) + (parakeet() ? 1 : 0) + (reazonspeech() ? 1 : 0) > 1) {
+    if ((value ? 1 : 0) + (parakeet() ? 1 : 0) + (reazonspeech() ? 1 : 0) + (vad_only() ? 1 : 0) > 1) {
         std::fprintf(stderr, "hikaru_error: conflicting_device_controls\n");
         std::exit(40);
+    }
+    if (vad_only()) {
+        if (std::strcmp(std::getenv("HIKARU_VAD_ONLY"), "1")) {
+            std::fprintf(stderr, "hikaru_error: invalid_vad_control\n");
+            std::exit(40);
+        }
+        value = "cpu";
     }
     if (parakeet_family()) {
         value = std::getenv(parakeet() ? "HIKARU_PARAKEET_DEVICE" : "HIKARU_REAZONSPEECH_DEVICE");

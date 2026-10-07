@@ -171,7 +171,7 @@ Correct: cargo test --lib asr_worker::tests::production_worker_runs... -- --exac
 
 ### 1. Scope / Trigger
 
-Apply the shared command/route contracts below when changing Native model commands or `ResolvedNativeLaunch`. Current source supports CT2's original eight routes plus exact Qwen, Parakeet and ReazonSpeech through separate CrispASR CPU/CUDA artifacts. Qwen requires model+aligner+CPU Silero; Parakeet and ReazonSpeech require model+CPU Silero and matching embedded both-device engine authority. ReazonSpeech exact Q8_0 and its functional matrix are enabled by the published/default shared-v3 authority; shared-v2 remains rollback and general/other-engine VAD remains unavailable. Current explicit CUDA never falls back, CPU never initializes CUDA, and `auto` selects a verified device only before worker launch. CrispASR dependency/readiness and source authority are in `paths-and-runtime-deps.md`.
+Apply the shared command/route contracts below when changing Native model commands or `ResolvedNativeLaunch`. Current source supports CT2's original eight routes plus exact Qwen, Parakeet and ReazonSpeech through separate CrispASR CPU/CUDA artifacts. Qwen requires model+aligner+CPU Silero; Parakeet and ReazonSpeech require model+CPU Silero and matching embedded both-device engine authority. ReazonSpeech retains its exact Q8_0 route and mandatory CPU VAD. CT2 now has the separate optional CPU VAD contract below; it does not wrap any mandatory pipeline. Current explicit CUDA never falls back, CPU never initializes CUDA, and `auto` selects a verified device only before worker launch. CrispASR dependency/readiness and source authority are in `paths-and-runtime-deps.md`.
 
 The v3 CPU-only capability statements below describe the **original CT2 CPU artifact**, not a universal application restriction. Its no-VAD/no-CrispASR closure remains strict; current CT2 CUDA and independent CrispASR artifacts do not broaden that verifier.
 
@@ -184,10 +184,10 @@ enum AsrRoutePolicy { Legacy, NativeMvp }
 async fn list_asr_engines(app: AppHandle, state: State<'_, AsrState>)
     -> Result<serde_json::Value, String>;
 #[tauri::command]
-async fn check_asr_model(app: AppHandle, state: State<'_, AsrState>, engine: String, model: String)
+async fn check_asr_model(app: AppHandle, state: State<'_, AsrState>, engine: String, model: String, use_vad: Option<bool>)
     -> Result<serde_json::Value, String>;
 #[tauri::command]
-async fn download_asr_model(app: AppHandle, state: State<'_, AsrState>, engine: String, model: String)
+async fn download_asr_model(app: AppHandle, state: State<'_, AsrState>, engine: String, model: String, use_vad: Option<bool>)
     -> Result<String, String>;
 #[tauri::command]
 async fn get_model_download_progress(state: State<'_, AsrState>, job_id: String)
@@ -241,6 +241,92 @@ Correct: one route policy -> all model/inference commands -> direct controlled f
 Wrong:   accept model name/path from settings and build a worker request
 Correct: T12 exact readiness -> resolved path -> ResolvedNativeLaunch
 ```
+
+## Optional CPU VAD for CT2
+
+### 1. Scope / Trigger
+
+Seven ordinary Faster-Whisper models and exact Kotoba support a default-off CPU
+Silero pass before their unchanged CT2 decoder. Qwen, Parakeet and ReazonSpeech
+keep their existing mandatory VAD; do not wrap them in this pass.
+
+### 2. Signatures
+
+- `check_asr_model` / `download_asr_model`: optional IPC `useVad`, default false.
+- `StartAsrArgs`: existing `useVad` and `vadConfig`; no public executable path.
+- `list_asr_engines`: CT2 `devices[].optionalVad: { available, reason }`.
+- Internal `ResolvedNativeLaunch::resolve(..., vad_cli_path: Option<PathBuf>)`
+  serializes `vadCliPath` only for CT2+VAD; worker roles are exactly `model`+`vad`.
+- `CTranslate2WhisperBackend::transcribe_audio(const wav::Audio&, ...)` reuses the
+  same decoder as the original file entry point.
+
+### 3. Contracts
+
+- Enabling CT2 VAD builds an effective model entry with the existing shared
+  Silero identity; it does not persist `requiredVad` onto CT2 manifest rows.
+  Direct and contained legacy installs both return verified `model`+`vad` roles.
+  On/off readiness cache keys and same-model download requirements stay distinct;
+  a conflicting active download returns an error rather than claiming coverage.
+- Resolve the requested ASR device first, then require that worker's `vad`
+  capability and the separately verified CrispASR **CPU** CLI's `vadExport`.
+  Missing VAD does not change the device selected by `auto`; explicit CUDA never
+  falls back. Disabled VAD neither resolves nor launches a VAD CLI on start.
+- Accept only known fields `threshold` (finite 0..1, default 0.5) and
+  `minSilenceDurationMs` (integer 0..60000, default 100). Reject the three other
+  known VAD fields when enabled; disabled configuration is ignored.
+- The child runs controlled `HIKARU_VAD_ONLY=1`, `CRISPASR_VAD_FAILOVER=0`,
+  `--vad-export-raw`, strict required CPU VAD, no ASR/aligner arguments, and no
+  offline short-gap post-merge. Fixed upstream min-speech/pad stay 250/30ms.
+  Child DLLs stay under the independent CPU runtime root, never CT2's tree.
+- Read bounded JSON only after exit0 and actual CPU completion. Integer PCM
+  `[start,end)` spans must be ordered, nonoverlapping and within real samples;
+  centisecond fields do not drive slicing. Each nonempty span uses original PCM,
+  fresh decoder seek/history/K2 state and one reused ASR backend. Add its sample
+  origin once; never concatenate speech or accumulate preceding durations.
+  Keep the decoder's existing `end_bounded_to_audio` normalization, not a new
+  rejection, timestamp repair, padding change or no-VAD retry.
+- VAD progress is monotonic completed chunks on stderr with a 120-second
+  no-progress watchdog; repeated logs do not reset it. ASR source progress stays
+  zero during VAD, then follows original-audio coordinates monotonically.
+- One host gate and Windows Job own the worker and VAD child. Reuse private
+  `asr-jobs/<jobId>-cli` and cleanup only after physical reap. Empty VAD succeeds
+  without loading ASR weights; partial/error/cancel never replaces existing ASS.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| VAD off; shared Silero or CPU CLI missing | Original CT2 request/readiness remains usable |
+| Enabled; missing/corrupt dependency or capability | Explicit failure; no ASR/no-VAD/Python fallback |
+| Same model downloading a different dependency set | Wait/retry error, not the old job as full coverage |
+| CPU VAD failure, partial JSON or absent completion | Failed job, never silence |
+| Completed empty spans | No ASR model load; preserve document/recovery/save target |
+| Decoder span failure | Preserve prior subtitles; do not repair endpoints |
+| Cancel during VAD or ASR | Terminate/reap owned tree, clean private result, release gate |
+
+### 5. Good / Base / Bad Cases
+
+Good: CPU Silero spans feed selected CPU/CUDA CT2 once and retain source gaps.
+Base: `useVad:false` keeps the original full-audio route.
+Bad: optional controls alter a mandatory pipeline, or an enabled failure retries
+full audio without VAD.
+
+### 6. Tests Required
+
+- Model manager: direct/legacy on/off readiness, corrupt shared dependency cache
+  invalidation, repair/resume, official/mirror identity, conflicting download sets.
+- Rust/protocol/launcher: exact roles/capabilities, supported parameter bounds,
+  CPU-only child, malformed output, genuine empty success, monotonic watchdog,
+  process-tree cancellation, private cleanup and next-job success.
+- Real CPU/CUDA matrix: eight-model short on/off, representative 80/128 Mel and
+  Kotoba medium/long, silence/gaps, unchanged mandatory routes. Unit tests and
+  successful short cases do not establish long-case or real GUI acceptance.
+
+### 7. Wrong vs Correct
+
+Wrong: `ASR device=cuda -> VAD cuda`, or `end_bounded_to_audio -> reject span`.
+Correct: verified CPU-only VAD -> unchanged selected-device decoder -> apply
+original sample origin once -> preserve Native rows on completion.
 
 ## Bundled CTranslate2 CPU Runtime (original v3 artifact)
 

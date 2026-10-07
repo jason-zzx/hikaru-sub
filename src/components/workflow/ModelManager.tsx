@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -51,7 +52,7 @@ export type ModelTranscribeGate =
   | "check_failed"
   | "aborted";
 
-export type ModelDownloadResult = "completed" | "failed";
+export type ModelDownloadResult = "completed" | "failed" | "aborted";
 
 export type ModelManagerHandle = {
   /** 重新检测模型状态，区分就绪 / 需下载 / 路线不可用 / 检测失败 / 已取消。 */
@@ -63,6 +64,8 @@ export type ModelManagerHandle = {
 interface ModelManagerProps {
   engine: string;
   model: string;
+  useVad?: boolean;
+  disabled?: boolean;
   status: AsrModelStatus | null;
   checking: boolean;
   checkError: string | null;
@@ -77,6 +80,8 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
     {
       engine,
       model,
+      useVad = false,
+      disabled = false,
       status,
       checking,
       checkError,
@@ -96,6 +101,17 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
     const downloadPromiseRef = useRef<Promise<ModelDownloadResult> | null>(null);
     const onDownloadingChangeRef = useRef(onDownloadingChange);
     onDownloadingChangeRef.current = onDownloadingChange;
+    const requestKey = `${engine}:${model}:${useVad}`;
+    const activeRequestRef = useRef<string | null>(requestKey);
+    activeRequestRef.current = requestKey;
+    useEffect(() => {
+      activeRequestRef.current = requestKey;
+      return () => {
+        activeRequestRef.current = null;
+        // Release this view's lock, not the backend's resumable download.
+        if (downloadPromiseRef.current) onDownloadingChangeRef.current?.(false);
+      };
+    }, [requestKey]);
 
     const setDownloadingState = useCallback((next: boolean) => {
       setDownloading(next);
@@ -105,39 +121,47 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
     const runDownload = useCallback((): Promise<ModelDownloadResult> => {
       if (downloadPromiseRef.current) return downloadPromiseRef.current;
 
+      const isCurrent = () => activeRequestRef.current === requestKey;
       const promise = (async (): Promise<ModelDownloadResult> => {
         setDownloadingState(true);
         setDownloadError(null);
         setProgress(null);
         setDownloadDiagnostics(null);
         try {
-          const jobId = await downloadAsrModel(engine, model);
-          for (;;) {
+          const jobId = await downloadAsrModel(engine, model, useVad);
+          while (isCurrent()) {
             await sleep(800);
+            if (!isCurrent()) return "aborted";
             const snap = await getModelDownloadProgress(jobId);
+            if (!isCurrent()) return "aborted";
             setProgress({ done: snap.downloadedBytes, total: snap.totalBytes });
             setDownloadDiagnostics(snap);
             if (snap.status === "completed") {
-              await refreshStatus();
-              return "completed";
+              const outcome = await refreshStatus();
+              if (!isCurrent() || outcome.kind === "aborted") return "aborted";
+              if (outcome.kind === "ok" && transcribeGate(outcome.status) === "ready") return "completed";
+              setDownloadError("下载后模型依赖仍未就绪，请重新检测。");
+              return "failed";
             }
             if (snap.status === "failed") {
               setDownloadError(snap.error ?? "下载失败");
               return "failed";
             }
           }
+          return "aborted";
         } catch (error) {
+          if (!isCurrent()) return "aborted";
           setDownloadError(String(error));
           return "failed";
         } finally {
-          setDownloadingState(false);
+          if (isCurrent()) setDownloadingState(false);
           downloadPromiseRef.current = null;
         }
       })();
 
       downloadPromiseRef.current = promise;
       return promise;
-    }, [engine, model, refreshStatus, setDownloadingState]);
+    }, [engine, model, useVad, requestKey, refreshStatus, setDownloadingState]);
 
     useImperativeHandle(
       ref,
@@ -198,14 +222,14 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-3 text-xs">
-          <span>模型状态：{statusText}</span>
+          <span>{useVad ? "模型与 VAD 状态：" : "模型状态："}{statusText}</span>
           <div className="flex items-center gap-2">
             {!downloading && (
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => void refreshStatus()}
-                disabled={checking}
+                disabled={disabled || checking}
                 className="text-text-muted hover:text-text"
               >
                 重新检测
@@ -216,6 +240,7 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
                 type="button"
                 variant="outline"
                 onClick={() => void runDownload()}
+                disabled={disabled}
                 className="px-2.5 py-1 text-sm"
               >
                 下载模型

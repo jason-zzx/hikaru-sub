@@ -239,12 +239,12 @@ function Assert-RestrictedLaunch([string]$RuntimeRoot) {
   }
   $stdout = $process.StandardOutput.ReadToEnd().Trim()
   $stderr = $process.StandardError.ReadToEnd().Trim()
-  if ($process.ExitCode -ne 20 -or -not $stdout) {
+  if ($process.ExitCode -ne 2 -or -not $stdout) {
     throw "Packaged worker restricted launch failed: exit=$($process.ExitCode) stdout=$stdout stderr=$stderr"
   }
   $event = $stdout.Split("`n", [System.StringSplitOptions]::RemoveEmptyEntries)[0] | ConvertFrom-Json
-  if ($event.event -ne "error" -or $event.code -ne "vad_not_built") {
-    throw "Packaged worker did not fail closed for excluded VAD: $stdout"
+  if ($event.event -ne "error" -or $event.code -ne "missing_model_role") {
+    throw "Packaged worker did not fail closed for missing VAD inputs: $stdout"
   }
 }
 

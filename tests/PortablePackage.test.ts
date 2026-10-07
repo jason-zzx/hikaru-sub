@@ -166,8 +166,9 @@ describe("portable package", () => {
     expect(crispasr.cpu.engines).toEqual(["qwen3-asr", "parakeet", "reazonspeech-nemo"]);
     expect(crispasr.cuda.engines).toEqual(["qwen3-asr", "parakeet", "reazonspeech-nemo"]);
     expect(crispasr.externalStableAssetPublished).toBe(true);
+    const ct2 = JSON.parse(readFileSync(rootFile("native-asr/runtime/windows-x64-cpu-lock.json"), "utf8"));
     for (const path of [
-      "native-asr/runtime/windows-x64-cpu-lock.json", "native-asr/artifacts/windows-x64-cpu.zip",
+      "native-asr/runtime/windows-x64-cpu-lock.json", ct2.artifact.path,
       "native-asr/runtime/crispasr-product-lock.json", crispasr.cpu.archive.path,
     ]) {
       await mkdir(dirname(join(root, path)), { recursive: true });

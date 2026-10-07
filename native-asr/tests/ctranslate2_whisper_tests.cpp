@@ -1718,6 +1718,73 @@ void run_core_tests() {
   expect_timestamp_error({1000, tokens.eot}, tokens, "invalid_generation");
   expect_timestamp_error({1000, 42, 2501}, tokens, "invalid_generation");
 
+  // A covered EOF does not excuse malformed, overlapping or in-audio suffixes.
+  for (const std::vector<std::size_t>& ids : std::vector<std::vector<std::size_t>>{
+           {1250, 42, 1300},
+           {1000, 42, 1200, 1250, 43, 1300},
+           {1000, 42, 1250, 1240, 43, 1300},
+           {1000, 42, 1250, 1250, 43, 1300, 1240, 42, 1350},
+           {1000, 42, 1250, 1250, 43, 1300, 1200, 42, 1350},
+           {1000, 42, 1250, 1250, 43, 1200, 43, 1300}}) {
+    expect_timestamp_error(ids, tokens, "timestamp_after_audio", 4770);
+  }
+  expect_timestamp_error(
+      {1000, 42, 1250, 1250, 43, 1250}, tokens, "invalid_generation", 4770);
+  expect_timestamp_error(
+      {1000, 42, 1250, 1250, 1250, 43, 1300}, tokens, "invalid_generation", 4770);
+  expect_timestamp_error(
+      {1000, 42, 1250, 1250, 43, 2501}, tokens, "invalid_generation", 4770);
+  const auto incomplete_eof = parse_timestamp_tokens(
+      {1000, 42, 1250, 1250, 43, tokens.eot}, tokens, decode, 0, 4770, 4770);
+  check(incomplete_eof.segments.size() == 1 && incomplete_eof.used_decoded_seek
+            && incomplete_eof.seek_advance_frames == 500
+            && incomplete_eof.history_tokens == std::vector<std::size_t>{1000, 42, 1250},
+        "unfinished EOF tail behavior drift");
+
+  try {
+    static_cast<void>(parse_timestamp_tokens(
+        {1000, 44, 1250, 1250, 43, 1300}, tokens, decode, 0, 4770, 4770));
+    throw std::runtime_error("empty prefix accepted EOF suffix");
+  } catch (const BackendError& error) {
+    check(error.code() == "timestamp_after_audio", "empty-prefix EOF error drift");
+  }
+  const std::vector<std::size_t> eof_suffix{
+      1000, 42, 1050, 1050, 43, 1100, 1100, 42, 1150,
+      1150, 43, 1200, 1200, 42, 1250, 1250, 43, 1300};
+  try {
+    static_cast<void>(parse_timestamp_tokens(eof_suffix, tokens, decode, 0, 4000, 4770));
+    throw std::runtime_error("non-final PCM window accepted EOF suffix");
+  } catch (const BackendError& error) {
+    check(error.code() == "timestamp_after_audio", "non-final EOF error drift");
+  }
+  for (const std::int64_t duration : {4770, 2770, 4999, 5000, 5001}) {
+    const auto eof = parse_timestamp_tokens(eof_suffix, tokens, decode, 0, duration, duration);
+    const std::size_t count = static_cast<std::size_t>((duration + 999) / 1000);
+    check(eof.segments.size() == count && eof.single_timestamp_ending
+              && !eof.used_decoded_seek && eof.seek_advance_frames == (duration + 9) / 10,
+          "complete EOF suffix retention/seek drift");
+    check(eof.history_tokens == std::vector<std::size_t>(
+              eof_suffix.begin(), eof_suffix.begin() + static_cast<std::ptrdiff_t>(count * 3)),
+          "unobserved EOF suffix entered history");
+    for (std::size_t index = 0; index < count; ++index) {
+      const auto& eof_segment = eof.segments[index];
+      const auto raw_end = static_cast<std::int64_t>(index + 1) * 1000;
+      check(eof_segment.segment.start_ms == static_cast<std::int64_t>(index) * 1000
+                && eof_segment.segment.end_ms == std::min(raw_end, duration)
+                && eof_segment.raw_end_ms == raw_end
+                && eof_segment.end_bounded_to_audio == (raw_end > duration)
+                && eof_segment.segment.text == (index % 2 == 0 ? " first" : " second"),
+            "EOF prefix text/raw or normalized boundary drift");
+    }
+  }
+  const auto offset_eof = parse_timestamp_tokens(eof_suffix, tokens, decode, 10000, 4770, 14770);
+  check(offset_eof.segments.size() == 5 && offset_eof.seek_advance_frames == 477
+            && offset_eof.segments.front().segment.start_ms == 10000
+            && offset_eof.segments.back().segment.start_ms == 14000
+            && offset_eof.segments.back().segment.end_ms == 14770
+            && offset_eof.segments.back().raw_end_ms == 15000,
+        "EOF suffix nonzero offset drift");
+
   std::vector<SegmentEvidence> duplicate_segments{
       {{0, 1000, "same"}},
       {{0, 1000, "same"}},
@@ -3302,6 +3369,106 @@ void run_kotoba_evidence(const std::vector<std::string>& args, bool k2) {
       {"sampleCount", raw["samples"].size()}}.dump() << '\n';
 }
 
+// Optional real-model regression: the exact failing crop stays ignored-local.
+void run_tail_regression(const std::vector<std::string>& args) {
+  const fs::path output = fs::u8path(required_arg(args, "--output"));
+  const wav::Audio original = wav::read_pcm16_mono_16khz(
+      fs::u8path(required_arg(args, "--audio")));
+  check(original.samples.size() == 247204 && original.duration_ms == 15450,
+        "tail regression requires the retained exact failing crop");
+  CTranslate2WhisperBackend ordinary(fs::u8path(required_arg(args, "--model")));
+  Json cases = Json::array();
+  const auto run = [&](CTranslate2WhisperBackend& backend, const wav::Audio& audio) {
+    std::cout << "tail_case=" << cases.size() << '\n' << std::flush;
+    std::vector<std::int64_t> progress;
+    auto result = backend.transcribe_audio(audio, [&](std::int64_t at) {
+      progress.push_back(at);
+      std::cout << "progress=" << at << '\n' << std::flush;
+    });
+    Json traces = Json::array();
+    for (const auto& trace : result.traces) traces.push_back(trace_json(trace));
+    Json segments = Json::array();
+    for (const auto& segment : result.segments) segments.push_back(segment_json(segment));
+    cases.push_back(Json{{"samples", audio.samples.size()}, {"failure", result.failure_code},
+                         {"traces", traces}, {"segments", segments}});
+    std::ofstream(output) << cases.dump(2) << '\n';
+    check(!result.traces.empty(), "initial input was silently skipped");
+    check(std::is_sorted(progress.begin(), progress.end()), "tail progress regressed");
+    if (result.failure_code.empty()) {
+      check(!progress.empty() && progress.back() == audio.duration_ms,
+            "tail completion progress did not reach duration");
+    }
+    return result;
+  };
+  const auto result = run(ordinary, original);
+  check(result.failure_code.empty() && result.traces.size() == 1
+            && result.segments.size() == 3,
+        "exact tail crop did not complete with its three original valid segments");
+  check(result.traces.front().seek_frames_after == 1545
+            && result.traces.front().final_window
+            && result.segments.back().end_bounded_to_audio,
+        "tail scheduling changed seek or existing endpoint normalization");
+  const auto mel = official_log_mel_for_test(
+      original.samples, ordinary.mel_bins(), 0,
+      static_cast<int>(source_frame_count(original.samples.size())));
+  std::ofstream(output.string() + ".mel", std::ios::binary).write(
+      reinterpret_cast<const char*>(mel.data()),
+      static_cast<std::streamsize>(mel.size() * sizeof(float)));
+  for (std::size_t remainder : {1u, 2u, 3u, 5u, 6u, 7u, 8u, 16u, 32u, 144u, 160u}) {
+    wav::Audio audio = original;
+    audio.samples.resize(247200 + remainder, 0.0f);
+    audio.duration_ms = (static_cast<std::int64_t>(audio.samples.size()) + 8) / 16;
+    const auto tail = run(ordinary, audio);
+    check(tail.failure_code.empty(), "boundary crop failed");
+    for (const auto& trace : tail.traces) {
+      check(trace.source_window_duration_ms > 0, "scheduled an exhausted tail");
+    }
+    check(tail.traces.front().source_window_duration_ms == audio.duration_ms,
+          "positive rounded tail was truncated before decoding");
+  }
+  for (std::size_t samples : {1u, 7u}) {
+    wav::Audio audio{std::vector<float>(samples, 0.0f), 0};
+    const auto initial = run(ordinary, audio);
+    check(initial.traces.front().generation_call_count > 0,
+          "initial sub-ms input newly became an empty success");
+  }
+  CTranslate2WhisperBackend kotoba(
+      fs::u8path(required_arg(args, "--kotoba-model")), kotoba_k2_config(),
+      std::nullopt, cpu_execution_config(), true);
+  wav::Audio speech = wav::read_pcm16_mono_16khz(
+      fs::u8path(required_arg(args, "--kotoba-audio")));
+  speech.samples.resize((speech.samples.size() / hop_length) * hop_length + 4, 0.0f);
+  speech.duration_ms = (static_cast<std::int64_t>(speech.samples.size()) + 8) / 16;
+  const auto normal = run(kotoba, speech);
+  check(normal.failure_code.empty() && !normal.segments.empty()
+            && !normal.traces.back().skipped_as_no_speech && normal.traces.back().final_window,
+        "K2 normal final-window regression");
+  // Fixed test-only branch control, not a silence/quality tuning experiment:
+  // default Kotoba may transcribe zero PCM rather than classify it as no-speech.
+  auto no_speech_config = kotoba_k2_config();
+  no_speech_config.no_speech_threshold = 0.0f;
+  no_speech_config.log_prob_threshold = 0.0f;
+  CTranslate2WhisperBackend no_speech(
+      fs::u8path(required_arg(args, "--kotoba-model")), no_speech_config,
+      std::nullopt, cpu_execution_config(), true);
+  wav::Audio silence{std::vector<float>(160004, 0.0f), 10000};
+  const auto quiet = run(no_speech, silence);
+  cases.back()["testOnlyForcedNoSpeechBranch"] = true;
+  std::ofstream(output) << cases.dump(2) << '\n';
+  check(quiet.failure_code.empty() && quiet.segments.empty() && quiet.traces.size() == 1
+            && quiet.traces.back().skipped_as_no_speech && quiet.traces.back().final_window,
+        "K2 no-speech final-window regression");
+  for (const auto* decoded : {&normal, &quiet}) {
+    for (const auto& trace : decoded->traces) {
+      check(trace.applied_seek_advance_frames <= 1000
+                && trace.seek_frames_after - trace.seek_frames_before
+                    == trace.applied_seek_advance_frames
+                && trace.final_window == (trace.ownership_end_ms == decoded->duration_ms),
+            "K2 stride or final ownership changed");
+    }
+  }
+}
+
 void run_candidate_b_identity_check() {
   static_cast<void>(restricted_path_policy());
   run_core_tests();
@@ -3339,6 +3506,8 @@ int main(int argc, char** argv) {
     } else if (args.empty() || std::find(args.begin(), args.end(), "--self-check") != args.end()) {
       run_core_tests();
       std::cout << "ctranslate2 whisper tests passed\n";
+    } else if (std::find(args.begin(), args.end(), "--run-tail-regression") != args.end()) {
+      run_tail_regression(args);
     } else if (std::find(args.begin(), args.end(), "--run-evidence") != args.end()) {
       run_evidence(args, false);
     } else if (std::find(args.begin(), args.end(), "--run-selected-evidence") != args.end()) {

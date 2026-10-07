@@ -36,10 +36,8 @@ describe("ASR release resource preparation", () => {
       join(repositoryRoot, "native-asr", "runtime", "windows-x64-cpu-lock.json"),
       join(root, "native-asr", "runtime", "windows-x64-cpu-lock.json"),
     );
-    copy(
-      join(repositoryRoot, "native-asr", "artifacts", "windows-x64-cpu.zip"),
-      join(root, "native-asr", "artifacts", "windows-x64-cpu.zip"),
-    );
+    const ct2 = JSON.parse(readFileSync(join(repositoryRoot, "native-asr/runtime/windows-x64-cpu-lock.json"), "utf8"));
+    copy(join(repositoryRoot, ct2.artifact.path), join(root, ct2.artifact.path));
 
     const lockPath = "native-asr/runtime/crispasr-product-lock.json";
     const lock = JSON.parse(readFileSync(join(repositoryRoot, lockPath), "utf8"));
@@ -64,7 +62,7 @@ describe("ASR release resource preparation", () => {
     expect(existsSync(crispasr)).toBe(true);
 
     expect(prepared.archiveSha256).toBe(
-      "31607037de21bfb541c993023e0597b23a3a3b321ec3bb1d33e2d056b29c60e9",
+      ct2.artifact.sha256,
     );
     expect(existsSync(join(root, "src-tauri", "resources", "asr-service"))).toBe(
       false,

@@ -61,6 +61,7 @@ describe("useAsrAvailability", () => {
     const whisperModels = ASR_ENGINE_MODELS["faster-whisper"].map(({ value }) => value);
     const modelOptions = asrModelSelectOptions("faster-whisper", {
       engine: "faster-whisper",
+      useVad: false,
       loading: false,
       statuses: Object.fromEntries(
         whisperModels.map((model) => [
@@ -80,6 +81,7 @@ describe("useAsrAvailability", () => {
     const kotobaModel = ASR_ENGINE_MODELS["kotoba-faster-whisper"][0].value;
     const kotobaOptions = asrModelSelectOptions("kotoba-faster-whisper", {
       engine: "kotoba-faster-whisper",
+      useVad: false,
       loading: false,
       statuses: {
         [kotobaModel]: status(
@@ -244,7 +246,7 @@ describe("useAsrAvailability", () => {
       useAsrAvailability("faster-whisper", "large-v3", "cpu"),
     );
     await waitFor(() => expect(result.current.engineLoading).toBe(false));
-    expect(mocks.checkAsrModel.mock.calls).toEqual([["faster-whisper", "large-v3"]]);
+    expect(mocks.checkAsrModel.mock.calls).toEqual([["faster-whisper", "large-v3", false]]);
     await act(async () => pending.shift()!());
     expect(result.current.routeAvailable).toBe(true);
     expect(result.current.modelLoading).toBe(false);
@@ -306,6 +308,70 @@ describe("useAsrAvailability", () => {
       expect(result.current.selectedModelStatus?.model).toBe("large-v3-turbo"),
     );
     expect(mocks.checkAsrModel).toHaveBeenCalledTimes(7);
+  });
+
+  it.each(["batch", "selected"])("isolates VAD readiness from a stale %s response", async (kind) => {
+    mocks.listAsrEngines.mockResolvedValue([{
+      name: "faster-whisper", available: true,
+      devices: [{ device: "cpu", available: true, optionalVad: { available: true } }],
+    }]);
+    mocks.checkAsrModel.mockImplementation(async (engine, model) => status(engine, model, "ready"));
+    const { result, rerender } = renderHook(
+      ({ useVad }) => useAsrAvailability("faster-whisper", "large-v3", "cpu", useVad),
+      { initialProps: { useVad: false } },
+    );
+    await waitFor(() => expect(result.current.modelOptions.every(option => !option.disabled)).toBe(true));
+    let finish!: (value: AsrModelStatus) => void;
+    mocks.checkAsrModel.mockImplementation((engine, model, useVad) => useVad
+      ? Promise.resolve(status(engine, model, "supportedMissing"))
+      : new Promise(resolve => { finish = resolve; }));
+    let pending!: Promise<unknown>;
+    act(() => { pending = kind === "batch" ? result.current.refresh() : result.current.refreshSelectedModel(); });
+    rerender({ useVad: true });
+    await waitFor(() => expect(result.current.selectedModelStatus?.disposition).toBe("supportedMissing"));
+    expect(mocks.checkAsrModel).toHaveBeenCalledWith("faster-whisper", "large-v3", true);
+    await act(async () => { finish(status("faster-whisper", "large-v3", "ready")); await pending; });
+    expect(result.current.selectedModelStatus?.disposition).toBe("supportedMissing");
+    expect(result.current.routeAvailable).toBe(true);
+  });
+
+  it.each(["cpu", "cuda", "auto"])("gates enabled VAD on the resolved %s capability without affecting off", async (device) => {
+    mocks.listAsrEngines.mockResolvedValue([{
+      name: "faster-whisper", available: true,
+      devices: [
+        { device: "cpu", available: true, optionalVad: { available: device === "auto", reason: "CPU VAD 不可用" } },
+        { device: "cuda", available: true, optionalVad: { available: false, reason: "CUDA worker 不支持 VAD" } },
+      ],
+    }]);
+    mocks.checkAsrModel.mockImplementation(async (engine, model) => status(engine, model, "ready"));
+    const { result, rerender } = renderHook(
+      ({ useVad }) => useAsrAvailability("faster-whisper", "large-v3", device, useVad),
+      { initialProps: { useVad: false } },
+    );
+    await waitFor(() => expect(result.current.routeAvailable).toBe(true));
+    rerender({ useVad: true });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.routeAvailable).toBe(false);
+    expect(result.current.unavailableReason).toBe(device === "cpu" ? "CPU VAD 不可用" : "CUDA worker 不支持 VAD");
+    expect(result.current.deviceOptions.find(option => option.value === device)?.disabled).toBe(true);
+    rerender({ useVad: false });
+    await waitFor(() => expect(result.current.routeAvailable).toBe(true));
+  });
+
+  it("treats absent optional capability as unavailable and uses CPU only when auto CUDA is unavailable", async () => {
+    mocks.listAsrEngines.mockResolvedValue([{
+      name: "faster-whisper", available: true,
+      devices: [{ device: "cpu", available: true }, { device: "cuda", available: false }],
+    }]);
+    mocks.checkAsrModel.mockImplementation(async (engine, model) => status(engine, model, "ready"));
+    const { result } = renderHook(() => useAsrAvailability("faster-whisper", "large-v3", "auto", true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.routeAvailable).toBe(false);
+    mocks.listAsrEngines.mockResolvedValue([{
+      name: "faster-whisper", available: true,
+      devices: [{ device: "cpu", available: true, optionalVad: { available: true } }, { device: "cuda", available: false }],
+    }]);
+    await act(async () => { expect(await result.current.refresh()).toMatchObject({ routeAvailable: true }); });
   });
 
   it("ignores stale model results after an engine change", async () => {

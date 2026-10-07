@@ -9,16 +9,16 @@ const select = read("../src/components/ui/select-adapter.tsx");
 
 describe("Native ASR frontend migration contract", () => {
   it("uses one availability owner and disabled Select items", () => {
-    expect(transcribe).toContain("useAsrAvailability(engine, model, device)");
+    expect(transcribe).toContain("useAsrAvailability(engine, model, device, selectedUseVad)");
     expect(settings).toContain("useAsrAvailability(");
     expect(select).toContain("disabled?: boolean");
     expect(select).toContain("disabled={opt.disabled}");
   });
 
-  it("gates starts and sends the Native MVP VAD contract", () => {
+  it("gates starts and sends the selected optional VAD request", () => {
     expect(transcribe).toContain("!availability.routeAvailable");
-    expect(transcribe).toContain("useVad: false");
-    expect(transcribe).toContain("vadConfig: null");
+    expect(transcribe).toContain("useVad: selectedUseVad");
+    expect(transcribe).toContain("vadConfig: selectedUseVad ? { threshold, minSilenceDurationMs } : null");
     expect(transcribe).not.toMatch(/启用 VAD|配置当前引擎依赖|无法启动 sidecar/);
   });
 

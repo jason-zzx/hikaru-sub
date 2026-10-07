@@ -147,7 +147,7 @@ void test_requests() {
   invalid["language"] = "en";
   expect_request_error(invalid, "invalid_language");
 
-  Json vad = base_request();
+  Json vad = base_request("parakeet", "crispasr");
   vad["useVad"] = true;
   vad["vadConfig"] = Json{{"threshold", 0.5},
                            {"minSpeechDurationMs", 500},
@@ -170,6 +170,31 @@ void test_requests() {
   check(nonfinite_marker != std::string::npos, "non-finite fixture marker missing");
   nonfinite.replace(nonfinite_marker, std::string("\"NONFINITE\"").size(), "1e9999");
   check(!parse_request_line(nonfinite, request, error), "non-finite VAD number must fail");
+
+  for (const char* engine : {"faster-whisper", "kotoba-faster-whisper"}) {
+    auto optional = base_request(engine);
+    optional["useVad"] = true;
+    expect_request_error(optional, "missing_model_role");
+    optional["modelPaths"].push_back({{"role", "vad"}, {"path", "C:\\models\\silero.bin"}});
+    check(!parse_request(optional, request, error), "VAD requires explicit CPU CLI");
+    optional["vadCliPath"] = "C:\\runtime\\crispasr.exe";
+    check(parse_request(optional, request, error) && !request.vad_config, "VAD defaults rejected");
+    optional["vadConfig"] = {{"threshold", 0.73}, {"minSilenceDurationMs", 321}};
+    check(parse_request(optional, request, error), "CT2 VAD parameters rejected");
+    check(request.vad_cli_path == optional["vadCliPath"].get<std::string>()
+              && request.vad_config->threshold == 0.73
+              && request.vad_config->min_silence_duration_ms == 321,
+          "CT2 VAD request fields lost");
+    for (const char* key : {"minSpeechDurationMs", "speechPadMs", "maxSegmentDurationMs"}) {
+      optional["vadConfig"][key] = 1000;
+      expect_request_error(optional, "unsupported_vad_config");
+      optional["vadConfig"].erase(key);
+    }
+    optional["vadConfig"]["minSilenceDurationMs"] = 100.5;
+    expect_request_error(optional, "invalid_vad_config");
+    optional["vadConfig"]["minSilenceDurationMs"] = 60001;
+    expect_request_error(optional, "invalid_vad_config");
+  }
 
   Json disabled_vad = base_request();
   disabled_vad["vadConfig"] = "ignored while disabled";

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectStore } from "../../stores/projectStore";
@@ -85,6 +85,93 @@ async function mountRoute(route: typeof routes[number]) {
   await waitFor(() => expect(start.hasAttribute("disabled")).toBe(false));
   return { user, view, start };
 }
+
+it("carries the optional VAD selection through pending checks, consent, download and start", async () => {
+  runtimeReady = true;
+  mocks.getSettings.mockResolvedValue({ asrEngine: "faster-whisper", asrModel: "large-v3", asrDevice: "cpu" });
+  mocks.listAsrEngines.mockImplementation(async () => engines().map(engine => ({
+    ...engine, devices: engine.devices?.map(device => ({ ...device, optionalVad: { available: true } })),
+  })));
+  let releaseCheck!: () => void;
+  const checkPending = new Promise<void>(resolve => { releaseCheck = resolve; });
+  let downloaded = false;
+  mocks.checkAsrModel.mockImplementation(async (engine, model, useVad) => {
+    if (useVad) await checkPending;
+    const ready = !useVad || downloaded;
+    return { engine, model, backend: "ctranslate2", available: true, downloaded: ready, disposition: ready ? "ready" : "supportedMissing" };
+  });
+  let finishDownload!: (value: object) => void;
+  mocks.downloadAsrModel.mockResolvedValue("vad-download");
+  mocks.getModelDownloadProgress.mockReturnValue(new Promise(resolve => { finishDownload = resolve; }));
+  let finishStart!: (value: object) => void;
+  mocks.startAsr.mockReturnValue(new Promise(resolve => { finishStart = resolve; }));
+  mocks.getAsrProgress.mockResolvedValue({ id: "vad-job", status: "running", progress: 0, processedMs: 0 });
+  const user = userEvent.setup();
+  const view = render(<TranscribeView />);
+  const toggle = screen.getByRole("switch");
+  expect(toggle.hasAttribute("disabled")).toBe(true);
+  await waitFor(() => expect(toggle.hasAttribute("disabled")).toBe(false));
+  await user.click(toggle);
+  const threshold = screen.getByRole("spinbutton", { name: /语音阈值/ });
+  const silence = screen.getByRole("spinbutton", { name: /最短静音时长/ });
+  expect(toggle.hasAttribute("disabled")).toBe(true);
+  expect(threshold.hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "开始转录" }).hasAttribute("disabled")).toBe(true);
+  await act(async () => releaseCheck());
+  await waitFor(() => expect(toggle.hasAttribute("disabled")).toBe(false));
+  fireEvent.change(threshold, { target: { value: "0.7" } });
+  fireEvent.change(silence, { target: { value: "345" } });
+  await user.click(screen.getByRole("button", { name: "开始转录" }));
+  await screen.findByText("模型或共享 VAD 依赖未就绪，是否下载所需依赖并转录？");
+  expect(toggle.hasAttribute("disabled")).toBe(true);
+  expect(threshold.hasAttribute("disabled")).toBe(true);
+  expect(mocks.downloadAsrModel).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "确定" }));
+  await waitFor(() => expect(mocks.getModelDownloadProgress).toHaveBeenCalledWith("vad-download"));
+  expect(toggle.hasAttribute("disabled")).toBe(true);
+  expect(silence.hasAttribute("disabled")).toBe(true);
+  expect(mocks.downloadAsrModel).toHaveBeenCalledExactlyOnceWith("faster-whisper", "large-v3", true);
+  await act(async () => {
+    downloaded = true;
+    finishDownload({ status: "completed", downloadedBytes: 100, totalBytes: 100 });
+  });
+  await waitFor(() => expect(mocks.startAsr).toHaveBeenCalledExactlyOnceWith({
+    audioPath: "C:/cache/workspace/audio.wav", engine: "faster-whisper", model: "large-v3", device: "cpu",
+    language: "ja", outputAssPath: "C:/media/input.transcribed.ass", useVad: true,
+    vadConfig: { threshold: 0.7, minSilenceDurationMs: 345 },
+  }));
+  expect(toggle.hasAttribute("disabled")).toBe(true);
+  expect(mocks.checkAsrModel.mock.calls.filter(call => call[1] === "large-v3").map(call => call[2])).toEqual([false, true, true, true]);
+  await act(async () => finishStart({ jobId: "vad-job" }));
+  await waitFor(() => expect(mocks.getAsrProgress).toHaveBeenCalled());
+  expect(toggle.hasAttribute("disabled")).toBe(true);
+  expect(screen.getAllByRole("combobox").every(select => select.hasAttribute("disabled"))).toBe(true);
+  await user.click(screen.getByRole("button", { name: "取消转录" }));
+  await waitFor(() => expect(toggle.hasAttribute("disabled")).toBe(false));
+  expect(mocks.cancelAsr).toHaveBeenCalledExactlyOnceWith("vad-job");
+  view.unmount();
+});
+
+it("retains optional VAD settings through CUDA runtime preparation", async () => {
+  mocks.listAsrEngines.mockImplementation(async () => engines().map(engine => ({
+    ...engine, devices: engine.devices?.map(device => ({ ...device, optionalVad: { available: runtimeReady } })),
+  })));
+  const { user, start } = await mountRoute(routes[0]);
+  await user.click(screen.getByRole("switch"));
+  await waitFor(() => expect(screen.getByRole("switch").hasAttribute("disabled")).toBe(false));
+  const toggle = screen.getByRole("switch");
+  const inputs = screen.getAllByRole("spinbutton");
+  fireEvent.change(screen.getByRole("spinbutton", { name: /语音阈值/ }), { target: { value: "0.9" } });
+  await user.click(start);
+  await screen.findByRole("button", { name: "下载并继续" });
+  expect(toggle.hasAttribute("disabled")).toBe(true);
+  expect(inputs.every(input => input.hasAttribute("disabled"))).toBe(true);
+  await user.click(screen.getByRole("button", { name: "下载并继续" }));
+  await waitFor(() => expect(mocks.startAsr).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    device: "cuda", useVad: true, vadConfig: { threshold: 0.9, minSilenceDurationMs: 100 },
+  })));
+  expect(mocks.checkAsrModel).toHaveBeenLastCalledWith("faster-whisper", "large-v3", true);
+});
 
 describe.each(routes)("$backend CUDA start dependency", (route) => {
   it("shows immediate feedback while the full dependency probe is pending", async () => {
@@ -268,7 +355,7 @@ describe.each(routes)("$backend CUDA start dependency", (route) => {
     expect(mocks.startAsr).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "确定" }));
     await waitFor(() => expect(mocks.startAsr).toHaveBeenCalledTimes(1), { timeout: 3000 });
-    expect(mocks.downloadAsrModel).toHaveBeenCalledExactlyOnceWith(route.engine, route.model);
+    expect(mocks.downloadAsrModel).toHaveBeenCalledExactlyOnceWith(route.engine, route.model, false);
   });
 
   it("discards the continuation after the subtitle document changes during installation", async () => {

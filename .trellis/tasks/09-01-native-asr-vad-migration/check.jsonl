@@ -1,0 +1,5 @@
+{"file":".trellis/spec/asr/quality-guidelines.md","reason":"Check real CPU/CUDA functional evidence, no synthetic timing or quality-R&D expansion; preserve no-VAD baseline."}
+{"file":".trellis/spec/tauri/index.md","reason":"Read linked media-ffmpeg-asr.md ASR host/routing and audio timeline sections on demand to check gate, reap, recovery and offsets; full guide exceeds injection limit."}
+{"file":".trellis/spec/tauri/paths-and-runtime-deps.md","reason":"Check optional versus mandatory readiness, shared asset isolation, package authority and no publication claims."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Check nonpersistent VAD controls and prior subtitle/recovery preservation."}
+{"file":".trellis/spec/frontend/services-and-tauri-bridge.md","reason":"Check typed IPC, download-to-start flow, stale async results and completed ASS behavior."}

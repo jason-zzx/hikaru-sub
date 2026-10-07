@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "status": "published-product-enabled",
+  "status": "published-runtime-dependency",
   "productEnablementAllowed": true,
   "publicationGate": {
     "externalStableAssetPublished": true,
     "runtimeDependencySourceRowPresent": true
   },
   "artifact": {
-    "id": "hikaru-asr-windows-x64-cuda-v2",
-    "path": "native-asr/artifacts/windows-x64-cuda-v2.zip",
+    "id": "hikaru-asr-windows-x64-cuda-v4",
+    "path": "native-asr/artifacts/windows-x64-cuda-v4.zip",
     "root": "windows-x64/cuda/",
-    "sizeBytes": 571028843,
-    "sha256": "42f00870df2826982f98016c69b5e73ca9a6da2d27ae11a6aa2dd15a870d766e",
+    "sizeBytes": 571097001,
+    "sha256": "9057dabf8da5e868c58de1eb3624729befe20e25c183046584ef122f1281c786",
     "sourceDateEpoch": 1788048000
   },
   "platform": "windows-x64",
@@ -34,7 +34,7 @@
       "faster-whisper",
       "kotoba-faster-whisper"
     ],
-    "vad": false,
+    "vad": true,
     "crispasr": false,
     "cuda": true,
     "vulkan": false,
@@ -225,53 +225,6 @@
       "cudnn64_9.dll",
       "nccl.dll"
     ]
-  },
-  "localQualification": {
-    "machine": {
-      "deviceIndex": 0,
-      "deviceName": "NVIDIA GeForce RTX 3070",
-      "computeCapability": "8.6",
-      "computeType": "float16",
-      "visibleDeviceCount": 1,
-      "driverApiVersion": 13020
-    },
-    "probe": {
-      "restrictedPath": true,
-      "available": true,
-      "reportedSupportEvidence": "theoretical",
-      "note": "The frozen worker bytes keep the conservative artifact-policy label while the exact published artifact has real RTX 3070 execution evidence; GTX 10 and other RTX generations remain theoretical compatibility claims."
-    },
-    "modelBackedModuleClosure": {
-      "engine": "faster-whisper",
-      "model": "large-v3",
-      "audioCase": "short-v1",
-      "readyDevice": "cuda",
-      "completed": true,
-      "runtimeRootRequired": [
-        "cublas64_12.dll",
-        "cublaslt64_12.dll"
-      ],
-      "systemRequired": [
-        "nvcuda.dll"
-      ],
-      "forbiddenAbsent": [
-        "cudart64_12.dll",
-        "cudnn64_9.dll",
-        "curand64_10.dll",
-        "nccl.dll"
-      ],
-      "allObservedModulesContainedByRuntimeOrWindowsRoot": true,
-      "pythonOrNetworkFallback": false
-    },
-    "finalModelMatrix": {
-      "summarySha256": "c89543ccbe2392cdbfdffb5ed5bc5a93dfa0be3cdbf512315211e29af61c82c3",
-      "artifactSha256": "9ca8511365009794a32f14e6fcaeb5aada9e088e9186125e9f3b54db74e300b4",
-      "shortModelCount": 8,
-      "largeV2LongDurationMs": 4144235,
-      "kotobaLongDurationMs": 4144235,
-      "nativeSm86PtxJitDisabled": true,
-      "allPassed": true
-    }
   },
   "cudaFatbin": {
     "schemaVersion": 1,

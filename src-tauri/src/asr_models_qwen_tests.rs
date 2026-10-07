@@ -109,7 +109,7 @@ async fn qwen_public_metadata_allows_download_and_reports_exact_missing_readines
     let manager = NativeAsrModelManager::default();
     assert_eq!(
         manager
-            .status_with_roots(roots, &model.engine, &model.model)
+            .status_with_roots(roots, &model.engine, &model.model, false)
             .await
             .unwrap()
             .disposition,

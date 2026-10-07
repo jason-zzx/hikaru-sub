@@ -23,7 +23,7 @@ recast as silence. No GPU task that has started silently retries on CPU.
 Ordinary CTranslate2 Whisper derives the Mel size from the loaded model (80 or
 128), supports its applicable `vocabulary.txt` or `vocabulary.json`, and never
 inherits Kotoba-only preprocessor readiness. Kotoba requires its exact model,
-non-empty `preprocessor_config.json`, 128 Mel, Japanese-only no-VAD path and
+non-empty `preprocessor_config.json`, 128 Mel, Japanese source and a
 15-second source window against the 30-second model timestamp range. Its K2
 bounded stride caps applied advance at 1000 frames, uses decoded-start ownership
 and exact `(startMs, endMs, text)` dedup, and reports monotonic progress. Changes
@@ -33,6 +33,22 @@ approved task and user-provided WAV+ASS truth: run every required short/medium/l
 case even if an earlier quality case fails, and keep Python output diagnostic-only.
 Do not repair subtitles by reference-matching, fuzzy dedup, backfilling, clipping
 or synthesizing timestamps.
+
+Optional CT2 CPU VAD uses the same ordinary/Kotoba decoder independently on each
+original PCM speech span, with one original sample-origin offset and no frontend
+short-cue merge across excluded gaps. Disabled VAD retains the full-audio baseline;
+mandatory CrispASR routes must not receive an outer VAD pass. Keep the existing
+CT2 `end_bounded_to_audio` normalization: it is not a new VAD rejection or permission
+to change decoder endpoints, padding or thresholds. In the actual final PCM window,
+the shared parser may retain a nonempty accepted prefix reaching EOF only when a
+single-timestamp-ending generation has a fully consumed, complete, ordered suffix
+whose timestamps are all at/after EOF and nondecreasing from the preceding raw
+endpoint. Otherwise original parsing/error handling remains. Retain only accepted
+prefix history and keep raw generation in the trace; excluded suffix text is not
+retimed or claimed to be proven hallucination or semantically lossless. A failed
+span stays a failed job, not silence or a no-VAD retry. Long-case and real GUI
+acceptance must remain explicitly incomplete when only short/medium or mocked-IPC
+checks pass.
 
 After an interrupted model run, terminate and confirm reap of only task-owned
 processes before an explicit retry; a killed run provides no success or timing

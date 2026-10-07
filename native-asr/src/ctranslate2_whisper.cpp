@@ -1361,6 +1361,40 @@ TimestampParseResult parse_timestamp_tokens(
         parsed.segments.push_back(std::move(segment));
       }
       last_slice = current_slice;
+      if (parsed.single_timestamp_ending
+          && window_offset_ms + source_window_duration_ms == audio_duration_ms
+          && !parsed.segments.empty()
+          && parsed.segments.back().segment.end_ms == audio_duration_ms
+          && current_slice < token_ids.size()) {
+        // Retain the supported prefix only for a complete, ordered EOF-only suffix.
+        std::size_t suffix_begin = current_slice;
+        std::int64_t previous_timestamp = timestamp_ms(
+            token_ids[current_slice - 1], tokens.timestamp_begin, window_offset_ms);
+        bool outside_audio = true;
+        for (std::size_t suffix_end : slices) {
+          if (suffix_end <= current_slice) continue;
+          if (suffix_end - suffix_begin < 2
+              || token_ids[suffix_begin] < tokens.timestamp_begin
+              || token_ids[suffix_end - 1] < tokens.timestamp_begin
+              || token_ids[suffix_begin] >= token_ids[suffix_end - 1]) {
+            outside_audio = false;
+            break;
+          }
+          for (std::size_t index = suffix_begin; index < suffix_end; ++index) {
+            if (token_ids[index] < tokens.timestamp_begin) continue;
+            const auto at = timestamp_ms(
+                token_ids[index], tokens.timestamp_begin, window_offset_ms);
+            if (at < audio_duration_ms || at < previous_timestamp) {
+              outside_audio = false;
+              break;
+            }
+            previous_timestamp = at;
+          }
+          if (!outside_audio) break;
+          suffix_begin = suffix_end;
+        }
+        if (outside_audio && suffix_begin == token_ids.size()) break;
+      }
     }
 
     if (parsed.single_timestamp_ending) {
@@ -1812,7 +1846,15 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     const SegmentCallback& on_segment,
     const CancellationCallback& is_cancelled) {
   check_cancelled(is_cancelled);
-  const wav::Audio audio = read_wav(audio_path);
+  return transcribe_audio(read_wav(audio_path), on_progress, on_segment, is_cancelled);
+}
+
+TranscriptionResult CTranslate2WhisperBackend::transcribe_audio(
+    const wav::Audio& audio,
+    const ProgressCallback& on_progress,
+    const SegmentCallback& on_segment,
+    const CancellationCallback& is_cancelled) {
+  check_cancelled(is_cancelled);
   TranscriptionResult result;
   result.duration_ms = audio.duration_ms;
   result.original_sample_count = audio.samples.size();
@@ -1870,6 +1912,9 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
     const std::int64_t source_duration_ms = std::min<std::int64_t>(
         static_cast<std::int64_t>(segment_frames) * 10,
         decode_duration_ms - window_offset_ms);
+    if (seek > 0 && source_duration_ms <= 0) {
+      break;
+    }
 
     WindowTrace trace;
     trace.window_offset_ms = window_offset_ms;
@@ -2027,7 +2072,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
       seek += advance;
       trace.seek_frames_after = seek;
       trace.next_window_start_ms = std::min(audio.duration_ms, seek * 10);
-      trace.final_window = seek == total_frames;
+      trace.final_window = seek == total_frames || seek * 10 >= decode_duration_ms;
       trace.ownership_end_ms = trace.final_window
           ? audio.duration_ms
           : trace.next_window_start_ms;
@@ -2146,7 +2191,7 @@ TranscriptionResult CTranslate2WhisperBackend::transcribe(
       seek += advance;
       trace.seek_frames_after = seek;
       trace.next_window_start_ms = std::min(audio.duration_ms, seek * 10);
-      trace.final_window = seek == total_frames;
+      trace.final_window = seek == total_frames || seek * 10 >= decode_duration_ms;
       trace.ownership_end_ms = trace.final_window
           ? audio.duration_ms
           : trace.next_window_start_ms;

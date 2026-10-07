@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "artifact": {
-    "id": "hikaru-asr-windows-x64-cpu-v4",
-    "path": "native-asr/artifacts/windows-x64-cpu.zip",
+    "id": "hikaru-asr-windows-x64-cpu-v6",
+    "path": "native-asr/artifacts/windows-x64-cpu-v6.zip",
     "root": "windows-x64/cpu/",
-    "sizeBytes": 6856800,
-    "sha256": "31607037de21bfb541c993023e0597b23a3a3b321ec3bb1d33e2d056b29c60e9",
+    "sizeBytes": 6923450,
+    "sha256": "0201aed63455c993279f11ed242b9b406189293a7b1ea642960973e718efa999",
     "sourceDateEpoch": 1788048000
   },
   "buildInput": {
@@ -33,7 +33,7 @@
       "faster-whisper",
       "kotoba-faster-whisper"
     ],
-    "vad": false,
+    "vad": true,
     "crispasr": false,
     "cuda": false,
     "vulkan": false,

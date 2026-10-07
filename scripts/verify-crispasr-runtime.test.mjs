@@ -39,6 +39,7 @@ assert not check(archive, {})
       const manifest = JSON.parse(readFileSync(join(target, "runtime-manifest.json"), "utf8"));
       artifact.artifactId = manifest.artifactId = "hikaru-asr-crispasr-windows-x64-cpu-shared-fixture";
       artifact.engines = manifest.capabilities.engines = ["qwen3-asr", "parakeet"];
+      delete manifest.capabilities.vadExport; // Baseline fixture predates standalone export.
       const modelPath = join(target, "licenses/MODEL-SOURCES.json");
       const models = JSON.parse(readFileSync(modelPath, "utf8"));
       models.assets = models.assets.filter(row => row.logicalModel !== "nvidia/parakeet-tdt_ctc-0.6b-ja");
@@ -58,6 +59,17 @@ assert not check(archive, {})
       };
       relock();
       verifyCrispasrTree(target, artifact, "cpu");
+      manifest.capabilities.vadExport = true;
+      writeFileSync(join(target, "runtime-manifest.json"), JSON.stringify(manifest));
+      // Capability alone never authorizes changed bytes without exact manifest authority.
+      expect(() => verifyCrispasrTree(target, artifact, "cpu")).toThrow();
+      relock();
+      verifyCrispasrTree(target, artifact, "cpu");
+      manifest.capabilities.vadExport = "true";
+      relock();
+      expect(() => verifyCrispasrTree(target, artifact, "cpu")).toThrow();
+      manifest.capabilities.vadExport = true;
+      relock();
       for (const engines of [["parakeet"], ["parakeet", "qwen3-asr"], ["qwen3-asr"]]) {
         expect(() => verifyCrispasrTree(target, { ...artifact, engines }, "cpu")).toThrow();
       }

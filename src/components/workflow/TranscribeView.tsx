@@ -14,6 +14,8 @@ import {
 import { useTaskStore } from "../../stores/taskStore";
 import { IconCheck } from "../layout/NavIcons";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Switch } from "../ui/switch";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Select } from "../ui/select-adapter";
 import { ModelManager, type ModelManagerHandle } from "./ModelManager";
@@ -33,11 +35,17 @@ import {
   saveAssText,
   startAsr,
 } from "../../services/tauri";
-import type { AsrJobSnapshot, FfmpegStatus } from "../../types";
+import type { AsrJobSnapshot, FfmpegStatus, StartAsrArgs } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
+
+type TranscribeAttempt = {
+  args: StartAsrArgs;
+  selectionKey: string;
+  documentGuard: ReturnType<typeof captureProjectDocumentGuard>;
+};
 
 const ASR_POLL_INTERVAL_MS = 700;
 const ASR_PROGRESS_RETRY_LIMIT = 90;
@@ -85,6 +93,16 @@ export function TranscribeView() {
   const [engine, setEngine] = useState("faster-whisper");
   const [model, setModel] = useState("large-v3");
   const [device, setDevice] = useState("auto");
+  const [useVad, setUseVad] = useState(false);
+  const [vadThreshold, setVadThreshold] = useState("0.5");
+  const [vadMinSilence, setVadMinSilence] = useState("100");
+  const optionalVadRoute = engine === "faster-whisper" || engine === "kotoba-faster-whisper";
+  const selectedUseVad = optionalVadRoute && useVad;
+  const threshold = Number(vadThreshold);
+  const minSilenceDurationMs = Number(vadMinSilence);
+  const thresholdValid = vadThreshold.trim() !== "" && Number.isFinite(threshold) && threshold >= 0 && threshold <= 1;
+  const minSilenceValid = vadMinSilence.trim() !== "" && Number.isInteger(minSilenceDurationMs) && minSilenceDurationMs >= 0 && minSilenceDurationMs <= 60000;
+  const vadConfigValid = !selectedUseVad || (thresholdValid && minSilenceValid);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [confirmDownloadOpen, setConfirmDownloadOpen] = useState(false);
   const [modelDownloading, setModelDownloading] = useState(false);
@@ -106,13 +124,18 @@ export function TranscribeView() {
   const modelManagerRef = useRef<ModelManagerHandle | null>(null);
   const confirmDownloadBusyRef = useRef(false);
   const startAttemptRef = useRef(false);
-  const availability = useAsrAvailability(engine, model, device);
+  const pendingTranscribeRef = useRef<TranscribeAttempt | null>(null);
+  const selectionKey = JSON.stringify([session?.videoPath, engine, model, device, selectedUseVad,
+    selectedUseVad ? vadThreshold : null, selectedUseVad ? vadMinSilence : null]);
+  const selectionKeyRef = useRef(selectionKey);
+  selectionKeyRef.current = selectionKey;
+  const availability = useAsrAvailability(engine, model, device, selectedUseVad);
   const cudaKind = availability.selectedModelStatus?.backend === "crispasr" ? "crispasrCuda" : "nativeAsrCuda";
   const cudaPreparation = useRuntimeDependencyPreparation(cudaKind);
 
   useEffect(() => {
     setAsrNotice(null);
-  }, [session?.videoPath, engine, model, device]);
+  }, [session?.videoPath, engine, model, device, selectedUseVad]);
 
   const refreshFfmpeg = useCallback(async (force = false) => {
     if (force) invalidateFfmpegStatus();
@@ -249,6 +272,7 @@ export function TranscribeView() {
     jobId: string,
     documentGuard: ReturnType<typeof captureProjectDocumentGuard>,
     discardRecoveryVideoPath: string | null,
+    request: StartAsrArgs,
   ) => {
     const rejectStaleResult = () => {
       if (documentGuard.unchanged()) return false;
@@ -290,8 +314,13 @@ export function TranscribeView() {
         try {
           const full = await getAsrProgress(jobId, true);
           if (!pollingRef.current || rejectStaleResult()) break;
-          const segments = full.segments ?? [];
-          if ((engine === "parakeet" || engine === "reazonspeech-nemo") && segments.length === 0) {
+          if (full.status !== "completed" || !full.segments) {
+            throw new Error("转录结果未完整完成，已保留现有字幕");
+          }
+          const segments = full.segments;
+          const preserveNativeSegments = request.engine === "parakeet" || request.engine === "reazonspeech-nemo" ||
+            ((request.engine === "faster-whisper" || request.engine === "kotoba-faster-whisper") && request.useVad === true);
+          if (preserveNativeSegments && segments.length === 0) {
             // Truthful silence is not a replacement document or a discard of
             // unsaved recovery. Keep cues, metadata, target and save token intact.
             setResultCount(0);
@@ -301,7 +330,6 @@ export function TranscribeView() {
             break;
           }
           const sourceCues = segmentsToCues(segments, PRIMARY_STYLE);
-          const preserveNativeSegments = engine === "parakeet" || engine === "reazonspeech-nemo";
           const cues = preserveNativeSegments
             ? sourceCues.map((cue, i) => ({ ...cue, primaryText: segments[i].text }))
             : mergeShortCues(sourceCues);
@@ -397,22 +425,24 @@ export function TranscribeView() {
     if (mountedRef.current) setTranscribing(false);
   };
 
-  const runTranscribe = async () => {
-    if (
-      !mountedRef.current ||
-      useProjectStore.getState().session?.videoPath !== session.videoPath
-    ) {
-      return;
+  const isCurrentAttempt = (attempt: TranscribeAttempt) => {
+    if (!mountedRef.current) return false;
+    if (selectionKeyRef.current !== attempt.selectionKey) {
+      setAsrError("转录设置已变化，请重新开始。");
+      return false;
     }
+    if (!attempt.documentGuard.unchanged()) {
+      setAsrError("字幕或工作视频已发生变化，请重新开始转录。");
+      return false;
+    }
+    return true;
+  };
+
+  const runTranscribe = async (attempt: TranscribeAttempt) => {
+    if (!isCurrentAttempt(attempt)) return;
     const discardDecision = await confirmDiscardUnsavedChanges();
-    if (!discardDecision.proceed) return;
-    if (
-      !mountedRef.current ||
-      useProjectStore.getState().session?.videoPath !== session.videoPath
-    ) {
-      return;
-    }
-    const documentGuard = captureProjectDocumentGuard(session.videoPath);
+    if (!discardDecision.proceed || !isCurrentAttempt(attempt)) return;
+    const documentGuard = attempt.documentGuard;
     pollingRef.current = true;
 
     setAsrError(null);
@@ -428,16 +458,7 @@ export function TranscribeView() {
       progress: 0,
     });
     try {
-      const { jobId, notice } = await startAsr({
-        audioPath,
-        engine,
-        model,
-        device,
-        language: "ja",
-        outputAssPath: session.transcribedAssPath,
-        useVad: false,
-        vadConfig: null,
-      });
+      const { jobId, notice } = await startAsr(attempt.args);
       if (!mountedRef.current) {
         pollingRef.current = false;
         cancelRequestedRef.current = false;
@@ -473,6 +494,7 @@ export function TranscribeView() {
         jobId,
         documentGuard,
         discardDecision.recoveryVideoPath,
+        attempt.args,
       );
     } catch (e) {
       pollingRef.current = false;
@@ -496,8 +518,10 @@ export function TranscribeView() {
   };
 
   const handleTranscribeAfterRuntime = async (
+    attempt: TranscribeAttempt,
     refreshed?: Awaited<ReturnType<typeof availability.refresh>>,
   ) => {
+    if (!isCurrentAttempt(attempt)) return;
     const routeAvailable = refreshed?.routeAvailable ?? availability.routeAvailable;
     const unavailableReason =
       refreshed?.unavailableReason ?? availability.unavailableReason;
@@ -508,17 +532,12 @@ export function TranscribeView() {
     if (startAttemptRef.current || modelDownloading || transcribing || checkingModel || cancelling) return;
 
     startAttemptRef.current = true;
-    const documentGuard = captureProjectDocumentGuard(session.videoPath);
     cancelRequestedRef.current = false;
     setCheckingModel(true);
     setAsrError(null);
     try {
       const gate = await modelManagerRef.current?.checkForTranscribe();
-      if (!mountedRef.current) return;
-      if (!documentGuard.unchanged()) {
-        setAsrError("字幕或工作视频已发生变化，请重新开始转录。");
-        return;
-      }
+      if (!isCurrentAttempt(attempt)) return;
       if (gate == null) {
         setAsrError("无法检测模型状态，请稍后重试。");
         return;
@@ -533,10 +552,11 @@ export function TranscribeView() {
         return;
       }
       if (gate === "needs_download") {
+        pendingTranscribeRef.current = attempt;
         setConfirmDownloadOpen(true);
         return;
       }
-      await runTranscribe();
+      await runTranscribe(attempt);
     } finally {
       startAttemptRef.current = false;
       if (mountedRef.current) setCheckingModel(false);
@@ -548,30 +568,38 @@ export function TranscribeView() {
       setAsrError("正在检测 Native ASR 可用性，请稍后重试。");
       return;
     }
+    if (!vadConfigValid) return;
+    const attempt: TranscribeAttempt = {
+      args: {
+        audioPath, engine, model, device, language: "ja",
+        outputAssPath: session.transcribedAssPath,
+        useVad: selectedUseVad,
+        vadConfig: selectedUseVad ? { threshold, minSilenceDurationMs } : null,
+      },
+      selectionKey,
+      documentGuard: captureProjectDocumentGuard(session.videoPath),
+    };
     if (device === "cuda" && availability.deviceDownloadRequired) {
-      const documentGuard = captureProjectDocumentGuard(session.videoPath);
       await cudaPreparation.requestDependency(async () => {
         setCheckingModel(true);
         try {
           const refreshed = await availability.refresh();
-          if (!mountedRef.current) return;
-          if (!documentGuard.unchanged()) {
-            setAsrError("字幕或工作视频已发生变化，请重新开始转录。");
-            return;
-          }
-          await handleTranscribeAfterRuntime(refreshed);
+          if (!isCurrentAttempt(attempt)) return;
+          await handleTranscribeAfterRuntime(attempt, refreshed);
         } finally {
           if (mountedRef.current) setCheckingModel(false);
         }
       });
       return;
     }
-    await handleTranscribeAfterRuntime();
+    await handleTranscribeAfterRuntime(attempt);
   };
 
   const handleConfirmDownloadAndTranscribe = async (value: string) => {
     setConfirmDownloadOpen(false);
-    if (value !== "confirm") return;
+    const attempt = pendingTranscribeRef.current;
+    pendingTranscribeRef.current = null;
+    if (value !== "confirm" || !attempt || !isCurrentAttempt(attempt)) return;
     if (confirmDownloadBusyRef.current || transcribing) return;
 
     confirmDownloadBusyRef.current = true;
@@ -579,13 +607,18 @@ export function TranscribeView() {
     setAsrError(null);
     try {
       const result = await modelManagerRef.current?.startDownload();
+      if (!isCurrentAttempt(attempt) || result === "aborted") return;
       if (result !== "completed") {
         setAsrError("模型下载失败，已取消转录。");
         return;
       }
-      await runTranscribe();
+      setCheckingModel(true);
+      await runTranscribe(attempt);
     } finally {
-      setModelDownloading(false);
+      if (mountedRef.current) {
+        setModelDownloading(false);
+        setCheckingModel(false);
+      }
       confirmDownloadBusyRef.current = false;
     }
   };
@@ -615,6 +648,11 @@ export function TranscribeView() {
   const percent = job ? Math.round(job.progress * 100) : 0;
   const hasMeasuredProgress = !!job && job.processedMs > 0;
   const settingsLocked =
+    availabilityPending ||
+    extracting ||
+    ffmpegPreparation.open ||
+    ffmpegPreparation.preparing ||
+    cudaPreparation.preparing ||
     transcribing ||
     cancelling ||
     modelDownloading ||
@@ -722,6 +760,31 @@ export function TranscribeView() {
             />
           </Labeled>
         </div>
+        {optionalVadRoute && (
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <Switch checked={useVad} onCheckedChange={setUseVad} disabled={settingsLocked} />
+              CPU VAD（跳过无语音区间）
+            </label>
+            {selectedUseVad && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Labeled label="语音阈值（0–1）">
+                  <Input type="number" min={0} max={1} step={0.01} value={vadThreshold}
+                    onChange={(event) => setVadThreshold(event.target.value)} disabled={settingsLocked}
+                    aria-invalid={!thresholdValid} aria-describedby="vad-threshold-help" />
+                  <span id="vad-threshold-help" className="text-xs text-text-muted">阈值越高越严格</span>
+                </Labeled>
+                <Labeled label="最短静音时长（ms）">
+                  <Input type="number" min={0} max={60000} step={1} value={vadMinSilence}
+                    onChange={(event) => setVadMinSilence(event.target.value)} disabled={settingsLocked}
+                    aria-invalid={!minSilenceValid} aria-describedby="vad-silence-help" />
+                  <span id="vad-silence-help" className="text-xs text-text-muted">连续静音达到该时长后结束语音段（0–60000，整数）</span>
+                </Labeled>
+              </div>
+            )}
+            {!vadConfigValid && <p role="alert" className="text-sm text-danger">请输入 0–1 的语音阈值和 0–60000 ms 的整数静音时长。</p>}
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
           <span
             className={
@@ -750,10 +813,12 @@ export function TranscribeView() {
         </div>
 
         <ModelManager
-          key={`${engine}:${model}`}
+          key={`${engine}:${model}:${selectedUseVad}`}
           ref={modelManagerRef}
           engine={engine}
           model={model}
+          useVad={selectedUseVad}
+          disabled={settingsLocked}
           status={availability.selectedModelStatus}
           checking={availability.modelLoading}
           checkError={availability.selectedModelError}
@@ -839,6 +904,9 @@ export function TranscribeView() {
               onClick={handleTranscribe}
               disabled={
                 !audioReady ||
+                !vadConfigValid ||
+                extracting ||
+                ffmpegPreparation.open ||
                 availabilityPending ||
                 !availability.routeAvailable ||
                 modelDownloading ||
@@ -931,7 +999,7 @@ export function TranscribeView() {
       <ConfirmDialog
         open={confirmDownloadOpen}
         title="模型未下载"
-        description="模型未下载，是否开始下载模型并转录"
+        description={selectedUseVad ? "模型或共享 VAD 依赖未就绪，是否下载所需依赖并转录？" : "模型未下载，是否开始下载模型并转录"}
         options={[
           { label: "取消", value: "cancel" },
           { label: "确定", value: "confirm", variant: "primary" },

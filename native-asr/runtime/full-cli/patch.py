@@ -58,8 +58,12 @@ def adapt(root):
         return 1;
     }
     if (hikaru_qwen::device()) {
-        if (!hikaru_qwen::local_file(params.model) ||
-            (!hikaru_qwen::parakeet_family() && !hikaru_qwen::local_file(params.aligner_model)))
+        if (hikaru_qwen::vad_only() &&
+            (!params.vad_export_raw || params.vad_export_file.empty() || params.fname_inp.size() != 1 ||
+             params.use_gpu || params.gpu_backend != "cpu"))
+            hikaru_qwen::fail("vad_only_route_mismatch");
+        if (!hikaru_qwen::vad_only() && (!hikaru_qwen::local_file(params.model) ||
+            (!hikaru_qwen::parakeet_family() && !hikaru_qwen::local_file(params.aligner_model))))
             hikaru_qwen::fail("explicit_model_unreadable");
         if (hikaru_qwen::parakeet() && (params.backend != "parakeet" || !params.aligner_model.empty()))
             hikaru_qwen::fail("parakeet_route_mismatch");
@@ -76,6 +80,27 @@ def adapt(root):
             '''const char* pretty_label, const std::string& cache_dir_override) {
     if (hikaru_qwen::device()) hikaru_qwen::fail("model_download_forbidden");''')
     changes['src/crispasr_cache.cpp'] = '#include "core/hikaru_qwen_device.h"\n' + changes['src/crispasr_cache.cpp']
+    # Only standalone CPU export bypasses offline short/gap merging.
+    replace('examples/cli/crispasr_vad_cli.cpp', '        opts.chunk_seconds = chunk_seconds;',
+            '''        if (hikaru_qwen::vad_only()) {
+            opts.post_merge_policy = crispasr_vad_post_merge_policy::streaming_json;
+            opts.stream_close_gap_ms = 0;
+        }
+        opts.chunk_seconds = chunk_seconds;''')
+    replace('src/crispasr.cpp', '        ggml_backend_tensor_get(prob, &vctx->probs[i], 0, sizeof(float));',
+            '''        ggml_backend_tensor_get(prob, &vctx->probs[i], 0, sizeof(float));
+        if (hikaru_qwen::vad_only())
+            fprintf(stderr, "hikaru_vad_progress: completed=%d total=%d\\n", i + 1, n_chunks);''')
+    replace('examples/cli/crispasr_run.cpp',
+            '            std::ofstream out(export_path, std::ios::binary | std::ios::trunc);',
+            '            std::ofstream out(std::filesystem::u8path(export_path), std::ios::binary | std::ios::trunc);')
+    replace('examples/cli/crispasr_run.cpp',
+            '                out << crispasr_serialize_vad_slices(slices, SR, slice_chunk, params.vad_export_raw);',
+            '''                out << crispasr_serialize_vad_slices(slices, SR, slice_chunk, params.vad_export_raw);
+                if (hikaru_qwen::vad_only()) {
+                    out.close();
+                    if (!out) return 42;
+                }''')
     # Shared loader is used by ASR, ForcedAligner and lazy audio. Its GGUF
     # metadata already uses ggml_fopen; mmap/fread must use the same UTF-8 contract.
     replace('src/core/gguf_loader.cpp',

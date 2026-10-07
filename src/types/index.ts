@@ -111,6 +111,8 @@ export interface AsrSegment {
 export type AsrRuntimeDevice = "cpu" | "cuda";
 
 export interface AsrDeviceCapability {
+  /** CT2 worker + independent verified CPU VAD CLI; absent for mandatory VAD routes. */
+  optionalVad?: { available: boolean; reason?: string | null };
   device: AsrRuntimeDevice;
   available: boolean;
   reason?: string | null;
@@ -154,6 +156,7 @@ export interface AsrJobSnapshot {
 }
 
 /** VAD（语音活动检测）配置。所有字段可选，未设置时引擎使用各自默认值。 */
+/** Native optional VAD accepts only threshold and minSilenceDurationMs. */
 export interface VadConfig {
   threshold?: number;
   minSpeechDurationMs?: number;

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <hikaru_asr/protocol.hpp>
+#include "wav_audio.hpp"
 
 namespace hikaru_asr::whisper {
 
@@ -363,6 +364,12 @@ class CTranslate2WhisperBackend {
 
   CTranslate2WhisperBackend(const CTranslate2WhisperBackend&) = delete;
   CTranslate2WhisperBackend& operator=(const CTranslate2WhisperBackend&) = delete;
+
+  TranscriptionResult transcribe_audio(
+      const wav::Audio& audio,
+      const ProgressCallback& on_progress = {},
+      const SegmentCallback& on_segment = {},
+      const CancellationCallback& is_cancelled = {});
 
   TranscriptionResult transcribe(
       const std::filesystem::path& audio_path,

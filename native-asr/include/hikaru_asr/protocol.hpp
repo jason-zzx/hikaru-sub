@@ -52,6 +52,7 @@ struct WorkerRequestV1 {
   std::string language;
   bool use_vad = false;
   std::optional<VadConfig> vad_config;
+  std::optional<std::string> vad_cli_path;
 };
 
 struct Segment {

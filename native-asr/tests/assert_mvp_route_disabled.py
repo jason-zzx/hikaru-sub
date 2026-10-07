@@ -40,7 +40,7 @@ if exit_code != 20 or event.get("code") != "model_not_ready":
 
 kotoba_vad = {**kotoba, "jobId": "release-route-kotoba-vad", "useVad": True}
 exit_code, event = run(kotoba_vad)
-if exit_code != 20 or event.get("code") != "kotoba_vad_not_qualified":
+if exit_code == 0 or event.get("code") != "missing_model_role":
     raise SystemExit(f"unexpected Kotoba VAD result: exit={exit_code} event={event}")
 
 unsupported = {

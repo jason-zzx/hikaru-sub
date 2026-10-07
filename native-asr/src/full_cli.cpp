@@ -98,7 +98,7 @@ struct Execution {
   int stage = 0;
   std::int64_t slice = 0, total = 0;
   std::set<std::string> roles;
-  bool line(const std::string& value, const std::string& device, Engine engine) {
+  bool line(const std::string& value, const std::string& device, Engine engine, bool vad_only = false) {
     const auto previous_stage = stage;
     const auto previous_slice = slice;
     if (value == "hikaru_stage: parakeet_model_loaded") stage = std::max(stage, 1);
@@ -127,8 +127,10 @@ struct Execution {
       else rnnt = true;
     }
     static const std::regex slice_line(R"(^hikaru_slice: completed=([0-9]+) total=([0-9]+)$)");
-    if (value.rfind("hikaru_slice:", 0) == 0) {
-      if (!std::regex_match(value, m, slice_line)) error = true;
+    static const std::regex vad_progress(R"(^hikaru_vad_progress: completed=([0-9]+) total=([0-9]+)$)");
+    const bool vad_chunk = vad_only && value.rfind("hikaru_vad_progress:", 0) == 0;
+    if (vad_chunk || value.rfind("hikaru_slice:", 0) == 0) {
+      if (!std::regex_match(value, m, vad_chunk ? vad_progress : slice_line)) error = true;
       else {
         const auto done = std::stoll(m[1]), count = std::stoll(m[2]);
         if (done <= 0 || done > count || (total && count != total) || done < slice) error = true;
@@ -157,30 +159,42 @@ Json document(const std::string& bytes, std::int64_t duration_ms) {
     return Json::parse(bytes, callback);
 }
 
-std::vector<Segment> transcribe(const WorkerRequestV1& request,
+namespace {
+struct Output {
+  std::string bytes;
+  Execution execution;
+  std::map<ModelRole, fs::path> models;
+  std::int64_t duration;
+};
+Output run(const WorkerRequestV1& request, bool vad_only,
                                const std::function<void(std::int64_t)>& ready,
                                const std::function<void(std::int64_t, std::int64_t)>& progress) {
   const bool parakeet = request.engine == Engine::Parakeet;
   const bool reazonspeech = request.engine == Engine::ReazonSpeechNemo;
   const bool parakeet_family = parakeet || reazonspeech;
-  require((parakeet_family || request.engine == Engine::Qwen3Asr) && request.backend == Backend::CrispAsr
+  if (!vad_only) require((parakeet_family || request.engine == Engine::Qwen3Asr) && request.backend == Backend::CrispAsr
       && request.device != Device::Vulkan && request.use_vad && !request.vad_config
       && request.model_paths.size() == (parakeet_family ? 2 : 3), "qwen_cli_request_invalid");
+  if (vad_only) require(request.backend == Backend::CTranslate2 && request.use_vad
+      && request.vad_cli_path && request.model_paths.size() == 2, "vad_cli_request_invalid");
+  const auto device = vad_only ? Device::Cpu : request.device;
   require(!request.job_id.empty() && std::all_of(request.job_id.begin(), request.job_id.end(), [](unsigned char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
   }), "qwen_cli_path_invalid");
   std::map<ModelRole, fs::path> models;
   for (const auto& model : request.model_paths) {
-    const fs::path path(wide(model.path)); check_path(path); models.emplace(model.role, path);
+    const fs::path path(wide(model.path));
+    if (!vad_only || model.role == ModelRole::Vad) check_path(path);
+    models.emplace(model.role, path);
   }
   require(models.size() == request.model_paths.size() && models.count(ModelRole::Model)
-      && models.count(ModelRole::Aligner) == (parakeet_family ? 0 : 1) && models.count(ModelRole::Vad), "qwen_cli_request_invalid");
+      && models.count(ModelRole::Aligner) == (vad_only || parakeet_family ? 0 : 1) && models.count(ModelRole::Vad), "qwen_cli_request_invalid");
   const fs::path audio(wide(request.audio_path)); check_path(audio);
 
   const fs::path work = audio.parent_path() / "asr-jobs" / (request.job_id + "-cli");
   check_path(work, true);
   require(fs::is_empty(work), "qwen_cli_work_not_empty");
-  const fs::path cli = executable_root() / "crispasr.exe"; check_path(cli);
+  const fs::path cli = vad_only ? fs::path(wide(*request.vad_cli_path)) : executable_root() / "crispasr.exe"; check_path(cli);
   // CreateProcessW limits lpCurrentDirectory even with extended spelling. The
   // CLI root is already first in DLL search order; a writable workspace
   // ancestor would add an unsafe search directory. Never relocate private data.
@@ -191,7 +205,7 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
       && fs::canonical((cwd / relative_audio).lexically_normal()) == fs::canonical(audio), "qwen_cli_path_invalid");
   const auto duration = wav::read_pcm16_mono_16khz(audio).duration_ms;
   require(duration > 0, "qwen_cli_audio_invalid");
-  ready(duration);
+  if (ready) ready(duration);
   // A pre-created, delete-denying result cannot be replaced by a symlink.
   // The host owns private workspace cleanup after the whole process tree reaps.
   const fs::path result = work / "result.json";
@@ -200,23 +214,36 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
       FILE_ATTRIBUTE_TEMPORARY, nullptr));
   require(output.value != INVALID_HANDLE_VALUE, "qwen_cli_result_failed");
   std::wstring command = quote(cli.wstring());
-  std::vector<std::wstring> args = {L"--backend", parakeet ? L"parakeet" : reazonspeech ? L"reazonspeech" : L"qwen3", L"-m", models.at(ModelRole::Model).wstring(),
+  std::vector<std::wstring> args;
+  if (!vad_only) args = {L"--backend", parakeet ? L"parakeet" : reazonspeech ? L"reazonspeech" : L"qwen3", L"-m", models.at(ModelRole::Model).wstring(),
       L"--vad", L"-vm", models.at(ModelRole::Vad).wstring(),
       L"--strict-pipeline", L"--require-vad", L"--require-word-timestamps", L"-l", L"ja",
       L"--split-on-punct", L"-ojf", L"-of", (work / "result").wstring(), L"-f", relative_audio.wstring(),
       L"--gpu-backend", wide(to_string(request.device)), L"-t", L"8", L"--cache-dir", (work / "cache").wstring()};
-  if (!parakeet_family) { args.push_back(L"-am"); args.push_back(models.at(ModelRole::Aligner).wstring()); }
-  if (request.device == Device::Cpu) args.push_back(L"--no-gpu");
+  if (!vad_only && !parakeet_family) { args.push_back(L"-am"); args.push_back(models.at(ModelRole::Aligner).wstring()); }
+  if (vad_only) {
+    const auto config = request.vad_config.value_or(VadConfig{});
+    args = {L"--vad-export-raw", result.wstring(), L"--vad", L"-vm", models.at(ModelRole::Vad).wstring(),
+        L"-f", relative_audio.wstring(), L"--gpu-backend", L"cpu", L"--strict-pipeline", L"--require-vad",
+        L"-vt", wide(Json(config.threshold.value_or(0.5)).dump()),
+        L"-vsd", std::to_wstring(config.min_silence_duration_ms.value_or(100)), L"-t", L"8"};
+  }
+  if (device == Device::Cpu) args.push_back(L"--no-gpu");
   for (const auto& arg : args) command += L" " + quote(arg);
   wchar_t system[32768]{};
   require(GetSystemDirectoryW(system, 32768) != 0, "qwen_cli_runtime_invalid");
   const auto root = fs::path(system).parent_path().wstring();
   // No inherited PATH, model cache, loader or device knobs. All non-system DLLs
   // must be beside the CLI; the host verifies the distributed file set.
-  const std::map<std::wstring, std::wstring> env = {
+  std::map<std::wstring, std::wstring> env = {
       {parakeet ? L"HIKARU_PARAKEET_DEVICE" : reazonspeech ? L"HIKARU_REAZONSPEECH_DEVICE" : L"HIKARU_QWEN_DEVICE", wide(to_string(request.device))},
       {L"PATH", cli.parent_path().wstring() + L";" + system},
       {L"SystemRoot", root}, {L"TEMP", work.wstring()}, {L"TMP", work.wstring()}, {L"WINDIR", root}};
+  if (vad_only) {
+    env.erase(L"HIKARU_QWEN_DEVICE");
+    env[L"HIKARU_VAD_ONLY"] = L"1";
+    env[L"CRISPASR_VAD_FAILOVER"] = L"0";
+  }
   std::wstring environment;
   for (const auto& [key, value] : env) { environment += key + L"=" + value; environment += L'\0'; }
   environment += L'\0';
@@ -267,9 +294,9 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
   std::size_t diagnostic_bytes = 0;
   const auto consume = [&] {
     const auto previous = execution.slice;
-    if (execution.line(line, to_string(request.device), request.engine))
+    if (execution.line(line, to_string(device), request.engine, vad_only))
       last_progress = std::chrono::steady_clock::now();
-    if (parakeet_family && execution.slice > previous) {
+    if ((parakeet_family || vad_only) && execution.slice > previous) {
       // Slice counts cannot exceed milliseconds in the bounded PCM WAV. This
       // also bounds the integer fraction used by the protocol progress bridge.
       require(execution.total <= duration, "qwen_cli_execution_invalid");
@@ -281,7 +308,7 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
   // Keep Qwen's accepted wait/cancel policy: graph diagnostics are execution
   // assertions, not a progress clock or a reason to impose a total-time cutoff.
   while (true) {
-    require(!parakeet_family || std::chrono::steady_clock::now() - last_progress < std::chrono::seconds(120),
+    require(!(parakeet_family || vad_only) || std::chrono::steady_clock::now() - last_progress < std::chrono::seconds(120),
             "qwen_cli_no_progress_timeout");
     DWORD available = 0;
     if (!PeekNamedPipe(reader.value, nullptr, 0, nullptr, &available, nullptr)) {
@@ -325,13 +352,30 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
     }
   }
   require(!execution.error && execution.vad
-      && (request.device != Device::Cpu || !execution.cpu_cuda), "qwen_cli_execution_invalid");
+      && (device != Device::Cpu || !execution.cpu_cuda), "qwen_cli_execution_invalid");
   LARGE_INTEGER length{};
   require(GetFileSizeEx(output.value, &length) && length.QuadPart > 0
       && length.QuadPart <= static_cast<LONGLONG>(limits::max_event_line_bytes));
   std::string bytes(static_cast<std::size_t>(length.QuadPart), '\0');
   require(ReadFile(output.value, bytes.data(), static_cast<DWORD>(bytes.size()), &count, nullptr)
       && count == bytes.size());
+  if (vad_only) require(execution.roles.empty() && execution.slice > 0
+      && execution.slice == execution.total, "vad_cli_execution_invalid");
+  return {std::move(bytes), std::move(execution), std::move(models), duration};
+}
+}  // namespace
+
+std::vector<Segment> transcribe(const WorkerRequestV1& request,
+                               const std::function<void(std::int64_t)>& ready,
+                               const std::function<void(std::int64_t, std::int64_t)>& progress) {
+  auto output = run(request, false, ready, progress);
+  const auto& bytes = output.bytes;
+  const auto& execution = output.execution;
+  const auto& models = output.models;
+  const auto duration = output.duration;
+  const bool parakeet = request.engine == Engine::Parakeet;
+  const bool reazonspeech = request.engine == Engine::ReazonSpeechNemo;
+  const bool parakeet_family = parakeet || reazonspeech;
   bool silence = false;
   auto segments = parakeet_family
       ? parakeet_cli::parse_result(bytes, duration, silence,
@@ -344,5 +388,28 @@ std::vector<Segment> transcribe(const WorkerRequestV1& request,
   require(silence || (execution.roles == expected && decoder_proved),
           "qwen_cli_execution_invalid");
   return segments;
+}
+std::vector<SpeechSpan> parse_vad_result(const std::string& bytes, std::int64_t samples) {
+  const auto root = document(bytes, samples);
+  const auto& vad = root.at("crispasr_vad");
+  require(integer(vad.at("version")) == 1 && text(vad.at("kind")) == "vad_segments"
+      && integer(vad.at("sample_rate")) == 16000);
+  const auto& slices = vad.at("slices");
+  require(slices.is_array() && slices.size() <= limits::max_replacement_segments
+      && integer(vad.at("num_slices")) == static_cast<std::int64_t>(slices.size()));
+  std::vector<SpeechSpan> spans;
+  std::int64_t previous = 0;
+  for (const auto& slice : slices) {
+    const auto start = integer(slice.at("start")), end = integer(slice.at("end"));
+    require(start >= previous && start < end && end <= samples);
+    spans.push_back({start, end});
+    previous = end;
+  }
+  return spans;
+}
+
+std::vector<SpeechSpan> detect_speech(const WorkerRequestV1& request, std::int64_t samples,
+                                    const std::function<void(std::int64_t, std::int64_t)>& progress) {
+  return parse_vad_result(run(request, true, {}, progress).bytes, samples);
 }
 }  // namespace hikaru_asr::full_cli

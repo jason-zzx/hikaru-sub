@@ -273,6 +273,7 @@ pub(crate) struct ModelDownloadSnapshot {
 
 #[derive(Debug)]
 struct ModelDownloadJob {
+    entry: ManifestModel,
     snapshot: ModelDownloadSnapshot,
 }
 
@@ -313,8 +314,9 @@ impl NativeAsrModelManager {
         app: &AppHandle,
         engine: &str,
         model: &str,
+        use_vad: bool,
     ) -> Result<NativeAsrModelStatus, String> {
-        self.status_with_roots(ManagedModelRoots::from_app(app)?, engine, model)
+        self.status_with_roots(ManagedModelRoots::from_app(app)?, engine, model, use_vad)
             .await
     }
 
@@ -323,6 +325,7 @@ impl NativeAsrModelManager {
         roots: ManagedModelRoots,
         engine: &str,
         model: &str,
+        use_vad: bool,
     ) -> Result<NativeAsrModelStatus, String> {
         let manifest = load_manifest()?;
         let Some(entry) = find_model(&manifest, engine, model) else {
@@ -331,7 +334,7 @@ impl NativeAsrModelManager {
         if !model_supported(entry) {
             return Ok(unavailable_status(engine, model));
         }
-        let entry = entry.clone();
+        let entry = effective_entry(&manifest, entry, use_vad)?;
         let resolved = self.resolve_entry_with_roots(roots, entry.clone()).await?;
         Ok(NativeAsrModelStatus {
             engine: engine.to_string(),
@@ -353,6 +356,7 @@ impl NativeAsrModelManager {
         app: &AppHandle,
         engine: &str,
         model: &str,
+        use_vad: bool,
     ) -> Result<Option<ResolvedNativeAsrModel>, String> {
         let manifest = load_manifest()?;
         let Some(entry) = find_model(&manifest, engine, model).cloned() else {
@@ -361,6 +365,7 @@ impl NativeAsrModelManager {
         if !model_supported(&entry) {
             return Ok(None);
         }
+        let entry = effective_entry(&manifest, &entry, use_vad)?;
         let roots = ManagedModelRoots::from_app(app)?;
         self.resolve_entry_with_roots(roots, entry).await
     }
@@ -432,9 +437,14 @@ impl NativeAsrModelManager {
         app: &AppHandle,
         engine: &str,
         model: &str,
+        use_vad: bool,
     ) -> Result<String, String> {
         let manifest = load_manifest()?;
-        let entry = downloadable_entry(&manifest, engine, model)?.clone();
+        let entry = effective_entry(
+            &manifest,
+            downloadable_entry(&manifest, engine, model)?,
+            use_vad,
+        )?;
         ensure_runtime_deps_writable_or_elevate(app)?;
         let settings = load_settings(app).unwrap_or_default();
         let profile = effective_source_profile(&settings)?;
@@ -457,10 +467,17 @@ impl NativeAsrModelManager {
         let total_bytes = model_total(&entry);
         let mut state = self.state.lock().await;
         if let Some(job_id) = state.active_by_model.get(&logical_id) {
+            let job = state.jobs[job_id]
+                .lock()
+                .map_err(|_| "模型下载状态已损坏".to_string())?;
+            if job.entry != entry {
+                return Err("该模型正在下载不同的依赖，请完成后重试".into());
+            }
             return Ok(job_id.clone());
         }
         let id = native_job_id();
         let job = Arc::new(StdMutex::new(ModelDownloadJob {
+            entry: entry.clone(),
             snapshot: ModelDownloadSnapshot {
                 id: id.clone(),
                 engine: entry.engine.clone(),
@@ -904,6 +921,25 @@ fn download_path(roots: &ManagedModelRoots, model: &ManifestModel) -> PathBuf {
         .join(&model.revision)
 }
 
+// The validated manifest already enforces one exact shared Silero identity.
+fn effective_entry(
+    manifest: &ModelManifest,
+    model: &ManifestModel,
+    use_vad: bool,
+) -> Result<ManifestModel, String> {
+    let mut entry = model.clone();
+    if use_vad && entry.backend == "ctranslate2" {
+        entry.required_vad = Some(
+            manifest
+                .models
+                .iter()
+                .find_map(|entry| entry.required_vad.clone())
+                .ok_or("共享 CPU VAD 模型未配置")?,
+        );
+    }
+    Ok(entry)
+}
+
 fn vad_model(model: &ManifestModel) -> Option<ManifestModel> {
     let file = model.required_vad.as_ref()?;
     let source = file.source.as_ref()?;
@@ -956,11 +992,15 @@ fn resolve_sync(
     }
     let legacy = legacy_path(roots, model);
     if verify_directory(&legacy, model, VerificationMode::Legacy, roots).is_ok() {
-        return Ok(Some(resolved(
+        let mut ready = resolved(
             model,
             legacy,
             NativeAsrModelOrigin::LegacyHuggingFaceSnapshot,
-        )));
+        );
+        if let Some(vad) = vad {
+            ready.roles.push(("vad".into(), vad));
+        }
+        return Ok(Some(ready));
     }
     Ok(None)
 }
@@ -1922,6 +1962,216 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn optional_vad_effective_entry_direct_legacy_and_cache_are_request_scoped() {
+        let manifest = load_manifest().unwrap();
+        for entry in &manifest.models {
+            assert_eq!(effective_entry(&manifest, entry, false).unwrap(), *entry);
+            let enabled = effective_entry(&manifest, entry, true).unwrap();
+            if entry.backend == "ctranslate2" {
+                assert!(entry.required_vad.is_none());
+                assert_eq!(
+                    enabled.required_vad,
+                    manifest.models.iter().find_map(|m| m.required_vad.clone())
+                );
+            } else {
+                assert_eq!(enabled, *entry);
+            }
+        }
+        for legacy in [false, true] {
+            let dir = tempdir().unwrap();
+            let roots = ManagedModelRoots::below(dir.path());
+            let (off, files) = complete_fixture();
+            let (qwen, vad_files) = qwen_fixture();
+            let mut on = off.clone();
+            on.required_vad = qwen.required_vad;
+            let model_path = if legacy {
+                legacy_path(&roots, &off)
+            } else {
+                direct_path(&roots, &off)
+            };
+            write_model(&model_path, &files);
+            let manager = NativeAsrModelManager::default();
+            assert_eq!(
+                manager
+                    .resolve_entry_with_roots(roots.clone(), off.clone())
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .roles
+                    .len(),
+                1
+            );
+            assert!(manager
+                .resolve_entry_with_roots(roots.clone(), on.clone())
+                .await
+                .unwrap()
+                .is_none());
+            let vad = vad_model(&on).unwrap();
+            write_model(&direct_path(&roots, &vad), &vad_files[2..]);
+            let ready = manager
+                .resolve_entry_with_roots(roots.clone(), on.clone())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                ready.roles.iter().map(|r| r.0.as_str()).collect::<Vec<_>>(),
+                ["model", "vad"]
+            );
+            assert_eq!(
+                ready.origin,
+                if legacy {
+                    NativeAsrModelOrigin::LegacyHuggingFaceSnapshot
+                } else {
+                    NativeAsrModelOrigin::DirectInstall
+                }
+            );
+            fs::write(&ready.roles[1].1, b"corrupt-vad").unwrap();
+            assert!(manager
+                .resolve_entry_with_roots(roots.clone(), on.clone())
+                .await
+                .unwrap()
+                .is_none());
+            assert_eq!(
+                manager
+                    .resolve_entry_with_roots(roots.clone(), off)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .roles
+                    .len(),
+                1
+            );
+            let parts = download_path(&roots, &vad).join("parts");
+            fs::create_dir_all(&parts).unwrap();
+            fs::write(
+                parts.join(format!("{}.part", vad.files[0].path)),
+                vad_files[2].1,
+            )
+            .unwrap();
+            let repair = manager
+                .start_download_for_model(on.clone(), roots.clone(), "http://127.0.0.1:1".into())
+                .await
+                .unwrap();
+            assert_eq!(
+                wait_terminal(&manager, &repair).await.status,
+                ModelDownloadJobStatus::Completed
+            );
+            assert_eq!(
+                manager
+                    .resolve_entry_with_roots(roots, on)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .roles
+                    .len(),
+                2
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn optional_vad_download_conflicts_resume_and_offline_legacy_reuse() {
+        for first_use_vad in [false, true] {
+            let server = MockServer::start_async().await;
+            let dir = tempdir().unwrap();
+            let roots = ManagedModelRoots::below(dir.path());
+            let (off, files) = complete_fixture();
+            let (qwen, vad_files) = qwen_fixture();
+            let mut on = off.clone();
+            on.required_vad = qwen.required_vad;
+            let vad = vad_model(&on).unwrap();
+            // Exact main model stays read-only in the legacy cache; only Silero is acquired.
+            write_model(&legacy_path(&roots, &off), &files);
+            let parts = download_path(&roots, &vad).join("parts");
+            fs::create_dir_all(&parts).unwrap();
+            let bytes = vad_files[2].1;
+            fs::write(
+                parts.join(format!("{}.part", vad.files[0].path)),
+                &bytes[..3],
+            )
+            .unwrap();
+            let url = file_url(&server.base_url(), &vad, &vad.files[0]);
+            let mock = server.mock(|when, then| {
+                when.method(GET)
+                    .path(url.strip_prefix(&server.base_url()).unwrap())
+                    .header("range", "bytes=3-");
+                then.status(206)
+                    .header(
+                        "content-range",
+                        format!("bytes 3-{}/{}", bytes.len() - 1, bytes.len()),
+                    )
+                    .body(bytes[3..].to_vec());
+            });
+            let manager = NativeAsrModelManager::default();
+            let first_entry = if first_use_vad { &on } else { &off };
+            let conflicting = if first_use_vad { &off } else { &on };
+            let first = manager
+                .start_download_for_model(first_entry.clone(), roots.clone(), server.base_url())
+                .await
+                .unwrap();
+            assert_eq!(
+                manager
+                    .start_download_for_model(first_entry.clone(), roots.clone(), server.base_url())
+                    .await
+                    .unwrap(),
+                first
+            );
+            assert!(manager
+                .start_download_for_model(conflicting.clone(), roots.clone(), server.base_url())
+                .await
+                .unwrap_err()
+                .contains("依赖"));
+            assert_eq!(
+                wait_terminal(&manager, &first).await.status,
+                ModelDownloadJobStatus::Completed
+            );
+            if !first_use_vad {
+                assert!(manager
+                    .resolve_entry_with_roots(roots.clone(), on.clone())
+                    .await
+                    .unwrap()
+                    .is_none());
+                let id = manager
+                    .start_download_for_model(on.clone(), roots.clone(), server.base_url())
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    wait_terminal(&manager, &id).await.status,
+                    ModelDownloadJobStatus::Completed
+                );
+            }
+            mock.assert_hits(1);
+            let ready = manager
+                .resolve_entry_with_roots(roots.clone(), on.clone())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                ready.origin,
+                NativeAsrModelOrigin::LegacyHuggingFaceSnapshot
+            );
+            assert_eq!(ready.roles.len(), 2);
+            assert!(!direct_path(&roots, &off).exists());
+            let offline = manager
+                .start_download_for_model(on.clone(), roots.clone(), "http://127.0.0.1:1".into())
+                .await
+                .unwrap();
+            let done = wait_terminal(&manager, &offline).await;
+            assert_eq!(done.status, ModelDownloadJobStatus::Completed);
+            assert_eq!(done.downloaded_bytes, model_total(&on));
+            assert!(manager
+                .resolve_entry_with_roots(roots.clone(), off)
+                .await
+                .unwrap()
+                .is_some());
+            for endpoint in [OFFICIAL_ENDPOINT, "https://hf-mirror.com"] {
+                assert!(file_url(endpoint, &on, on.required_vad.as_ref().unwrap())
+                    .starts_with(&format!("{endpoint}/ggml-org/whisper-vad/resolve/")));
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn readiness_prefers_exact_direct_then_exact_legacy() {
         let dir = tempdir().unwrap();
         let roots = ManagedModelRoots::below(dir.path());
@@ -2002,7 +2252,7 @@ mod tests {
         for pass in ["cold", "cached"] {
             let start = std::time::Instant::now();
             let status = manager
-                .status_with_roots(roots.clone(), "faster-whisper", "large-v3")
+                .status_with_roots(roots.clone(), "faster-whisper", "large-v3", false)
                 .await
                 .unwrap();
             assert_eq!(status.disposition, NativeAsrModelDisposition::Ready);
@@ -2234,6 +2484,7 @@ mod tests {
                 ManagedModelRoots::below(dir.path()),
                 "reazonspeech-nemo",
                 "reazon-research/reazonspeech-nemo-v2",
+                false,
             )
             .await
             .unwrap();

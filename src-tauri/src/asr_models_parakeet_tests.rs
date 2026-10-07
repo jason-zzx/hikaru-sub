@@ -71,7 +71,8 @@ async fn parakeet_exact_metadata_and_public_readiness_follow_build_capability() 
             .status_with_roots(
                 ManagedModelRoots::below(dir.path()),
                 &entry.engine,
-                &entry.model
+                &entry.model,
+                false
             )
             .await
             .unwrap()

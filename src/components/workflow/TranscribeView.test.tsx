@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectStore } from "../../stores/projectStore";
@@ -100,6 +100,9 @@ vi.mock("../../services/tauri", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Radix Select uses browser APIs not implemented by jsdom.
+  HTMLElement.prototype.hasPointerCapture = () => false;
+  HTMLElement.prototype.scrollIntoView = () => undefined;
   useProjectStore.setState(useProjectStore.getInitialState());
   useTaskStore.setState(useTaskStore.getInitialState());
   useUiStore.setState(useUiStore.getInitialState());
@@ -146,11 +149,12 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-async function renderAndStart() {
+async function renderAndStart(useVad = false) {
   const user = userEvent.setup();
   const view = render(<TranscribeView />);
   const start = await screen.findByRole("button", { name: "开始转录" });
   await waitFor(() => expect((start as HTMLButtonElement).disabled).toBe(false));
+  if (useVad) await user.click(screen.getByRole("switch"));
   await user.click(start);
   return { user, view };
 }
@@ -158,7 +162,7 @@ async function renderAndStart() {
 describe("TranscribeView Native ASR flow", () => {
   const displayRows = [
     { startMs: 0, endMs: 400, text: " A " },
-    { startMs: 200, endMs: 900, text: "B" },
+    { startMs: 500, endMs: 900, text: "B" },
     { startMs: 1000, endMs: 2000, text: "先" },
     { startMs: 1000, endMs: 1300, text: "後" },
   ];
@@ -168,16 +172,20 @@ describe("TranscribeView Native ASR flow", () => {
     detectedLanguage: "ja", error: null,
   });
 
-  it.each(["parakeet", "qwen3-asr", "faster-whisper"])(
-    "installs and serializes completed %s results with its own display policy", async (engine) => {
+  it.each([
+    ["parakeet", false], ["reazonspeech-nemo", false], ["qwen3-asr", false],
+    ["faster-whisper", false], ["kotoba-faster-whisper", false],
+    ["faster-whisper", true], ["kotoba-faster-whisper", true],
+  ] as const)(
+    "installs and serializes completed %s results with VAD=%s and its own display policy", async (engine, useVad) => {
       mocks.getSettings.mockResolvedValue({ asrEngine: engine, asrModel: "fixture", asrDevice: "cpu" });
       // Same dimensions as the model-free real-product video fixture.
       mocks.getVideoInfo.mockResolvedValue({ width: 320, height: 180, durationMs: 1000, fps: 25 });
       mocks.startAsr.mockResolvedValue({ jobId: "completed-job" });
       mocks.getAsrProgress.mockResolvedValue(completed());
-      await renderAndStart();
+      await renderAndStart(useVad);
       await waitFor(() => expect(mocks.saveAssText).toHaveBeenCalledTimes(1));
-      const expected = engine === "parakeet" ? displayRows : [
+      const expected = engine === "parakeet" || engine === "reazonspeech-nemo" || useVad ? displayRows : [
         { startMs: 0, endMs: 900, text: "AB" },
         { startMs: 1000, endMs: 2000, text: "後先" },
       ];
@@ -198,7 +206,11 @@ describe("TranscribeView Native ASR flow", () => {
     },
   );
 
-  it.each([false, true])("keeps the entire loaded document on empty Parakeet completion (dirty=%s)", async (dirty) => {
+  it.each([
+    ["parakeet", false], ["parakeet", true],
+    ["faster-whisper", false], ["faster-whisper", true],
+    ["kotoba-faster-whisper", false], ["kotoba-faster-whisper", true],
+  ] as const)("keeps the entire loaded document on empty %s completion (dirty=%s)", async (engine, dirty) => {
     const doc = createDefaultDocument("Existing document", 640, 480);
     doc.cues = [{ id: "old", startMs: 10, endMs: 900, primaryText: "Existing", style: "Primary", layer: 0 }];
     useProjectStore.getState().loadAssDocument(doc, { kind: "translated", path: "C:/media/input.translated.ass" });
@@ -208,16 +220,101 @@ describe("TranscribeView Native ASR flow", () => {
     });
     const before = useProjectStore.getState();
     expect(before.isDirty).toBe(dirty);
-    mocks.getSettings.mockResolvedValue({ asrEngine: "parakeet", asrModel: "fixture", asrDevice: "cpu" });
+    mocks.getSettings.mockResolvedValue({ asrEngine: engine, asrModel: "fixture", asrDevice: "cpu" });
     mocks.startAsr.mockResolvedValue({ jobId: "completed-job" });
     mocks.getAsrProgress.mockResolvedValue(completed([]));
-    await renderAndStart();
+    await renderAndStart(engine !== "parakeet");
     expect(await screen.findByText("转录完成，未检测到语音；已保留现有字幕，未保存 ASS")).toBeTruthy();
     expect(useProjectStore.getState()).toBe(before);
     expect(withDiscardedSubtitleRecovery).not.toHaveBeenCalled();
     expect(mocks.getVideoInfo).not.toHaveBeenCalled();
     expect(mocks.saveAssText).not.toHaveBeenCalled();
     expect(useTaskStore.getState().tasks.asr?.status).toBe("success");
+  });
+
+  it("defaults VAD off, validates only the two enabled inputs, and resets on remount", async () => {
+    const user = userEvent.setup();
+    const view = render(<TranscribeView />);
+    const start = screen.getByRole("button", { name: "开始转录" });
+    await waitFor(() => expect(start.hasAttribute("disabled")).toBe(false));
+    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
+    expect(screen.queryByRole("spinbutton")).toBeNull();
+    await user.click(screen.getByRole("switch"));
+    const threshold = screen.getByRole("spinbutton", { name: /语音阈值/ }) as HTMLInputElement;
+    const silence = screen.getByRole("spinbutton", { name: /最短静音时长/ }) as HTMLInputElement;
+    expect([threshold.value, threshold.min, threshold.max, threshold.step]).toEqual(["0.5", "0", "1", "0.01"]);
+    expect([silence.value, silence.min, silence.max, silence.step]).toEqual(["100", "0", "60000", "1"]);
+    expect(screen.getAllByRole("spinbutton")).toHaveLength(2);
+    for (const [input, values, valid] of [
+      [threshold, ["", "-0.1", "1.1"], "0.5"],
+      [silence, ["", "-1", "60001", "1.5"], "100"],
+    ] as const) {
+      for (const value of values) {
+        fireEvent.change(input, { target: { value } });
+        expect(start.hasAttribute("disabled")).toBe(true);
+        expect(input.getAttribute("aria-invalid")).toBe("true");
+      }
+      fireEvent.change(input, { target: { value: valid } });
+      expect(start.hasAttribute("disabled")).toBe(false);
+    }
+    for (const [thresholdValue, silenceValue] of [["0", "0"], ["1", "60000"]]) {
+      fireEvent.change(threshold, { target: { value: thresholdValue } });
+      fireEvent.change(silence, { target: { value: silenceValue } });
+      expect(start.hasAttribute("disabled")).toBe(false);
+    }
+    fireEvent.change(threshold, { target: { value: "" } });
+    await user.click(screen.getByRole("switch"));
+    mocks.startAsr.mockResolvedValue({ jobId: "off-job" });
+    await user.click(start);
+    await waitFor(() => expect(mocks.startAsr).toHaveBeenCalledWith(expect.objectContaining({ useVad: false, vadConfig: null })));
+    view.unmount();
+    render(<TranscribeView />);
+    await waitFor(() => expect(screen.getByRole("switch").hasAttribute("disabled")).toBe(false));
+    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
+    await user.click(screen.getByRole("switch"));
+    expect((screen.getByRole("spinbutton", { name: /语音阈值/ }) as HTMLInputElement).value).toBe("0.5");
+    expect((screen.getByRole("spinbutton", { name: /最短静音时长/ }) as HTMLInputElement).value).toBe("100");
+  });
+
+  it.each(["qwen3-asr", "parakeet", "reazonspeech-nemo"])("does not apply optional controls to mandatory %s", async (engine) => {
+    const user = userEvent.setup();
+    render(<TranscribeView />);
+    await waitFor(() => expect(screen.getByRole("switch").hasAttribute("disabled")).toBe(false));
+    await user.click(screen.getByRole("switch"));
+    fireEvent.change(screen.getByRole("spinbutton", { name: /语音阈值/ }), { target: { value: "0.8" } });
+    await user.click(screen.getAllByRole("combobox")[0]);
+    const label = engine === "qwen3-asr" ? "Qwen3" : engine === "parakeet" ? "parakeet" : "ReazonSpeech NeMo";
+    await user.click(screen.getByRole("option", { name: label }));
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("spinbutton")).toBeNull();
+    mocks.startAsr.mockResolvedValue({ jobId: "mandatory-job" });
+    await user.click(screen.getByRole("button", { name: "开始转录" }));
+    await waitFor(() => expect(mocks.startAsr).toHaveBeenCalledWith(expect.objectContaining({ engine, useVad: false, vadConfig: null })));
+  });
+
+  it.each([false, true])("preserves document/recovery/ASS on CT2 VAD failure, cancellation and partial output (dirty=%s)", async (dirty) => {
+    const doc = createDefaultDocument("Existing document", 640, 480);
+    doc.cues = [{ id: "old", startMs: 10, endMs: 900, primaryText: "Existing", style: "Primary", layer: 0 }];
+    useProjectStore.getState().loadAssDocument(doc, { kind: "translated", path: "C:/media/input.translated.ass" });
+    if (dirty) useProjectStore.getState().updateCue("old", { primaryText: "Unsaved edit" });
+    const before = useProjectStore.getState();
+    for (const status of ["failed", "cancelled", "user-cancel", "partial", "missing-segments", "start-error"]) {
+      mocks.startAsr.mockResolvedValue({ jobId: "failed-job" });
+      if (status === "start-error") mocks.startAsr.mockRejectedValueOnce(new Error("VAD unavailable"));
+      mocks.getAsrProgress.mockImplementation(async (_id, includeSegments) => {
+        if (status === "partial") return { ...completed(), status: includeSegments ? "running" : "completed" };
+        if (status === "missing-segments") return { ...completed(), segments: undefined };
+        return { ...completed(), status: status === "user-cancel" ? "running" : status, error: "VAD failed safely" };
+      });
+      const { view, user } = await renderAndStart(true);
+      if (status === "user-cancel") await user.click(await screen.findByRole("button", { name: "取消转录" }));
+      await waitFor(() => expect(useTaskStore.getState().tasks.asr?.status).not.toBe("running"));
+      expect(useProjectStore.getState()).toBe(before);
+      expect(withDiscardedSubtitleRecovery).not.toHaveBeenCalled();
+      expect(mocks.getVideoInfo).not.toHaveBeenCalled();
+      expect(mocks.saveAssText).not.toHaveBeenCalled();
+      view.unmount();
+    }
   });
 
   it("keeps prior subtitles when ReazonSpeech rejects an invalid medium/long result", async () => {
@@ -254,13 +351,13 @@ describe("TranscribeView Native ASR flow", () => {
     expect(useTaskStore.getState().tasks.asr?.status).toBe("error");
   });
 
-  it("rejects a stale Parakeet completion after the final async snapshot read", async () => {
-    mocks.getSettings.mockResolvedValue({ asrEngine: "parakeet", asrModel: "fixture", asrDevice: "cpu" });
+  it.each(["parakeet", "faster-whisper", "kotoba-faster-whisper"])("rejects a stale %s completion after the final async snapshot read", async (engine) => {
+    mocks.getSettings.mockResolvedValue({ asrEngine: engine, asrModel: "fixture", asrDevice: "cpu" });
     mocks.startAsr.mockResolvedValue({ jobId: "completed-job" });
     let finish!: (value: ReturnType<typeof completed>) => void;
     mocks.getAsrProgress.mockImplementation((_id, includeSegments) => includeSegments
       ? new Promise(resolve => { finish = resolve; }) : Promise.resolve(completed()));
-    await renderAndStart();
+    await renderAndStart(engine !== "parakeet");
     await waitFor(() => expect(finish).toBeTypeOf("function"));
     await act(async () => {
       useProjectStore.getState().setCues([{ id: "new", startMs: 10, endMs: 500, primaryText: "Newer edit", style: "Primary", layer: 0 }]);
@@ -294,10 +391,44 @@ describe("TranscribeView Native ASR flow", () => {
       outputAssPath: "C:/media/input.transcribed.ass", useVad: false, vadConfig: null,
     }), { timeout: 3000 });
     // Backend qualified_native_launch supplies required CPU VAD; no new frontend switch.
-    expect(mocks.downloadAsrModel).toHaveBeenCalledExactlyOnceWith(engine, model);
+    expect(mocks.downloadAsrModel).toHaveBeenCalledExactlyOnceWith(engine, model, false);
     expect(mocks.getModelDownloadProgress).toHaveBeenCalledWith("qwen-pair-download");
     expect(mocks.refreshSelectedModel.mock.calls.length).toBeGreaterThanOrEqual(2);
     view.unmount();
+  });
+
+  it.each([
+    ...["tiny", "base", "small", "medium", "large-v2", "large-v3", "large-v3-turbo"].map(model => ["faster-whisper", model]),
+    ["kotoba-faster-whisper", "kotoba-tech/kotoba-whisper-v2.0-faster"],
+  ])("starts optional VAD for %s / %s with the default parameters", async (engine, model) => {
+    mocks.getSettings.mockResolvedValue({ asrEngine: engine, asrModel: model, asrDevice: "cpu" });
+    mocks.startAsr.mockResolvedValue({ jobId: "vad-job" });
+    const { view } = await renderAndStart(true);
+    expect(mocks.startAsr).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      engine, model, device: "cpu", useVad: true,
+      vadConfig: { threshold: 0.5, minSilenceDurationMs: 100 },
+    }));
+    view.unmount();
+  });
+
+  it("locks the downloaded VAD request through discard consent and rejects intervening edits", async () => {
+    const ready = { engine: "faster-whisper", model: "large-v3", available: true, downloaded: true, disposition: "ready" };
+    mocks.refreshSelectedModel.mockResolvedValue({ kind: "ok", status: ready });
+    mocks.refreshSelectedModel.mockResolvedValueOnce({ kind: "ok", status: { ...ready, downloaded: false, disposition: "supportedMissing" } });
+    mocks.downloadAsrModel.mockResolvedValue("download-job");
+    mocks.getModelDownloadProgress.mockResolvedValue({ status: "completed", downloadedBytes: 100, totalBytes: 100 });
+    let consent!: (value: { proceed: boolean; recoveryVideoPath: null }) => void;
+    vi.mocked(confirmDiscardUnsavedChanges).mockReturnValueOnce(new Promise(resolve => { consent = resolve; }));
+    const { user } = await renderAndStart(true);
+    await user.click(screen.getByRole("button", { name: "确定" }));
+    await waitFor(() => expect(confirmDiscardUnsavedChanges).toHaveBeenCalled());
+    expect(screen.getByRole("switch").hasAttribute("disabled")).toBe(true);
+    expect(screen.getAllByRole("spinbutton").every(input => input.hasAttribute("disabled"))).toBe(true);
+    act(() => useProjectStore.getState().setCues([]));
+    await act(async () => consent({ proceed: true, recoveryVideoPath: null }));
+    expect(mocks.startAsr).not.toHaveBeenCalled();
+    expect(screen.getByText("字幕或工作视频已发生变化，请重新开始转录。")).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole("switch").hasAttribute("disabled")).toBe(false));
   });
 
   it("starts the exact Kotoba Native CPU route through the existing flow", async () => {

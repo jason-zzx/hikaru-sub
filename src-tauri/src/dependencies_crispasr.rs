@@ -151,6 +151,7 @@ fn verify_payload(
         || caps.device != device
         || caps.engines != engines
         || !caps.vad
+        || caps.vad_export && device != "cpu"
         || !caps.crispasr
         || caps.cuda != (device == "cuda")
         || caps.vulkan
@@ -223,6 +224,8 @@ fn verify_payload(
         root: root.to_path_buf(),
         artifact_id: artifact.artifact_id.clone(),
         engines,
+        supports_vad: caps.vad,
+        vad_cli_path: (device == "cpu" && caps.vad_export).then(|| root.join("crispasr.exe")),
     })
 }
 
@@ -428,6 +431,42 @@ mod tests {
                 artifact
             )
             .is_err());
+        }
+    }
+
+    #[test]
+    fn standalone_vad_export_requires_verified_cpu_capability_and_full_closure() {
+        for device in ["cpu", "cuda"] {
+            let dir = tempdir().unwrap();
+            let resources = dir.path().join("resources");
+            let deps = dir.path().join("deps");
+            let mut lock = fixture(&resources, &deps, device);
+            assert!(verify_at(&resources, &deps, device, &lock)
+                .unwrap()
+                .vad_cli_path
+                .is_none());
+            let root = runtime_root(&resources, &deps, device).unwrap();
+            let path = root.join("runtime-manifest.json");
+            let mut manifest: serde_json::Value =
+                serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            manifest["capabilities"]["vadExport"] = true.into();
+            let bytes = serde_json::to_vec(&manifest).unwrap();
+            fs::write(&path, &bytes).unwrap();
+            assert!(verify_at(&resources, &deps, device, &lock).is_err());
+            let artifact = if device == "cpu" {
+                lock.cpu.as_mut().unwrap()
+            } else {
+                lock.cuda.as_mut().unwrap()
+            };
+            artifact.manifest_sha256 = hash(&bytes);
+            if device == "cuda" {
+                assert!(verify_at(&resources, &deps, device, &lock).is_err());
+                continue;
+            }
+            let verified = verify_at(&resources, &deps, device, &lock).unwrap();
+            assert_eq!(verified.vad_cli_path, Some(root.join("crispasr.exe")));
+            fs::write(root.join("vcomp140.dll"), b"corrupt").unwrap();
+            assert!(verify_at(&resources, &deps, device, &lock).is_err());
         }
     }
 

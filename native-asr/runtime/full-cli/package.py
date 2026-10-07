@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path
 import shutil
+import subprocess
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -24,6 +25,55 @@ def is_published_cuda_archive(archive, authority):
     # Publication belongs to exact uploaded bytes, never to a future rebuild.
     return (authority.get('externalStableAssetPublished') is True
             and archive == (authority.get('cuda') or {}).get('archive'))
+
+
+def package_cpu_only(args):
+    """Replace the CPU executables; retain the verified CUDA authority and notices."""
+    if not re.fullmatch(r'shared-[a-z0-9]+(?:-[a-z0-9]+)*', args.candidate_id or ''):
+        raise ValueError('CPU-only package requires a fresh shared-* identity')
+    args.output = args.output.resolve()
+    if not args.output.is_relative_to(ROOT / 'native-asr/build/full-cli'):
+        raise ValueError('candidate output must use ignored full-cli scratch')
+    # Existing distribution verifier owns the full baseline closure, including licenses.
+    subprocess.run(['node', '--input-type=module', '-e',
+                    "import { verifyCrispasrArchive } from './scripts/verify-crispasr-runtime.mjs';"
+                    "for (const device of ['cpu','cuda']) verifyCrispasrArchive({root:process.cwd(),device});"],
+                   cwd=ROOT, check=True)
+    lock = json.loads((ROOT / 'native-asr/runtime/crispasr-product-lock.json').read_text(encoding='utf-8'))
+    args.output.mkdir(parents=True, exist_ok=False)
+    stage = args.output / 'cpu'
+    with zipfile.ZipFile(ROOT / lock['cpu']['archive']['path']) as archive:
+        archive.extractall(stage)  # Paths/closure were checked above.
+    root = stage / 'windows-x64/crispasr/cpu'
+    shutil.copyfile(args.cpu_build / 'bin/crispasr.exe', root / 'crispasr.exe')
+    shutil.copyfile(args.cpu_worker / 'bin/hikaru-asr-qwen-cli-worker.exe', root / 'hikaru-asr-worker.exe')
+    manifest = json.loads((root / 'runtime-manifest.json').read_text(encoding='utf-8'))
+    manifest['artifactId'] = 'hikaru-asr-crispasr-windows-x64-cpu-' + args.candidate_id
+    manifest['capabilities']['vadExport'] = True
+    for row in manifest['files']:
+        row.update(identity(root / row['path']))
+    write_json(root / 'runtime-manifest.json', manifest)
+    (root / 'SHA256SUMS').write_text(''.join(f"{r['sha256']}  {r['path']}\n" for r in manifest['files']), encoding='utf-8', newline='\n')
+    archive = args.output / 'crispasr-cpu.zip'
+    with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as output:
+        for file in sorted(root.rglob('*')):
+            if file.is_file():
+                info = zipfile.ZipInfo(file.relative_to(stage).as_posix(), (2026, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                output.writestr(info, file.read_bytes(), compresslevel=9)
+    lock['cpu'] = {'artifactId': manifest['artifactId'],
+                   'manifestSha256': identity(root / 'runtime-manifest.json')['sha256'],
+                   'files': manifest['files'], 'engines': manifest['capabilities']['engines'],
+                   'archive': {'path': archive.relative_to(ROOT).as_posix(),
+                               'root': 'windows-x64/crispasr/cpu/', **identity(archive)}}
+    # CPU-only work does not re-label, rebuild or unpublish the unchanged CUDA artifact.
+    write_json(args.output / 'crispasr-product-lock.json', lock)
+    subprocess.run(['node', '--input-type=module', '-e',
+                    "import { readFileSync } from 'node:fs';"
+                    "import { verifyCrispasrTree } from './scripts/verify-crispasr-runtime.mjs';"
+                    "const lock=JSON.parse(readFileSync(process.argv[1],'utf8'));"
+                    "verifyCrispasrTree(process.argv[2],lock.cpu,'cpu');",
+                    str(args.output / 'crispasr-product-lock.json'), str(root)], cwd=ROOT, check=True)
 
 
 def package(args):
@@ -113,7 +163,8 @@ def package(args):
             if at < 0: raise ValueError('license anchor missing')
             (licenses/name).write_text(text[at:],encoding='utf-8',newline='\n')
             notices.append({'name':name,'license':'public domain or permissive alternative; full text retained','localLicenseFile':'licenses/'+name,'source':'pinned-upstream:'+path})
-        with zipfile.ZipFile(ROOT/'native-asr/artifacts/windows-x64-cpu.zip') as ct2:
+        ct2_lock = json.loads((ROOT/'native-asr/runtime/windows-x64-cpu-lock.json').read_text(encoding='utf-8'))
+        with zipfile.ZipFile(ROOT/ct2_lock['artifact']['path']) as ct2:
             name='Microsoft-Visual-Cpp-V14-Runtime-2026-License.docx'
             (licenses/name).write_bytes(ct2.read('windows-x64/cpu/licenses/'+name))
         (licenses/'Microsoft-Visual-Cpp-Runtime.txt').write_text(
@@ -171,7 +222,14 @@ def package(args):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('source','cpu-build','cuda-build','cpu-worker','cuda-worker','redist','cuda-toolkit','extra-licenses','output'):
-        parser.add_argument('--'+name,type=Path,required=True)
+        parser.add_argument('--'+name,type=Path)
+    parser.add_argument('--cpu-only', action='store_true', help='Update CPU VAD export while preserving verified CUDA authority')
     parser.add_argument('--candidate-id', help='Fresh shared-* identity; never a publication or model availability toggle')
     parser.add_argument('--parakeet-acquisition-lock', type=Path)
-    package(parser.parse_args())
+    args = parser.parse_args()
+    required = ('cpu_build', 'cpu_worker', 'output') if args.cpu_only else (
+        'source', 'cpu_build', 'cuda_build', 'cpu_worker', 'cuda_worker', 'redist', 'cuda_toolkit', 'extra_licenses', 'output')
+    for name in required:
+        if getattr(args, name) is None:
+            parser.error('--' + name.replace('_', '-') + ' is required')
+    (package_cpu_only if args.cpu_only else package)(args)

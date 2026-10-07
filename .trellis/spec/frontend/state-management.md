@@ -15,7 +15,7 @@ Zustand stores under `src/stores/`. Session subtitle edits use Immer (`produce`)
 | Clip job | `clipStore.ts` | Clip `jobId`, snapshot, options (`useAsWorkingVideo`), success/error messages |
 | Burn job | `burnStore.ts` | Burn job lifecycle mirroring clip |
 
-Settings (`AppSettings`) are loaded/saved via Tauri (`getSettings` / `setSettings`), not mirrored as a full Zustand store by default. The Translation view's temporary provider selection stays in component state, initializes from `defaultTranslationProviderId`, and must not write back to settings. Transient VAD config is **session-only** and must not be written to project or global settings (see `/AGENTS.md`).
+Settings (`AppSettings`) are loaded/saved via Tauri (`getSettings` / `setSettings`), not mirrored as a full Zustand store by default. The Translation view's temporary provider selection stays in component state, initializes from `defaultTranslationProviderId`, and must not write back to settings. Optional CT2 VAD state lives only in the current TranscribeView instance: `useVad=false`, threshold `0.5`, minimum silence `100ms` on mount. It must not be written to project, global settings or localStorage. Only ordinary Faster-Whisper and exact Kotoba show the controls; mandatory Qwen/Parakeet/ReazonSpeech routes do not consume them. Snapshot engine/model/device/useVad/config for each attempt, lock controls through preparation/confirmation/download/start/run/cancel, and reject stale async checks before starting or applying results.
 
 ## VideoSession vs ASS Document
 

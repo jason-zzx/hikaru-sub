@@ -3,7 +3,7 @@
   "name": "native-asr-vad-migration",
   "title": "Add Native ASR VAD support",
   "description": "Migrate the required VAD behavior and managed model assets to Native ASR only after Qwen3, Parakeet, and ReazonSpeech productization are complete.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -12,7 +12,7 @@
   "assignee": "zzx",
   "createdAt": "2026-09-01",
   "completedAt": null,
-  "branch": null,
+  "branch": "dev-crisp-asr",
   "base_branch": "dev-crisp-asr",
   "worktree_path": null,
   "commit": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": "09-01-native-asr-remaining-migrations",
   "relatedFiles": [],
-  "notes": "Qwen, Parakeet and ReazonSpeech prerequisites are completed and archived; all three already use the frozen mandatory CPU Silero dependency. This child remains planning for additional route applicability and general VAD configuration, not reimplementation of those pipelines. PRD exists, design.md/implement.md are pending, and implement.jsonl/check.jsonl are empty. No implementation start is authorized; VAD stays CPU-only for both CPU and CUDA ASR.",
+  "notes": "Owner approved the reviewed planning artifacts and context manifests; implementation is active and begins with the P1 minimal CPU VAD/CT2 runtime proof. User confirmed optional VAD for all seven Faster-Whisper models and exact Kotoba, default off, with threshold and minimum-silence controls. Proposed implementation reuses the pinned full CPU CLI standalone VAD export and per-span CT2 decoding; existing Qwen/Parakeet/ReazonSpeech mandatory VAD stays unchanged. Static source investigation only; the minimal runtime proof is the first implementation gate, not completed evidence. Implementation is authorized. Git history changes and publication remain unauthorized.",
   "meta": {}
 }

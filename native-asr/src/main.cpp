@@ -1,5 +1,6 @@
 #ifndef HIKARU_ASR_QWEN_CLI_WORKER
 #include "ctranslate2_whisper.hpp"
+#include "full_cli.hpp"
 #else
 #include "qwen_cli.hpp"
 #endif
@@ -13,7 +14,6 @@
 #include "../third_party/nlohmann/json.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -204,25 +204,6 @@ Json final_segment_evidence(const Segment& segment) {
 }
 #endif
 
-void validate_candidate_b_config(const WorkerRequestV1& request) {
-  if (!request.use_vad || !request.vad_config) {
-    return;
-  }
-  const VadConfig& config = *request.vad_config;
-  const bool mismatch =
-      (config.threshold && std::abs(*config.threshold - whisper::vad_threshold) > 1e-9)
-      || (config.min_speech_duration_ms && *config.min_speech_duration_ms != 0)
-      || (config.min_silence_duration_ms
-          && *config.min_silence_duration_ms != whisper::vad_min_silence_ms)
-      || (config.speech_pad_ms && *config.speech_pad_ms != whisper::vad_speech_pad_ms)
-      || config.max_segment_duration_ms.has_value();
-  if (mismatch) {
-    throw whisper::BackendError(
-        "vad_config_identity_mismatch",
-        "Candidate B accepts only the frozen ordinary faster-whisper VAD defaults");
-  }
-}
-
 std::optional<fs::path> request_model_path(const WorkerRequestV1& request, ModelRole role) {
   for (const ModelPath& model : request.model_paths) {
     if (model.role == role) return ctranslate2_compatible_path(fs::u8path(model.path));
@@ -272,33 +253,51 @@ int run_ctranslate2(const WorkerRequestV1& request) {
         "this CTranslate2 worker does not implement Vulkan");
     return 2;
   }
+  Emitter emitter(request);
+  bool ready_sent = false;
   try {
-    if (kotoba && request.use_vad) {
-      throw whisper::BackendError(
-          "kotoba_vad_not_qualified",
-          "Native Kotoba VAD is not qualified");
-    }
-    if (ordinary && request.use_vad) {
-#ifndef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
-      throw whisper::BackendError(
-          "vad_not_built",
-          "Candidate B VAD support is not included in this worker");
-#else
-      validate_candidate_b_config(request);
-#endif
-    }
     const fs::path audio = fs::u8path(request.audio_path);
     const fs::path model = model_path(request);
-    whisper::validate_model_directory(model, kotoba);
-    const std::int64_t duration_ms = whisper::verified_wav_duration_ms(audio);
-#ifdef HIKARU_ASR_ENABLE_CANDIDATE_B_DEVELOPMENT
-    const std::optional<fs::path> vad_model = ordinary && request.use_vad
-        ? std::optional<fs::path>(
-              current_executable_directory() / "silero_vad_v6.onnx")
-        : std::nullopt;
-#else
+    if (!request.use_vad) whisper::validate_model_directory(model, kotoba);
+    const auto pcm = request.use_vad ? wav::read_pcm16_mono_16khz(audio) : wav::Audio{};
+    const auto duration_ms = request.use_vad ? pcm.duration_ms : whisper::verified_wav_duration_ms(audio);
+    EventV1 ready;
+    ready.type = EventType::Ready;
+    ready.backend = Backend::CTranslate2;
+    ready.device = request.device;
+    ready.duration_ms = duration_ms;
+    // VAD reports no ASR source progress. Its own monotonic chunk clock stays
+    // on stderr, so scanning to EOF cannot precede a backwards ASR percentage.
+    if (request.use_vad) {
+      if (!emitter.emit(ready)) return 74;
+      ready_sent = true;
+    }
+    std::vector<full_cli::SpeechSpan> spans;
+    if (request.use_vad) {
+      spans = full_cli::detect_speech(request, static_cast<std::int64_t>(pcm.samples.size()),
+          [](std::int64_t done, std::int64_t total) {
+            std::cerr << "hikaru_vad_progress: completed=" << done << " total=" << total << '\n';
+          });
+    }
+    const auto progress = [&](std::int64_t processed_ms) {
+      EventV1 event;
+      event.type = EventType::Progress;
+      event.processed_ms = processed_ms;
+      event.duration_ms = duration_ms;
+      if (!emitter.emit(event))
+        throw whisper::BackendError("protocol_emit_failed", "progress event could not be emitted");
+    };
+    const auto segment = [&](const Segment& value) {
+      EventV1 event;
+      event.type = EventType::Segment;
+      event.segment = value;
+      if (!emitter.emit(event))
+        throw whisper::BackendError("protocol_emit_failed", "segment event could not be emitted");
+    };
+    // A successful empty VAD never constructs a CT2 backend or loads weights.
+    if (!request.use_vad || !spans.empty()) {
+    if (request.use_vad) whisper::validate_model_directory(model, kotoba);
     const std::optional<fs::path> vad_model = std::nullopt;
-#endif
     const whisper::CandidateAConfig config = kotoba
         ? whisper::kotoba_k2_config()
         : whisper::CandidateAConfig{};
@@ -324,46 +323,39 @@ int run_ctranslate2(const WorkerRequestV1& request) {
         execution,
         kotoba);
 #endif
-    Emitter emitter(request);
-
-    EventV1 ready;
-    ready.type = EventType::Ready;
-    ready.backend = Backend::CTranslate2;
-    ready.device = request.device;
-    ready.duration_ms = duration_ms;
-    if (!emitter.emit(ready)) {
-      return 74;
-    }
-
-    const whisper::TranscriptionResult result = backend.transcribe(
-        audio,
-        [&](std::int64_t processed_ms) {
-          EventV1 progress;
-          progress.type = EventType::Progress;
-          progress.processed_ms = processed_ms;
-          progress.duration_ms = duration_ms;
-          if (!emitter.emit(progress)) {
-            throw whisper::BackendError("protocol_emit_failed", "progress event could not be emitted");
-          }
-        },
-        [&](const Segment& segment) {
-          EventV1 event;
-          event.type = EventType::Segment;
-          event.segment = segment;
-          if (!emitter.emit(event)) {
-            throw whisper::BackendError("protocol_emit_failed", "segment event could not be emitted");
-          }
+    if (!request.use_vad) {
+      if (!emitter.emit(ready)) return 74;
+      ready_sent = true;
+      const auto result = backend.transcribe(audio, progress, segment);
+      if (!result.failure_code.empty())
+        throw whisper::BackendError(result.failure_code, "CTranslate2 generated an invalid timestamp sequence");
+    } else {
+      for (const auto& span : spans) {
+        wav::Audio slice;
+        slice.samples.assign(pcm.samples.begin() + span.start_sample, pcm.samples.begin() + span.end_sample);
+        slice.duration_ms = (static_cast<std::int64_t>(slice.samples.size()) * 1000 + wav::sample_rate / 2) / wav::sample_rate;
+        const auto source_ms = [&](std::int64_t local_ms) {
+          return ((span.start_sample + local_ms * (wav::sample_rate / 1000)) * 1000
+              + wav::sample_rate / 2) / wav::sample_rate;
+        };
+        // Each invocation owns fresh seek/history/K2 state. No compressed audio,
+        // previous-span prompt, cumulative-duration offsets or timestamp repair.
+        const auto result = backend.transcribe_audio(slice, [&](std::int64_t local_ms) {
+          const auto at = std::min(span.end_sample, span.start_sample + local_ms * 16);
+          progress((at * 1000 + wav::sample_rate / 2) / wav::sample_rate);
         });
-
-    if (!result.failure_code.empty()) {
-      if (!emitter.emit(error_event(
-              result.failure_code,
-              request.use_vad
-                  ? "Candidate B failed closed"
-                  : "CTranslate2 generated an invalid timestamp sequence"))) {
-        return 74;
+        if (!result.failure_code.empty())
+          throw whisper::BackendError(result.failure_code, "CTranslate2 VAD span decoding failed");
+        for (const auto& evidence : result.segments) {
+          auto value = evidence.segment;
+          value.start_ms = source_ms(value.start_ms);
+          value.end_ms = source_ms(value.end_ms);
+          segment(value);
+        }
+        progress((span.end_sample * 1000 + wav::sample_rate / 2) / wav::sample_rate);
       }
-      return 20;
+      progress(duration_ms);
+    }
     }
 
     EventV1 completed;
@@ -375,10 +367,16 @@ int run_ctranslate2(const WorkerRequestV1& request) {
     }
     return 0;
   } catch (const whisper::BackendError& error) {
-    emit_pre_ready_error(error.code(), error.what());
+    if (ready_sent) emitter.emit(error_event(error.code(), error.what()));
+    else emit_pre_ready_error(error.code(), error.what());
+    return 20;
+  } catch (const full_cli::Error& error) {
+    if (ready_sent) emitter.emit(error_event(error.what(), "CPU VAD execution failed"));
+    else emit_pre_ready_error(error.what(), "CPU VAD execution failed");
     return 20;
   } catch (const std::exception&) {
-    emit_pre_ready_error("model_runtime_failed", "native ASR runtime failed");
+    if (ready_sent) emitter.emit(error_event("model_runtime_failed", "native ASR runtime failed"));
+    else emit_pre_ready_error("model_runtime_failed", "native ASR runtime failed");
     return 20;
   }
 }
