@@ -168,6 +168,35 @@ describe("RuntimeDependenciesPanel", () => {
     expect(onCleanup).toHaveBeenCalledWith("appCache");
   });
 
+  it.each([0, 2048])(
+    "shows legacy cleanup only for reported residue (%i bytes)",
+    async (sizeBytes) => {
+      const onCleanup = vi.fn();
+      const props = {
+        probe: null,
+        onChangeSourceMode: vi.fn(),
+        onMeasureStorage: vi.fn(),
+        onCleanup,
+      };
+      const { rerender } = render(
+        <RuntimeDependenciesPanel {...props} storage={{ items: [] }} />,
+      );
+      expect(screen.queryByText("旧版 Python 转录环境")).toBeNull();
+      rerender(
+        <RuntimeDependenciesPanel
+          {...props}
+          storage={{
+            items: [{ kind: "legacyPython" as const, managed: true, sizeBytes }],
+          }}
+        />,
+      );
+      expect(screen.getByText("旧版 Python 转录环境")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /下载|去配置/ })).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "清理" }));
+      expect(onCleanup).toHaveBeenCalledExactlyOnceWith("legacyPython");
+    },
+  );
+
   it("lists only production runtime dependencies under the status card", () => {
     render(<RuntimeDependenciesPanel probe={{ sourceMode: "official", items: [
       { kind: "ffmpeg", status: "available", managed: true },

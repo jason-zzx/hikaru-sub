@@ -232,6 +232,7 @@ export type RuntimeDependencyKind =
   | "nativeAsrCuda"
   | "crispasrCpu"
   | "crispasrCuda"
+  | "legacyPython"
   | "asrModels"
   | "downloads"
   | "appCache";

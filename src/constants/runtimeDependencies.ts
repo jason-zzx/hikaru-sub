@@ -9,6 +9,7 @@ export const RUNTIME_DEPENDENCY_LABEL: Record<RuntimeDependencyKind, string> = {
   nativeAsrCuda: "CUDA 运行依赖",
   crispasrCpu: "CPU 运行依赖",
   crispasrCuda: "CUDA 运行依赖",
+  legacyPython: "旧版 Python 转录环境",
   asrModels: "ASR 模型缓存",
   downloads: "临时下载缓存",
   appCache: "应用缓存",

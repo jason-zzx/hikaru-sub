@@ -28,7 +28,7 @@ Typical production install-dir layout (see `/AGENTS.md`):
 - `deps/downloads/native-asr-models/<engine>/<model-id-segments>/<revision>` — Native ASR `.part`, staging, and repair data
 - `deps/downloads` — other temporary archives
 
-Old `deps/python311` / `deps/asr-service` directories may remain from prior releases but are not production dependency probe, measure, cleanup, or route inputs. Cutover and rollback never delete them automatically.
+Old `deps/python311` / `deps/asr-service` directories are not production dependency probe or route inputs. Explicit storage measurement offers them as the cleanup-only `legacyPython` item when residue exists (see below). Cutover and rollback never delete them automatically.
 
 Native model manifest IDs must reject traversal, absolute/drive paths, backslashes, extra separators, Windows reserved device names, trailing-dot/space aliases, and ASCII case collisions before joining paths. A model ID is either one safe segment or exactly one safe `owner/name`; each repository-style segment is validated independently before the existing contained path builder runs. Direct required files reject symlinks/reparse points; legacy HF symlinks are allowed only when the snapshot and canonical file target stay below the canonical managed Hugging Face root. Concurrent model jobs may race while creating shared parent directories: accept only `AlreadyExists`, immediately re-read with `symlink_metadata`, and reject link/reparse-like or non-directory entries before descending.
 
@@ -36,11 +36,52 @@ Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI choo
 
 ## Probe / Prepare / Cleanup UX Contract
 
-Settings entry: **probe only**. Storage sizes: user-triggered measure. Cleanup buttons: only when measured size > 0 and the target is managed.
+Settings entry: **probe only**. Storage sizes: user-triggered measure. Cleanup buttons: only when measured size > 0 and the target is managed; the cleanup-only `legacyPython` row is existence-based, so an empty leftover directory is also removable.
 
 Dependency probes still perform exact runtime/model hashes; `spawn_blocking` does not make unoptimized SHA256 cheap. Keep `[profile.dev.package.sha2] opt-level = 3` in `src-tauri/Cargo.toml` so debug/dev probes do not spend minutes hashing weights. This changes neither release settings nor hash/path/device checks. Engine listing reuses both results from one `crispasr::items` call instead of hashing its CPU payload again for CUDA capability.
 
 Manual, read-only regression profiles (ignored in ordinary Cargo tests): `dependency_hash_throughput` checks a fixed 32 MiB fixture; `dependency_probe_profile` profiles actual default-model cold/cached readiness and runtime/CUDA probes. Set test-only `HIKARU_PROFILE_RESOURCES` to the resource directory and `HIKARU_PROFILE_DEPS` to executable-adjacent `deps`, then run `cargo test --manifest-path src-tauri/Cargo.toml dependency_probe_profile -- --ignored --nocapture --test-threads=1`. These inputs never affect production resolution. Compare unoptimized hashing with `--config profile.dev.package.sha2.opt-level=0`; do not run competing profiles concurrently or substitute size-only readiness to improve timings.
+
+## Scenario: Legacy Python Environment Cleanup
+
+### 1. Scope / Trigger
+
+Settings → storage → explicit measurement after upgrading from the Python sidecar. The NSIS installer additionally auto-cleans the same fixed managed residue after copying the new binary, by running `hikaru-sub.exe --cleanup-legacy-python`; portable roots skip it, cleanup failure never fails installation, and Settings remains the retry path. No startup deletion and no additional runtime readiness row.
+
+### 2. Signatures
+
+Existing `measure_runtime_dependency_storage` and `cleanup_runtime_dependency` commands carry `RuntimeDependencyKind::LegacyPython` / `"legacyPython"`; the frontend sends only the kind, never a deletion path. Preparation rejects this kind.
+
+### 3. Contracts
+
+- Measurement returns one managed storage item only when selected residue exists, including empty directories. UI label: `旧版 Python 转录环境`; successful cleanup remeasures and removes the row.
+- The fixed cleanup set is executable-adjacent `deps/python311`, `deps/asr-service`, and immediate `deps/downloads` children matching `python311-runtime.{zip,tar.gz,tar.xz,exe}` (including `.part`), `python311-install.log`, or `python311-extract-<digits>`.
+- Windows installer maintenance: `cleanup_installed_legacy_python(exe)` runs before Tauri/WebView/portable bootstrap; `detect_portable(exe_dir)` means skip; the exit code reports cleanup result to NSIS. NSIS `NSIS_HOOK_POSTINSTALL` invokes only the just-installed `${MAINBINARYNAME}.exe` and treats nonzero/error as non-fatal.
+- Never use legacy configured Python/service paths. Preserve all models (including reused HF snapshots), Native CPU/CUDA runtimes/downloads, FFmpeg, source checkouts, user/global environments, portable `data`/`cache`/`webview`, and work cache. The installer maintenance entry must not create portable roots, settings or WebView directories.
+- Measurement and deletion stay inside existing `spawn_blocking` commands. Selected roots and their `deps`/`downloads` parents reject links/reparse points; recursive measurement skips nested links and directory deletion never follows them.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| No selected residue | Omit row; repeated cleanup succeeds |
+| Empty selected directory | Show `0 B` and allow cleanup |
+| Selected root or parent is a link/junction | Reject scan/cleanup rather than resolve its target |
+| Locked files / denied access | Report failure without raw paths; leave remaining residue retryable |
+| Installer cleanup fails / portable root | Installer succeeds; Settings can retry / residue is untouched |
+| Cleanup succeeds | Refresh storage; hide row when nothing remains |
+
+### 5. Good/Base/Bad Cases
+
+Good: delete the old `.venv` together with its managed service copy. Base: fresh installs have no row. Bad: delete all `deps/models/huggingface` or all `deps/downloads` as Python residue.
+
+### 6. Tests Required
+
+`dependencies::tests::legacy_python_*` cover absence, empty residue, exact allowlist, sibling preservation, junctions, locked-file failure and retry, plus installer entry reuse/portable skip. `SettingsRuntimeDependencies` / `SettingsLegacyPythonCleanup` cover conditional visibility, confirmation/cancel, refresh and failure. `WindowsBundleConfig` and the ignored local NSIS proof cover POSTINSTALL wiring, non-fatal behavior, path-with-spaces execution, model preservation, portable skip, no Tauri bootstrap, and idempotence. The Tauri wrapper test verifies kind-only dispatch.
+
+### 7. Wrong vs Correct
+
+Wrong: restore the old `python311` / `asrVenv` install buttons, clean paths from old settings, duplicate installer `RMDir` rules, or let cleanup failure abort an otherwise successful install. Correct: a single cleanup-only `legacyPython` item with backend-owned fixed paths, and NSIS invokes the new binary's bounded maintenance entry after installation without failing installation for cleanup errors.
 
 ## Scenario: Native CPU Runtime Dependency Payload
 
@@ -72,7 +113,7 @@ async fn probe_runtime_dependencies(app: AppHandle, asr_state: State<'_, AsrStat
 - `nativeAsrCpu` resolves from `resource_dir()/native-asr/windows-x64/cpu`, requires artifact `hikaru-asr-windows-x64-cpu-v3` with exact ordered engines `["faster-whisper", "kotoba-faster-whisper"]`, reports `source: "builtIn"`, `managed: false`, and is never downloadable or cleanable.
 - Exact model readiness comes from the process-owned `NativeAsrModelManager`; do not duplicate size/hash/path validation in `dependencies.rs`.
 - Probe remains status/path/version only. Runtime reads and model hashing use `spawn_blocking`; probe never calls recursive `dir_size`.
-- Explicit storage measurement emits managed FFmpeg when applicable, bounded `deps/models`, `deps/downloads`, and application work cache. It emits no Python/venv or bundled-runtime storage item.
+- Explicit storage measurement emits managed FFmpeg when applicable, bounded `deps/models`, `deps/downloads`, and application work cache. It emits no legacy `python311`/`asrVenv` or bundled-runtime storage item; `legacyPython` is a separate conditional cleanup-only item.
 - `asrModels` cleanup targets only executable-adjacent `deps/models`; `downloads` remains `deps/downloads`; app-cache cleanup preserves current-video workspace/proxy data.
 - Legacy Python/venv enum variants may remain temporarily for rollback compatibility, but production payloads do not offer them.
 

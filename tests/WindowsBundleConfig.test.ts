@@ -38,6 +38,25 @@ describe("Windows bundle configuration", () => {
     expect(nsisHookText).toContain("$INSTDIR\\deps");
   });
 
+  it("runs bounded legacy cleanup only after installing the new binary", () => {
+    const hook = nsisHookText.match(/!macro NSIS_HOOK_POSTINSTALL\s([\s\S]*?)!macroend/)?.[1];
+    expect(hook).toContain(
+      'ExecWait \'"$INSTDIR\\${MAINBINARYNAME}.exe" --cleanup-legacy-python\' $0',
+    );
+    expect(hook).toContain("${If} ${Errors}");
+    expect(hook).toContain("${OrIf} $0 != 0");
+    expect(hook).toContain("设置中重试");
+    expect(hook).not.toMatch(/RMDir|Delete |Abort|Quit|REBOOTOK/);
+    const entry = readFileSync(
+      fileURLToPath(new URL("../src-tauri/src/lib.rs", import.meta.url)),
+      "utf8",
+    );
+    expect(entry.indexOf('"--cleanup-legacy-python"')).toBeLessThan(
+      entry.indexOf("app_paths::bootstrap_portable_paths()"),
+    );
+    expect(entry).toContain("dependencies::cleanup_installed_legacy_python(&exe)");
+  });
+
   it("does not bundle FFmpeg binaries in release packages", () => {
     expect(JSON.stringify(config.bundle.resources)).not.toContain("binaries/*");
     expect(packageJson.scripts["release:local"]).toBe(

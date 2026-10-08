@@ -77,6 +77,13 @@ describe("runtime dependency Tauri wrappers", () => {
     });
   });
 
+  it("cleans legacy Python through the existing command without passing a filesystem target", async () => {
+    await cleanupRuntimeDependency("legacyPython");
+    expect(invoke).toHaveBeenCalledExactlyOnceWith("cleanup_runtime_dependency", {
+      args: { kind: "legacyPython", preserveVideoPath: null },
+    });
+  });
+
   it("measures managed dependency storage sizes", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ items: [] });
 

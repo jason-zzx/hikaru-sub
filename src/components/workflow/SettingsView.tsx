@@ -415,9 +415,11 @@ export function SettingsView() {
                 ? sessionVideoPath
                   ? "将清理应用缓存中的 workspace、转码代理、预览与切片抽帧（保留当前工作视频相关缓存），是否确认清理"
                   : "将清理应用缓存中的 workspace、转码代理、预览与切片抽帧，是否确认清理"
-                : cleanupKind
-                  ? `即将清理「${RUNTIME_DEPENDENCY_LABEL[cleanupKind]}」。清理后再次使用需要重新安装依赖，是否确认清理`
-                  : "清理后再次使用需要重新安装依赖，是否确认清理"}
+                : cleanupKind === "legacyPython"
+                  ? "将删除当前安装目录中旧版受管 Python、转录服务及其下载残留，保留模型和当前运行依赖，不影响系统 Python。是否确认清理"
+                  : cleanupKind
+                    ? `即将清理「${RUNTIME_DEPENDENCY_LABEL[cleanupKind]}」。清理后再次使用需要重新安装依赖，是否确认清理`
+                    : "清理后再次使用需要重新安装依赖，是否确认清理"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="-mx-0 -mb-0 gap-2 rounded-none border-0 bg-transparent p-0 sm:justify-end">

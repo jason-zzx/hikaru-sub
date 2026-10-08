@@ -29,6 +29,16 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Installer-only maintenance runs before WebView, settings and worker setup.
+    #[cfg(windows)]
+    if std::env::args_os().nth(1).as_deref()
+        == Some(std::ffi::OsStr::new("--cleanup-legacy-python"))
+    {
+        let result = std::env::current_exe()
+            .map_err(|_| "无法定位安装目录".to_string())
+            .and_then(|exe| dependencies::cleanup_installed_legacy_python(&exe));
+        std::process::exit(if result.is_ok() { 0 } else { 1 });
+    }
     if let Err(error) = app_paths::bootstrap_portable_paths() {
         app_paths::show_fatal_startup_error_and_exit(&error);
     }

@@ -320,9 +320,14 @@ export function RuntimeDependenciesPanel({
           </span>
         </div>
         {metaLines([item])}
+        {item.kind === "legacyPython" && (
+          <p className="mt-1 text-xs text-text-muted">
+            旧版遗留，当前转录已不再需要；清理不影响模型和当前运行依赖。
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-start gap-2 md:justify-end">
-        {item.managed && item.sizeBytes > 0 && (
+        {item.managed && (item.sizeBytes > 0 || item.kind === "legacyPython") && (
           <Button
             type="button"
             variant="destructive"

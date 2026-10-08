@@ -251,6 +251,7 @@ pub enum RuntimeDependencyKind {
     CrispasrCuda,
     Python311,
     AsrVenv,
+    LegacyPython,
     AsrModels,
     Downloads,
     AppCache,
@@ -2224,6 +2225,7 @@ async fn run_prepare_job(
         RuntimeDependencyKind::CrispasrCuda => crispasr::prepare(&app, &job, &profile).await,
         RuntimeDependencyKind::Python311 => prepare_python311(&app, &job, &profile).await,
         RuntimeDependencyKind::AsrVenv => Err("ASR 引擎依赖由 ASR 一键配置流程准备".into()),
+        RuntimeDependencyKind::LegacyPython => Err("旧版 Python 转录环境仅支持清理".into()),
         RuntimeDependencyKind::AsrModels => Err("ASR 模型由模型管理器按具体引擎和模型下载".into()),
         RuntimeDependencyKind::Downloads => Err("下载缓存不需要准备".into()),
         RuntimeDependencyKind::AppCache => Err("应用缓存不需要准备".into()),
@@ -2269,6 +2271,115 @@ fn dir_size(path: &Path) -> u64 {
             }
         })
         .sum()
+}
+
+// Fixed application-owned paths only; never consult legacy user-configured paths.
+fn legacy_python_metadata(path: &Path) -> Result<Option<fs::Metadata>, String> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if is_link_like(&metadata) => {
+            Err("旧版 Python 环境路径包含链接，拒绝扫描或清理".into())
+        }
+        Ok(metadata) => Ok(Some(metadata)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err("无法检查旧版 Python 环境，请检查目录权限后重试".into()),
+    }
+}
+
+fn legacy_python_targets(deps: &Path) -> Result<Vec<PathBuf>, String> {
+    if legacy_python_metadata(deps)?.is_none() {
+        return Ok(Vec::new());
+    }
+    let mut targets = Vec::new();
+    for name in ["python311", "asr-service"] {
+        let path = deps.join(name);
+        if legacy_python_metadata(&path)?.is_some() {
+            targets.push(path);
+        }
+    }
+    let downloads = deps.join("downloads");
+    if legacy_python_metadata(&downloads)?.is_some() {
+        let entries = fs::read_dir(&downloads)
+            .map_err(|_| "无法检查旧版 Python 下载残留，请检查目录权限后重试")?;
+        for entry in entries {
+            let entry = entry.map_err(|_| "无法检查旧版 Python 下载残留")?;
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let archive = name.strip_suffix(".part").unwrap_or(&name);
+            let is_archive = [
+                RuntimeDependencyArchive::Zip,
+                RuntimeDependencyArchive::TarGz,
+                RuntimeDependencyArchive::TarXz,
+                RuntimeDependencyArchive::WindowsInstaller,
+            ]
+            .iter()
+            .any(|kind| archive == python_runtime_download_file_name(*kind));
+            let is_extract = name
+                .strip_prefix("python311-extract-")
+                .is_some_and(|suffix| {
+                    !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit())
+                });
+            if is_archive || is_extract || name == "python311-install.log" {
+                let path = entry.path();
+                if legacy_python_metadata(&path)?.is_some() {
+                    targets.push(path);
+                }
+            }
+        }
+    }
+    Ok(targets)
+}
+
+fn file_size(path: &Path) -> u64 {
+    fs::metadata(path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0)
+}
+
+fn measure_legacy_python_storage(
+    deps: &Path,
+) -> Result<Option<RuntimeDependencyStorageItem>, String> {
+    let targets = legacy_python_targets(deps)?;
+    if targets.is_empty() {
+        return Ok(None);
+    }
+    let mut size_bytes = 0;
+    for target in targets {
+        size_bytes += file_size(&target);
+    }
+    Ok(Some(RuntimeDependencyStorageItem {
+        kind: RuntimeDependencyKind::LegacyPython,
+        path: Some(deps.to_string_lossy().into_owned()),
+        managed: true,
+        size_bytes,
+    }))
+}
+
+#[cfg(windows)]
+pub(crate) fn cleanup_installed_legacy_python(exe: &Path) -> Result<(), String> {
+    let install_dir = exe.parent().ok_or("无法定位安装目录")?;
+    if crate::app_paths::detect_portable(install_dir) {
+        return Ok(());
+    }
+    cleanup_legacy_python(&deps_dir_from_exe(exe)?)
+}
+
+fn cleanup_legacy_python(deps: &Path) -> Result<(), String> {
+    // Validate every selected root before deletion; remove_dir_all does not follow
+    // nested symlinks/junctions. A link at a selected root is rejected, not resolved.
+    for target in legacy_python_targets(deps)? {
+        let is_dir = target.is_dir();
+        let result = if is_dir {
+            fs::remove_dir_all(&target)
+        } else {
+            fs::remove_file(&target)
+        };
+        if let Err(error) = result {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                return Err("无法清理旧版 Python 环境，请关闭旧版应用或 Python 转录进程并检查目录权限后重试".into());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn normalized_components(path: &Path) -> Vec<String> {
@@ -2349,6 +2460,7 @@ fn cleanup_target_for_kind(
             let settings = load_settings(app).unwrap_or_default();
             Ok(effective_asr_service_dir(app, settings.asr_service_path.as_deref())?.join(".venv"))
         }
+        RuntimeDependencyKind::LegacyPython => Err("旧版 Python 环境需按固定清单清理".into()),
         RuntimeDependencyKind::AsrModels => managed_models_dir(app),
         RuntimeDependencyKind::Downloads => downloads_dir(app),
         RuntimeDependencyKind::AppCache => work_cache_dir(app),
@@ -2699,7 +2811,8 @@ fn measure_runtime_dependency_storage_inner(
             RuntimeDependencyKind::NativeAsrCpu
             | RuntimeDependencyKind::CrispasrCpu
             | RuntimeDependencyKind::Python311
-            | RuntimeDependencyKind::AsrVenv => unreachable!(),
+            | RuntimeDependencyKind::AsrVenv
+            | RuntimeDependencyKind::LegacyPython => unreachable!(),
         };
         if kind == RuntimeDependencyKind::Ffmpeg && !managed {
             continue;
@@ -2726,6 +2839,9 @@ fn measure_runtime_dependency_storage_inner(
             managed,
             size_bytes,
         });
+    }
+    if let Some(legacy) = measure_legacy_python_storage(&deps_dir(app)?)? {
+        items.push(legacy);
     }
     Ok(RuntimeDependencyStorage { items })
 }
@@ -2941,6 +3057,9 @@ pub async fn cleanup_runtime_dependency(
         let _runtime_storage = runtime_storage;
         let deps = deps_dir(&app)?;
         fs::create_dir_all(&deps).map_err(|e| e.to_string())?;
+        if kind == RuntimeDependencyKind::LegacyPython {
+            return cleanup_legacy_python(&deps);
+        }
         if kind == RuntimeDependencyKind::CrispasrCuda {
             safe_remove_runtime_dependency_dir(&crispasr::managed_root(&app)?, &deps)?;
             return safe_remove_runtime_dependency_dir(&crispasr::download_dir(&app)?, &deps);
@@ -3410,6 +3529,156 @@ mod tests {
 
         assert_eq!(dir_size(temp.path()), 17);
         assert_eq!(dir_size(&temp.path().join("missing")), 0);
+    }
+
+    #[test]
+    fn legacy_python_storage_is_absent_until_residue_exists_including_empty_dirs() {
+        let temp = tempfile::tempdir().unwrap();
+        let deps = temp.path().join("deps");
+        assert!(measure_legacy_python_storage(&deps).unwrap().is_none());
+        cleanup_legacy_python(&deps).unwrap();
+        fs::create_dir_all(deps.join("asr-service")).unwrap();
+        let item = measure_legacy_python_storage(&deps).unwrap().unwrap();
+        assert_eq!(serde_json::to_value(item.kind).unwrap(), "legacyPython");
+        assert!(item.managed);
+        assert_eq!(item.size_bytes, 0);
+        cleanup_legacy_python(&deps).unwrap();
+        assert!(measure_legacy_python_storage(&deps).unwrap().is_none());
+    }
+
+    #[test]
+    fn legacy_python_cleanup_removes_only_managed_environment_and_exact_downloads() {
+        let temp = tempfile::tempdir().unwrap();
+        let deps = temp.path().join("deps");
+        let remove = [
+            "python311/current/python.exe",
+            "python311/current.123/failed-install",
+            "asr-service/.venv/Lib/site-packages/torch/test.bin",
+            "asr-service/main.py",
+            "asr-service/asr-debug.log",
+            "downloads/python311-runtime.zip",
+            "downloads/python311-runtime.tar.gz.part",
+            "downloads/python311-runtime.tar.xz",
+            "downloads/python311-runtime.exe.part",
+            "downloads/python311-install.log",
+            "downloads/python311-extract-123/python.exe",
+        ];
+        let preserve = [
+            "models/huggingface/hub/model.bin",
+            "models/ctranslate2/model.bin",
+            "models/crispasr/model.gguf",
+            "models/shared/silero.bin",
+            "asr-runtime/cuda/current/runtime.dll",
+            "asr-runtime/crispasr/cuda/current/runtime.dll",
+            "ffmpeg/current/ffmpeg.exe",
+            "downloads/native-asr-models/model.part",
+            "downloads/native-asr-cuda/runtime.zip",
+            "downloads/crispasr-cuda/runtime.zip",
+            "downloads/ffmpeg.zip",
+            "downloads/python311-runtime.zip.backup",
+            "downloads/python311-extract-custom/keep",
+        ];
+        for name in remove.iter().chain(preserve.iter()) {
+            let path = deps.join(name);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, [1u8; 7]).unwrap();
+        }
+        // Sibling source checkout and user environment are not cleanup inputs.
+        fs::create_dir_all(temp.path().join("asr-service/.venv")).unwrap();
+        assert_eq!(
+            measure_legacy_python_storage(&deps)
+                .unwrap()
+                .unwrap()
+                .size_bytes,
+            remove.len() as u64 * 7 - 6 * 7,
+        );
+        cleanup_legacy_python(&deps).unwrap();
+        assert!(!deps.join("python311").exists());
+        assert!(!deps.join("asr-service").exists());
+        for name in remove {
+            assert!(!deps.join(name).exists(), "{name}");
+        }
+        for name in preserve {
+            assert!(deps.join(name).is_file(), "{name}");
+        }
+        assert!(temp.path().join("asr-service/.venv").is_dir());
+        assert!(measure_legacy_python_storage(&deps).unwrap().is_none());
+        cleanup_legacy_python(&deps).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn legacy_python_installer_cleanup_reuses_targets_but_skips_portable() {
+        let temp = tempfile::tempdir().unwrap();
+        let exe = temp.path().join("hikaru-sub.exe");
+        let service = temp.path().join("deps/asr-service/.venv");
+        fs::create_dir_all(&service).unwrap();
+        fs::write(service.join("old.bin"), b"old").unwrap();
+        let marker = temp.path().join(".portable");
+        fs::write(&marker, b"").unwrap();
+        cleanup_installed_legacy_python(&exe).unwrap();
+        assert!(service.join("old.bin").exists());
+        fs::remove_file(marker).unwrap();
+        cleanup_installed_legacy_python(&exe).unwrap();
+        assert!(!service.exists());
+        cleanup_installed_legacy_python(&exe).unwrap();
+        for name in ["data", "cache", "webview"] {
+            assert!(!temp.path().join(name).exists());
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn legacy_python_cleanup_never_follows_junctions() {
+        for relative in ["", "downloads", "python311", "asr-service"] {
+            let temp = tempfile::tempdir().unwrap();
+            let deps = temp.path().join("deps");
+            let outside = temp.path().join("outside");
+            fs::create_dir_all(&outside).unwrap();
+            fs::write(outside.join("keep.bin"), [1u8; 100]).unwrap();
+            let link = deps.join(relative);
+            if !relative.is_empty() {
+                fs::create_dir_all(&deps).unwrap();
+            }
+            let output = hidden_command("cmd.exe")
+                .args(["/C", "mklink", "/J"])
+                .arg(&link)
+                .arg(&outside)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{relative}: {output:?}");
+            assert!(measure_legacy_python_storage(&deps).is_err());
+            assert!(cleanup_legacy_python(&deps).is_err());
+            fs::remove_dir(&link).unwrap();
+            assert!(outside.join("keep.bin").is_file());
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn legacy_python_cleanup_reports_locked_files_and_can_retry() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let temp = tempfile::tempdir().unwrap();
+        let service = temp.path().join("asr-service");
+        fs::create_dir(&service).unwrap();
+        let path = service.join("main.py");
+        fs::write(&path, b"test").unwrap();
+        let locked = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&path)
+            .unwrap();
+        let error = cleanup_legacy_python(temp.path()).unwrap_err();
+        assert!(error.contains("关闭旧版应用"));
+        assert!(!error.contains(&temp.path().to_string_lossy().to_string()));
+        assert!(measure_legacy_python_storage(temp.path())
+            .unwrap()
+            .is_some());
+        drop(locked);
+        cleanup_legacy_python(temp.path()).unwrap();
+        assert!(measure_legacy_python_storage(temp.path())
+            .unwrap()
+            .is_none());
     }
 
     #[test]
