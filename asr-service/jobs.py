@@ -116,6 +116,7 @@ class JobManager:
             outputAssPath=output_ass_path,
         )
         thread = threading.Thread(target=self._run, args=(job,), daemon=True)
+        job.thread = thread
         thread.start()
         return job
 

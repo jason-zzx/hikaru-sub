@@ -199,6 +199,11 @@ def _wait_for_completion(job):
     while time.time() < deadline:
         snapshot = job.snapshot(with_segments=True)
         if snapshot["status"] not in {"pending", "running"}:
+            # 状态先于终态文件落盘生效；等待 worker 线程写完 asr-jobs/
+            # 再返回，避免 TemporaryDirectory 清理与落盘竞争。
+            thread = getattr(job, "thread", None)
+            if thread is not None:
+                thread.join(timeout=3)
             return snapshot
         time.sleep(0.02)
     raise AssertionError(f"job did not finish: {job.snapshot(with_segments=True)}")

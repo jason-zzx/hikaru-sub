@@ -11,3 +11,12 @@
 # These hash-bound Parakeet sources were reviewed and built with CRLF bytes.
 **/research/p2_host.py text eol=crlf
 native-asr/src/full_cli.cpp text eol=crlf
+
+# Benchmark fixture hashes in corpus manifests are bound to LF bytes; CI
+# Windows runners default to core.autocrlf=true and would break assSha256.
+asr-service/benchmarks/fixtures/*.ass text eol=lf
+
+# Vitest's module pipeline throws "Invalid or unexpected token" for large
+# .mjs tooling sources checked out as all-CRLF (verified on windows runners
+# with core.autocrlf=true); keep them LF.
+scripts/*.mjs text eol=lf
