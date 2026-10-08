@@ -569,7 +569,11 @@ export function verifyRuntimeArchive({
     }
     seen.add(canonicalPath);
   }
-  const temporary = mkdtempSync(join(tmpdir(), "hikaru-asr-runtime-"));
+  // renameSync below requires the temp tree and destination on the same volume;
+  // CI runners may split os.tmpdir() and the workspace across drives (EXDEV).
+  const temporaryBase = extractTo || extractPayloadTo ? dirname(resolve(extractPayloadTo ?? extractTo)) : tmpdir();
+  mkdirSync(temporaryBase, { recursive: true });
+  const temporary = mkdtempSync(join(temporaryBase, ".hikaru-asr-runtime-"));
   try {
     extractZipSafely(archivePath, temporary);
     const result = verifyExtractedRuntime(temporary, lock);

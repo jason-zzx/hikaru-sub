@@ -88,7 +88,10 @@ export function verifyCrispasrArchive({ root, device = "cpu", extractTo, candida
   check(lstatSync(path).size === archive.sizeBytes && sha256File(path) === archive.sha256);
   const entries = listZipEntries(path), expected = artifact.files.map(f => archive.root + f.path).concat(archive.root + "SHA256SUMS", archive.root + "runtime-manifest.json").sort();
   check(JSON.stringify(entries.map(e => e.path).sort()) === JSON.stringify(expected));
-  const temp = mkdtempSync(join(tmpdir(), "hikaru-crispasr-"));
+  // Keep temp on the destination volume so the renameSync below cannot hit EXDEV.
+  const tempBase = extractTo ? dirname(resolve(extractTo)) : tmpdir();
+  mkdirSync(tempBase, { recursive: true });
+  const temp = mkdtempSync(join(tempBase, ".hikaru-crispasr-"));
   try {
     extractZipSafely(path, temp);
     const payload = join(temp, archive.root);
