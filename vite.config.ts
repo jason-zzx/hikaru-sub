@@ -1,7 +1,8 @@
 import path from "node:path";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import type { Plugin } from "vite";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -31,6 +32,16 @@ export function viteIgnoreMissingJassubDefaultFont(): Plugin {
   };
 }
 
+export const testExclude = [
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/dist-electron/**",
+  "**/cypress/**",
+  "**/.{idea,git,cache,output,temp}/**",
+  ".trellis/**",
+  "native-asr/build/**",
+];
+
 export default defineConfig(async () => ({
   plugins: [viteIgnoreMissingJassubDefaultFont(), react(), tailwindcss()],
 
@@ -49,6 +60,9 @@ export default defineConfig(async () => ({
   },
 
   clearScreen: false,
+  test: {
+    exclude: testExclude,
+  },
   server: {
     port: 1420,
     strictPort: true,

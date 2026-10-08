@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import configFactory from "./vite.config";
+import configFactory, { testExclude } from "./vite.config";
 
 describe("vite config", () => {
   it("builds jASSUB workers as ES modules", async () => {
@@ -11,5 +11,8 @@ describe("vite config", () => {
     });
 
     expect(config.worker?.format).toBe("es");
+    expect(config.test?.exclude).toEqual(testExclude);
+    expect(config.test?.exclude).toContain("**/node_modules/**");
+    expect(config.test?.exclude).toContain("native-asr/build/**");
   });
 });
