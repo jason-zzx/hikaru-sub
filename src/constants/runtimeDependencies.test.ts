@@ -3,6 +3,7 @@ import {
   RUNTIME_DEPENDENCY_LABEL,
   RUNTIME_SOURCE_MODE_LABEL,
   formatDependencyBytes,
+  formatDependencyPath,
 } from "./runtimeDependencies";
 
 describe("runtime dependency constants", () => {
@@ -24,5 +25,18 @@ describe("runtime dependency constants", () => {
     expect(formatDependencyBytes(512)).toBe("512 B");
     expect(formatDependencyBytes(1024 * 1024)).toBe("1.00 MB");
     expect(formatDependencyBytes(25 * 1024 * 1024)).toBe("25.0 MB");
+  });
+
+  it("normalizes dependency paths for display", () => {
+    expect(
+      formatDependencyPath("\\\\?\\C:\\app\\deps\\asr-runtime\\cuda\\current"),
+    ).toBe("C:\\app\\deps\\asr-runtime\\cuda\\current");
+    expect(formatDependencyPath("C:\\app\\deps\\asr-runtime/crispasr/cuda/current")).toBe(
+      "C:\\app\\deps\\asr-runtime\\crispasr\\cuda\\current",
+    );
+    expect(formatDependencyPath("C:\\app\\deps\\ffmpeg\\current")).toBe(
+      "C:\\app\\deps\\ffmpeg\\current",
+    );
+    expect(formatDependencyPath("/usr/local/bin")).toBe("/usr/local/bin");
   });
 });

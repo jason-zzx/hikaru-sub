@@ -37,3 +37,10 @@ export function formatDependencyBytes(bytes: number): string {
 
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
 }
+
+// 后端路径来源不一（canonicalize 的 \\\?\ 前缀、拼接产生的混合斜杠），
+// UI 统一展示为普通 Windows 反斜杠路径。
+export function formatDependencyPath(path: string): string {
+  const stripped = path.startsWith("\\\\?\\") ? path.slice(4) : path;
+  return /^[A-Za-z]:/.test(stripped) ? stripped.replace(/\//g, "\\") : stripped;
+}
