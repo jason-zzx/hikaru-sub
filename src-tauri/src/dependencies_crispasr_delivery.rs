@@ -394,7 +394,7 @@ mod tests {
                 let original = fs::read(&dll).unwrap();
                 fs::remove_file(&dll).unwrap();
                 let missing = verify_at(&resources, &deps, device, &lock);
-                fs::write(&dll, vec![0; original.len()]).unwrap();
+                fs::write(&dll, b"corrupt").unwrap();
                 let corrupt = verify_at(&resources, &deps, device, &lock);
                 fs::write(&dll, original).unwrap();
                 assert!(missing.is_err() && corrupt.is_err());

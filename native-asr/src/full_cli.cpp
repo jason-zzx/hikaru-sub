@@ -145,9 +145,8 @@ struct Execution {
 Json document(const std::string& bytes, std::int64_t duration_ms) {
     require(duration_ms > 0 && !bytes.empty() && bytes.size() <= limits::max_event_line_bytes
         && bytes.compare(0, 3, "\xef\xbb\xbf") != 0 && bytes.find('\0') == std::string::npos);
-    // nlohmann treats raw NUL as EOF. Reject it and validate the entire supplied
-    // byte span, including unknown fields/suffixes, without repairing any text.
-    (void)wide(bytes);
+    // nlohmann validates UTF-8 (including escaped surrogates) and treats raw NUL
+    // as EOF. Reject NUL and parse the entire byte span without repairing text.
     std::vector<std::set<std::string>> keys;
     const auto callback = [&](int depth, Json::parse_event_t event, Json& parsed) {
       require(depth <= 64);

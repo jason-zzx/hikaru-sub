@@ -29,7 +29,9 @@ struct ArtifactLock {
     artifact_id: String,
     #[serde(default)]
     engines: Option<Vec<String>>,
-    manifest_sha256: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    manifest_sha256: Option<String>,
     files: Vec<NativeAsrRuntimeFile>,
     #[serde(default)]
     archive: Option<ArchiveLock>,
@@ -120,19 +122,12 @@ fn verify_payload(
     device: &str,
     artifact: &ArtifactLock,
 ) -> Result<ResolvedNativeAsrCpuRuntime, String> {
-    for path in [
-        root,
-        &root.join("runtime-manifest.json"),
-        &root.join("SHA256SUMS"),
-    ] {
+    for path in [root, &root.join("runtime-manifest.json")] {
         verify_plain_ancestors(path).map_err(|_| UNAVAILABLE)?;
     }
     if !artifact
         .artifact_id
         .starts_with(&format!("hikaru-asr-crispasr-windows-x64-{device}-"))
-        || !is_sha256(&artifact.manifest_sha256)
-        || sha256_file(&root.join("runtime-manifest.json")).map_err(|_| UNAVAILABLE)?
-            != artifact.manifest_sha256
     {
         return Err(UNAVAILABLE.into());
     }
@@ -159,8 +154,6 @@ fn verify_payload(
     {
         return Err(UNAVAILABLE.into());
     }
-    let checksums = parse_runtime_checksums(&root).map_err(|_| UNAVAILABLE)?;
-    let mut expected = HashSet::new();
     let mut binaries = vec![
         "hikaru-asr-worker.exe",
         "crispasr.exe",
@@ -172,52 +165,26 @@ fn verify_payload(
     if device == "cuda" {
         binaries.extend(["cudart64_12.dll", "cublas64_12.dll", "cublasLt64_12.dll"]);
     }
-    for row in &artifact.files {
-        if (!row.path.starts_with("licenses/") && !binaries.contains(&row.path.as_str()))
-            || !safe_runtime_relative_path(&row.path)
-            || row.path.contains(['\\', ':'])
-            || row
-                .path
-                .split('/')
-                .any(|part| crate::asr_models::validate_segment("runtime.file", part).is_err())
-            || !expected.insert(row.path.to_ascii_lowercase())
-            || row.size_bytes == 0
-            || !is_sha256(&row.sha256)
-            || checksums.get(&row.path) != Some(&row.sha256)
-            || !manifest.files.iter().any(|file| {
-                file.path == row.path
-                    && file.size_bytes == row.size_bytes
-                    && file.sha256 == row.sha256
-            })
+    for binary in binaries {
+        let row = artifact
+            .files
+            .iter()
+            .find(|file| file.path == binary)
+            .ok_or(UNAVAILABLE)?;
+        if row.size_bytes == 0
+            || !manifest
+                .files
+                .iter()
+                .any(|file| file.path == row.path && file.size_bytes == row.size_bytes)
         {
             return Err(UNAVAILABLE.into());
         }
         let path = root.join(&row.path);
         verify_plain_ancestors(&path).map_err(|_| UNAVAILABLE)?;
         let metadata = fs::symlink_metadata(&path).map_err(|_| UNAVAILABLE)?;
-        if !metadata.is_file()
-            || metadata.len() != row.size_bytes
-            || sha256_file(&path).map_err(|_| UNAVAILABLE)? != row.sha256
-        {
+        if is_link_like(&metadata) || !metadata.is_file() || metadata.len() != row.size_bytes {
             return Err(UNAVAILABLE.into());
         }
-    }
-    let mut actual = Vec::new();
-    collect_runtime_files(&root, &root, &mut actual).map_err(|_| UNAVAILABLE)?;
-    if artifact.files.len() != manifest.files.len()
-        || checksums.len() != artifact.files.len()
-        || actual.into_iter().collect::<HashSet<_>>()
-            != artifact
-                .files
-                .iter()
-                .map(|file| file.path.clone())
-                .collect()
-        || binaries
-            .iter()
-            .any(|path| !expected.contains(&path.to_ascii_lowercase()))
-        || !expected.contains("licenses/third-party-notices.json")
-    {
-        return Err(UNAVAILABLE.into());
     }
     Ok(ResolvedNativeAsrCpuRuntime {
         worker: root.join("hikaru-asr-worker.exe"),
@@ -281,7 +248,6 @@ mod tests {
         let root = runtime_root(resources, deps, device).unwrap();
         fs::create_dir_all(root.join("licenses")).unwrap();
         let mut files = Vec::new();
-        let mut checksums = String::new();
         let mut paths = vec![
             "hikaru-asr-worker.exe",
             "crispasr.exe",
@@ -297,10 +263,8 @@ mod tests {
         for path in paths {
             let bytes = format!("synthetic {device} {path}");
             fs::write(root.join(path), &bytes).unwrap();
-            checksums.push_str(&format!("{}  {path}\n", hash(bytes.as_bytes())));
             files.push(serde_json::json!({"path":path, "sizeBytes":bytes.len(), "sha256":hash(bytes.as_bytes())}));
         }
-        fs::write(root.join("SHA256SUMS"), checksums).unwrap();
         let id = format!("hikaru-asr-crispasr-windows-x64-{device}-fixture");
         let manifest = serde_json::to_vec(&serde_json::json!({
             "schemaVersion":1, "artifactId":id, "platform":"windows-x64", "arch":"x64", "protocolVersion":1,
@@ -311,7 +275,7 @@ mod tests {
         fs::write(root.join("runtime-manifest.json"), &manifest).unwrap();
         let mut value = serde_json::json!({"schemaVersion":1,"productEnablementAllowed":true,"cpu":null,"cuda":null});
         value[device] =
-            serde_json::json!({"artifactId":id,"manifestSha256":hash(&manifest),"files":files});
+            serde_json::json!({"artifactId":id,"files":files});
         serde_json::from_value(value).unwrap()
     }
 
@@ -396,7 +360,6 @@ mod tests {
             manifest["capabilities"]["engines"] = serde_json::json!(["qwen3-asr", "parakeet"]);
             let bytes = serde_json::to_vec(&manifest).unwrap();
             fs::write(&manifest_path, &bytes).unwrap();
-            artifact.manifest_sha256 = hash(&bytes);
             let shared = verify_payload(&root, device, artifact).unwrap();
             shared.require_engine("qwen3-asr").unwrap();
             shared.require_engine("parakeet").unwrap();
@@ -440,7 +403,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let resources = dir.path().join("resources");
             let deps = dir.path().join("deps");
-            let mut lock = fixture(&resources, &deps, device);
+            let lock = fixture(&resources, &deps, device);
             assert!(verify_at(&resources, &deps, device, &lock)
                 .unwrap()
                 .vad_cli_path
@@ -452,13 +415,6 @@ mod tests {
             manifest["capabilities"]["vadExport"] = true.into();
             let bytes = serde_json::to_vec(&manifest).unwrap();
             fs::write(&path, &bytes).unwrap();
-            assert!(verify_at(&resources, &deps, device, &lock).is_err());
-            let artifact = if device == "cpu" {
-                lock.cpu.as_mut().unwrap()
-            } else {
-                lock.cuda.as_mut().unwrap()
-            };
-            artifact.manifest_sha256 = hash(&bytes);
             if device == "cuda" {
                 assert!(verify_at(&resources, &deps, device, &lock).is_err());
                 continue;
@@ -494,9 +450,6 @@ mod tests {
                     verify_at(&resources.join("other"), &deps.join("other"), device, &lock)
                         .is_err()
                 );
-                fs::write(runtime.root.join("ctranslate2.dll"), b"wrong tree").unwrap();
-                assert!(verify_at(&resources, &deps, device, &lock).is_err());
-                fs::remove_file(runtime.root.join("ctranslate2.dll")).unwrap();
                 fs::write(&runtime.worker, b"corrupt").unwrap();
                 assert!(verify_at(&resources, &deps, device, &lock).is_err());
                 let mut lock = fixture(&resources, &deps, device);

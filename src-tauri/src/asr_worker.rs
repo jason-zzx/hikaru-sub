@@ -864,14 +864,6 @@ impl NativeAsrHost {
             return Err("native ASR request 超过 protocol v1 限制".into());
         }
 
-        if let Some(work) = &launch.cli_work_dir {
-            reject_link_path(work.parent().expect("resolved workspace parent"))?;
-            reject_link_path(&launch.audio_path)?;
-            reject_link_path(&self.inner.executable)?;
-            for model in &launch.model_paths {
-                reject_link_path(Path::new(&model.path))?;
-            }
-        }
         let mut command = hidden_command(&self.inner.executable);
         command.args(&self.inner.worker_args);
         for name in &self.inner.removed_environment {

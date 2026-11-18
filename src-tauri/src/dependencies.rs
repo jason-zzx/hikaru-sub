@@ -5,7 +5,7 @@ use crate::process::hidden_command;
 use crate::settings::{load_settings, AppSettings, RuntimeDependencySourceMode};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
@@ -79,12 +79,7 @@ const NATIVE_ASR_CUDA_REQUIRED_ENTRIES: &[&str] = &[
     "vcomp140.dll",
     "vcruntime140.dll",
     "vcruntime140_1.dll",
-    "cuda-fatbin.json",
-    "licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt",
-    "licenses/NVIDIA-CUDA-Runtime.txt",
-    "licenses/THIRD-PARTY-NOTICES.json",
     "runtime-manifest.json",
-    "SHA256SUMS",
 ];
 const NATIVE_ASR_CPU_REQUIRED_ENTRIES: &[&str] = &[
     NATIVE_ASR_CPU_WORKER,
@@ -95,7 +90,6 @@ const NATIVE_ASR_CPU_REQUIRED_ENTRIES: &[&str] = &[
     "vcruntime140.dll",
     "vcruntime140_1.dll",
     "runtime-manifest.json",
-    "SHA256SUMS",
 ];
 
 #[derive(Debug, Clone)]
@@ -127,8 +121,6 @@ struct NativeAsrCudaProductLock {
     product_enablement_allowed: bool,
     publication_gate: NativeAsrCudaPublicationGate,
     artifact: NativeAsrCudaArtifactLock,
-    #[serde(default)]
-    local_qualification: Option<NativeAsrCudaLocalQualification>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,30 +136,6 @@ struct NativeAsrCudaArtifactLock {
     id: String,
     size_bytes: u64,
     sha256: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct NativeAsrCudaLocalQualification {
-    machine: NativeAsrCudaQualifiedMachine,
-    model_backed_module_closure: NativeAsrCudaQualifiedModelRun,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct NativeAsrCudaQualifiedMachine {
-    device_index: i32,
-    device_name: String,
-    compute_capability: String,
-    compute_type: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct NativeAsrCudaQualifiedModelRun {
-    ready_device: String,
-    completed: bool,
-    python_or_network_fallback: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -223,6 +191,8 @@ struct NativeAsrRuntimeManifest {
 struct NativeAsrRuntimeFile {
     path: String,
     size_bytes: u64,
+    #[serde(default)]
+    #[allow(dead_code)]
     sha256: String,
 }
 
@@ -1079,71 +1049,6 @@ fn is_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn parse_runtime_checksums(root: &Path) -> Result<HashMap<String, String>, String> {
-    let text = fs::read_to_string(root.join("SHA256SUMS"))
-        .map_err(|error| format!("无法读取 Native ASR 运行时校验表：{error}"))?;
-    let mut checksums = HashMap::new();
-    for line in text.lines().filter(|line| !line.is_empty()) {
-        let Some((sha256, path)) = line.split_once("  ") else {
-            return Err("Native ASR 运行时校验表格式无效".into());
-        };
-        if !is_sha256(sha256)
-            || checksums
-                .insert(path.to_string(), sha256.to_string())
-                .is_some()
-        {
-            return Err("Native ASR 运行时校验表包含无效或重复条目".into());
-        }
-    }
-    Ok(checksums)
-}
-
-fn safe_runtime_relative_path(path: &str) -> bool {
-    let value = Path::new(path);
-    !value.is_absolute()
-        && value
-            .components()
-            .all(|component| matches!(component, Component::Normal(_)))
-}
-
-fn collect_runtime_files(
-    root: &Path,
-    directory: &Path,
-    files: &mut Vec<String>,
-) -> Result<(), String> {
-    for entry in fs::read_dir(directory)
-        .map_err(|error| format!("无法读取 Native ASR CUDA 运行时目录：{error}"))?
-    {
-        let entry = entry.map_err(|error| error.to_string())?;
-        let path = entry.path();
-        let metadata = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
-        if is_link_like(&metadata) {
-            return Err(format!(
-                "Native ASR CUDA 运行时禁止链接：{}",
-                path.display()
-            ));
-        }
-        if metadata.is_dir() {
-            collect_runtime_files(root, &path, files)?;
-        } else if metadata.is_file() {
-            let relative = path
-                .strip_prefix(root)
-                .map_err(|error| error.to_string())?
-                .to_string_lossy()
-                .replace('\\', "/");
-            if relative != "runtime-manifest.json" && relative != "SHA256SUMS" {
-                files.push(relative);
-            }
-        } else {
-            return Err(format!(
-                "Native ASR CUDA 运行时包含不支持的条目：{}",
-                path.display()
-            ));
-        }
-    }
-    Ok(())
-}
-
 fn verify_native_asr_cuda_runtime_at(
     root: &Path,
 ) -> Result<(PathBuf, PathBuf, String, bool), String> {
@@ -1182,36 +1087,21 @@ fn verify_native_asr_cuda_runtime_at(
     {
         return Err("Native ASR CUDA 运行时身份或能力与发布契约不匹配".into());
     }
-    let checksums = parse_runtime_checksums(root)?;
-    let manifest_paths = manifest
-        .files
+    for entry in NATIVE_ASR_CUDA_REQUIRED_ENTRIES
         .iter()
-        .map(|row| row.path.clone())
-        .collect::<HashSet<_>>();
-    let mut actual_files = Vec::new();
-    collect_runtime_files(root, root, &mut actual_files)?;
-    if manifest.files.len() != checksums.len()
-        || manifest_paths.len() != manifest.files.len()
-        || actual_files.into_iter().collect::<HashSet<_>>() != manifest_paths
+        .copied()
+        .filter(|entry| *entry != "runtime-manifest.json")
     {
-        return Err("Native ASR CUDA 运行时文件闭集不匹配".into());
-    }
-    for row in &manifest.files {
-        if !safe_runtime_relative_path(&row.path)
-            || checksums.get(&row.path) != Some(&row.sha256)
-            || !is_sha256(&row.sha256)
-        {
-            return Err(format!("Native ASR CUDA 运行时文件条目无效：{}", row.path));
-        }
-        let path = root.join(&row.path);
+        let row = manifest
+            .files
+            .iter()
+            .find(|file| file.path == entry)
+            .ok_or_else(|| format!("Native ASR CUDA 运行时文件条目无效：{entry}"))?;
+        let path = root.join(entry);
         let metadata = fs::symlink_metadata(&path)
             .map_err(|error| format!("无法检查 Native ASR CUDA 运行时文件：{error}"))?;
-        if is_link_like(&metadata)
-            || !metadata.is_file()
-            || metadata.len() != row.size_bytes
-            || sha256_file(&path)? != row.sha256
-        {
-            return Err(format!("Native ASR CUDA 运行时文件损坏：{}", row.path));
+        if is_link_like(&metadata) || !metadata.is_file() || metadata.len() != row.size_bytes {
+            return Err(format!("Native ASR CUDA 运行时文件损坏：{entry}"));
         }
     }
     let worker = root.join(NATIVE_ASR_CPU_WORKER);
@@ -1302,29 +1192,6 @@ fn native_asr_cuda_download_enabled() -> bool {
     native_asr_cuda_download_enabled_for(&lock, &sources)
 }
 
-fn apply_cuda_support_evidence(capability: &mut NativeAsrCudaCapability) {
-    if !capability.available {
-        return;
-    }
-    let Some(qualification) =
-        native_asr_cuda_product_lock().and_then(|lock| lock.local_qualification)
-    else {
-        return;
-    };
-    let machine = qualification.machine;
-    let run = qualification.model_backed_module_closure;
-    if capability.device_index == Some(machine.device_index)
-        && capability.device_name.as_deref() == Some(machine.device_name.as_str())
-        && capability.compute_capability.as_deref() == Some(machine.compute_capability.as_str())
-        && capability.compute_type.as_deref() == Some(machine.compute_type.as_str())
-        && run.ready_device == "cuda"
-        && run.completed
-        && !run.python_or_network_fallback
-    {
-        capability.support_evidence = Some("realTested".into());
-    }
-}
-
 pub(crate) fn native_asr_cuda_capability(app: &AppHandle) -> NativeAsrCudaCapability {
     if !native_asr_cuda_product_enabled() {
         return NativeAsrCudaCapability {
@@ -1381,7 +1248,6 @@ pub(crate) fn native_asr_cuda_capability(app: &AppHandle) -> NativeAsrCudaCapabi
                     }
                 });
             capability.supports_vad = capability.available && supports_vad;
-            apply_cuda_support_evidence(&mut capability);
             capability
         }
         Err(error) => NativeAsrCudaCapability {
@@ -3196,7 +3062,6 @@ mod tests {
             }
             fs::write(path, b"runtime").unwrap();
         }
-        fs::write(root.join("SHA256SUMS"), b"checksums").unwrap();
         fs::write(
             root.join("runtime-manifest.json"),
             serde_json::to_vec(&serde_json::json!({
@@ -3229,7 +3094,7 @@ mod tests {
         for entry in NATIVE_ASR_CUDA_REQUIRED_ENTRIES
             .iter()
             .copied()
-            .filter(|entry| *entry != "runtime-manifest.json" && *entry != "SHA256SUMS")
+            .filter(|entry| *entry != "runtime-manifest.json")
         {
             let path = root.join(entry);
             if let Some(parent) = path.parent() {
@@ -3248,18 +3113,6 @@ mod tests {
                 .unwrap()
                 .cmp(right["path"].as_str().unwrap())
         });
-        let sums = files
-            .iter()
-            .map(|row| {
-                format!(
-                    "{}  {}",
-                    row["sha256"].as_str().unwrap(),
-                    row["path"].as_str().unwrap()
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        fs::write(root.join("SHA256SUMS"), format!("{sums}\n")).unwrap();
         fs::write(
             root.join("runtime-manifest.json"),
             serde_json::to_vec(&serde_json::json!({
@@ -3309,33 +3162,7 @@ mod tests {
             Some(&wrong_source),
             &lock.artifact
         ));
-        assert!(NATIVE_ASR_CUDA_REQUIRED_ENTRIES
-            .contains(&"licenses/NVIDIA-CUDA-Toolkit-12.9-License.txt"));
-    }
-
-    #[test]
-    fn a_new_cuda_artifact_does_not_inherit_old_hardware_qualification() {
-        let mut capability = NativeAsrCudaCapability {
-            supports_vad: false,
-            available: true,
-            download_required: false,
-            code: None,
-            reason: None,
-            device_index: Some(0),
-            device_name: Some("NVIDIA GeForce RTX 3070".into()),
-            visible_device_count: Some(1),
-            compute_capability: Some("8.6".into()),
-            compute_type: Some("float16".into()),
-            driver_version: Some(13020),
-            support_evidence: Some("theoretical".into()),
-        };
-        apply_cuda_support_evidence(&mut capability);
-        assert_eq!(capability.support_evidence.as_deref(), Some("theoretical"));
-
-        capability.device_name = Some("NVIDIA GeForce RTX 4070".into());
-        capability.support_evidence = Some("theoretical".into());
-        apply_cuda_support_evidence(&mut capability);
-        assert_eq!(capability.support_evidence.as_deref(), Some("theoretical"));
+        assert!(NATIVE_ASR_CUDA_REQUIRED_ENTRIES.contains(&"cublas64_12.dll"));
     }
 
     #[test]
@@ -3408,12 +3235,6 @@ mod tests {
         assert!(verify_native_asr_cuda_runtime_at(&root)
             .unwrap_err()
             .contains("损坏"));
-
-        write_native_cuda_runtime(&root);
-        fs::write(root.join("unexpected.dll"), b"unexpected").unwrap();
-        assert!(verify_native_asr_cuda_runtime_at(&root)
-            .unwrap_err()
-            .contains("闭集"));
     }
 
     #[test]

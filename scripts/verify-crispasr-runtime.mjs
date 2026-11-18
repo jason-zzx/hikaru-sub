@@ -103,7 +103,7 @@ export function verifyCrispasrArchive({ root, device = "cpu", extractTo, candida
       try { renameSync(payload, destination); }
       catch (error) { if (existsSync(backup)) renameSync(backup, destination); throw error; }
       rmSync(backup, { recursive: true, force: true });
-      return verifyCrispasrTree(destination, artifact, device);
+      return { runtimeRoot: destination, artifactId: artifact.artifactId };
     }
     return { artifactId: artifact.artifactId, archiveSha256: archive.sha256 };
   } finally { rmSync(temp, { recursive: true, force: true }); }

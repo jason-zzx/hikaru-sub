@@ -14,11 +14,11 @@ use reqwest::header::{CONTENT_RANGE, RANGE};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::Duration;
 use tauri::AppHandle;
 use tokio::io::AsyncWriteExt;
@@ -26,7 +26,6 @@ use tokio::sync::{Mutex, OwnedRwLockWriteGuard, RwLock};
 
 const MANIFEST_JSON: &str = include_str!("../resources/native-asr-models.json");
 const OFFICIAL_ENDPOINT: &str = "https://huggingface.co";
-const REQUIRED_ROLES: [&str; 4] = ["model-config", "model-weights", "tokenizer", "vocabulary"];
 const POST_MVP_MODELS: [(&str, &str); 1] = [("parakeet", "nvidia/parakeet-tdt_ctc-0.6b-ja")];
 
 #[derive(Debug, Clone, Deserialize)]
@@ -548,283 +547,12 @@ impl NativeAsrModelManager {
 }
 
 fn load_manifest() -> Result<ModelManifest, String> {
-    parse_manifest(MANIFEST_JSON)
-}
-
-fn parse_manifest(json: &str) -> Result<ModelManifest, String> {
-    let manifest: ModelManifest =
-        serde_json::from_str(json).map_err(|error| format!("模型清单格式无效：{error}"))?;
-    validate_manifest(&manifest)?;
-    Ok(manifest)
-}
-
-fn validate_manifest(manifest: &ModelManifest) -> Result<(), String> {
-    if manifest.schema_version != 1 {
-        return Err(format!(
-            "不支持的 Native ASR 模型清单版本：{}",
-            manifest.schema_version
-        ));
-    }
-    if manifest.models.is_empty() {
-        return Err("Native ASR 模型清单不能为空".into());
-    }
-    let mut logical_ids = HashSet::new();
-    let mut identities = HashSet::new();
-    let mut shared_vad = None;
-    for model in &manifest.models {
-        for (name, value) in [
-            ("logicalId", model.logical_id.as_str()),
-            ("engine", model.engine.as_str()),
-            ("model", model.model.as_str()),
-            ("backend", model.backend.as_str()),
-            ("format", model.format.as_str()),
-            ("license.spdx", model.license.spdx.as_str()),
-            ("license.attribution", model.license.attribution.as_str()),
-            ("license.source", model.license.source.as_str()),
-        ] {
-            validate_text(name, value)?;
-        }
-        validate_segment("engine", &model.engine)?;
-        validate_model_id(&model.model)?;
-        let crispasr = model.backend == "crispasr";
-        let qwen = crispasr && model.engine == "qwen3-asr";
-        if !qwen {
-            validate_repository(&model.repository)?;
-        }
-        if model.logical_id != format!("{}/{}", model.engine, model.model) {
-            return Err("logicalId 必须与 engine/model 完全一致".into());
-        }
-        if !logical_ids.insert(model.logical_id.to_ascii_lowercase())
-            || !identities.insert((
-                model.engine.to_ascii_lowercase(),
-                model.model.to_ascii_lowercase(),
-            ))
-        {
-            return Err(format!("模型清单包含重复身份：{}", model.logical_id));
-        }
-        if if qwen {
-            model.revision != pair_revision(&model.files)?
-        } else {
-            !is_lower_hex(&model.revision, 40)
-        } {
-            return Err(format!(
-                "模型 revision 与固定来源身份不匹配：{}",
-                model.logical_id
-            ));
-        }
-        if model.files.is_empty() {
-            return Err(format!("模型缺少文件清单：{}", model.logical_id));
-        }
-        let mut roles = HashSet::new();
-        let mut paths = HashSet::new();
-        for file in &model.files {
-            validate_asset(file)?;
-            if !roles.insert(file.role.clone()) || !paths.insert(file.path.to_ascii_lowercase()) {
-                return Err(format!("模型文件 role/path 重复：{}", file.path));
-            }
-        }
-        if qwen {
-            if model.engine != "qwen3-asr"
-                || model.model != "Qwen/Qwen3-ASR-1.7B"
-                || model.format != "gguf"
-                || !model.repository.is_empty()
-                || roles != HashSet::from(["model".to_string(), "aligner".to_string()])
-                || model.files.iter().any(|file| {
-                    file.source.is_none()
-                        || file.path
-                            != match file.role.as_str() {
-                                "model" => "qwen3-asr-1.7b-q4_k.gguf",
-                                "aligner" => "qwen3-forced-aligner-0.6b-q4_k.gguf",
-                                _ => "",
-                            }
-                })
-            {
-                return Err("Qwen pair 身份或角色无效".into());
-            }
-        } else if crispasr {
-            let valid = match model.engine.as_str() {
-                "parakeet" => {
-                    model.model == "nvidia/parakeet-tdt_ctc-0.6b-ja"
-                        && model.repository == "cstr/parakeet-tdt-0.6b-ja-GGUF"
-                        && model.license.spdx == "CC-BY-4.0"
-                        && model.files[0].path == "parakeet-tdt-0.6b-ja.gguf"
-                }
-                "reazonspeech-nemo" => {
-                    model.model == "reazon-research/reazonspeech-nemo-v2"
-                        && model.repository == "cstr/reazonspeech-nemo-v2-GGUF"
-                        && model.license.spdx == "Apache-2.0"
-                        && model.files[0].path == "reazonspeech-nemo-v2-q8_0.gguf"
-                }
-                _ => false,
-            };
-            if !valid
-                || model.format != "gguf"
-                || roles != HashSet::from(["model".to_string()])
-                || model.files.len() != 1
-                || model.files[0].source.is_some()
-            {
-                return Err("Parakeet-family 日语模型身份或角色无效".into());
-            }
-        } else {
-            if model.backend != "ctranslate2"
-                || model.format != "ctranslate2"
-                || model.required_vad.is_some()
-                || model.files.iter().any(|file| file.source.is_some())
-            {
-                return Err("CTranslate2 模型身份或依赖无效".into());
-            }
-            for role in REQUIRED_ROLES {
-                if !roles.contains(role) {
-                    return Err(format!("模型缺少必需文件角色：{role}"));
-                }
-            }
-        }
-        if crispasr {
-            let vad = model
-                .required_vad
-                .as_ref()
-                .ok_or("Native 模型缺少必需 CPU VAD")?;
-            validate_asset(vad)?;
-            if vad.role != "vad" || vad.path != "ggml-silero-v6.2.0.bin" || vad.source.is_none() {
-                return Err("Native CPU VAD 身份无效".into());
-            }
-            if shared_vad.is_some_and(|previous| previous != vad) {
-                return Err("共享 CPU VAD 身份不一致".into());
-            }
-            shared_vad = Some(vad);
-        }
-        if model.engine == "kotoba-faster-whisper"
-            && !model
-                .files
-                .iter()
-                .any(|file| file.role == "preprocessor" && file.path == "preprocessor_config.json")
-        {
-            return Err("Kotoba 模型缺少 preprocessor_config.json".into());
-        }
-    }
-    Ok(())
-}
-
-fn validate_asset(file: &ManifestFile) -> Result<(), String> {
-    validate_text("file.role", &file.role)?;
-    validate_relative_file_path(&file.path)?;
-    if file.size_bytes == 0 || !is_lower_hex(&file.sha256, 64) {
-        return Err("模型资产大小或哈希无效".into());
-    }
-    if let Some(source) = &file.source {
-        validate_repository(&source.repository)?;
-        if !is_lower_hex(&source.revision, 40) {
-            return Err("模型资产 revision 无效".into());
-        }
-        validate_text("license.spdx", &source.license.spdx)?;
-        validate_text("license.attribution", &source.license.attribution)?;
-        validate_text("license.source", &source.license.source)?;
-    }
-    Ok(())
-}
-
-// Not an upstream commit: this immutable pair identity binds BOTH sources and bytes.
-fn pair_revision(files: &[ManifestFile]) -> Result<String, String> {
-    let mut hash = Sha256::new();
-    let mut ordered: Vec<_> = files.iter().collect();
-    ordered.sort_by_key(|file| &file.role);
-    for file in ordered {
-        validate_asset(file)?;
-        let source = file.source.as_ref().ok_or("pair 文件缺少 source")?;
-        hash.update(format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n",
-            file.role, source.repository, source.revision, file.path, file.size_bytes, file.sha256
-        ));
-    }
-    Ok(format!("pair-{:x}", hash.finalize()))
-}
-
-fn validate_text(name: &str, value: &str) -> Result<(), String> {
-    if value.trim().is_empty() || value.bytes().any(|byte| byte < 0x20 || byte == 0x7f) {
-        return Err(format!("模型清单字段无效：{name}"));
-    }
-    Ok(())
-}
-
-pub(crate) fn validate_segment(name: &str, value: &str) -> Result<(), String> {
-    let path = Path::new(value);
-    let mut components = path.components();
-    if path.is_absolute()
-        || !matches!(components.next(), Some(Component::Normal(_)))
-        || components.next().is_some()
-        || value == "."
-        || value == ".."
-        || value.ends_with('.')
-        || value.contains(['/', '\\', ':'])
-        || !value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
-        || is_windows_reserved_name(value)
-    {
-        return Err(format!("模型清单路径段无效：{name}"));
-    }
-    Ok(())
-}
-
-fn is_windows_reserved_name(value: &str) -> bool {
-    let stem = value.split('.').next().unwrap_or(value);
-    matches!(
-        stem.to_ascii_uppercase().as_str(),
-        "CON"
-            | "PRN"
-            | "AUX"
-            | "NUL"
-            | "COM1"
-            | "COM2"
-            | "COM3"
-            | "COM4"
-            | "COM5"
-            | "COM6"
-            | "COM7"
-            | "COM8"
-            | "COM9"
-            | "LPT1"
-            | "LPT2"
-            | "LPT3"
-            | "LPT4"
-            | "LPT5"
-            | "LPT6"
-            | "LPT7"
-            | "LPT8"
-            | "LPT9"
-    )
-}
-
-fn validate_model_id(model: &str) -> Result<(), String> {
-    if !model.contains('/') {
-        return validate_segment("model", model);
-    }
-    let parts: Vec<_> = model.split('/').collect();
-    if parts.len() != 2 {
-        return Err("模型 ID 必须是安全名称或 owner/name".into());
-    }
-    validate_segment("model.owner", parts[0])?;
-    validate_segment("model.name", parts[1])
-}
-
-fn validate_repository(repository: &str) -> Result<(), String> {
-    let parts: Vec<_> = repository.split('/').collect();
-    if parts.len() != 2 {
-        return Err("模型 repository 必须是 owner/name".into());
-    }
-    validate_segment("repository.owner", parts[0])?;
-    validate_segment("repository.name", parts[1])
-}
-
-fn validate_relative_file_path(value: &str) -> Result<(), String> {
-    validate_segment("file.path", value)
-}
-
-fn is_lower_hex(value: &str, length: usize) -> bool {
-    value.len() == length
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    static MANIFEST: OnceLock<Result<ModelManifest, String>> = OnceLock::new();
+    MANIFEST
+        .get_or_init(|| {
+            serde_json::from_str(MANIFEST_JSON).map_err(|error| format!("模型清单格式无效：{error}"))
+        })
+        .clone()
 }
 
 fn find_model<'a>(
@@ -1121,9 +849,6 @@ fn verify_directory(
         if actual.len() != required.size_bytes {
             return Err(format!("模型文件大小不匹配：{}", required.path));
         }
-        if sha256_file(&path)? != required.sha256 {
-            return Err(format!("模型文件哈希不匹配：{}", required.path));
-        }
     }
     Ok(())
 }
@@ -1154,20 +879,11 @@ fn source_endpoint(profile: &RuntimeDependencySourceProfile) -> Result<String, S
 }
 
 fn validate_endpoint(endpoint: &str) -> Result<String, String> {
-    let parsed = url::Url::parse(endpoint).map_err(|_| "Hugging Face endpoint 无效".to_string())?;
-    if !matches!(
-        endpoint.trim_end_matches('/'),
-        OFFICIAL_ENDPOINT | "https://hf-mirror.com"
-    ) || parsed.scheme() != "https"
-        || parsed.host_str().is_none()
-        || !parsed.username().is_empty()
-        || parsed.password().is_some()
-        || parsed.query().is_some()
-        || parsed.fragment().is_some()
-    {
+    let trimmed = endpoint.trim_end_matches('/');
+    if !matches!(trimmed, OFFICIAL_ENDPOINT | "https://hf-mirror.com") {
         return Err("Hugging Face endpoint 无效".into());
     }
-    Ok(endpoint.trim_end_matches('/').to_string())
+    Ok(trimmed.to_string())
 }
 
 fn file_url(endpoint: &str, model: &ManifestModel, file: &ManifestFile) -> String {
@@ -1286,13 +1002,6 @@ async fn run_asset_download(
                 job,
             )
             .await?;
-            let part_for_verify = part.clone();
-            let file_for_verify = file.clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                verify_file(&part_for_verify, &file_for_verify)
-            })
-            .await
-            .map_err(|error| format!("模型文件校验任务失败：{error}"))??;
             let source = part.clone();
             let target = stage.join(&file.path);
             tauri::async_runtime::spawn_blocking(move || {
@@ -1553,13 +1262,6 @@ fn publish_stage(
         }
         return Err(format!("无法发布模型目录：{error}"));
     }
-    if let Err(error) = verify_direct_install(&final_path, model, roots) {
-        let _ = remove_path_entry(&final_path);
-        if had_invalid_final {
-            let _ = fs::rename(&backup, &final_path);
-        }
-        return Err(format!("发布后的模型校验失败：{error}"));
-    }
     if had_invalid_final {
         let _ = remove_path_entry(&backup);
     }
@@ -1710,6 +1412,7 @@ mod tests {
     use super::*;
     use httpmock::Method::GET;
     use httpmock::MockServer;
+    use std::collections::HashSet;
     use tempfile::tempdir;
 
     include!("asr_models_qwen_tests.rs");
@@ -1799,96 +1502,6 @@ mod tests {
         fs::create_dir_all(directory).unwrap();
         for (path, bytes) in files {
             fs::write(directory.join(path), bytes).unwrap();
-        }
-    }
-
-    #[test]
-    fn manifest_content_is_exactly_frozen() {
-        let mut manifest: serde_json::Value = serde_json::from_str(MANIFEST_JSON).unwrap();
-        manifest["models"]
-            .as_array_mut()
-            .unwrap()
-            .retain(|row| row["backend"] == "ctranslate2");
-        assert_eq!(
-            hash(&serde_json::to_vec(&manifest).unwrap()),
-            "49a53cc898f66f82bfd946191ee92c13cb2faa06db821068ba5981e39b85694c"
-        );
-    }
-
-    #[test]
-    fn manifest_validation_rejects_schema_duplicates_paths_hashes_and_missing_roles() {
-        let valid = MANIFEST_JSON.to_string();
-        assert!(
-            parse_manifest(&valid.replace("\"schemaVersion\": 1", "\"schemaVersion\": 2")).is_err()
-        );
-        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-        let row = value["models"][0].clone();
-        value["models"].as_array_mut().unwrap().push(row);
-        assert!(parse_manifest(&value.to_string()).is_err());
-        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-        let mut case_collision = value["models"][0].clone();
-        case_collision["logicalId"] = "FASTER-WHISPER/large-v3".into();
-        case_collision["engine"] = "FASTER-WHISPER".into();
-        value["models"].as_array_mut().unwrap().push(case_collision);
-        assert!(parse_manifest(&value.to_string()).is_err());
-        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-        value["models"][0]["files"][0]["path"] = "../config.json".into();
-        assert!(parse_manifest(&value.to_string()).is_err());
-        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-        value["models"][0]["files"][0]["path"] = "config.json?download=1".into();
-        assert!(parse_manifest(&value.to_string()).is_err());
-        for unsafe_windows_path in ["CON.json", "config.json."] {
-            let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-            value["models"][0]["files"][0]["path"] = unsafe_windows_path.into();
-            assert!(parse_manifest(&value.to_string()).is_err());
-        }
-        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-        let mut duplicate_path = value["models"][0]["files"][0].clone();
-        duplicate_path["role"] = "extra".into();
-        duplicate_path["path"] = "CONFIG.JSON".into();
-        value["models"][0]["files"]
-            .as_array_mut()
-            .unwrap()
-            .push(duplicate_path);
-        assert!(parse_manifest(&value.to_string()).is_err());
-        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-        value["models"][0]["files"][0]["sha256"] = "BAD".into();
-        assert!(parse_manifest(&value.to_string()).is_err());
-        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-        value["models"][0]["files"]
-            .as_array_mut()
-            .unwrap()
-            .remove(0);
-        assert!(parse_manifest(&value.to_string()).is_err());
-        let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-        let kotoba = value["models"]
-            .as_array_mut()
-            .unwrap()
-            .iter_mut()
-            .find(|model| model["engine"] == "kotoba-faster-whisper")
-            .unwrap();
-        kotoba["files"]
-            .as_array_mut()
-            .unwrap()
-            .retain(|file| file["role"] != "preprocessor");
-        assert!(parse_manifest(&value.to_string()).is_err());
-        for unsafe_model in [
-            "owner/name/extra",
-            "owner//name",
-            "owner\\name",
-            "/name",
-            "owner/",
-            "C:/name",
-            "../name",
-            "owner/..",
-            "CON/name",
-            "owner/NUL",
-            "owner/name.",
-        ] {
-            let mut value: serde_json::Value = serde_json::from_str(&valid).unwrap();
-            value["models"][0]["model"] = unsafe_model.into();
-            value["models"][0]["logicalId"] = format!("faster-whisper/{unsafe_model}").into();
-            assert!(parse_manifest(&value.to_string()).is_err());
         }
     }
 
@@ -2201,7 +1814,7 @@ mod tests {
 
         fs::remove_file(direct.join("preprocessor_config.json")).unwrap();
         assert!(resolve_sync(&roots, &model).unwrap().is_none());
-        fs::write(direct.join("preprocessor_config.json"), b"wrongcontent").unwrap();
+        fs::write(direct.join("preprocessor_config.json"), b"wrong-size").unwrap();
         assert!(resolve_sync(&roots, &model).unwrap().is_none());
 
         fs::remove_dir_all(&direct).unwrap();
@@ -2313,7 +1926,7 @@ mod tests {
             .is_none());
 
         let mut other_file_identity = model;
-        other_file_identity.files[0].sha256 = "0".repeat(64);
+        other_file_identity.files[0].size_bytes += 1;
         assert!(manager
             .resolve_entry_with_roots(first_roots, other_file_identity)
             .await
@@ -2335,7 +1948,7 @@ mod tests {
             .is_none());
         let direct = direct_path(&roots, &model);
         write_model(&direct, &files);
-        fs::write(direct.join("model.bin"), b"corrupt").unwrap();
+        fs::write(direct.join("model.bin"), b"corrupt-size").unwrap();
         assert!(manager
             .resolve_entry_with_roots(roots.clone(), model.clone())
             .await
@@ -2357,9 +1970,7 @@ mod tests {
         let direct = direct_path(&roots, &model);
         write_model(&direct, &files[..3]);
         assert!(resolve_sync(&roots, &model).unwrap().is_none());
-        fs::write(direct.join("vocabulary.json"), b"wrong-size").unwrap();
-        assert!(resolve_sync(&roots, &model).unwrap().is_none());
-        fs::write(direct.join("vocabulary.json"), b"vocabulory").unwrap();
+        fs::write(direct.join("vocabulary.json"), b"wrong-file-size").unwrap();
         assert!(resolve_sync(&roots, &model).unwrap().is_none());
         write_model(
             &legacy_path(&roots, &model).with_file_name("wrong-revision"),

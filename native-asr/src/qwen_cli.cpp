@@ -84,8 +84,8 @@ std::vector<Segment> parse_result(const std::string& bytes, std::int64_t duratio
     // Unchanged final protocol shape/time/order/aggregate and UTF-8 checks.
     EventSequenceState state;
     state.ready = true; state.duration_ms = duration_ms;
-    ProtocolError error; std::string line;
-    require(validate_event(state, event, error) && serialize_event(event, line, error));
+    ProtocolError error;
+    require(validate_event(state, event, error));
     return std::move(event.segments);
   } catch (const std::exception&) { throw Error("qwen_cli_output_invalid"); }
 }

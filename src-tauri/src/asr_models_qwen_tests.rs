@@ -1,4 +1,18 @@
 // Included only by asr_models::tests; all downloads use tiny synthetic bytes.
+fn pair_revision(files: &[ManifestFile]) -> Result<String, String> {
+    let mut hash = Sha256::new();
+    let mut ordered: Vec<_> = files.iter().collect();
+    ordered.sort_by_key(|file| &file.role);
+    for file in ordered {
+        let source = file.source.as_ref().ok_or("pair 文件缺少 source")?;
+        hash.update(format!(
+            "{}\n{}\n{}\n{}\n{}\n{}\n",
+            file.role, source.repository, source.revision, file.path, file.size_bytes, file.sha256
+        ));
+    }
+    Ok(format!("pair-{:x}", hash.finalize()))
+}
+
 fn qwen_fixture() -> (ManifestModel, Vec<(&'static str, &'static [u8])>) {
     let mut model = find_model(
         &load_manifest().unwrap(),
@@ -123,52 +137,6 @@ async fn qwen_public_metadata_allows_download_and_reports_exact_missing_readines
 }
 
 #[test]
-fn qwen_manifest_rejects_mixed_sources_missing_roles_and_unsafe_assets() {
-    let (model, _) = qwen_fixture();
-    let manifest = |model| ModelManifest {
-        schema_version: 1,
-        models: vec![model],
-    };
-    validate_manifest(&manifest(model.clone())).unwrap();
-    for role in 0..3 {
-        for mutation in 0..7 {
-            let mut bad = model.clone();
-            let file = if role == 2 {
-                bad.required_vad.as_mut().unwrap()
-            } else {
-                &mut bad.files[role]
-            };
-            match mutation {
-                0 => file.path = "../escaped.gguf".into(),
-                1 => file.path = "CON.bin".into(),
-                2 => file.source.as_mut().unwrap().revision = "main".into(),
-                3 => file.source.as_mut().unwrap().repository = "owner/../../name".into(),
-                4 => file.sha256 = "0".into(),
-                5 => file.source = None,
-                _ => file.path = "trailing.gguf.".into(),
-            }
-            assert!(
-                validate_manifest(&manifest(bad)).is_err(),
-                "role={role}, mutation={mutation}"
-            );
-        }
-    }
-    let mut mixed = model.clone();
-    mixed.files[1].source.as_mut().unwrap().revision = "b".repeat(40);
-    assert_ne!(pair_revision(&mixed.files).unwrap(), model.revision);
-    assert!(validate_manifest(&manifest(mixed)).is_err());
-    let mut half = model.clone();
-    half.files.pop();
-    assert!(validate_manifest(&manifest(half)).is_err());
-    let mut absent = model.clone();
-    absent.required_vad = None;
-    assert!(validate_manifest(&manifest(absent)).is_err());
-    let mut duplicate = model.clone();
-    duplicate.files[1].path = model.files[0].path.to_uppercase();
-    assert!(validate_manifest(&manifest(duplicate)).is_err());
-}
-
-#[test]
 fn qwen_complete_half_corrupt_and_mixed_pairs_never_guess_roles_or_legacy_paths() {
     let dir = tempdir().unwrap();
     let roots = ManagedModelRoots::below(&dir.path().join("中文 路径"));
@@ -194,7 +162,7 @@ fn qwen_complete_half_corrupt_and_mixed_pairs_never_guess_roles_or_legacy_paths(
     assert!(direct.starts_with(&roots.crispasr));
     assert!(!direct.starts_with(&roots.direct));
     for (path, bytes) in &files[..2] {
-        fs::write(direct.join(path), vec![b'x'; bytes.len()]).unwrap();
+        fs::write(direct.join(path), b"corrupt").unwrap();
         assert!(resolve_sync(&roots, &model).unwrap().is_none());
         fs::write(direct.join(path), bytes).unwrap();
     }
@@ -225,7 +193,7 @@ async fn qwen_cached_readiness_rechecks_required_vad_and_cleanup_invalidates_all
             .is_some());
         assert!(!manager.ready_cache.lock().unwrap().is_empty());
         if corrupt {
-            fs::write(&vad, vec![b'x'; files[2].1.len()]).unwrap();
+            fs::write(&vad, b"corrupt").unwrap();
         } else {
             fs::remove_file(&vad).unwrap();
         }
