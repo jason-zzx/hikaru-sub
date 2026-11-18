@@ -1549,7 +1549,12 @@ fn extract_archive(
                 powershell_quote(source),
                 powershell_quote(target)
             );
-            let status = hidden_command("powershell")
+            let mut cmd = hidden_command("powershell");
+            // Windows PowerShell 5.1 inherits PSModulePath from a parent pwsh 7
+            // shell and loads Microsoft.PowerShell.Archive 1.2.7, which calls
+            // a 3-arg ZipFileExtensions.ExtractToDirectory overload absent in .NET 4.x.
+            cmd.env_remove("PSModulePath");
+            let status = cmd
                 .args([
                     "-NoProfile",
                     "-ExecutionPolicy",

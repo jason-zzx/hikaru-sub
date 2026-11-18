@@ -263,6 +263,7 @@ mod tests {
         fs::rename(runtime_root(&resources, &deps, "cuda").unwrap(), &payload).unwrap();
         let archive = temp.path().join("fixture.zip");
         assert!(hidden_command("powershell")
+            .env_remove("PSModulePath")
             .args([
                 "-NoProfile",
                 "-Command",
