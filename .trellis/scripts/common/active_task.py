@@ -523,24 +523,6 @@ def resolve_context_key(
     scripts and subprocesses. It does not store the task itself.
     """
     if allow_environment_context:
-        # The optional dsh-trellis plugin contributes this managed value for the
-        # current DSH shell execution. It may intentionally forward a child
-        # identity different from the shell's own DSH_SESSION_ID, so it wins.
-        dsh_override = _string_value(os.environ.get("DSH_TRELLIS_CONTEXT_ID"))
-        if dsh_override:
-            return _sanitize_key(dsh_override) or _hash_value(dsh_override)
-
-        # A DSH-managed shell rebuilds the DSH_* namespace. The paired sentinel
-        # and session id therefore identify the inner DSH session more reliably
-        # than a generic TRELLIS_CONTEXT_ID inherited from an outer host.
-        if (
-            _string_value(os.environ.get("DSH_SHELL")) == "1"
-            and _string_value(os.environ.get("DSH_SESSION_ID"))
-        ):
-            dsh_context_key = _lookup_env_context_key("dsh")
-            if dsh_context_key:
-                return dsh_context_key
-
         override = _string_value(os.environ.get("TRELLIS_CONTEXT_ID"))
         if override:
             return _sanitize_key(override) or _hash_value(override)
@@ -666,17 +648,15 @@ def resolve_active_task(
     platform_input: dict[str, Any] | None = None,
     platform: str | None = None,
     *,
-    allow_single_session_fallback: bool = True,
+    allow_single_session_fallback: bool = False,
     allow_environment_context: bool = True,
 ) -> ActiveTask:
     """Resolve the active task from session runtime state only.
 
     A stale session task is returned as stale. Missing context identity or a
-    missing/empty session context falls back to single-session inference: if
-    exactly one session file exists in the runtime, return its task with
-    source_type="session-fallback" — covers pull-based platform sub-agents
-    (copilot, gemini, qoder) that don't inherit the parent's session id. ≥2
-    files or 0 files yield ActiveTask(None) — refuses to guess across windows.
+    Missing or unmatched session identity does not infer ownership from the
+    number of session files. Pull-based child-agent callers that cannot inherit
+    a parent identity must opt into the compatibility fallback explicitly.
     """
     context_key = resolve_context_key(
         platform_input,

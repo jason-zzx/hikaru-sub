@@ -43,7 +43,7 @@ From Step 1 you know the current task and status. Check the task directory:
 
 - **Active task status `planning` + no `prd.md`** → Phase 1.1. Load the `trellis-brainstorm` skill.
 - **Active task status `planning` + `prd.md` exists** → stay in Phase 1. Lightweight tasks can be PRD-only; complex tasks need `design.md` + `implement.md`. Load the relevant Phase 1 step detail before `task.py start`.
-- **Active task status `in_progress`** → Phase 2. Load the next step detail; it will route implementation/check work through DSH's native `subagent` tool and the child-only `trellis-agent-*` role skills:
+- **Active task status `in_progress`** → Phase 2 step 2.1. Load the step detail:
   ```bash
   python ./.trellis/scripts/get_context.py --mode phase --step 2.1 --platform dsh
   ```
@@ -56,8 +56,8 @@ From Step 1 you know the current task and status. Check the task directory:
 | User intent | Skill |
 |---|---|
 | New feature / unclear requirements | `trellis-brainstorm` |
-| Active task implementation | dispatch a child that loads `trellis-agent-implement` |
-| Done coding / quality check | dispatch a child that loads `trellis-agent-check` |
+| About to write code | `trellis-before-dev` |
+| Done coding / quality check | `trellis-check` |
 | Stuck / fixed same bug multiple times | `trellis-break-loop` |
 | Learned something worth capturing | `trellis-update-spec` |
 

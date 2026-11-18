@@ -19,7 +19,7 @@ This page lists common Trellis file locations in a user project by platform. Whe
 | CodeBuddy | `--codebuddy` | `.codebuddy/` | `.codebuddy/skills/` | `.codebuddy/agents/` | `.codebuddy/hooks/` + `.codebuddy/settings.json` |
 | GitHub Copilot | `--copilot` | `.github/` | `.github/skills/` | `.github/agents/` | `.github/copilot/hooks/` + prompts |
 | Factory Droid | `--droid` | `.factory/` | `.factory/skills/` | `.factory/droids/` | `.factory/hooks/` + settings |
-| DeepSeek Harness (dsh) | `--dsh` | `.dsh/` | `.agents/skills/` (shared) + `.dsh/skills/` (entry + child-only role skills) | No declarative agent directory — `trellis-agent-{research,implement,check}` skills are loaded by native `subagent` children | None (class-2 pull-based; optional companion plugin adds workflow breadcrumbs and `trellis_wait`) |
+| DeepSeek Harness (dsh) | `--dsh` | `.dsh/` | `.agents/skills/` (shared) + `.dsh/skills/` (entry skills) | None (workflow skills run implement/check inline) | None (class-2 pull-based; no project hooks/settings) |
 | Pi Agent | `--pi` | `.pi/` | `.agents/skills/` | `.pi/agents/` | `.pi/extensions/trellis/` (native `trellis_subagent` tool) + `.pi/settings.json` |
 | Trae IDE | `--trae` | `.trae/` | `.trae/skills/` | `.trae/agents/` | `.trae/hooks/` + `.trae/hooks.json` |
 | Reasonix | `--reasonix` | `.reasonix/` | `.reasonix/skills/` | None — sub-agents are skills with `runAs: subagent` frontmatter | None |
@@ -51,9 +51,8 @@ These platforms usually have `trellis-research`, `trellis-implement`, and `trell
 - Grok Build (`.grok/agents/`; dispatch via `spawn_subagent` with `subagent_type`)
 - Kimi Code (`.kimi-code/agents/`; the same prompts are also delivered as skills under `.kimi-code/skills/`)
 - Snow CLI (`.snow/agents/`; auto-discovered project agents + class-1 hooks)
-- DeepSeek Harness (`.dsh/skills/trellis-agent-{research,implement,check}/`; native `subagent` children load the matching child-only role skill)
 
-When changing implementation/check/research behavior, look for the corresponding platform agent or role-skill files first.
+When changing implementation/check/research behavior, look for the corresponding platform agent files first.
 
 ### Native Trellis Sub-Agent Tool
 
