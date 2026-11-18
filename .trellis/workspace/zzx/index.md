@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 41
-- **Last Active**: 2026-10-07
+- **Total Sessions**: 42
+- **Last Active**: 2026-11-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1398 | Active |
+| `journal-1.md` | ~1434 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 42 | 2026-11-18 | Optimize HLS download throughput and progress UX | `f8473e7` | `main` |
 | 41 | 2026-10-07 | Native ASR optional VAD migration | `d35375b` | `dev-crisp-asr` |
 | 40 | 2026-09-28 | Native ASR safeguard cleanup and runtime delivery | `6489cb5`, `1daf86b` | `dev-crisp-asr` |
 | 39 | 2026-09-23 | Completed Native ReazonSpeech productization | `bded0da` | `dev-crisp-asr` |

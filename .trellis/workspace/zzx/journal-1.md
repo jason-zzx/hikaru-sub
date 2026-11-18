@@ -1396,3 +1396,39 @@ Completed four approved safeguard-cleanup batches, preserving model/runtime inte
 ### Status
 
 [OK] **Completed**
+
+
+## Session 42: Optimize HLS download throughput and progress UX
+<!-- trellis-session: v=2 fp=0a3d7f8629284e6c -->
+
+**Date**: 2026-11-18
+**Task**: Optimize HLS download throughput and progress UX
+**Branch**: `main`
+
+### Summary
+
+Eliminated HTTP/2 single-connection bottleneck, unbuffered per-chunk disk writes, blocking pre-download probe, and narrow playlist rejections in HLS downloads; added real-time transfer speed, merging phase status, 0% failure card display, and high-contrast progress UI; simplified downloader code via ponytail-review.
+
+### Main Changes
+
+- Switched HLS client to HTTP/1.1 connection pooling (24-48 auto concurrency) with HTTP/2 protocol fallback and concurrent key prefetching
+- Replaced custom SpillWriter with in-memory buffering (<= 32 MiB) plus tokio::io::BufWriter spill path and single-spawn_blocking epoch assembly
+- Added external audio rendition selection, discontinuity/multi-MAP epoch tracking, KEY METHOD=NONE parsing, and shared download_hls_pair_with_client fan-out
+- Deferred remote probing in start_video_download, surfaced DownloadPhase (preparing/downloading/merging) and EMA speedBytesPerSec, fixed 0% failure UI, improved contrast, and hid progress card on completion
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f8473e7` | feat(download): Optimize HLS download throughput and progress UX |
+
+### Testing
+
+- [OK] cargo check --manifest-path src-tauri/Cargo.toml --all-targets: passed (0 warnings)
+- [OK] cargo test --manifest-path src-tauri/Cargo.toml --lib hls_: 41 passed, 0 failed
+- [OK] cargo test --manifest-path src-tauri/Cargo.toml --lib download::tests: 24 passed, 0 failed
+- [OK] pnpm test: 116 test files, 951 tests passed; pnpm build: passed
+
+### Status
+
+[OK] **Completed**
