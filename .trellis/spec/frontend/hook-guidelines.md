@@ -8,6 +8,7 @@ Long-running Tauri jobs that must finish even if the user navigates away are pol
 |------|-------|----------------|
 | `useClipJobPoller` | `clipStore` | Clip completion unlocks navigation / may `setSession`; leaving ImportView must not strand busy state |
 | `useBurnJobPoller` | `burnStore` | Same pattern for burn jobs |
+| `useDownloadJobPoller` | `downloadStore` | Keep download polling, status-bar updates, and completion/failure views alive across page switches |
 
 Reference: `src/hooks/useClipJobPoller.ts`, mounted in `AppLayout`.
 

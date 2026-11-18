@@ -1,9 +1,10 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { message } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskStore } from "../../stores/taskStore";
+import { useDownloadStore } from "../../stores/downloadStore";
 import {
   cancelVideoDownload,
   checkFfmpeg,
@@ -13,11 +14,7 @@ import {
   prepareVideoSession,
   startVideoDownload,
 } from "../../services/tauri";
-import type {
-  DownloadMode,
-  DownloadSnapshot,
-  FfmpegStatus,
-} from "../../types";
+import type { FfmpegStatus } from "../../types";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import {
@@ -28,7 +25,6 @@ import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 import { Button } from "../ui/button";
 import { formatTransferSpeed } from "../../constants/runtimeDependencies";
 
-const POLL_INTERVAL_MS = 700;
 const INPUT_CLASS =
   "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
@@ -53,20 +49,25 @@ export function DownloadView() {
 
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
-  const [mode, setMode] = useState<DownloadMode>("single");
-  const [name, setName] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [audioUrl, setAudioUrl] = useState("");
-  const [headers, setHeaders] = useState("");
-  const [saveDir, setSaveDir] = useState("");
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [snapshot, setSnapshot] = useState<DownloadSnapshot | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [completedPath, setCompletedPath] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const {
+    mode,
+    name,
+    videoUrl,
+    audioUrl,
+    headers,
+    saveDir,
+    jobId,
+    snapshot,
+    error,
+    completedPath,
+    busy,
+    setForm,
+    startJob,
+    applySnapshot,
+    setError,
+    finishJob,
+  } = useDownloadStore();
   const [importing, setImporting] = useState(false);
-
-  const pollingRef = useRef(false);
 
   const refreshFfmpeg = async (force = false) => {
     if (force) invalidateFfmpegStatus();
@@ -79,12 +80,6 @@ export function DownloadView() {
     refreshFfmpeg().catch(() => setFfmpeg(null));
   }, []);
 
-  useEffect(() => {
-    return () => {
-      pollingRef.current = false;
-    };
-  }, []);
-
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
   const separateMode = mode === "separate";
   const canStart =
@@ -94,62 +89,17 @@ export function DownloadView() {
     !busy &&
     !jobId;
 
-  const pollProgress = async (id: string) => {
-    pollingRef.current = true;
-    while (pollingRef.current) {
-      try {
-        const snap = await getVideoDownloadProgress(id);
-        setSnapshot(snap);
-        if (snap.progress !== null) {
-          updateTask("video-download", {
-            progress: Math.round(snap.progress * 100),
-          });
-        }
-        if (
-          snap.status === "completed" ||
-          snap.status === "failed" ||
-          snap.status === "cancelled"
-        ) {
-          pollingRef.current = false;
-          setBusy(false);
-          setJobId(null);
-          if (snap.status === "completed" && snap.outputPath) {
-            setCompletedPath(snap.outputPath);
-            updateTask("video-download", { status: "success", progress: 100 });
-          } else if (snap.status === "failed") {
-            setError(snap.error ?? "下载失败");
-            updateTask("video-download", { status: "error" });
-          } else {
-            updateTask("video-download", { status: "idle" });
-          }
-          break;
-        }
-      } catch (e) {
-        setError(String(e));
-        pollingRef.current = false;
-        setBusy(false);
-        setJobId(null);
-        updateTask("video-download", { status: "error" });
-        break;
-      }
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    }
-  };
-
   const handlePickSaveDir = async () => {
     try {
       const dir = await pickDirectory();
-      if (dir) setSaveDir(dir);
+      if (dir) setForm({ saveDir: dir });
     } catch (e) {
       setError(`无法选择目录：${String(e)}`);
     }
   };
 
   const runStart = async () => {
-    setError(null);
-    setCompletedPath(null);
-    setSnapshot(null);
-    setBusy(true);
+    startJob();
     upsertTask({
       id: "video-download",
       label: "视频下载",
@@ -165,11 +115,10 @@ export function DownloadView() {
         headers: headers.trim() || null,
         saveDir: saveDir.trim() || null,
       });
-      setJobId(id);
-      void pollProgress(id);
+      startJob(id);
     } catch (e) {
       setError(String(e));
-      setBusy(false);
+      finishJob();
       updateTask("video-download", { status: "error" });
     }
   };
@@ -187,16 +136,14 @@ export function DownloadView() {
 
   const handleCancel = async () => {
     if (!jobId) return;
-    pollingRef.current = false;
     try {
       await cancelVideoDownload(jobId);
       const snap = await getVideoDownloadProgress(jobId);
-      setSnapshot(snap);
+      applySnapshot(snap);
     } catch (e) {
       setError(String(e));
     } finally {
-      setJobId(null);
-      setBusy(false);
+      finishJob();
       updateTask("video-download", { status: "idle" });
     }
   };
@@ -302,13 +249,13 @@ export function DownloadView() {
         <div className="flex flex-wrap gap-3">
           <ModeButton
             active={mode === "single"}
-            onClick={() => setMode("single")}
+            onClick={() => setForm({ mode: "single" })}
             label="单 URL"
             desc="音视频合一或纯音频 m3u8"
           />
           <ModeButton
             active={mode === "separate"}
-            onClick={() => setMode("separate")}
+            onClick={() => setForm({ mode: "separate" })}
             label="分离音视频"
             desc="并发分片下载，完成后合并"
           />
@@ -322,7 +269,7 @@ export function DownloadView() {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setForm({ name: e.target.value })}
               placeholder="例如 episode-01"
               className={INPUT_CLASS}
               disabled={busy}
@@ -334,7 +281,7 @@ export function DownloadView() {
             <input
               type="url"
               value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
+              onChange={(e) => setForm({ videoUrl: e.target.value })}
               placeholder="https://example.com/video.m3u8"
               className={INPUT_CLASS}
               disabled={busy}
@@ -345,7 +292,7 @@ export function DownloadView() {
               <input
                 type="url"
                 value={audioUrl}
-                onChange={(e) => setAudioUrl(e.target.value)}
+                onChange={(e) => setForm({ audioUrl: e.target.value })}
                 placeholder="https://example.com/audio.m3u8"
                 className={INPUT_CLASS}
                 disabled={busy}
@@ -355,7 +302,7 @@ export function DownloadView() {
           <Field label="自定义请求头（可选）">
             <textarea
               value={headers}
-              onChange={(e) => setHeaders(e.target.value)}
+              onChange={(e) => setForm({ headers: e.target.value })}
               placeholder={"Referer: https://example.com\nUser-Agent: ..."}
               rows={3}
               className={INPUT_CLASS}
@@ -370,7 +317,7 @@ export function DownloadView() {
               <input
                 type="text"
                 value={saveDir}
-                onChange={(e) => setSaveDir(e.target.value)}
+                onChange={(e) => setForm({ saveDir: e.target.value })}
                 placeholder="留空使用默认下载目录"
                 className={INPUT_CLASS}
                 disabled={busy}

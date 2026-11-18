@@ -4,6 +4,9 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DownloadView } from "./DownloadView";
+import { useDownloadJobPoller } from "../../hooks/useDownloadJobPoller";
+import { useDownloadStore } from "../../stores/downloadStore";
+import { useTaskStore } from "../../stores/taskStore";
 import {
   checkFfmpeg,
   getVideoDownloadProgress,
@@ -42,8 +45,15 @@ vi.mock("../../hooks/useRuntimeDependencyPreparation", () => ({
   }),
 }));
 
+function DownloadWorkspace({ showView = true }: { showView?: boolean }) {
+  useDownloadJobPoller();
+  return showView ? <DownloadView /> : <div>other-page</div>;
+}
+
 describe("DownloadView speed display", () => {
   beforeEach(() => {
+    useDownloadStore.getState().resetAll();
+    useTaskStore.getState().clearTasks();
     vi.mocked(checkFfmpeg).mockResolvedValue({
       available: true,
       path: "ffmpeg",
@@ -54,6 +64,8 @@ describe("DownloadView speed display", () => {
 
   afterEach(() => {
     cleanup();
+    useDownloadStore.getState().resetAll();
+    useTaskStore.getState().clearTasks();
     vi.resetAllMocks();
   });
 
@@ -95,7 +107,7 @@ describe("DownloadView speed display", () => {
           }),
       );
 
-    render(<DownloadView />);
+    render(<DownloadWorkspace />);
 
     await user.type(screen.getByPlaceholderText("例如 episode-01"), "ep01");
     await user.type(
@@ -176,7 +188,7 @@ describe("DownloadView speed display", () => {
         error: null,
       });
 
-    render(<DownloadView />);
+    render(<DownloadWorkspace />);
 
     await user.type(screen.getByPlaceholderText("例如 episode-01"), "ep02");
     await user.type(
@@ -205,7 +217,7 @@ describe("DownloadView speed display", () => {
       error: "获取解密密钥失败：HTTP 403",
     });
 
-    render(<DownloadView />);
+    render(<DownloadWorkspace />);
 
     await user.type(screen.getByPlaceholderText("例如 episode-01"), "ep03");
     await user.type(
@@ -237,7 +249,7 @@ describe("DownloadView speed display", () => {
       error: "下载已取消",
     });
 
-    render(<DownloadView />);
+    render(<DownloadWorkspace />);
 
     await user.type(screen.getByPlaceholderText("例如 episode-01"), "ep04");
     await user.type(
@@ -252,5 +264,116 @@ describe("DownloadView speed display", () => {
     });
 
     expect(screen.queryByText(/下载中…/)).toBeNull();
+  });
+
+  it("keeps polling across page switches and restores progress and completed view on return", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startVideoDownload).mockResolvedValue("dl-nav");
+
+    let resolveSecondPoll!: (
+      value: Awaited<ReturnType<typeof getVideoDownloadProgress>>,
+    ) => void;
+    let resolveThirdPoll!: (
+      value: Awaited<ReturnType<typeof getVideoDownloadProgress>>,
+    ) => void;
+
+    vi.mocked(getVideoDownloadProgress)
+      .mockResolvedValueOnce({
+        id: "dl-nav",
+        status: "running",
+        phase: "downloading",
+        progress: 0.25,
+        processedMs: 25_000,
+        durationMs: 100_000,
+        speedBytesPerSec: Math.round(40 * 1024 * 1024),
+        outputPath: null,
+        error: null,
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecondPoll = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveThirdPoll = resolve;
+          }),
+      );
+
+    const { rerender } = render(<DownloadWorkspace showView />);
+
+    await user.type(screen.getByPlaceholderText("例如 episode-01"), "ep-nav");
+    await user.type(
+      screen.getByPlaceholderText("https://example.com/video.m3u8"),
+      "https://cdn.example.com/nav.m3u8",
+    );
+    await user.click(screen.getByRole("button", { name: "开始下载" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("25%")).toBeTruthy();
+    });
+
+    // 切走页面卸载 DownloadView，App 层 poller 仍在工作
+    rerender(<DownloadWorkspace showView={false} />);
+    expect(screen.getByText("other-page")).toBeTruthy();
+
+    await waitFor(() => {
+      expect(getVideoDownloadProgress).toHaveBeenCalledTimes(2);
+    });
+
+    await act(async () => {
+      resolveSecondPoll({
+        id: "dl-nav",
+        status: "running",
+        phase: "downloading",
+        progress: 0.75,
+        processedMs: 75_000,
+        durationMs: 100_000,
+        speedBytesPerSec: Math.round(60 * 1024 * 1024),
+        outputPath: null,
+        error: null,
+      });
+    });
+
+    await waitFor(() => {
+      expect(useTaskStore.getState().tasks["video-download"]?.progress).toBe(75);
+    });
+
+    // 切回页面后保留表单与最新进度、取消按钮
+    rerender(<DownloadWorkspace showView />);
+    expect(screen.getByText("75%")).toBeTruthy();
+    expect(screen.getByText("60.0 MB/s")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "取消下载" })).toBeTruthy();
+    expect(
+      (screen.getByPlaceholderText("例如 episode-01") as HTMLInputElement).value,
+    ).toBe("ep-nav");
+
+    // 再次切走期间完成，切回直接展示下载完成
+    rerender(<DownloadWorkspace showView={false} />);
+    await waitFor(() => {
+      expect(getVideoDownloadProgress).toHaveBeenCalledTimes(3);
+    });
+    await act(async () => {
+      resolveThirdPoll({
+        id: "dl-nav",
+        status: "completed",
+        phase: null,
+        progress: 1,
+        processedMs: 100_000,
+        durationMs: 100_000,
+        speedBytesPerSec: null,
+        outputPath: "C:\\Downloads\\ep-nav.mp4",
+        error: null,
+      });
+    });
+
+    rerender(<DownloadWorkspace showView />);
+    await waitFor(() => {
+      expect(screen.queryByText("下载进度")).toBeNull();
+      expect(screen.getByText("下载完成")).toBeTruthy();
+      expect(screen.getByText("C:\\Downloads\\ep-nav.mp4")).toBeTruthy();
+    });
   });
 });

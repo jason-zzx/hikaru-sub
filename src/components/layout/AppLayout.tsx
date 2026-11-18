@@ -3,6 +3,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { initActiveCueTracker } from "../../services/activeCueTracker";
 import { useBurnJobPoller } from "../../hooks/useBurnJobPoller";
 import { useClipJobPoller } from "../../hooks/useClipJobPoller";
+import { useDownloadJobPoller } from "../../hooks/useDownloadJobPoller";
 import { useUnsavedChangesCloseGuard } from "../../hooks/useUnsavedChangesCloseGuard";
 import { useGlobalFileDrop } from "../../hooks/useGlobalFileDrop";
 import { useSubtitleRecoveryAutosave } from "../../hooks/useSubtitleRecoveryAutosave";
@@ -42,6 +43,7 @@ export function AppLayout() {
 
   useBurnJobPoller();
   useClipJobPoller();
+  useDownloadJobPoller();
   const closeGuard = useUnsavedChangesCloseGuard();
   useSubtitleRecoveryAutosave();
   useGlobalFileDrop();
