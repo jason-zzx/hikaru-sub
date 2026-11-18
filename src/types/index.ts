@@ -373,12 +373,16 @@ export interface StartVideoDownloadArgs {
   strategy?: DownloadStrategy | null;
 }
 
+export type DownloadPhase = "preparing" | "downloading" | "merging";
+
 export interface DownloadSnapshot {
   id: string;
   status: DownloadStatus;
+  phase?: DownloadPhase | null;
   progress: number | null;
   processedMs: number;
   durationMs: number;
+  speedBytesPerSec?: number | null;
   outputPath: string | null;
   error: string | null;
 }

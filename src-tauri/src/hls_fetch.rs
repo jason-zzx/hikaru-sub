@@ -1,9 +1,27 @@
 use crate::hls_types::{ByteRange, CancellationToken};
 use futures::StreamExt;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, RANGE};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue, RANGE, USER_AGENT};
 use reqwest::StatusCode;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
+
+pub const DEFAULT_HLS_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const DEFAULT_SEGMENT_MEMORY_BUFFER_LIMIT: usize = 32 * 1024 * 1024;
+const SPILL_WRITER_CAPACITY: usize = 512 * 1024;
+
+pub fn build_get_request(
+    client: &reqwest::Client,
+    url: &str,
+    headers: &HeaderMap,
+) -> reqwest::RequestBuilder {
+    let mut request = client.get(url).headers(headers.clone());
+    if !headers.contains_key(USER_AGENT) {
+        request = request.header(USER_AGENT, HeaderValue::from_static(DEFAULT_HLS_USER_AGENT));
+    }
+    request
+}
 
 /// AES-128-CBC 整段解密参数（密钥已取回、IV 已在规划阶段确定）。
 #[derive(Debug, Clone, Copy)]
@@ -18,9 +36,7 @@ pub async fn fetch_key_bytes(
     key_url: &str,
     headers: &HeaderMap,
 ) -> Result<[u8; 16], String> {
-    let response = client
-        .get(key_url)
-        .headers(headers.clone())
+    let response = build_get_request(client, key_url, headers)
         .send()
         .await
         .map_err(|err| err.to_string())?;
@@ -42,10 +58,10 @@ pub async fn fetch_key_bytes(
     Ok(key)
 }
 
-/// AES-128-CBC 解密；优先按 PKCS7 去填充，失败再退回不去填充以兼容个别不规范流。
-fn aes128_cbc_decrypt(data: &[u8], params: &AesCbcParams) -> Result<Vec<u8>, String> {
+/// 原地 AES-128-CBC 解密；优先按 PKCS7 去填充，失败再保留原文以兼容个别不规范流。
+fn aes128_cbc_decrypt(mut data: Vec<u8>, params: &AesCbcParams) -> Result<Vec<u8>, String> {
     use aes::Aes128;
-    use cbc::cipher::block_padding::{NoPadding, Pkcs7};
+    use cbc::cipher::block_padding::{NoPadding, Pkcs7, RawPadding};
     use cbc::cipher::{BlockDecryptMut, KeyIvInit};
     type Aes128CbcDec = cbc::Decryptor<Aes128>;
 
@@ -56,19 +72,16 @@ fn aes128_cbc_decrypt(data: &[u8], params: &AesCbcParams) -> Result<Vec<u8>, Str
         return Err(format!("加密分片长度 {} 不是 16 的倍数", data.len()));
     }
 
-    let mut buf = data.to_vec();
-    match Aes128CbcDec::new(&params.key.into(), &params.iv.into())
-        .decrypt_padded_mut::<Pkcs7>(&mut buf)
-    {
-        Ok(plain) => Ok(plain.to_vec()),
-        Err(_) => {
-            let mut raw = data.to_vec();
-            let plain = Aes128CbcDec::new(&params.key.into(), &params.iv.into())
-                .decrypt_padded_mut::<NoPadding>(&mut raw)
-                .map_err(|err| format!("AES-128 解密失败：{err}"))?;
-            Ok(plain.to_vec())
-        }
+    Aes128CbcDec::new(&params.key.into(), &params.iv.into())
+        .decrypt_padded_mut::<NoPadding>(&mut data)
+        .map_err(|err| format!("AES-128 解密失败：{err}"))?;
+
+    let last_block_start = data.len() - 16;
+    if let Ok(unpadded) = Pkcs7::raw_unpad(&data[last_block_start..]) {
+        let trim = 16 - unpadded.len();
+        data.truncate(data.len() - trim);
     }
+    Ok(data)
 }
 
 pub fn parse_header_map(headers: &str) -> Result<HeaderMap, String> {
@@ -94,40 +107,104 @@ pub fn range_header_value(range: ByteRange) -> String {
     format!("bytes={}-{}", range.offset, end)
 }
 
-async fn write_response_stream_to_file(
+async fn write_response_stream_buffered(
     response: reqwest::Response,
     output_path: &Path,
     expected_len: Option<u64>,
     cancel: &CancellationToken,
+    decrypt: Option<AesCbcParams>,
+    downloaded_bytes: Option<&Arc<AtomicU64>>,
+    memory_limit: usize,
 ) -> Result<u64, String> {
-    let mut file = tokio::fs::File::create(output_path)
-        .await
-        .map_err(|err| err.to_string())?;
+    let initial_cap = expected_len
+        .or_else(|| response.content_length())
+        .map(|len| (len as usize).min(memory_limit))
+        .unwrap_or(0);
+    let mut buffer = Vec::with_capacity(initial_cap);
+    let mut spill: Option<tokio::io::BufWriter<tokio::fs::File>> = None;
+    let mut received = 0_u64;
     let mut stream = response.bytes_stream();
-    let mut written = 0_u64;
 
-    while let Some(chunk) = stream.next().await {
+    let stream_res: Result<(), String> = async {
+        while let Some(chunk_res) = stream.next().await {
+            if cancel.is_cancelled() {
+                return Err("下载已取消".into());
+            }
+            let chunk = chunk_res.map_err(|err| err.to_string())?;
+            let chunk_len = chunk.len() as u64;
+            received += chunk_len;
+            if let Some(counter) = downloaded_bytes {
+                counter.fetch_add(chunk_len, Ordering::Relaxed);
+            }
+
+            if let Some(writer) = spill.as_mut() {
+                writer
+                    .write_all(&chunk)
+                    .await
+                    .map_err(|err| err.to_string())?;
+            } else if decrypt.is_none() && buffer.len() + chunk.len() > memory_limit {
+                let file = tokio::fs::File::create(output_path)
+                    .await
+                    .map_err(|err| err.to_string())?;
+                let mut writer = tokio::io::BufWriter::with_capacity(SPILL_WRITER_CAPACITY, file);
+                if !buffer.is_empty() {
+                    writer
+                        .write_all(&buffer)
+                        .await
+                        .map_err(|err| err.to_string())?;
+                    buffer = Vec::new();
+                }
+                writer
+                    .write_all(&chunk)
+                    .await
+                    .map_err(|err| err.to_string())?;
+                spill = Some(writer);
+            } else {
+                buffer.extend_from_slice(&chunk);
+            }
+        }
+
         if cancel.is_cancelled() {
             return Err("下载已取消".into());
         }
-        let chunk = chunk.map_err(|err| err.to_string())?;
-        file.write_all(&chunk)
-            .await
-            .map_err(|err| err.to_string())?;
-        written += chunk.len() as u64;
-    }
-
-    file.flush().await.map_err(|err| err.to_string())?;
-
-    if let Some(expected) = expected_len {
-        if written != expected {
-            return Err(format!("期望 {expected} 字节，实际 {written} 字节"));
+        if let Some(expected) = expected_len {
+            if received != expected {
+                return Err(format!("期望 {expected} 字节，实际 {received} 字节"));
+            }
         }
+        if let Some(writer) = spill.as_mut() {
+            writer.flush().await.map_err(|err| err.to_string())?;
+            writer.shutdown().await.map_err(|err| err.to_string())?;
+        }
+        Ok(())
     }
+    .await;
 
-    Ok(written)
+    if let Some(writer) = spill {
+        let std_file = writer.into_inner().into_std().await;
+        drop(std_file);
+        if let Err(err) = stream_res {
+            let _ = tokio::fs::remove_file(output_path).await;
+            return Err(err);
+        }
+        return Ok(received);
+    }
+    stream_res?;
+
+    let path = output_path.to_path_buf();
+    tokio::task::spawn_blocking(move || -> Result<u64, String> {
+        let payload = match decrypt {
+            Some(params) => aes128_cbc_decrypt(buffer, &params)?,
+            None => buffer,
+        };
+        std::fs::write(&path, &payload).map_err(|err| err.to_string())?;
+        Ok(payload.len() as u64)
+    })
+    .await
+    .map_err(|err| format!("写入分片任务异常退出：{err}"))?
 }
 
+#[cfg(test)]
 pub async fn download_url_to_file(
     client: reqwest::Client,
     url: &str,
@@ -138,10 +215,40 @@ pub async fn download_url_to_file(
     cancel: CancellationToken,
     decrypt: Option<AesCbcParams>,
 ) -> Result<u64, String> {
-    if let Some(parent) = output_path.parent() {
-        tokio::fs::create_dir_all(parent)
-            .await
-            .map_err(|err| err.to_string())?;
+    download_url_to_file_with_options(
+        client,
+        url,
+        headers,
+        byte_range,
+        output_path,
+        retries,
+        cancel,
+        decrypt,
+        true,
+        None,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn download_url_to_file_with_options(
+    client: reqwest::Client,
+    url: &str,
+    headers: HeaderMap,
+    byte_range: Option<ByteRange>,
+    output_path: &Path,
+    retries: usize,
+    cancel: CancellationToken,
+    decrypt: Option<AesCbcParams>,
+    ensure_parent_dir: bool,
+    downloaded_bytes: Option<Arc<AtomicU64>>,
+) -> Result<u64, String> {
+    if ensure_parent_dir {
+        if let Some(parent) = output_path.parent() {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|err| err.to_string())?;
+        }
     }
 
     let mut attempt = 0_usize;
@@ -150,7 +257,7 @@ pub async fn download_url_to_file(
             return Err("下载已取消".into());
         }
 
-        let mut request = client.get(url).headers(headers.clone());
+        let mut request = build_get_request(&client, url, &headers);
         if let Some(range) = byte_range {
             request = request.header(RANGE, range_header_value(range));
         }
@@ -158,50 +265,28 @@ pub async fn download_url_to_file(
         let result = async {
             let response = request.send().await.map_err(|err| err.to_string())?;
             let status = response.status();
-
-            if let Some(range) = byte_range {
-                if status != StatusCode::PARTIAL_CONTENT {
+            let expected_len = match byte_range {
+                Some(_) if status != StatusCode::PARTIAL_CONTENT => {
                     return Err(format!(
                         "期望 HTTP 206 Partial Content，实际 HTTP {}",
                         status.as_u16()
                     ));
                 }
-                if decrypt.is_some() {
-                    let bytes = response.bytes().await.map_err(|err| err.to_string())?;
-                    if cancel.is_cancelled() {
-                        return Err("下载已取消".into());
-                    }
-                    if bytes.len() as u64 != range.length {
-                        return Err(format!(
-                            "期望 {} 字节，实际 {} 字节",
-                            range.length,
-                            bytes.len()
-                        ));
-                    }
-                    return write_payload(&bytes, output_path, decrypt.as_ref()).await;
-                }
-                return write_response_stream_to_file(
-                    response,
-                    output_path,
-                    Some(range.length),
-                    &cancel,
-                )
-                .await;
-            }
+                Some(range) => Some(range.length),
+                None if !status.is_success() => return Err(format!("HTTP {}", status.as_u16())),
+                None => None,
+            };
 
-            if !status.is_success() {
-                return Err(format!("HTTP {}", status.as_u16()));
-            }
-
-            if decrypt.is_some() {
-                let bytes = response.bytes().await.map_err(|err| err.to_string())?;
-                if cancel.is_cancelled() {
-                    return Err("下载已取消".into());
-                }
-                return write_payload(&bytes, output_path, decrypt.as_ref()).await;
-            }
-
-            write_response_stream_to_file(response, output_path, None, &cancel).await
+            write_response_stream_buffered(
+                response,
+                output_path,
+                expected_len,
+                &cancel,
+                decrypt,
+                downloaded_bytes.as_ref(),
+                DEFAULT_SEGMENT_MEMORY_BUFFER_LIMIT,
+            )
+            .await
         }
         .await;
 
@@ -228,22 +313,6 @@ pub async fn download_url_to_file(
             }
         }
     }
-}
-
-/// 按需解密后写入文件，返回写入的字节数。
-async fn write_payload(
-    bytes: &[u8],
-    output_path: &Path,
-    decrypt: Option<&AesCbcParams>,
-) -> Result<u64, String> {
-    let payload = match decrypt {
-        Some(params) => aes128_cbc_decrypt(bytes, params)?,
-        None => bytes.to_vec(),
-    };
-    tokio::fs::write(output_path, &payload)
-        .await
-        .map_err(|err| err.to_string())?;
-    Ok(payload.len() as u64)
 }
 
 #[cfg(test)]
@@ -522,5 +591,114 @@ mod tests {
         .unwrap_err();
 
         assert!(err.contains("下载已取消"));
+    }
+
+    #[tokio::test]
+    async fn injects_default_user_agent_only_when_absent() {
+        let server = httpmock::MockServer::start_async().await;
+        let default_mock = server
+            .mock_async(|when, then| {
+                when.method("GET")
+                    .path("/default.ts")
+                    .header("user-agent", DEFAULT_HLS_USER_AGENT);
+                then.status(200).body("ok-default");
+            })
+            .await;
+        let custom_mock = server
+            .mock_async(|when, then| {
+                when.method("GET")
+                    .path("/custom.ts")
+                    .header("user-agent", "CustomAgent/1.0");
+                then.status(200).body("ok-custom");
+            })
+            .await;
+        let dir = tempdir().unwrap();
+        let cancel = CancellationToken::new(Arc::new(AtomicBool::new(false)));
+
+        download_url_to_file(
+            reqwest::Client::new(),
+            &format!("{}/default.ts", server.base_url()),
+            HeaderMap::new(),
+            None,
+            &dir.path().join("default.ts"),
+            0,
+            cancel.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let headers = parse_header_map("User-Agent: CustomAgent/1.0").unwrap();
+        download_url_to_file(
+            reqwest::Client::new(),
+            &format!("{}/custom.ts", server.base_url()),
+            headers,
+            None,
+            &dir.path().join("custom.ts"),
+            0,
+            cancel,
+            None,
+        )
+        .await
+        .unwrap();
+
+        default_mock.assert_async().await;
+        custom_mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn tracks_downloaded_bytes_and_spills_above_memory_limit() {
+        let server = httpmock::MockServer::start_async().await;
+        let body = vec![b'z'; 96 * 1024];
+        server
+            .mock_async({
+                let body = body.clone();
+                move |when, then| {
+                    when.method("GET").path("/spill.ts");
+                    then.status(200).body(body.clone());
+                }
+            })
+            .await;
+        let dir = tempdir().unwrap();
+        let out = dir.path().join("spill.ts");
+        let cancel = CancellationToken::new(Arc::new(AtomicBool::new(false)));
+        let counter = Arc::new(AtomicU64::new(0));
+
+        let response = reqwest::Client::new()
+            .get(format!("{}/spill.ts", server.base_url()))
+            .send()
+            .await
+            .unwrap();
+        let written = write_response_stream_buffered(
+            response,
+            &out,
+            None,
+            &cancel,
+            None,
+            Some(&counter),
+            4 * 1024,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(written, body.len() as u64);
+        assert_eq!(counter.load(Ordering::Relaxed), body.len() as u64);
+        assert_eq!(std::fs::read(&out).unwrap(), body);
+    }
+
+    #[test]
+    fn aes128_cbc_decrypt_falls_back_to_nopadding_when_unpadded() {
+        use aes::Aes128;
+        use cbc::cipher::block_padding::NoPadding;
+        use cbc::cipher::{BlockEncryptMut, KeyIvInit};
+        type Aes128CbcEnc = cbc::Encryptor<Aes128>;
+
+        let key = [0x33u8; 16];
+        let iv = [0x44u8; 16];
+        let plaintext = b"0123456789abcdef0123456789abcdef".to_vec();
+        let ciphertext =
+            Aes128CbcEnc::new(&key.into(), &iv.into()).encrypt_padded_vec_mut::<NoPadding>(&plaintext);
+        let decrypted = aes128_cbc_decrypt(ciphertext, &AesCbcParams { key, iv }).unwrap();
+        assert_eq!(decrypted, plaintext);
     }
 }

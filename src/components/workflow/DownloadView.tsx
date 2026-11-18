@@ -26,6 +26,7 @@ import {
 } from "../../services/subtitleRecovery";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 import { Button } from "../ui/button";
+import { formatTransferSpeed } from "../../constants/runtimeDependencies";
 
 const POLL_INTERVAL_MS = 700;
 const INPUT_CLASS =
@@ -248,6 +249,20 @@ export function DownloadView() {
     snapshot?.progress !== null && snapshot?.progress !== undefined
       ? Math.round(snapshot.progress * 100)
       : null;
+  const speedLabel = formatTransferSpeed(snapshot?.speedBytesPerSec);
+  const snapshotFailed =
+    snapshot?.status === "failed" ||
+    (!busy &&
+      Boolean(error) &&
+      snapshot !== null &&
+      snapshot.status !== "completed" &&
+      snapshot.status !== "cancelled");
+  const snapshotCancelled = snapshot?.status === "cancelled";
+  const snapshotCompleted = snapshot?.status === "completed" || Boolean(completedPath);
+  const showProgressCard = !snapshotCompleted && (busy || snapshot !== null);
+  const isMerging = snapshot?.phase === "merging";
+  const isPreparing = snapshot?.phase === "preparing";
+  const failureMessage = snapshot?.error ?? error ?? "下载失败";
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
@@ -276,7 +291,7 @@ export function DownloadView() {
         </div>
       )}
 
-      {error && (
+      {error && !snapshotFailed && (
         <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
         </div>
@@ -395,29 +410,63 @@ export function DownloadView() {
         </div>
       </section>
 
-      {(busy || snapshot) && (
+      {showProgressCard && (
         <section className="rounded-xl border border-border bg-surface-raised p-5">
-          <h3 className="mb-4 font-medium">下载进度</h3>
-          {progressPercent !== null ? (
+          <h3 className="mb-4 font-medium">
+            {snapshotFailed
+              ? "下载失败"
+              : snapshotCancelled
+                ? "下载已取消"
+                : "下载进度"}
+          </h3>
+          {snapshotFailed ? (
+            <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+              {failureMessage}
+            </div>
+          ) : snapshotCancelled ? (
+            <p className="text-sm text-text-muted">已取消下载</p>
+          ) : progressPercent !== null ? (
             <>
               <div className="mb-2 flex justify-between text-sm">
-                <span className="text-text-muted">
+                <span className="text-foreground/80">
                   {formatMs(snapshot?.processedMs ?? 0)} /{" "}
                   {formatMs(snapshot?.durationMs ?? 0)}
                 </span>
-                <span className="font-mono text-accent">{progressPercent}%</span>
+                <span className="flex items-center gap-3 font-mono">
+                  {speedLabel && (
+                    <span className="font-medium text-foreground">
+                      {speedLabel}
+                    </span>
+                  )}
+                  <span className="font-semibold text-primary">
+                    {progressPercent}%
+                  </span>
+                </span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-surface">
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full bg-accent transition-all"
+                  className="h-full bg-primary transition-all"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
+              {isMerging && (
+                <p className="mt-2 text-xs font-medium text-foreground/80">
+                  下载完成，正在合并封装…
+                </p>
+              )}
             </>
           ) : (
-            <p className="text-sm text-text-muted">
-              下载中… 已处理 {formatMs(snapshot?.processedMs ?? 0)}
-              {snapshot?.durationMs ? ` / ${formatMs(snapshot.durationMs)}` : ""}
+            <p className="text-sm text-foreground/80">
+              {isMerging
+                ? "下载完成，正在合并封装…"
+                : isPreparing
+                  ? "正在解析播放列表…"
+                  : `下载中… 已处理 ${formatMs(snapshot?.processedMs ?? 0)}${snapshot?.durationMs ? ` / ${formatMs(snapshot.durationMs)}` : ""}`}
+              {!isMerging && !isPreparing && speedLabel ? (
+                <span className="ml-2 font-mono font-medium text-foreground">
+                  {speedLabel}
+                </span>
+              ) : null}
             </p>
           )}
         </section>

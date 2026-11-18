@@ -71,6 +71,81 @@ Correct: … -vn -af aresample=async=1:first_pts=0 …     → return covered_ms
 | Clip | `clip.rs` | Soft/hard cut; progress polling; optional replace working video is a **frontend** session decision |
 | Burn | `burn.rs` | Hard-sub export via FFmpeg/libass; burn page has no subtitle preview |
 
+### HLS Segment Downloader Contract
+
+#### 1. Scope / Trigger
+
+Apply when changing `download.rs`, `hls_types.rs`, `hls_playlist.rs`, `hls_fetch.rs`, `hls_download.rs`, or `DownloadSnapshot` / `DownloadView.tsx`.
+
+#### 2. Signatures
+
+```rust
+#[tauri::command]
+async fn start_video_download(app: AppHandle, args: StartVideoDownloadArgs) -> Result<String, String>;
+
+#[tauri::command]
+async fn get_video_download_progress(app: AppHandle, job_id: String) -> Result<DownloadSnapshot, String>;
+
+#[serde(rename_all = "camelCase")]
+pub enum DownloadPhase {
+    Preparing,
+    Downloading,
+    Merging,
+}
+
+#[serde(rename_all = "camelCase")]
+pub struct DownloadSnapshot {
+    pub id: String,
+    pub status: DownloadStatus,
+    pub phase: Option<DownloadPhase>,
+    pub progress: Option<f64>,
+    pub processed_ms: i64,
+    pub duration_ms: i64,
+    pub speed_bytes_per_sec: Option<u64>,
+    pub output_path: Option<String>,
+    pub error: Option<String>,
+}
+```
+
+#### 3. Contracts
+
+- **Multi-connection HTTP/1.1 default**: `build_hls_http_client` enforces `.http1_only()` with `connect_timeout`, `read_timeout` (never a full-body `.timeout(...)`), `pool_max_idle_per_host >= 32`, `tcp_nodelay(true)`, `tcp_keepalive`, explicit `system-proxy` feature, and default browser `User-Agent` only when caller headers omit `user-agent`. Only HTTP 426 / HTTP/1.1 connection-or-request errors during playlist resolution switch to `build_hls_http2_fallback_client` (2 MiB stream / 8 MiB connection initial windows).
+- **Multi-worker scheduling & buffered I/O**: `download_plan` pre-creates the segment directory once, prefetches keys concurrently, schedules across a `JoinSet` (`auto_concurrency_for_parallelism`: `(parallelism * 3).clamp(24, 48)`), buffers segments `<= 32 MiB` in memory before single `spawn_blocking` in-place AES-128 decrypt + `std::fs::write` (spilling `> 32 MiB` via `BufWriter`), and runs `assemble_media_file_with_cancel` in one `spawn_blocking` pass (`4 MiB` `BufWriter`, `1 MiB` copy buffer).
+- **`m3u8-rs 6.0.0` `KEY:METHOD=NONE` gotcha**: `m3u8-rs` rejects `#EXT-X-KEY:METHOD=NONE` without `IV` into `segment.unknown_tags` (`tag == "X-KEY"`). Always inspect `unknown_tags` for `METHOD=NONE` when `segment.key.is_none()` so clear segments after encrypted segments are not decrypted.
+- **Playlist coverage & log-only fallback**: Master playlists with `#EXT-X-MEDIA:TYPE=AUDIO` (`Single` mode) resolve and download video + audio concurrently; VOD `#EXT-X-DISCONTINUITY` playlists assemble per-epoch files into `concat.txt` (`AssembledMedia::ConcatList`). Multi-epoch `concat` remux failures return `HlsDownloadError::RemuxFallback` so `Auto` logs via `eprintln!` and falls back to FFmpeg without adding UI banners or exposing concurrency/strategy controls.
+- **Non-blocking start & speed metering**: `start_video_download` validates inputs locally, stores `save_dir`, and returns `job_id` immediately without remote `ffprobe`. Binary `video/*`, non-playlist `audio/*`, and `application/octet-stream` playlist responses fail fast to trigger FFmpeg fallback. `speed_bytes_per_sec` reports smoothed transfer rate only while active network downloads (Rust chunks or FFmpeg `total_size=`) are running; local remux and terminal states emit `None` (`null`).
+
+#### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| HTTP/2-only host returns 426 or HTTP/1.1 handshake error | Switch that download client to tuned HTTP/2 fallback |
+| Direct binary media URL (`video/mp4`, `octet-stream`) | Reject playlist read immediately (`PlaylistParse`) -> `Auto` falls back to FFmpeg |
+| `#EXT-X-KEY:METHOD=NONE` without `IV` | Clear `active_key` via `segment.unknown_tags` |
+| Multi-epoch `concat` remux fails in `Auto` mode | Log fallback via `eprintln!` and invoke `run_ffmpeg_strategy` |
+| Cancel before `output_path` is finalized | Clean `hikaru-download-cache/<job_id>` via `save_dir` |
+
+#### 5. Good / Base / Bad Cases
+
+- Good: HTTP/1.1 multi-connection pool + `JoinSet` + single `spawn_blocking` segment writes saturate high-bandwidth CDNs and report live `speedBytesPerSec` in `DownloadView`.
+- Base: Normal VOD m3u8 returns single `AssembledMedia::SingleFile`, resolves local extension in milliseconds, and clears `speedBytesPerSec` during remux.
+- Bad: Using HTTP/2 ALPN multiplexing onto 1 TCP connection, calling per-chunk `tokio::fs::File::write_all`, blocking `start_video_download` on remote `ffprobe`, or ignoring `unknown_tags` for `METHOD=NONE`.
+
+#### 6. Tests Required
+
+- Rust (`hls_types`, `hls_playlist`, `hls_fetch`, `hls_download`, `download`): concurrency clamping, external audio master selection, discontinuity epoch + `METHOD=NONE` + multi-`MAP` planning, default UA preservation, memory-limit `SpillWriter`, `NoPadding` AES decrypt, HTTP 426 / binary-media playlist rejection, `ConcatList` assembly/remux args, `SpeedMeter`, and `total_size=` parsing.
+- Frontend (`runtimeDependencies.test.ts`, `DownloadView.test.tsx`): speed formatting, active determinate/indeterminate speed display, clearing on `null`, and absence of fallback/concurrency/strategy UI controls.
+
+#### 7. Wrong vs Correct
+
+```text
+Wrong:   enable HTTP/2 ALPN for all segments + write each HTTP chunk via tokio::fs::File::write_all
+Correct: .http1_only() multi-connection pool + buffer <=32 MiB then single spawn_blocking write
+
+Wrong:   read only segment.key -> #EXT-X-KEY:METHOD=NONE silently keeps prior AES key active
+Correct: check segment.key AND segment.unknown_tags (tag == "X-KEY", METHOD=NONE)
+```
+
 ## Native ASR Job Host
 
 ### Scope / Trigger

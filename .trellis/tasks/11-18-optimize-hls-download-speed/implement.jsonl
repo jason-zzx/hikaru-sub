@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/tauri/media-ffmpeg-asr.md", "reason": "Download/FFmpeg architecture and HLS audio/timeline contracts"}
+{"file": ".trellis/spec/tauri/async-and-blocking.md", "reason": "Async Tauri command and spawn_blocking rules"}
+{"file": ".trellis/spec/tauri/command-guidelines.md", "reason": "Command wiring, logging redaction, and lifecycle"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "DownloadSnapshot IPC payload contract"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "DownloadView Simplified Chinese UI and shadcn guidelines"}

@@ -1,10 +1,11 @@
 use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
 use crate::hls_download::{
-    build_hls_http_client, download_hls_media_with_client, remove_hls_temp_dir,
+    build_hls_http_client, download_hls_pair_with_client,
+    download_hls_single_or_master_with_client, remove_hls_temp_dir, HlsSingleDownloadResult,
 };
 use crate::hls_types::{
-    CancellationToken, DownloadStrategy, HlsDownloadError, HlsDownloadRequest, MediaKind,
-    SegmentDownloadConfig,
+    AssembledMedia, CancellationToken, DownloadStrategy, HlsDownloadError, MediaExtensionHint,
+    MediaKind, SegmentDownloadConfig,
 };
 use crate::process::hidden_command;
 use crate::settings::load_settings;
@@ -16,8 +17,9 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 use tauri::{AppHandle, Manager};
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::Mutex;
 
 static JOB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -68,23 +70,82 @@ pub enum DownloadStatus {
     Cancelled,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DownloadPhase {
+    Preparing,
+    Downloading,
+    Merging,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadSnapshot {
     pub id: String,
     pub status: DownloadStatus,
+    pub phase: Option<DownloadPhase>,
     pub progress: Option<f64>,
     pub processed_ms: i64,
     pub duration_ms: i64,
+    pub speed_bytes_per_sec: Option<u64>,
     pub output_path: Option<String>,
     pub error: Option<String>,
 }
 
+#[derive(Debug, Default)]
+struct SpeedMeter {
+    last_sample_at: Option<Instant>,
+    last_bytes: u64,
+    ema_bps: Option<f64>,
+}
+
+impl SpeedMeter {
+    fn sample(&mut self, active: bool, total_bytes: u64, now: Instant) -> Option<u64> {
+        if !active {
+            self.last_sample_at = None;
+            self.ema_bps = None;
+            return None;
+        }
+        let Some(prev_at) = self.last_sample_at else {
+            self.last_sample_at = Some(now);
+            self.last_bytes = total_bytes;
+            return None;
+        };
+        let dt = now.saturating_duration_since(prev_at).as_secs_f64();
+        if dt >= 0.25 {
+            let delta = total_bytes.saturating_sub(self.last_bytes) as f64;
+            let inst = delta / dt;
+            let smoothed = match self.ema_bps {
+                Some(prev) => 0.45 * inst + 0.55 * prev,
+                None => inst,
+            };
+            self.ema_bps = Some(smoothed);
+            self.last_sample_at = Some(now);
+            self.last_bytes = total_bytes;
+        }
+        self.ema_bps.map(|bps| bps.max(0.0).round() as u64)
+    }
+}
+
 struct DownloadJobInner {
     snapshot: DownloadSnapshot,
-    output_path: PathBuf,
+    save_dir: PathBuf,
+    stem: String,
+    output_path: Option<PathBuf>,
     children: Vec<RunningChild>,
     cancel_flag: Arc<AtomicBool>,
+    downloaded_bytes: Arc<AtomicU64>,
+    speed_active: Arc<AtomicBool>,
+    speed_meter: SpeedMeter,
+}
+
+impl DownloadJobInner {
+    fn lock_output_path(&mut self, ext: &str) -> PathBuf {
+        let path = unique_output_path(&self.save_dir, &self.stem, ext);
+        self.output_path = Some(path.clone());
+        self.snapshot.output_path = Some(path.to_string_lossy().into_owned());
+        path
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -272,6 +333,13 @@ fn parse_time_token(line: &str) -> Option<i64> {
 pub fn parse_progress_out_time_ms(line: &str) -> Option<i64> {
     let trimmed = line.trim();
     let rest = trimmed.strip_prefix("out_time_ms=")?;
+    rest.trim().parse().ok()
+}
+
+/// 解析 `-progress` 输出中的 `total_size=` 行（字节数）。
+pub fn parse_progress_total_size(line: &str) -> Option<u64> {
+    let trimmed = line.trim();
+    let rest = trimmed.strip_prefix("total_size=")?;
     rest.trim().parse().ok()
 }
 
@@ -664,6 +732,7 @@ fn run_ffmpeg_child_collect_progress(
     kind: ChildKind,
     ffmpeg: String,
     args: Vec<String>,
+    total_size_target: Option<Arc<AtomicU64>>,
     mut on_progress: impl FnMut(i64, i64) + Send + 'static,
 ) -> Result<(), String> {
     let mut child = hidden_command(&ffmpeg)
@@ -700,6 +769,11 @@ fn run_ffmpeg_child_collect_progress(
                 if duration_ms == 0 {
                     if let Some(d) = parse_duration_line(&text) {
                         duration_ms = d;
+                    }
+                }
+                if let Some(target) = total_size_target.as_ref() {
+                    if let Some(size) = parse_progress_total_size(&text) {
+                        target.store(size, Ordering::Relaxed);
                     }
                 }
                 if let Some(processed) =
@@ -772,16 +846,74 @@ fn update_hls_separate_stream_progress(
     update_parallel_download_progress(job, video, audio);
 }
 
+fn probe_local_media_streams(ffprobe: &str, path: &Path) -> Option<(bool, bool)> {
+    let output = hidden_command(ffprobe)
+        .args([
+            "-hide_banner",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "csv=p=0",
+        ])
+        .arg(path)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Some(parse_stream_codec_types(&stdout))
+}
+
+#[allow(clippy::too_many_arguments)]
 fn run_ffmpeg_strategy(
     app: AppHandle,
     job: Arc<Mutex<DownloadJobInner>>,
     ffmpeg: String,
+    ffprobe: String,
     mode: DownloadMode,
     video_url: String,
     audio_url: Option<String>,
     headers: String,
-    output_path: PathBuf,
 ) {
+    if is_job_cancelled(&job) {
+        return;
+    }
+
+    let probe = match probe_media(&ffprobe, mode, &video_url, audio_url.as_deref(), &headers) {
+        Ok(probe) => probe,
+        Err(err) => {
+            commit_snapshot(&job, |snap| {
+                if snap.status != DownloadStatus::Cancelled {
+                    snap.status = DownloadStatus::Failed;
+                    snap.phase = None;
+                    snap.speed_bytes_per_sec = None;
+                    snap.error = Some(err);
+                }
+            });
+            return;
+        }
+    };
+
+    if is_job_cancelled(&job) {
+        return;
+    }
+
+    let output_path = {
+        let mut guard = job.blocking_lock();
+        let path = guard.lock_output_path(&probe.extension);
+        guard.downloaded_bytes.store(0, Ordering::Relaxed);
+        guard.speed_active.store(true, Ordering::Relaxed);
+        guard.speed_meter = SpeedMeter::default();
+        guard.snapshot.phase = Some(DownloadPhase::Downloading);
+        if probe.duration_ms > 0 {
+            guard.snapshot.duration_ms = guard.snapshot.duration_ms.max(probe.duration_ms);
+        }
+        path
+    };
+
     match mode {
         DownloadMode::Single => {
             let args = build_single_download_args(&video_url, &headers, &output_path);
@@ -793,6 +925,8 @@ fn run_ffmpeg_strategy(
             } else {
                 commit_snapshot(&job, |snap| {
                     snap.status = DownloadStatus::Failed;
+                    snap.phase = None;
+                    snap.speed_bytes_per_sec = None;
                     snap.error = Some("分离模式需要提供音频 URL".into());
                 });
             }
@@ -800,20 +934,69 @@ fn run_ffmpeg_strategy(
     }
 }
 
-fn build_single_remux_args(input_path: &Path, output_path: &Path) -> Vec<String> {
-    vec![
-        "-hide_banner".to_string(),
-        "-y".to_string(),
-        "-i".to_string(),
-        input_path.to_string_lossy().into_owned(),
-        "-c".to_string(),
-        "copy".to_string(),
-        "-bsf:a".to_string(),
-        "aac_adtstoasc".to_string(),
+fn extend_assembled_input_args(args: &mut Vec<String>, media: &AssembledMedia) {
+    match media {
+        AssembledMedia::SingleFile(path) => {
+            args.extend(["-i".to_string(), path.to_string_lossy().into_owned()]);
+        }
+        AssembledMedia::ConcatList(concat_path) => {
+            args.extend([
+                "-f".to_string(),
+                "concat".to_string(),
+                "-safe".to_string(),
+                "0".to_string(),
+                "-i".to_string(),
+                concat_path.to_string_lossy().into_owned(),
+            ]);
+        }
+    }
+}
+
+fn build_single_remux_args(
+    media: &AssembledMedia,
+    output_path: &Path,
+    use_adtstoasc: bool,
+) -> Vec<String> {
+    let mut args = vec!["-hide_banner".to_string(), "-y".to_string()];
+    extend_assembled_input_args(&mut args, media);
+    args.extend(["-c".to_string(), "copy".to_string()]);
+    if use_adtstoasc {
+        args.extend(["-bsf:a".to_string(), "aac_adtstoasc".to_string()]);
+    }
+    args.extend([
         "-movflags".to_string(),
         "+faststart".to_string(),
         output_path.to_string_lossy().into_owned(),
-    ]
+    ]);
+    args
+}
+
+fn build_assembled_merge_args(
+    video: &AssembledMedia,
+    audio: &AssembledMedia,
+    audio_use_adtstoasc: bool,
+    output_path: &Path,
+) -> Vec<String> {
+    let mut args = vec!["-hide_banner".to_string(), "-y".to_string()];
+    extend_assembled_input_args(&mut args, video);
+    extend_assembled_input_args(&mut args, audio);
+    args.extend([
+        "-map".to_string(),
+        "0:v:0".to_string(),
+        "-map".to_string(),
+        "1:a:0".to_string(),
+        "-c".to_string(),
+        "copy".to_string(),
+    ]);
+    if audio_use_adtstoasc {
+        args.extend(["-bsf:a".to_string(), "aac_adtstoasc".to_string()]);
+    }
+    args.extend([
+        "-movflags".to_string(),
+        "+faststart".to_string(),
+        output_path.to_string_lossy().into_owned(),
+    ]);
+    args
 }
 
 fn commit_snapshot(job: &Arc<Mutex<DownloadJobInner>>, update: impl FnOnce(&mut DownloadSnapshot)) {
@@ -844,16 +1027,11 @@ async fn kill_all_children_async(job: &Arc<Mutex<DownloadJobInner>>) {
 }
 
 async fn cleanup_hls_job_temp_async(job: &Arc<Mutex<DownloadJobInner>>) {
-    let (parent, job_id) = {
+    let (save_dir, job_id) = {
         let guard = job.lock().await;
-        (
-            guard.output_path.parent().map(|p| p.to_path_buf()),
-            guard.snapshot.id.clone(),
-        )
+        (guard.save_dir.clone(), guard.snapshot.id.clone())
     };
-    if let Some(parent) = parent {
-        remove_hls_temp_dir(&parent, &job_id);
-    }
+    remove_hls_temp_dir(&save_dir, &job_id);
 }
 
 async fn run_ffmpeg_remux(
@@ -861,49 +1039,76 @@ async fn run_ffmpeg_remux(
     kind: ChildKind,
     ffmpeg: String,
     args: Vec<String>,
+    fallback_on_error: bool,
     on_progress: impl FnMut(i64, i64) + Send + 'static,
 ) -> Result<(), HlsDownloadError> {
-    tokio::task::spawn_blocking(move || {
-        run_ffmpeg_child_collect_progress(job, kind, ffmpeg, args, on_progress)
+    let result = tokio::task::spawn_blocking(move || {
+        run_ffmpeg_child_collect_progress(job, kind, ffmpeg, args, None, on_progress)
     })
     .await
-    .map_err(|_| HlsDownloadError::Operation("FFmpeg 任务异常退出".into()))?
-    .map_err(HlsDownloadError::Operation)
+    .map_err(|_| HlsDownloadError::Operation("FFmpeg 任务异常退出".into()))?;
+
+    result.map_err(|err| {
+        if fallback_on_error {
+            HlsDownloadError::RemuxFallback(err)
+        } else {
+            HlsDownloadError::Operation(err)
+        }
+    })
 }
 
+async fn resolve_single_output_extension(
+    ffprobe: &str,
+    probe_path: &Path,
+    hint: MediaExtensionHint,
+) -> String {
+    if hint == MediaExtensionHint::M4a {
+        return "m4a".to_string();
+    }
+    let ffprobe = ffprobe.to_string();
+    let probe_path = probe_path.to_path_buf();
+    let probed = tokio::task::spawn_blocking(move || probe_local_media_streams(&ffprobe, &probe_path))
+        .await
+        .ok()
+        .flatten();
+    match probed {
+        Some((false, true)) => "m4a".to_string(),
+        _ => "mp4".to_string(),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn run_segment_strategy(
     app: AppHandle,
     job: Arc<Mutex<DownloadJobInner>>,
     ffmpeg: String,
+    ffprobe: String,
     mode: DownloadMode,
     video_url: String,
     audio_url: Option<String>,
     headers: String,
-    output_path: PathBuf,
     strategy: DownloadStrategy,
 ) {
-    let job_id = job.lock().await.snapshot.id.clone();
+    let (job_id, output_parent, downloaded_bytes, speed_active) = {
+        let mut guard = job.lock().await;
+        guard.snapshot.status = DownloadStatus::Running;
+        guard.snapshot.phase = Some(DownloadPhase::Downloading);
+        guard.downloaded_bytes.store(0, Ordering::Relaxed);
+        guard.speed_active.store(true, Ordering::Relaxed);
+        (
+            guard.snapshot.id.clone(),
+            guard.save_dir.clone(),
+            guard.downloaded_bytes.clone(),
+            guard.speed_active.clone(),
+        )
+    };
     eprintln!(
         "[hikaru][download] run_segment_strategy 启动 job={job_id} mode={mode:?} strategy={strategy:?} video_url={video_url} audio={}",
         audio_url.is_some()
     );
-    let output_parent = match output_path.parent() {
-        Some(parent) => parent.to_path_buf(),
-        None => {
-            commit_snapshot_async(&job, |snap| {
-                snap.status = DownloadStatus::Failed;
-                snap.error = Some("无法解析输出目录".into());
-            })
-            .await;
-            return;
-        }
-    };
-    {
-        let mut guard = job.lock().await;
-        guard.snapshot.status = DownloadStatus::Running;
-    }
 
     let ffmpeg_for_fallback = ffmpeg.clone();
+    let ffprobe_for_fallback = ffprobe.clone();
     let audio_url_for_fallback = audio_url.clone();
     let cancel = {
         let guard = job.lock().await;
@@ -913,8 +1118,11 @@ async fn run_segment_strategy(
     let hls_client = match build_hls_http_client(&config) {
         Ok(client) => client,
         Err(err) => {
+            speed_active.store(false, Ordering::Relaxed);
             commit_snapshot_async(&job, |snap| {
                 snap.status = DownloadStatus::Failed;
+                snap.phase = None;
+                snap.speed_bytes_per_sec = None;
                 snap.error = Some(err.message());
             })
             .await;
@@ -922,20 +1130,51 @@ async fn run_segment_strategy(
         }
     };
 
+    let mark_merging = {
+        let job = job.clone();
+        let speed_active = speed_active.clone();
+        Arc::new(move || {
+            speed_active.store(false, Ordering::Relaxed);
+            update_snapshot_progress(&job, |snap| {
+                snap.phase = Some(DownloadPhase::Merging);
+                snap.speed_bytes_per_sec = None;
+            });
+        })
+    };
+
     let result: Result<(), HlsDownloadError> = async {
-        match mode {
+        let video_progress = Arc::new(std::sync::Mutex::new(InputProgress::default()));
+        let audio_progress = Arc::new(std::sync::Mutex::new(InputProgress::default()));
+        let on_pair_progress = {
+            let job = job.clone();
+            let video_progress = video_progress.clone();
+            let audio_progress = audio_progress.clone();
+            move |kind: MediaKind, done: i64, total: i64| {
+                let stream = match kind {
+                    MediaKind::Video => DownloadInputKind::Video,
+                    MediaKind::Audio => DownloadInputKind::Audio,
+                };
+                update_hls_separate_stream_progress(
+                    &job,
+                    stream,
+                    done,
+                    total,
+                    &video_progress,
+                    &audio_progress,
+                );
+            }
+        };
+
+        let outcome = match mode {
             DownloadMode::Single => {
-                let temp = download_hls_media_with_client(
-                    hls_client.clone(),
-                    HlsDownloadRequest {
-                        job_id: job_id.clone(),
-                        url: video_url.clone(),
-                        kind: MediaKind::Video,
-                        output_path: output_parent.join("single.tmp"),
-                    },
+                download_hls_single_or_master_with_client(
+                    hls_client,
+                    job_id.clone(),
+                    video_url.clone(),
+                    output_parent,
                     &headers,
                     config,
-                    cancel.clone(),
+                    cancel,
                     {
                         let job = job.clone();
                         move |done, total| {
@@ -947,95 +1186,82 @@ async fn run_segment_strategy(
                             });
                         }
                     },
-                    None,
+                    on_pair_progress,
+                    Some(downloaded_bytes),
+                    Some(mark_merging),
                 )
-                .await?;
-                if is_job_cancelled_async(&job).await {
-                    return Ok(());
-                }
-                update_snapshot_progress(&job, |snap| {
-                    snap.duration_ms = snap.duration_ms.max(temp.duration_ms);
-                });
-                let args = build_single_remux_args(&temp.temp_media_path, &output_path);
-                run_ffmpeg_remux(job.clone(), ChildKind::Merge, ffmpeg, args, {
-                    let job = job.clone();
-                    move |_processed, _duration| {
-                        update_snapshot_progress(&job, |snap| {
-                            if snap.progress.is_some() {
-                                snap.progress = Some(0.95);
-                            }
-                        });
-                    }
-                })
-                .await?;
+                .await?
             }
             DownloadMode::Separate => {
                 let audio_url = audio_url.ok_or_else(|| {
                     HlsDownloadError::Operation("分离模式需要提供音频 URL".into())
                 })?;
-                let video_progress = Arc::new(std::sync::Mutex::new(InputProgress::default()));
-                let audio_progress = Arc::new(std::sync::Mutex::new(InputProgress::default()));
-                let semaphore = Arc::new(Semaphore::new(config.concurrency));
-                let video = download_hls_media_with_client(
-                    hls_client.clone(),
-                    HlsDownloadRequest {
-                        job_id: job_id.clone(),
-                        url: video_url.clone(),
-                        kind: MediaKind::Video,
-                        output_path: output_parent.join("video.tmp"),
-                    },
-                    &headers,
-                    config.clone(),
-                    cancel.clone(),
-                    {
-                        let job = job.clone();
-                        let video_progress = video_progress.clone();
-                        let audio_progress = audio_progress.clone();
-                        move |done, total| {
-                            update_hls_separate_stream_progress(
-                                &job,
-                                DownloadInputKind::Video,
-                                done,
-                                total,
-                                &video_progress,
-                                &audio_progress,
-                            );
-                        }
-                    },
-                    Some(semaphore.clone()),
-                );
-                let audio = download_hls_media_with_client(
+                let (video, audio) = download_hls_pair_with_client(
                     hls_client,
-                    HlsDownloadRequest {
-                        job_id: job_id.clone(),
-                        url: audio_url,
-                        kind: MediaKind::Audio,
-                        output_path: output_parent.join("audio.tmp"),
-                    },
+                    job_id.clone(),
+                    video_url.clone(),
+                    audio_url,
+                    output_parent,
                     &headers,
                     config,
                     cancel,
+                    on_pair_progress,
+                    Some(downloaded_bytes),
+                    Some(mark_merging),
+                )
+                .await?;
+                HlsSingleDownloadResult::MuxedPair { video, audio }
+            }
+        };
+
+        speed_active.store(false, Ordering::Relaxed);
+        commit_snapshot_async(&job, |snap| {
+            snap.phase = Some(DownloadPhase::Merging);
+            snap.speed_bytes_per_sec = None;
+        })
+        .await;
+        if is_job_cancelled_async(&job).await {
+            return Ok(());
+        }
+
+        match outcome {
+            HlsSingleDownloadResult::Single(temp) => {
+                update_snapshot_progress(&job, |snap| {
+                    snap.duration_ms = snap.duration_ms.max(temp.duration_ms);
+                });
+                let ext = resolve_single_output_extension(
+                    &ffprobe,
+                    &temp.probe_path,
+                    temp.extension_hint,
+                )
+                .await;
+                let output_path = job.lock().await.lock_output_path(&ext);
+                let fallback_on_error = matches!(temp.media, AssembledMedia::ConcatList(_));
+                let args = build_single_remux_args(
+                    &temp.media,
+                    &output_path,
+                    temp.extension_hint == MediaExtensionHint::Ts,
+                );
+                run_ffmpeg_remux(
+                    job.clone(),
+                    ChildKind::Merge,
+                    ffmpeg,
+                    args,
+                    fallback_on_error,
                     {
                         let job = job.clone();
-                        let video_progress = video_progress.clone();
-                        let audio_progress = audio_progress.clone();
-                        move |done, total| {
-                            update_hls_separate_stream_progress(
-                                &job,
-                                DownloadInputKind::Audio,
-                                done,
-                                total,
-                                &video_progress,
-                                &audio_progress,
-                            );
+                        move |_processed, _duration| {
+                            update_snapshot_progress(&job, |snap| {
+                                if snap.progress.is_some() {
+                                    snap.progress = Some(0.95);
+                                }
+                            });
                         }
                     },
-                    Some(semaphore),
-                );
-                let (video, audio) = tokio::try_join!(video, audio)?;
-                if is_job_cancelled_async(&job).await {
-                    return Ok(());
-                }
+                )
+                .await?;
+            }
+            HlsSingleDownloadResult::MuxedPair { video, audio } => {
                 {
                     let mut video_state = video_progress.lock().unwrap();
                     video_state.done = true;
@@ -1049,13 +1275,21 @@ async fn run_segment_strategy(
                         .max(video.duration_ms)
                         .max(audio.duration_ms);
                 });
-                let args =
-                    build_merge_args(&video.temp_media_path, &audio.temp_media_path, &output_path);
+                let output_path = job.lock().await.lock_output_path("mp4");
+                let fallback_on_error = matches!(video.media, AssembledMedia::ConcatList(_))
+                    || matches!(audio.media, AssembledMedia::ConcatList(_));
+                let args = build_assembled_merge_args(
+                    &video.media,
+                    &audio.media,
+                    audio.extension_hint == MediaExtensionHint::Ts,
+                    &output_path,
+                );
                 run_ffmpeg_remux(
                     job.clone(),
                     ChildKind::Merge,
                     ffmpeg,
                     args,
+                    fallback_on_error,
                     |_processed, _duration| {},
                 )
                 .await?;
@@ -1066,6 +1300,7 @@ async fn run_segment_strategy(
     }
     .await;
 
+    speed_active.store(false, Ordering::Relaxed);
     match &result {
         Ok(()) => eprintln!("[hikaru][download] run_segment_strategy 分片阶段完成 job={job_id}"),
         Err(err) => eprintln!(
@@ -1074,18 +1309,23 @@ async fn run_segment_strategy(
         ),
     }
 
+    let current_output_path = { job.lock().await.output_path.clone() };
     match result {
         Ok(()) => {
             if is_job_cancelled_async(&job).await {
                 cleanup_hls_job_temp_async(&job).await;
-                let _ = fs::remove_file(&output_path);
+                if let Some(path) = current_output_path {
+                    let _ = fs::remove_file(path);
+                }
                 return;
             }
             cleanup_hls_job_temp_async(&job).await;
             commit_snapshot_async(&job, |snap| {
                 snap.status = DownloadStatus::Completed;
+                snap.phase = None;
                 snap.progress = Some(1.0);
-                snap.output_path = Some(output_path.to_string_lossy().into_owned());
+                snap.speed_bytes_per_sec = None;
+                snap.output_path = current_output_path.map(|p| p.to_string_lossy().into_owned());
                 snap.error = None;
             })
             .await;
@@ -1095,7 +1335,20 @@ async fn run_segment_strategy(
             let fallback_allowed =
                 strategy == DownloadStrategy::Auto && err.is_auto_fallback_eligible();
             cleanup_hls_job_temp_async(&job).await;
+            if let Some(path) = current_output_path {
+                let _ = fs::remove_file(path);
+            }
             if fallback_allowed {
+                eprintln!(
+                    "[hikaru][download] 回退至 FFmpeg 兼容模式 job={job_id}: {err_message}"
+                );
+                {
+                    let mut guard = job.lock().await;
+                    guard.output_path = None;
+                    guard.snapshot.phase = Some(DownloadPhase::Preparing);
+                    guard.snapshot.output_path = None;
+                    guard.snapshot.speed_bytes_per_sec = None;
+                }
                 let app = app.clone();
                 let job = job.clone();
                 tokio::task::spawn_blocking(move || {
@@ -1103,11 +1356,11 @@ async fn run_segment_strategy(
                         app,
                         job,
                         ffmpeg_for_fallback,
+                        ffprobe_for_fallback,
                         mode,
                         video_url,
                         audio_url_for_fallback,
                         headers,
-                        output_path,
                     );
                 })
                 .await
@@ -1115,10 +1368,11 @@ async fn run_segment_strategy(
                 return;
             }
             kill_all_children_async(&job).await;
-            let _ = fs::remove_file(&output_path);
             commit_snapshot_async(&job, |snap| {
                 if snap.status != DownloadStatus::Cancelled {
                     snap.status = DownloadStatus::Failed;
+                    snap.phase = None;
+                    snap.speed_bytes_per_sec = None;
                     snap.error = Some(err_message);
                 }
             })
@@ -1136,7 +1390,17 @@ fn run_separate_parallel_download(
     headers: String,
 ) {
     let result = (|| -> Result<(), String> {
-        let output_path = job.blocking_lock().output_path.clone();
+        let (output_path, total_downloaded_bytes, speed_active) = {
+            let guard = job.blocking_lock();
+            (
+                guard
+                    .output_path
+                    .clone()
+                    .ok_or_else(|| "缺少输出文件路径".to_string())?,
+                guard.downloaded_bytes.clone(),
+                guard.speed_active.clone(),
+            )
+        };
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
@@ -1146,6 +1410,8 @@ fn run_separate_parallel_download(
 
         let video_progress = Arc::new(std::sync::Mutex::new(InputProgress::default()));
         let audio_progress = Arc::new(std::sync::Mutex::new(InputProgress::default()));
+        let video_bytes = Arc::new(AtomicU64::new(0));
+        let audio_bytes = Arc::new(AtomicU64::new(0));
 
         let video_job = job.clone();
         let video_progress_for_thread = video_progress.clone();
@@ -1153,13 +1419,22 @@ fn run_separate_parallel_download(
         let video_args =
             build_input_download_args(DownloadInputKind::Video, &video_url, &headers, &video_tmp);
         let video_ffmpeg = ffmpeg.clone();
+        let video_bytes_for_thread = video_bytes.clone();
+        let audio_bytes_for_video = audio_bytes.clone();
+        let total_for_video = total_downloaded_bytes.clone();
         let video_handle = std::thread::spawn(move || {
             run_ffmpeg_child_collect_progress(
                 video_job.clone(),
                 ChildKind::Video,
                 video_ffmpeg,
                 video_args,
+                Some(video_bytes_for_thread.clone()),
                 move |processed, duration| {
+                    total_for_video.store(
+                        video_bytes_for_thread.load(Ordering::Relaxed)
+                            + audio_bytes_for_video.load(Ordering::Relaxed),
+                        Ordering::Relaxed,
+                    );
                     let snapshot_pair = {
                         let mut video = video_progress_for_thread.lock().unwrap();
                         video.processed_ms = processed;
@@ -1180,13 +1455,22 @@ fn run_separate_parallel_download(
         let audio_args =
             build_input_download_args(DownloadInputKind::Audio, &audio_url, &headers, &audio_tmp);
         let audio_ffmpeg = ffmpeg.clone();
+        let audio_bytes_for_thread = audio_bytes.clone();
+        let video_bytes_for_audio = video_bytes.clone();
+        let total_for_audio = total_downloaded_bytes;
         let audio_handle = std::thread::spawn(move || {
             run_ffmpeg_child_collect_progress(
                 audio_job.clone(),
                 ChildKind::Audio,
                 audio_ffmpeg,
                 audio_args,
+                Some(audio_bytes_for_thread.clone()),
                 move |processed, duration| {
+                    total_for_audio.store(
+                        video_bytes_for_audio.load(Ordering::Relaxed)
+                            + audio_bytes_for_thread.load(Ordering::Relaxed),
+                        Ordering::Relaxed,
+                    );
                     let snapshot_pair = {
                         let mut audio = audio_progress_for_thread.lock().unwrap();
                         audio.processed_ms = processed;
@@ -1202,6 +1486,7 @@ fn run_separate_parallel_download(
         });
 
         wait_parallel_download_workers(&job, video_handle, audio_handle)?;
+        speed_active.store(false, Ordering::Relaxed);
         {
             let mut video = video_progress.lock().unwrap();
             video.done = true;
@@ -1220,23 +1505,32 @@ fn run_separate_parallel_download(
             if snap.progress.is_some() {
                 snap.progress = Some(0.95);
             }
+            snap.phase = Some(DownloadPhase::Merging);
+            snap.speed_bytes_per_sec = None;
         });
 
         let merge_args = build_merge_args(&video_tmp, &audio_tmp, &output_path);
-        run_ffmpeg_child_collect_progress(job.clone(), ChildKind::Merge, ffmpeg, merge_args, {
-            let job_for_progress = job.clone();
-            move |processed, duration| {
-                update_snapshot_progress(&job_for_progress, |snap| {
-                    snap.processed_ms = processed;
-                    if duration > 0 {
-                        snap.duration_ms = duration;
-                    }
-                    if snap.progress.is_some() {
-                        snap.progress = Some(0.95);
-                    }
-                });
-            }
-        })?;
+        run_ffmpeg_child_collect_progress(
+            job.clone(),
+            ChildKind::Merge,
+            ffmpeg,
+            merge_args,
+            None,
+            {
+                let job_for_progress = job.clone();
+                move |processed, duration| {
+                    update_snapshot_progress(&job_for_progress, |snap| {
+                        snap.processed_ms = processed;
+                        if duration > 0 {
+                            snap.duration_ms = duration;
+                        }
+                        if snap.progress.is_some() {
+                            snap.progress = Some(0.95);
+                        }
+                    });
+                }
+            },
+        )?;
 
         if is_job_cancelled(&job) {
             let _ = fs::remove_file(&video_tmp);
@@ -1249,7 +1543,9 @@ fn run_separate_parallel_download(
         let _ = fs::remove_file(&audio_tmp);
         commit_snapshot(&job, |snap| {
             snap.status = DownloadStatus::Completed;
+            snap.phase = None;
             snap.progress = Some(1.0);
+            snap.speed_bytes_per_sec = None;
             snap.output_path = Some(output_path.to_string_lossy().into_owned());
             snap.error = None;
         });
@@ -1260,15 +1556,23 @@ fn run_separate_parallel_download(
 
     if let Err(err) = result {
         kill_all_children(&job);
-        let output_path = job.blocking_lock().output_path.clone();
-        if let Ok((video_tmp, audio_tmp)) = temp_download_paths(&output_path) {
-            let _ = fs::remove_file(video_tmp);
-            let _ = fs::remove_file(audio_tmp);
+        let output_path = {
+            let guard = job.blocking_lock();
+            guard.speed_active.store(false, Ordering::Relaxed);
+            guard.output_path.clone()
+        };
+        if let Some(output_path) = output_path {
+            if let Ok((video_tmp, audio_tmp)) = temp_download_paths(&output_path) {
+                let _ = fs::remove_file(video_tmp);
+                let _ = fs::remove_file(audio_tmp);
+            }
+            let _ = fs::remove_file(output_path);
         }
-        let _ = fs::remove_file(output_path);
         commit_snapshot(&job, |snap| {
             if snap.status != DownloadStatus::Cancelled {
                 snap.status = DownloadStatus::Failed;
+                snap.phase = None;
+                snap.speed_bytes_per_sec = None;
                 snap.error = Some(err);
             }
         });
@@ -1293,7 +1597,10 @@ fn run_download(
     let result = (|| -> Result<(), String> {
         let output_path = {
             let guard = job.blocking_lock();
-            guard.output_path.clone()
+            guard
+                .output_path
+                .clone()
+                .ok_or_else(|| "缺少输出文件路径".to_string())?
         };
 
         if let Some(parent) = output_path.parent() {
@@ -1379,7 +1686,9 @@ fn run_download(
 
         commit_snapshot(&job, |snap| {
             snap.status = DownloadStatus::Completed;
+            snap.phase = None;
             snap.progress = Some(1.0);
+            snap.speed_bytes_per_sec = None;
             snap.processed_ms = parsed_duration_ms.max(snap.duration_ms);
             snap.output_path = Some(output_path.to_string_lossy().into_owned());
             snap.error = None;
@@ -1391,11 +1700,19 @@ fn run_download(
 
     if let Err(err) = result {
         kill_all_children(&job);
-        let output_path = job.blocking_lock().output_path.clone();
-        let _ = fs::remove_file(&output_path);
+        let output_path = {
+            let guard = job.blocking_lock();
+            guard.speed_active.store(false, Ordering::Relaxed);
+            guard.output_path.clone()
+        };
+        if let Some(output_path) = output_path {
+            let _ = fs::remove_file(output_path);
+        }
         commit_snapshot(&job, |snap| {
             if snap.status != DownloadStatus::Cancelled {
                 snap.status = DownloadStatus::Failed;
+                snap.phase = None;
+                snap.speed_bytes_per_sec = None;
                 snap.error = Some(err);
             }
         });
@@ -1411,6 +1728,12 @@ fn handle_progress_line(
     if *duration_ms == 0 {
         if let Some(d) = parse_duration_line(text) {
             *duration_ms = d;
+        }
+    }
+
+    if let Some(total_size) = parse_progress_total_size(text) {
+        if let Ok(guard) = job.try_lock() {
+            guard.downloaded_bytes.store(total_size, Ordering::Relaxed);
         }
     }
 
@@ -1465,6 +1788,15 @@ pub async fn start_video_download(
     if stem.is_empty() {
         return Err("请填写下载名称".into());
     }
+    if args.mode == DownloadMode::Separate
+        && args
+            .audio_url
+            .as_deref()
+            .map(|u| u.trim().is_empty())
+            .unwrap_or(true)
+    {
+        return Err("分离模式需要提供音频 URL".into());
+    }
 
     let settings = load_settings(&app).unwrap_or_default();
     let ffprobe = resolve_ffprobe(&app, &settings);
@@ -1476,14 +1808,6 @@ pub async fn start_video_download(
         .transpose()?
         .unwrap_or_default();
 
-    let probe = probe_media(
-        &ffprobe,
-        args.mode,
-        &args.video_url,
-        args.audio_url.as_deref(),
-        &headers,
-    )?;
-
     let save_dir = match args.save_dir.as_deref() {
         Some(dir) if !dir.trim().is_empty() => {
             let path = PathBuf::from(dir);
@@ -1493,24 +1817,30 @@ pub async fn start_video_download(
         _ => default_save_dir(&app)?,
     };
 
-    let output_path = unique_output_path(&save_dir, &stem, &probe.extension);
     let job_id = new_job_id();
     let snapshot = DownloadSnapshot {
         id: job_id.clone(),
         status: DownloadStatus::Pending,
+        phase: Some(DownloadPhase::Preparing),
         progress: None,
         processed_ms: 0,
-        duration_ms: probe.duration_ms,
-        output_path: Some(output_path.to_string_lossy().into_owned()),
+        duration_ms: 0,
+        speed_bytes_per_sec: None,
+        output_path: None,
         error: None,
     };
 
     let cancel_flag = Arc::new(AtomicBool::new(false));
     let job = Arc::new(Mutex::new(DownloadJobInner {
-        snapshot: snapshot.clone(),
-        output_path: output_path.clone(),
+        snapshot,
+        save_dir,
+        stem,
+        output_path: None,
         children: Vec::new(),
-        cancel_flag: cancel_flag.clone(),
+        cancel_flag,
+        downloaded_bytes: Arc::new(AtomicU64::new(0)),
+        speed_active: Arc::new(AtomicBool::new(false)),
+        speed_meter: SpeedMeter::default(),
     }));
 
     {
@@ -1530,11 +1860,11 @@ pub async fn start_video_download(
                     app_clone,
                     job,
                     ffmpeg,
+                    ffprobe,
                     mode,
                     video_url,
                     audio_url,
                     headers,
-                    output_path,
                 );
             });
         }
@@ -1545,11 +1875,11 @@ pub async fn start_video_download(
                     app_clone,
                     job,
                     ffmpeg,
+                    ffprobe,
                     mode,
                     video_url,
                     audio_url,
                     headers,
-                    output_path,
                     strategy,
                 )
                 .await;
@@ -1559,6 +1889,8 @@ pub async fn start_video_download(
                     eprintln!("[hikaru][download] 分片下载任务异常退出: {err:?}");
                     commit_snapshot_async(&supervised_job, |snap| {
                         snap.status = DownloadStatus::Failed;
+                        snap.phase = None;
+                        snap.speed_bytes_per_sec = None;
                         snap.error = Some(format!("分片下载任务异常退出: {err}"));
                     })
                     .await;
@@ -1576,11 +1908,20 @@ pub async fn get_video_download_progress(
     job_id: String,
 ) -> Result<DownloadSnapshot, String> {
     let state = app.state::<DownloadState>();
-    let jobs = state.jobs.lock().await;
-    let job = jobs
-        .get(&job_id)
-        .ok_or_else(|| format!("下载任务不存在: {job_id}"))?;
-    let guard = job.lock().await;
+    let job = {
+        let jobs = state.jobs.lock().await;
+        jobs.get(&job_id)
+            .cloned()
+            .ok_or_else(|| format!("下载任务不存在: {job_id}"))?
+    };
+    let mut guard = job.lock().await;
+    let active = guard.snapshot.status == DownloadStatus::Running
+        && guard.speed_active.load(Ordering::Relaxed);
+    let total_bytes = guard.downloaded_bytes.load(Ordering::Relaxed);
+    let speed = guard
+        .speed_meter
+        .sample(active, total_bytes, Instant::now());
+    guard.snapshot.speed_bytes_per_sec = speed;
     Ok(guard.snapshot.clone())
 }
 
@@ -1594,13 +1935,17 @@ pub async fn cancel_video_download(app: AppHandle, job_id: String) -> Result<(),
             .ok_or_else(|| format!("下载任务不存在: {job_id}"))?
     };
 
-    let (mut children, output_path, job_id_for_hls) = {
+    let (mut children, save_dir, output_path, job_id_for_hls) = {
         let mut guard = job.lock().await;
         CancellationToken::new(guard.cancel_flag.clone()).cancel();
+        guard.speed_active.store(false, Ordering::Relaxed);
         guard.snapshot.status = DownloadStatus::Cancelled;
+        guard.snapshot.phase = None;
+        guard.snapshot.speed_bytes_per_sec = None;
         guard.snapshot.error = Some("下载已取消".into());
         (
             std::mem::take(&mut guard.children),
+            guard.save_dir.clone(),
             guard.output_path.clone(),
             guard.snapshot.id.clone(),
         )
@@ -1610,14 +1955,14 @@ pub async fn cancel_video_download(app: AppHandle, job_id: String) -> Result<(),
         let _ = entry.child.kill();
         let _ = entry.child.wait();
     }
-    if let Ok((video_tmp, audio_tmp)) = temp_download_paths(&output_path) {
-        let _ = fs::remove_file(video_tmp);
-        let _ = fs::remove_file(audio_tmp);
+    remove_hls_temp_dir(&save_dir, &job_id_for_hls);
+    if let Some(output_path) = output_path {
+        if let Ok((video_tmp, audio_tmp)) = temp_download_paths(&output_path) {
+            let _ = fs::remove_file(video_tmp);
+            let _ = fs::remove_file(audio_tmp);
+        }
+        let _ = fs::remove_file(output_path);
     }
-    if let Some(parent) = output_path.parent() {
-        remove_hls_temp_dir(parent, &job_id_for_hls);
-    }
-    let _ = fs::remove_file(output_path);
     Ok(())
 }
 
@@ -1685,6 +2030,63 @@ mod tests {
     fn parse_progress_out_time_ms_works() {
         assert_eq!(parse_progress_out_time_ms("out_time_ms=12345"), Some(12345));
         assert_eq!(parse_progress_out_time_ms("progress=continue"), None);
+    }
+
+    #[test]
+    fn parse_progress_total_size_works() {
+        assert_eq!(parse_progress_total_size("total_size=52428800"), Some(52428800));
+        assert_eq!(parse_progress_total_size("total_size=N/A"), None);
+    }
+
+    #[test]
+    fn download_phase_serializes_as_camel_case() {
+        assert_eq!(
+            serde_json::to_string(&DownloadPhase::Preparing).unwrap(),
+            "\"preparing\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DownloadPhase::Downloading).unwrap(),
+            "\"downloading\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DownloadPhase::Merging).unwrap(),
+            "\"merging\""
+        );
+    }
+
+    #[test]
+    fn speed_meter_computes_smoothed_rate_and_resets_when_inactive() {
+        let t0 = Instant::now();
+        let mut meter = SpeedMeter::default();
+        assert_eq!(meter.sample(true, 0, t0), None);
+        // 1 second -> 50 MB
+        let t1 = t0 + std::time::Duration::from_secs(1);
+        assert_eq!(meter.sample(true, 50_000_000, t1), Some(50_000_000));
+        // 1 more second -> 30 MB delta -> 0.45 * 30M + 0.55 * 50M = 41M
+        let t2 = t1 + std::time::Duration::from_secs(1);
+        assert_eq!(meter.sample(true, 80_000_000, t2), Some(41_000_000));
+        // Inactive clears speed
+        assert_eq!(meter.sample(false, 80_000_000, t2), None);
+    }
+
+    #[test]
+    fn build_single_remux_and_assembled_merge_args_support_concat_lists() {
+        let single_args = build_single_remux_args(
+            &AssembledMedia::ConcatList(PathBuf::from("concat.txt")),
+            Path::new("out.mp4"),
+            true,
+        );
+        assert!(single_args.windows(2).any(|w| w == ["-f", "concat"]));
+        assert!(single_args.windows(2).any(|w| w == ["-bsf:a", "aac_adtstoasc"]));
+
+        let merge_args = build_assembled_merge_args(
+            &AssembledMedia::ConcatList(PathBuf::from("v_concat.txt")),
+            &AssembledMedia::SingleFile(PathBuf::from("audio.bin")),
+            false,
+            Path::new("merged.mp4"),
+        );
+        assert!(merge_args.windows(2).any(|w| w == ["-f", "concat"]));
+        assert!(!merge_args.contains(&"aac_adtstoasc".to_string()));
     }
 
     #[test]

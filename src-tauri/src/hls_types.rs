@@ -54,6 +54,12 @@ pub struct SegmentDecryptInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MasterPlaylistSelection {
+    pub video_url: String,
+    pub audio_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HlsInitSegment {
     pub url: String,
     pub byte_range: Option<ByteRange>,
@@ -61,8 +67,15 @@ pub struct HlsInitSegment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HlsEpoch {
+    pub index: usize,
+    pub init: Option<HlsInitSegment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HlsSegment {
     pub index: usize,
+    pub epoch_index: usize,
     pub url: String,
     pub duration_ms: i64,
     pub byte_range: Option<ByteRange>,
@@ -73,9 +86,16 @@ pub struct HlsSegment {
 pub struct HlsMediaPlan {
     pub kind: MediaKind,
     pub init: Option<HlsInitSegment>,
+    pub epochs: Vec<HlsEpoch>,
     pub segments: Vec<HlsSegment>,
     pub total_duration_ms: i64,
     pub output_extension_hint: MediaExtensionHint,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AssembledMedia {
+    SingleFile(PathBuf),
+    ConcatList(PathBuf),
 }
 
 #[derive(Debug, Clone)]
@@ -96,19 +116,19 @@ pub struct SegmentDownloadConfig {
 impl Default for SegmentDownloadConfig {
     fn default() -> Self {
         Self {
-            concurrency: 8,
+            concurrency: MIN_AUTO_CONCURRENCY,
             retries: 3,
             request_timeout_secs: 30,
         }
     }
 }
 
-const MIN_AUTO_CONCURRENCY: usize = 8;
-const MAX_AUTO_CONCURRENCY: usize = 32;
+const MIN_AUTO_CONCURRENCY: usize = 24;
+const MAX_AUTO_CONCURRENCY: usize = 48;
 
 pub fn auto_concurrency_for_parallelism(parallelism: usize) -> usize {
     parallelism
-        .saturating_mul(2)
+        .saturating_mul(3)
         .clamp(MIN_AUTO_CONCURRENCY, MAX_AUTO_CONCURRENCY)
 }
 
@@ -132,28 +152,27 @@ mod tests {
 
     #[test]
     fn auto_concurrency_clamps_low_parallelism_to_minimum() {
-        assert_eq!(auto_concurrency_for_parallelism(1), 8);
-        assert_eq!(auto_concurrency_for_parallelism(2), 8);
-        assert_eq!(auto_concurrency_for_parallelism(4), 8);
+        assert_eq!(auto_concurrency_for_parallelism(1), 24);
+        assert_eq!(auto_concurrency_for_parallelism(4), 24);
+        assert_eq!(auto_concurrency_for_parallelism(8), 24);
     }
 
     #[test]
     fn auto_concurrency_scales_for_typical_machines() {
-        assert_eq!(auto_concurrency_for_parallelism(6), 12);
-        assert_eq!(auto_concurrency_for_parallelism(8), 16);
-        assert_eq!(auto_concurrency_for_parallelism(12), 24);
+        assert_eq!(auto_concurrency_for_parallelism(10), 30);
+        assert_eq!(auto_concurrency_for_parallelism(12), 36);
     }
 
     #[test]
     fn auto_concurrency_clamps_high_parallelism_to_maximum() {
-        assert_eq!(auto_concurrency_for_parallelism(16), 32);
-        assert_eq!(auto_concurrency_for_parallelism(64), 32);
+        assert_eq!(auto_concurrency_for_parallelism(16), 48);
+        assert_eq!(auto_concurrency_for_parallelism(64), 48);
     }
 
     #[test]
     fn automatic_config_uses_auto_concurrency_and_existing_retry_defaults() {
         let config = SegmentDownloadConfig::automatic();
-        assert!((8..=32).contains(&config.concurrency));
+        assert!((24..=48).contains(&config.concurrency));
         assert_eq!(config.retries, 3);
         assert_eq!(config.request_timeout_secs, 30);
     }
@@ -183,8 +202,6 @@ impl CancellationToken {
 pub enum HlsSupportError {
     LivePlaylist,
     UnsupportedEncryption,
-    UnsupportedDiscontinuity,
-    UnsupportedAudioRendition,
     UnsupportedByteRange(String),
     PlaylistParse(String),
     UrlResolve(String),
@@ -198,12 +215,6 @@ impl HlsSupportError {
             HlsSupportError::LivePlaylist => "不支持直播 m3u8，请使用兼容模式".into(),
             HlsSupportError::UnsupportedEncryption => {
                 "检测到加密分片，当前快速模式暂不支持，请使用兼容模式".into()
-            }
-            HlsSupportError::UnsupportedDiscontinuity => {
-                "检测到复杂时间轴切换，当前快速模式暂不支持，请使用兼容模式".into()
-            }
-            HlsSupportError::UnsupportedAudioRendition => {
-                "无法解析主播放列表中的音频轨，请使用兼容模式".into()
             }
             HlsSupportError::UnsupportedByteRange(detail) => {
                 format!("无法解析 byte-range 分片：{detail}，请使用兼容模式")
@@ -220,8 +231,6 @@ impl HlsSupportError {
             self,
             HlsSupportError::LivePlaylist
                 | HlsSupportError::UnsupportedEncryption
-                | HlsSupportError::UnsupportedDiscontinuity
-                | HlsSupportError::UnsupportedAudioRendition
                 | HlsSupportError::UnsupportedByteRange(_)
                 | HlsSupportError::EmptyPlaylist
                 | HlsSupportError::PlaylistParse(_)
@@ -235,17 +244,19 @@ impl HlsSupportError {
 pub enum HlsDownloadError {
     Plan(HlsSupportError),
     Operation(String),
+    RemuxFallback(String),
 }
 
 impl HlsDownloadError {
     pub fn message(&self) -> String {
         match self {
             HlsDownloadError::Plan(err) => err.user_message(),
-            HlsDownloadError::Operation(msg) => msg.clone(),
+            HlsDownloadError::Operation(msg) | HlsDownloadError::RemuxFallback(msg) => msg.clone(),
         }
     }
 
     pub fn is_auto_fallback_eligible(&self) -> bool {
         matches!(self, HlsDownloadError::Plan(err) if err.is_fallback_eligible())
+            || matches!(self, HlsDownloadError::RemuxFallback(_))
     }
 }

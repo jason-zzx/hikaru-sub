@@ -38,6 +38,20 @@ export function formatDependencyBytes(bytes: number): string {
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${unit}`;
 }
 
+export function formatTransferSpeed(
+  bytesPerSec: number | null | undefined,
+): string | null {
+  if (
+    bytesPerSec === null ||
+    bytesPerSec === undefined ||
+    !Number.isFinite(bytesPerSec) ||
+    bytesPerSec < 0
+  ) {
+    return null;
+  }
+  return `${formatDependencyBytes(bytesPerSec)}/s`;
+}
+
 // 后端路径来源不一（canonicalize 的 \\\?\ 前缀、拼接产生的混合斜杠），
 // UI 统一展示为普通 Windows 反斜杠路径。
 export function formatDependencyPath(path: string): string {

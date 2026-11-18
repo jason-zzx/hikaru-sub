@@ -4,6 +4,7 @@ import {
   RUNTIME_SOURCE_MODE_LABEL,
   formatDependencyBytes,
   formatDependencyPath,
+  formatTransferSpeed,
 } from "./runtimeDependencies";
 
 describe("runtime dependency constants", () => {
@@ -25,6 +26,14 @@ describe("runtime dependency constants", () => {
     expect(formatDependencyBytes(512)).toBe("512 B");
     expect(formatDependencyBytes(1024 * 1024)).toBe("1.00 MB");
     expect(formatDependencyBytes(25 * 1024 * 1024)).toBe("25.0 MB");
+  });
+
+  it("formats transfer speeds and hides missing or invalid values", () => {
+    expect(formatTransferSpeed(null)).toBeNull();
+    expect(formatTransferSpeed(undefined)).toBeNull();
+    expect(formatTransferSpeed(-1)).toBeNull();
+    expect(formatTransferSpeed(52.4 * 1024 * 1024)).toBe("52.4 MB/s");
+    expect(formatTransferSpeed(512 * 1024)).toBe("512.0 KB/s");
   });
 
   it("normalizes dependency paths for display", () => {
