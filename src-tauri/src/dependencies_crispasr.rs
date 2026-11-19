@@ -285,11 +285,16 @@ mod tests {
         assert!(published.supports_engine("qwen3-asr"));
         assert!(published.supports_engine("parakeet"));
         assert!(published.supports_engine("reazonspeech-nemo"));
-        // Retained published v1 remains valid rollback authority, not Parakeet/ReazonSpeech support.
-        let mut lock: ProductLock = serde_json::from_str(include_str!(
-            "../../native-asr/runtime/crispasr-product-lock-v1.json"
-        ))
-        .unwrap();
+
+        // Verify a single-engine lock rejects parakeet/reazonspeech until both devices declare them.
+        let mut lock: ProductLock = serde_json::from_str(PUBLISHED_LOCK_JSON).unwrap();
+        for (device, artifact) in [
+            ("cpu", lock.cpu.as_mut().unwrap()),
+            ("cuda", lock.cuda.as_mut().unwrap()),
+        ] {
+            artifact.artifact_id = format!("hikaru-asr-crispasr-windows-x64-{device}-v1");
+            artifact.engines = None;
+        }
         assert!(lock.supports_engine("qwen3-asr"));
         assert!(!lock.supports_engine("parakeet"));
         for (device, artifact) in [

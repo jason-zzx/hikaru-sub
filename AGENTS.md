@@ -174,7 +174,6 @@ interface SubtitleCue {
 - CT2 模型直接安装位于 `deps/models/ctranslate2/<engine>/<model-id-segments>/<revision>`，可只读复用精确 `deps/models/huggingface` snapshot；Qwen 原子 pair 位于 `deps/models/crispasr/qwen3-asr/Qwen/Qwen3-ASR-1.7B/<pair-revision>`，共享必需 CPU Silero 在 `deps/models/shared/silero/vad/<vad-revision>`。一个 Qwen 下载/readiness 单元覆盖 pair+VAD，CPU/CUDA 共用权重；partial/staging 复用 `deps/downloads/native-asr-models`。旧 `deps/python11` / `deps/asr-service` 不作为生产运行依赖；NSIS 安装完成新版文件后自动清理这两个受管目录及精确匹配的 Python 下载残留，portable 跳过。它们也只在用户计算存储占用后有残留时显示「旧版 Python 转录环境」（`legacyPython`）供设置页重试；不删除模型、Native runtime、系统 Python 或自定义环境。
 - 设置页进入时只调用 `probe_runtime_dependencies`（状态/路径/版本，不做递归扫盘）；磁盘占用走独立 `measure_runtime_dependency_storage`，由「存储空间 → 计算占用空间」触发。清理按钮只在已计算且占用 > 0、且该项为受管目标时显示（`legacyPython` 按残留存在性返回，空目录也允许清理）；不要把 `dir_size` 重新塞回 probe。「应用缓存」对应安装版 `%LOCALAPPDATA%\com.hikaru.sub\cache` 或 portable `<exe>/cache`（`work_cache_dir`），只统计/清理其下 `workspace`/`transcode`/`preview`/`clip-frames`，并保留当前工作视频相关缓存（包括 `subtitle.recovery.json`）；新增工作缓存也放到该 `cache/` 目录下。旧版直接落在 `com.hikaru.sub\` 根下的同名目录不再纳入统计与清理。`measure_runtime_dependency_storage` 与 `cleanup_runtime_dependency` 须保持 async + `spawn_blocking`（清理受管 `deps/` 前仍可在 async 侧做可写性/提权检查），勿在 async worker 上直接递归扫盘或删目录。
 - Portable 绿色版：exe 同级存在 `.portable` 时，配置落在 `<exe>/data`，工作缓存落在 `<exe>/cache`，WebView2 落在 `<exe>/webview`（启动时设 `WEBVIEW2_USER_DATA_FOLDER`）；判定与解析统一走 `src-tauri/src/app_paths.rs`，不要再直接用 `app.path().app_config_dir()` / `app_cache_dir()` 定位业务数据。安装版与 `tauri dev`（无标记）仍用系统 AppData。不做旧 AppData 迁移。便携目录创建/初始化失败时须弹框提示并退出，且不得在失败后把 `is_portable` 锁成 true。
-- `tauri-plugin-persisted-scope` 仍硬编码 Tauri `app_data_dir`，portable 下可能在系统 AppData 留下极小的 scope 持久化文件；不要为此改写 `APPDATA`/`LOCALAPPDATA` 环境变量。
 - 不要重新引入 `%APPDATA%\com.hikaru.sub` 或 `%LOCALAPPDATA%\com.hikaru.sub` 作为大型受管依赖目录。
 - 下载源由 `src-tauri/resources/runtime-dependency-sources.json` 驱动，设置页仅可选官方源或中国大陆镜像（默认官方源）；CUDA pack 的两条 source row 必须保持同一精确 size/SHA，禁止镜像重打包。旧配置中的 `auto`/`custom` 加载时静默迁移为官方源。
 - Native 模型下载只从受信 manifest 的 repository/revision/file 与官方/中国大陆 source profile 派生 URL；中国大陆源使用 `https://hf-mirror.com`。不得接受自定义模型 URL，也不得记录 headers、正文或私有路径。
@@ -205,7 +204,7 @@ interface SubtitleCue {
 ## 安全与隐私
 
 - 不把 API Key、访问令牌、Cookie、私有下载地址、真实用户资料或模型授权信息写入源码、测试快照、示例配置或日志。
-- 外部 URL、m3u8 playlist、HTTP headers、字幕文本、文件名和用户选择路径都视为不可信输入；涉及路径解析、临时目录、压制输出、下载合并和 asset scope 时保持校验、归一化与越界防护。
+- 外部 URL、m3u8 playlist、HTTP headers、字幕文本、文件名和用户选择路径都视为不可信输入；涉及路径解析、临时目录、压制输出和下载合并时保持校验、归一化与越界防护。
 - 调用 FFmpeg、Python、pip 或系统命令时优先使用结构化参数，避免把未转义的用户输入拼进 shell 字符串。
 - 诊断日志可以记录阶段、错误码、耗时和必要路径，但不要输出完整敏感请求头、密钥或翻译 API 请求正文。
 

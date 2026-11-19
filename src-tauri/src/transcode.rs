@@ -61,13 +61,6 @@ impl TranscodeState {
     }
 }
 
-#[tauri::command]
-pub async fn detect_video_codec(app: AppHandle, path: String) -> Result<String, String> {
-    let settings = load_settings(&app)?;
-    let ffprobe = resolve_ffprobe(&app, &settings);
-    probe_video_codec(&ffprobe, &path)
-}
-
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VideoPlaybackProbe {
@@ -160,29 +153,6 @@ pub fn evaluate_playback_compat(
     }
 
     (true, Some(format!("未知或不支持的容器格式 {format_name}")))
-}
-
-fn probe_video_codec(ffprobe: &str, path: &str) -> Result<String, String> {
-    let output = hidden_command(ffprobe)
-        .args([
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "stream=codec_name",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            path,
-        ])
-        .output()
-        .map_err(|e| format!("执行 ffprobe 失败: {}", e))?;
-
-    if !output.status.success() {
-        return Err("ffprobe 执行失败".to_string());
-    }
-
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 fn probe_video_playback_with_ffprobe(

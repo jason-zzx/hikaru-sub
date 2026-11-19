@@ -12,7 +12,6 @@ Rules encoded in code:
 - Call `bootstrap_portable_paths()` before WebView creation (`lib.rs`). Failure → fatal dialog + exit; **do not** lock `is_portable()` true on failed bootstrap.
 - Business code uses `app_config_dir` / `app_data_dir` / `work_cache_dir` from `app_paths`, not raw `app.path().app_*` for those roots.
 - No migration from old AppData layouts.
-- Do not rewrite `APPDATA` / `LOCALAPPDATA` to work around `tauri-plugin-persisted-scope` (tiny scope files in system AppData on portable are accepted).
 
 Work cache children of interest: `workspace/`, `transcode/`, `preview/`, `clip-frames/` (and similar). App-cache measure/cleanup targets these under `work_cache_dir`, preserving caches tied to the current working video. Legacy same-named dirs directly under `com.hikaru.sub\` root are **out of scope**.
 
@@ -32,7 +31,7 @@ Old `deps/python311` / `deps/asr-service` directories are not production depende
 
 Native model manifest IDs must reject traversal, absolute/drive paths, backslashes, extra separators, Windows reserved device names, trailing-dot/space aliases, and ASCII case collisions before joining paths. A model ID is either one safe segment or exactly one safe `owner/name`; each repository-style segment is validated independently before the existing contained path builder runs. Direct required files reject symlinks/reparse points; legacy HF symlinks are allowed only when the snapshot and canonical file target stay below the canonical managed Hugging Face root. Concurrent model jobs may race while creating shared parent directories: accept only `AlreadyExists`, immediately re-read with `symlink_metadata`, and reject link/reparse-like or non-directory entries before descending.
 
-Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI chooses official vs China mirror (default official). Legacy `auto`/`custom` migrate silently to official. Native model URLs derive from the selected profile and exact bundled manifest; the China profile uses `https://hf-mirror.com`. Historical Python source rows remain rollback metadata only.
+Download sources: `src-tauri/resources/runtime-dependency-sources.json`. UI chooses official vs China mirror (default official). Legacy `auto`/`custom` migrate silently to official. Native model URLs derive from the selected profile and exact bundled manifest; the China profile uses `https://hf-mirror.com`.
 
 ## Probe / Prepare / Cleanup UX Contract
 
@@ -95,8 +94,10 @@ The original CT2 CPU payload below applies to `nativeAsrCpu`, not every current 
 enum RuntimeDependencyKind {
     Ffmpeg,
     NativeAsrCpu,
-    Python311, // accepted legacy input; not emitted by T16 production probe/measure
-    AsrVenv,   // accepted legacy input; not emitted by T16 production probe/measure
+    NativeAsrCuda,
+    CrispasrCpu,
+    CrispasrCuda,
+    LegacyPython,
     AsrModels,
     Downloads,
     AppCache,
@@ -115,7 +116,7 @@ async fn probe_runtime_dependencies(app: AppHandle, asr_state: State<'_, AsrStat
 - Probe remains status/path/version only. Runtime reads and model hashing use `spawn_blocking`; probe never calls recursive `dir_size`.
 - Explicit storage measurement emits managed FFmpeg when applicable, bounded `deps/models`, `deps/downloads`, and application work cache. It emits no legacy `python311`/`asrVenv` or bundled-runtime storage item; `legacyPython` is a separate conditional cleanup-only item.
 - `asrModels` cleanup targets only executable-adjacent `deps/models`; `downloads` remains `deps/downloads`; app-cache cleanup preserves current-video workspace/proxy data.
-- Legacy Python/venv enum variants may remain temporarily for rollback compatibility, but production payloads do not offer them.
+- Legacy `Python311`/`AsrVenv` enum variants and installer paths have been removed; only `LegacyPython` cleanup remains for upgrading installations.
 
 ### 4. Validation & Error Matrix
 
@@ -197,7 +198,7 @@ Exact `nvidia/parakeet-tdt_ctc-0.6b-ja` uses cstr F16 GGUF at immutable revision
 - ASR installs under `deps/models/crispasr/parakeet/nvidia/parakeet-tdt_ctc-0.6b-ja/<revision>`. A logical download/readiness unit includes the identical existing shared Silero asset; combined size is 1,247,817,898 bytes. Reuse the existing stages, Range restart/resume, hash verification, atomic publication, VAD publication mutex and cleanup storage lease. Different references to the same shared VAD are a manifest error.
 - There is no per-model cleanup/download-cancel API. Parakeet staging/repair must not remove shared VAD or sibling Qwen installs; the existing explicit all-model storage cleanup still owns the complete managed models root.
 - Private model-backed tests may exercise managed complete-partial publication and host/ASS without overriding public support. They are not proof that the immutable Qwen-only published runtime contains Parakeet.
-- The existing full-CLI packager generates a fresh `shared-*` CPU/CUDA candidate with exact ordered engines `["qwen3-asr", "parakeet", "reazonspeech-nemo"]`, complete four/seven-DLL closure and full model-source credit. Default builds embed the verified published shared-v3 authority; exact shared-v2 rollback bytes remain in `crispasr-product-lock-v2.json`, and Qwen-only rollback remains in `crispasr-product-lock-v1.json`. Absolute `HIKARU_CRISPASR_CANDIDATE_LOCK` selects an immutable candidate at build time across resource preparation, Rust embedding and portable packaging; running apps never read it or a mutable external lock. Default source rows point to shared-v3: 719,771,622 bytes, SHA-256 `5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0`; both official and ghfast.top bytes were verified. Old remote assets are untouched.
+- The existing full-CLI packager generates a fresh `shared-*` CPU/CUDA candidate with exact ordered engines `["qwen3-asr", "parakeet", "reazonspeech-nemo"]`, complete four/seven-DLL closure and full model-source credit. Default builds embed `native-asr/runtime/crispasr-product-lock.json`; historical rollback lock files (`crispasr-product-lock-v1.json`, `crispasr-product-lock-v2.json`) and superseded local CPU zips have been removed from the repository. Absolute `HIKARU_CRISPASR_CANDIDATE_LOCK` selects an immutable candidate at build time across resource preparation, Rust embedding and portable packaging; running apps never read it or a mutable external lock. Old remote assets remain untouched.
 - Local extracted NSIS/portable file/probe checks and real short-path portable WebView CPU/CUDA selection/start/frontend ASS save are recorded separately. Synthetic file-drop and a verified preseeded audio cache were used; this is not manual install/uninstall or a fresh model network download. No release readiness or support beyond measured hardware is inferred.
 
 ### 4. Validation & Error Matrix

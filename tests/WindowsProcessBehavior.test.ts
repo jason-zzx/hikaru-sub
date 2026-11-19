@@ -16,9 +16,8 @@ describe("Windows child process behavior", () => {
     expect(processSource).toContain("creation_flags");
   });
 
-  it("starts Python and FFmpeg through the hidden command helper", () => {
-    expect(readSource("asr.rs")).toContain("hidden_command(python)");
+  it("starts FFmpeg and native ASR workers through the hidden command helper", () => {
+    expect(readSource("asr_worker.rs")).toContain("hidden_command");
     expect(readSource("ffmpeg.rs")).toContain("hidden_command");
-    expect(readSource("asr_setup.rs")).toContain("hidden_command");
   });
 });

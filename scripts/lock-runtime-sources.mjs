@@ -23,13 +23,6 @@ const officialSources = {
       "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
     archive: "zip",
   },
-  python311: {
-    url:
-      process.env.RUNTIME_OFFICIAL_PYTHON311_URL ??
-      "https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
-    archive: "tar.gz",
-    stripPrefix: "python",
-  },
 };
 
 const chinaSources = {
@@ -38,13 +31,6 @@ const chinaSources = {
       process.env.RUNTIME_CHINA_FFMPEG_URL ??
       "https://ghfast.top/https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n7.1.5-1-g7d0e842004-win64-gpl-7.1.zip",
     archive: "zip",
-  },
-  python311: {
-    url:
-      process.env.RUNTIME_CHINA_PYTHON311_URL ??
-      "https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
-    archive: "tar.gz",
-    stripPrefix: "python",
   },
 };
 
@@ -74,22 +60,16 @@ async function sourceWithDigest(source, name) {
 }
 
 async function main() {
+  const existing = JSON.parse(await readFile(outPath, "utf8"));
+  const existingProfiles = existing.platforms?.["windows-x64"] ?? {};
   const officialFfmpeg = await sourceWithDigest(
     officialSources.ffmpeg,
     "official-ffmpeg-windows.zip",
-  );
-  const officialPython = await sourceWithDigest(
-    officialSources.python311,
-    "official-python311-windows.tar.gz",
   );
   const chinaFfmpeg =
     chinaSources.ffmpeg.url === officialSources.ffmpeg.url
       ? officialFfmpeg
       : await sourceWithDigest(chinaSources.ffmpeg, "china-ffmpeg-windows.zip");
-  const chinaPython =
-    chinaSources.python311.url === officialSources.python311.url
-      ? officialPython
-      : await sourceWithDigest(chinaSources.python311, "china-python311-windows.tar.gz");
 
   const manifest = {
     schemaVersion: 1,
@@ -100,31 +80,25 @@ async function main() {
           id: "official",
           label: "官方源",
           ffmpeg: officialFfmpeg,
-          python311: officialPython,
-          pipIndexUrl: "https://pypi.org/simple",
-          pipExtraIndexUrls: [],
-          pytorchCpuIndexUrl: "https://download.pytorch.org/whl/cpu",
-          pytorchCudaIndexUrl: "https://download.pytorch.org/whl/cu126",
-          pytorchCpuFindLinksUrl: null,
-          pytorchCudaFindLinksUrl: null,
+          ...(existingProfiles.official?.nativeAsrCuda
+            ? { nativeAsrCuda: existingProfiles.official.nativeAsrCuda }
+            : {}),
           huggingfaceEndpoint: null,
+          ...(existingProfiles.official?.crispasrCuda
+            ? { crispasrCuda: existingProfiles.official.crispasrCuda }
+            : {}),
         },
         china: {
           id: "china",
           label: "中国大陆镜像",
           ffmpeg: chinaFfmpeg,
-          python311: chinaPython,
-          pipIndexUrl: "https://pypi.tuna.tsinghua.edu.cn/simple",
-          pipExtraIndexUrls: ["https://pypi.org/simple"],
-          pytorchCpuIndexUrl: null,
-          pytorchCudaIndexUrl: null,
-          pytorchCpuFindLinksUrl:
-            process.env.RUNTIME_CHINA_PYTORCH_CPU_FIND_LINKS_URL ??
-            "https://mirrors.aliyun.com/pytorch-wheels/cpu/",
-          pytorchCudaFindLinksUrl:
-            process.env.RUNTIME_CHINA_PYTORCH_CUDA_FIND_LINKS_URL ??
-            "https://mirrors.aliyun.com/pytorch-wheels/cu126/",
+          ...(existingProfiles.china?.nativeAsrCuda
+            ? { nativeAsrCuda: existingProfiles.china.nativeAsrCuda }
+            : {}),
           huggingfaceEndpoint: "https://hf-mirror.com",
+          ...(existingProfiles.china?.crispasrCuda
+            ? { crispasrCuda: existingProfiles.china.crispasrCuda }
+            : {}),
         },
       },
     },

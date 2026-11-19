@@ -6,12 +6,10 @@ Owner-authorized dependency publication completed on the existing `native-asr-cu
 release: **`hikaru-asr-crispasr-windows-x64-cuda-shared-v3.zip`**, 719,771,622 bytes,
 SHA-256 `5d927f797b149521fe68bb842db17a782592a4837a7ea54cf8d9b9c47b2f76b0`.
 Official GitHub and normal `https://ghfast.top/` source downloads both match and pass
-isolated closure, three-engine authorization and CUDA probe checks. Default
-`../crispasr-product-lock.json` embeds Qwen+Parakeet+ReazonSpeech on both devices with
+isolated closure, three-engine authorization and CUDA probe checks. Default `../crispasr-product-lock.json` embeds Qwen+Parakeet+ReazonSpeech on both devices with
 truthful publication flags. Ordinary builds require no candidate environment input.
-CPU archive is `native-asr/artifacts/crispasr-cpu-shared-v4.zip`; CUDA remains separate/on-demand.
-Exact shared-v2 rollback authority is retained at `../crispasr-product-lock-v2.json`;
-Qwen-only v1, old remote assets and historical proofs are untouched. This dependency
+Current bundled CPU archive is referenced by `../crispasr-product-lock.json` (`native-asr/artifacts/crispasr-cpu-shared-vad-local.zip`); CUDA remains separate/on-demand.
+Historical local rollback locks (`crispasr-product-lock-v1.json`, `crispasr-product-lock-v2.json`) and superseded CPU zips have been cleaned from the repo; old remote assets and historical proofs remain untouched. This dependency
 publication is not an application release. A candidate build still uses its explicit
 unpublished lock; do not pass the published lock as a candidate input.
 

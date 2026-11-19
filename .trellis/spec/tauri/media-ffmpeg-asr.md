@@ -639,12 +639,11 @@ Wrong:   T12 rewires public model commands while start_asr still defaults to Pyt
 Correct: T12 lands the internal seam -> T16/T17 wire contracts -> T18 cuts over production
 ```
 
-## Legacy ASR Sidecar Source
+## Native ASR Boundary
 
 - Production/default inference and model management use the independent Native worker; Tauri does not start or fall back to the Python FastAPI sidecar.
-- Legacy sidecar/setup source in `asr.rs` and `asr_setup.rs` may remain for one stable release cycle as rollback/diagnostic evidence, but no frontend caller or packaged `asr-service` resource exposes it.
-- App exit calls idempotent `AsrState.shutdown()` so active Native workers and any explicitly constructed legacy test process share cleanup policy; `lib.rs` must not reach into process fields.
-- Legacy `HIKARU_ASR_DEBUG_LOG`/`deps/asr-service/asr-debug.log` guidance applies only to intentional sidecar development or rollback testing, not production model downloads.
+- Legacy Rust sidecar/setup code (`asr_setup.rs` and the legacy sidecar route in `asr.rs`) has been removed; repo-root `asr-service/` remains only as standalone development/historical reference source.
+- App exit calls idempotent `AsrState.shutdown()` to terminate active Native workers; `lib.rs` must not reach into process fields.
 - Rust owns orchestration only. The independent Native worker owns production inference; do not run model inference inside the Tauri process.
 
 ## ASS Files on Disk

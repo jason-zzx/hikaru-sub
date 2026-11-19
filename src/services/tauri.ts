@@ -19,8 +19,6 @@ import type {
   ProbeDownloadMediaArgs,
   PreviewFontFile,
   PrepareRuntimeDependencyArgs,
-  RenderSubtitlePreviewFrameArgs,
-  RenderSubtitlePreviewFrameResult,
   RuntimeDependencyKind,
   RuntimeDependencyProbe,
   RuntimeDependencySnapshot,
@@ -174,10 +172,6 @@ export function transcribedAssPath(session: VideoSession): string {
 
 export function translatedAssPath(session: VideoSession): string {
   return session.translatedAssPath;
-}
-
-export function workspaceDirFromSession(session: VideoSession): string {
-  return session.workspacePath;
 }
 
 export async function saveSubtitleRecovery(
@@ -346,16 +340,6 @@ export async function discoverPreviewFonts(
   extraDirs: string[] = [],
 ): Promise<PreviewFontFile[]> {
   return invoke<PreviewFontFile[]>("discover_preview_fonts", { extraDirs });
-}
-
-/** 通过 FFmpeg/libass 渲染一帧硬字幕预览图。 */
-export async function renderSubtitlePreviewFrame(
-  args: RenderSubtitlePreviewFrameArgs,
-): Promise<RenderSubtitlePreviewFrameResult> {
-  return invoke<RenderSubtitlePreviewFrameResult>(
-    "render_subtitle_preview_frame",
-    { args },
-  );
 }
 
 /** 探测 m3u8 媒体流信息。 */

@@ -326,18 +326,6 @@ export interface PreviewFontFile {
   fontNames?: string[];
 }
 
-export interface RenderSubtitlePreviewFrameArgs {
-  videoPath: string;
-  assText: string;
-  timeMs: number;
-  fontDir?: string | null;
-}
-
-export interface RenderSubtitlePreviewFrameResult {
-  imagePath: string;
-  imageUrl: string;
-}
-
 export type DownloadMode = "single" | "separate";
 
 export type DownloadStatus =

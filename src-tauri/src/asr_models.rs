@@ -1554,17 +1554,13 @@ mod tests {
     #[test]
     fn manifest_source_profiles_select_official_and_china_endpoints() {
         let official: RuntimeDependencySourceProfile = serde_json::from_value(serde_json::json!({
-            "id": "official", "label": "official", "ffmpeg": null, "python311": null,
-            "pipIndexUrl": null, "pipExtraIndexUrls": [], "pytorchCpuIndexUrl": null,
-            "pytorchCudaIndexUrl": null, "pytorchCpuFindLinksUrl": null,
-            "pytorchCudaFindLinksUrl": null, "huggingfaceEndpoint": "https://ignored.example"
+            "id": "official", "label": "official", "ffmpeg": null,
+            "huggingfaceEndpoint": "https://ignored.example"
         }))
         .unwrap();
         let china: RuntimeDependencySourceProfile = serde_json::from_value(serde_json::json!({
-            "id": "china", "label": "china", "ffmpeg": null, "python311": null,
-            "pipIndexUrl": null, "pipExtraIndexUrls": [], "pytorchCpuIndexUrl": null,
-            "pytorchCudaIndexUrl": null, "pytorchCpuFindLinksUrl": null,
-            "pytorchCudaFindLinksUrl": null, "huggingfaceEndpoint": "https://hf-mirror.com"
+            "id": "china", "label": "china", "ffmpeg": null,
+            "huggingfaceEndpoint": "https://hf-mirror.com"
         }))
         .unwrap();
         assert_eq!(source_endpoint(&official).unwrap(), OFFICIAL_ENDPOINT);

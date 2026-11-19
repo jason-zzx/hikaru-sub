@@ -13,7 +13,7 @@ Documented product rule (see `/AGENTS.md`): `measure_runtime_dependency_storage`
 | `dependencies.rs` | `probe_runtime_dependencies`, `measure_runtime_dependency_storage`, cleanup paths use `spawn_blocking` |
 | `fonts.rs` | `discover_preview_fonts` scans fonts off the async worker |
 | `ffmpeg.rs` | Heavy extract / probe work offloaded |
-| `asr.rs` / `asr_setup.rs` | Sidecar / setup blocking sections offloaded |
+| `asr.rs` | Native ASR runtime probe and host lifecycle calls offloaded |
 | `download.rs`, `clip.rs`, `burn.rs` | Job internals / blocking sections use `spawn_blocking` |
 
 ## Probe vs Measure

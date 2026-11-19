@@ -1,10 +1,8 @@
 mod app_paths;
 mod asr;
 mod asr_models;
-mod asr_setup;
 mod asr_worker;
 mod ass;
-mod asset_scope;
 mod burn;
 mod clip;
 mod dependencies;
@@ -17,7 +15,6 @@ mod hls_playlist;
 mod hls_types;
 mod lifecycle;
 mod media_server;
-mod preview;
 mod process;
 mod project;
 mod settings;
@@ -44,14 +41,10 @@ pub fn run() {
     }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_persisted_scope::init())
         .manage(asr::AsrState::default())
-        .manage(asr_setup::AsrSetupState::default())
         .manage(dependencies::RuntimeDependencyState::default())
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
@@ -83,16 +76,9 @@ pub fn run() {
             asr::check_asr_model,
             asr::download_asr_model,
             asr::get_model_download_progress,
-            asr_setup::probe_asr_setup_environment,
-            asr_setup::start_asr_setup,
-            asr_setup::get_asr_setup_progress,
-            asr_setup::cancel_asr_setup,
             ass::save_ass_text,
             ass::load_ass_text,
-            asset_scope::allow_asset_path,
             media_server::register_media_playback,
-            preview::render_subtitle_preview_frame,
-            transcode::detect_video_codec,
             transcode::probe_video_playback,
             transcode::start_transcode,
             transcode::check_transcode_progress,
@@ -137,9 +123,6 @@ pub fn run() {
                     state.shutdown();
                 }
                 if let Some(state) = app_handle.try_state::<clip::ClipState>() {
-                    state.shutdown();
-                }
-                if let Some(state) = app_handle.try_state::<asr_setup::AsrSetupState>() {
                     state.shutdown();
                 }
                 if let Some(state) = app_handle.try_state::<dependencies::RuntimeDependencyState>()

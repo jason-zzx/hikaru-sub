@@ -18,7 +18,6 @@ export {
   parseAssColor,
   rgbaToAssColor,
   assColorToCss,
-  hexToAssColor,
 } from "./color";
 
 export {
@@ -55,10 +54,8 @@ export {
 export {
   type AsrSegment,
   type MergeOptions,
-  type SplitOptions,
   segmentsToCues,
   mergeShortCues,
-  splitLongCues,
 } from "./postprocess";
 
 export {

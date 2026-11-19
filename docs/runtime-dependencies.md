@@ -87,8 +87,6 @@ deps/       # managed FFmpeg, models, and downloads
 
 The portable directory must be writable. If initialization fails, Hikaru Sub reports a fatal startup error and exits without locking the process into portable mode.
 
-`tauri-plugin-persisted-scope` may still leave a small scope file in the system application-data directory. Hikaru Sub does not rewrite global `APPDATA` or `LOCALAPPDATA` environment variables to suppress that file.
-
 ## Working cache
 
 The application cache owns only generated working data and media:

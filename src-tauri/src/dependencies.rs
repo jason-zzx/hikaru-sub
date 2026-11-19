@@ -11,7 +11,7 @@ use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex as StdMutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
@@ -219,8 +219,6 @@ pub enum RuntimeDependencyKind {
     NativeAsrCuda,
     CrispasrCpu,
     CrispasrCuda,
-    Python311,
-    AsrVenv,
     LegacyPython,
     AsrModels,
     Downloads,
@@ -286,14 +284,6 @@ pub struct RuntimeDependencySourceProfile {
     pub native_asr_cuda: Option<RuntimeDependencyBinarySource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crispasr_cuda: Option<RuntimeDependencyBinarySource>,
-    pub python311: Option<RuntimeDependencyBinarySource>,
-    pub pip_index_url: Option<String>,
-    #[serde(default)]
-    pub pip_extra_index_urls: Vec<String>,
-    pub pytorch_cpu_index_url: Option<String>,
-    pub pytorch_cuda_index_url: Option<String>,
-    pub pytorch_cpu_find_links_url: Option<String>,
-    pub pytorch_cuda_find_links_url: Option<String>,
     pub huggingface_endpoint: Option<String>,
 }
 
@@ -357,8 +347,6 @@ pub struct PrepareRuntimeDependencyArgs {
     #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]
-    pub profile: Option<crate::asr_setup::AsrSetupProfile>,
-    #[serde(default)]
     pub recreate: bool,
 }
 
@@ -384,32 +372,6 @@ pub struct RuntimeDependencySnapshot {
     pub resolved_path: Option<String>,
     pub log_tail: Vec<String>,
     pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PythonCommand {
-    pub program: String,
-    pub args: Vec<String>,
-}
-
-impl PythonCommand {
-    pub fn display(&self) -> String {
-        if self.args.is_empty() {
-            self.program.clone()
-        } else {
-            format!("{} {}", self.program, self.args.join(" "))
-        }
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResolvedPython {
-    pub command: String,
-    pub version: String,
-    pub source: String,
-    pub managed: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -567,111 +529,8 @@ fn managed_native_asr_cuda_download_dir(app: &AppHandle) -> Result<PathBuf, Stri
     Ok(downloads_dir(app)?.join("native-asr-cuda"))
 }
 
-pub fn managed_python_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(deps_dir(app)?.join("python311").join("current"))
-}
-
-pub fn managed_asr_service_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(deps_dir(app)?.join("asr-service"))
-}
-
-/// 判断目录是否为源码仓库 checkout 根下的 `asr-service`（与 settings 启发式对齐）。
-///
-/// 必须等于 `repo/asr-service`，避免把仓库树内的 `resources/asr-service`、
-/// `target/*/deps/asr-service` 等误判为源码服务目录。
-pub fn is_source_checkout_asr_service_dir(service_dir: &Path) -> bool {
-    if !service_dir.join("main.py").is_file() {
-        return false;
-    }
-    service_dir.ancestors().any(|ancestor| {
-        looks_like_repo_root(ancestor)
-            && paths_loosely_equal(service_dir, &ancestor.join("asr-service"))
-    })
-}
-
-fn paths_loosely_equal(left: &Path, right: &Path) -> bool {
-    match (left.canonicalize(), right.canonicalize()) {
-        (Ok(left), Ok(right)) => left == right,
-        _ => left == right,
-    }
-}
-
-fn looks_like_repo_root(dir: &Path) -> bool {
-    dir.join("src-tauri").join("tauri.conf.json").is_file()
-        && (dir.join("package.json").is_file() || dir.join("pnpm-workspace.yaml").is_file())
-        && dir.join("asr-service").join("main.py").is_file()
-}
-
-/// 从起点向上查找仓库根；`cwd_hint` 可覆盖 `current_dir`（便于测试）。
-pub fn find_source_checkout_root(exe_path: &Path, cwd_hint: Option<&Path>) -> Option<PathBuf> {
-    let mut starts = Vec::new();
-    if let Some(cwd) = cwd_hint {
-        starts.push(cwd.to_path_buf());
-    } else if let Ok(cwd) = std::env::current_dir() {
-        starts.push(cwd);
-    }
-    starts.push(exe_path.to_path_buf());
-    if let Some(parent) = exe_path.parent() {
-        starts.push(parent.to_path_buf());
-    }
-
-    for start in starts {
-        for ancestor in start.ancestors() {
-            if looks_like_repo_root(ancestor) {
-                return Some(ancestor.to_path_buf());
-            }
-        }
-    }
-    None
-}
-
-/// 解析当前应使用的 ASR 服务目录（纯函数，便于单测）。
-///
-/// 顺序：有效配置路径 →（prefer_source_checkout 时）仓库 `asr-service` → exe 旁 `deps/asr-service`。
-pub fn resolve_effective_asr_service_dir(
-    configured: Option<&str>,
-    exe_path: &Path,
-    prefer_source_checkout: bool,
-    cwd_hint: Option<&Path>,
-) -> Result<PathBuf, String> {
-    if let Some(path) = configured.map(str::trim).filter(|s| !s.is_empty()) {
-        let dir = PathBuf::from(path);
-        if dir.join("main.py").is_file() {
-            return Ok(dir);
-        }
-    }
-
-    if prefer_source_checkout {
-        if let Some(root) = find_source_checkout_root(exe_path, cwd_hint) {
-            let service = root.join("asr-service");
-            if service.join("main.py").is_file() {
-                return Ok(service);
-            }
-        }
-    }
-
-    Ok(deps_dir_from_exe(exe_path)?.join("asr-service"))
-}
-
-/// 当前运行时有效的 ASR 服务目录（debug 优先仓库，release 用安装目录 deps）。
-pub fn effective_asr_service_dir(
-    _app: &AppHandle,
-    configured: Option<&str>,
-) -> Result<PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    resolve_effective_asr_service_dir(configured, &exe, cfg!(debug_assertions), None)
-}
-
 pub fn managed_model_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(managed_models_dir(app)?.join("huggingface"))
-}
-
-pub fn managed_asr_venv_python_path(service_dir: &Path) -> PathBuf {
-    if cfg!(windows) {
-        service_dir.join(".venv").join("Scripts").join("python.exe")
-    } else {
-        service_dir.join(".venv").join("bin").join("python")
-    }
 }
 
 fn deps_writability_probe_path(deps_root: &Path) -> PathBuf {
@@ -747,148 +606,6 @@ fn exe_name(base: &str) -> String {
     } else {
         base.to_string()
     }
-}
-
-pub fn python_version(command: &PythonCommand) -> Result<String, String> {
-    let output = hidden_command(&command.program)
-        .args(&command.args)
-        .args([
-            "-c",
-            "import sys; print('.'.join(map(str, sys.version_info[:3]))); raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)",
-        ])
-        .output()
-        .map_err(|e| format!("无法启动 Python（{}）：{e}", command.display()))?;
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if output.status.success() {
-        Ok(stdout)
-    } else if stdout.is_empty() {
-        Err(format!("不是可用的 Python 3.11：{}", command.display()))
-    } else {
-        Err(format!("不是 Python 3.11：{stdout}"))
-    }
-}
-
-/// Python 3.11 候选：设置路径 → 系统 →（可选）额外解释器 →（可选）受管目录。
-///
-/// 开发环境通常传 `extra_python_exe`（`asr-service/.venv`），不传受管 `deps/python311`；
-/// 发布版传受管目录，不传仓库 venv。
-pub fn python311_candidates(
-    settings: &AppSettings,
-    managed_python: Option<&Path>,
-    extra_python_exe: Option<&Path>,
-) -> Vec<PythonCommand> {
-    let mut candidates = Vec::new();
-    if let Some(path) = settings
-        .python_path
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-    {
-        candidates.push(PythonCommand {
-            program: path.into(),
-            args: vec![],
-        });
-    }
-    if cfg!(windows) {
-        candidates.push(PythonCommand {
-            program: "py".into(),
-            args: vec!["-3.11".into()],
-        });
-        candidates.push(PythonCommand {
-            program: "python".into(),
-            args: vec![],
-        });
-        candidates.push(PythonCommand {
-            program: "python3".into(),
-            args: vec![],
-        });
-        candidates.push(PythonCommand {
-            program: "python3.11".into(),
-            args: vec![],
-        });
-    } else {
-        candidates.push(PythonCommand {
-            program: "python3.11".into(),
-            args: vec![],
-        });
-        candidates.push(PythonCommand {
-            program: "python3".into(),
-            args: vec![],
-        });
-        candidates.push(PythonCommand {
-            program: "python".into(),
-            args: vec![],
-        });
-    }
-    if let Some(exe) = extra_python_exe.filter(|path| path.is_file()) {
-        candidates.push(PythonCommand {
-            program: exe.to_string_lossy().into_owned(),
-            args: vec![],
-        });
-    }
-    if let Some(dir) = managed_python {
-        if let Some(exe) = find_managed_python_executable(dir) {
-            candidates.push(PythonCommand {
-                program: exe.to_string_lossy().into_owned(),
-                args: vec![],
-            });
-        }
-    }
-    candidates
-}
-
-/// 开发环境：系统之后回退到仓库 `asr-service/.venv`；发布版：回退到 `deps/python311`。
-pub(crate) fn python311_lookup_fallbacks(
-    app: &AppHandle,
-    settings: &AppSettings,
-) -> (Option<PathBuf>, Option<PathBuf>) {
-    if cfg!(debug_assertions) {
-        let venv = effective_asr_service_dir(app, settings.asr_service_path.as_deref())
-            .ok()
-            .map(|service| managed_asr_venv_python_path(&service));
-        (None, venv)
-    } else {
-        (managed_python_dir(app).ok(), None)
-    }
-}
-
-#[allow(dead_code)]
-pub fn resolve_python311(app: &AppHandle, settings: &AppSettings) -> Option<ResolvedPython> {
-    let (managed, venv_exe) = python311_lookup_fallbacks(app, settings);
-    let settings_path = settings
-        .python_path
-        .as_deref()
-        .filter(|s| !s.trim().is_empty());
-    let venv_program = venv_exe
-        .as_deref()
-        .filter(|path| path.is_file())
-        .map(|path| path.to_string_lossy().into_owned());
-    python311_candidates(settings, managed.as_deref(), venv_exe.as_deref())
-        .into_iter()
-        .find_map(|candidate| {
-            let version = python_version(&candidate).ok()?;
-            let managed_path = managed.as_deref().is_some_and(|dir| {
-                path_is_under(Path::new(&candidate.program), dir)
-                    || Path::new(&candidate.program) == dir.join("python.exe")
-            });
-            let venv_path = venv_program
-                .as_deref()
-                .is_some_and(|path| path == candidate.program);
-            let source = if settings_path == Some(candidate.program.as_str()) {
-                "settings"
-            } else if managed_path {
-                "managed"
-            } else if venv_path {
-                "venv"
-            } else {
-                "system"
-            };
-            Some(ResolvedPython {
-                command: candidate.display(),
-                version,
-                source: source.into(),
-                managed: managed_path,
-            })
-        })
 }
 
 pub fn peer_ffprobe_path(ffmpeg_path: &str) -> String {
@@ -1604,36 +1321,12 @@ fn extract_archive(
     }
 }
 
-fn python_runtime_download_file_name(archive: RuntimeDependencyArchive) -> &'static str {
+fn legacy_python_download_file_name(archive: RuntimeDependencyArchive) -> &'static str {
     match archive {
         RuntimeDependencyArchive::Zip => "python311-runtime.zip",
         RuntimeDependencyArchive::TarGz => "python311-runtime.tar.gz",
         RuntimeDependencyArchive::TarXz => "python311-runtime.tar.xz",
         RuntimeDependencyArchive::WindowsInstaller => "python311-runtime.exe",
-    }
-}
-
-fn archive_payload_root(root: &Path, strip_prefix: Option<&str>) -> Result<PathBuf, String> {
-    let Some(prefix) = strip_prefix else {
-        return Ok(root.to_path_buf());
-    };
-    let prefix_path = Path::new(prefix);
-    let safe_prefix = !prefix_path.is_absolute()
-        && prefix_path
-            .components()
-            .all(|component| matches!(component, Component::Normal(_)));
-    if !safe_prefix {
-        return Err(format!("归档 stripPrefix 不安全：{prefix}"));
-    }
-
-    let payload = root.join(prefix_path);
-    if payload.is_dir() {
-        Ok(payload)
-    } else {
-        Err(format!(
-            "归档中未找到 stripPrefix 目录：{}",
-            payload.display()
-        ))
     }
 }
 
@@ -1656,109 +1349,6 @@ fn find_file_by_name(root: &Path, name: &str) -> Option<PathBuf> {
         }
     }
     None
-}
-
-fn find_managed_python_executable(root: &Path) -> Option<PathBuf> {
-    let preferred = if cfg!(windows) {
-        root.join("python.exe")
-    } else {
-        root.join("bin").join("python3")
-    };
-    if preferred.is_file() {
-        return Some(preferred);
-    }
-    let fallback = if cfg!(windows) {
-        "python.exe"
-    } else {
-        "python"
-    };
-    find_file_by_name(root, fallback)
-}
-
-async fn wait_for_usable_managed_python(root: &Path) -> Result<(PathBuf, String), String> {
-    let mut last_error = None;
-    for attempt in 0..30 {
-        if let Some(python) = find_managed_python_executable(root) {
-            let command = PythonCommand {
-                program: python.to_string_lossy().into_owned(),
-                args: vec![],
-            };
-            match python_version(&command) {
-                Ok(version) => return Ok((python, version)),
-                Err(error) => last_error = Some(error),
-            }
-        }
-        if attempt < 29 {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-    }
-    Err(last_error.unwrap_or_else(|| missing_managed_python_message(root)))
-}
-
-fn directory_snapshot(root: &Path) -> String {
-    let Ok(entries) = fs::read_dir(root) else {
-        return "无法读取安装目录".into();
-    };
-    let mut names = entries
-        .filter_map(Result::ok)
-        .map(|entry| {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if entry.path().is_dir() {
-                format!("{name}/")
-            } else {
-                name
-            }
-        })
-        .collect::<Vec<_>>();
-    names.sort();
-    if names.is_empty() {
-        "安装目录为空".into()
-    } else {
-        names.join(", ")
-    }
-}
-
-fn missing_managed_python_message(root: &Path) -> String {
-    format!(
-        "Python 安装完成后未找到 python.exe（{}）。目录内容：{}",
-        root.display(),
-        directory_snapshot(root)
-    )
-}
-
-fn python_installer_args(target: &Path, log_path: &Path) -> Vec<String> {
-    let target_dir = target.to_string_lossy();
-    vec![
-        "/quiet".into(),
-        "InstallAllUsers=0".into(),
-        format!("TargetDir={target_dir}"),
-        format!("DefaultJustForMeTargetDir={target_dir}"),
-        "Include_pip=1".into(),
-        "Include_launcher=0".into(),
-        "Include_tcltk=0".into(),
-        "Include_test=0".into(),
-        "Include_doc=0".into(),
-        "Shortcuts=0".into(),
-        "PrependPath=0".into(),
-        "/log".into(),
-        log_path.to_string_lossy().into_owned(),
-    ]
-}
-
-fn cleanup_stale_current_temp_dirs(target: &Path) {
-    let Some(parent) = target.parent() else {
-        return;
-    };
-    let Ok(entries) = fs::read_dir(parent) else {
-        return;
-    };
-    for entry in entries.filter_map(Result::ok) {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if path.is_dir() && name.starts_with("current.") {
-            let _ = fs::remove_dir_all(path);
-        }
-    }
 }
 
 fn replace_dir_with_temp(temp: &Path, target: &Path) -> Result<(), String> {
@@ -1931,138 +1521,6 @@ async fn prepare_native_asr_cuda(
     Ok(target.to_string_lossy().into_owned())
 }
 
-async fn prepare_python311(
-    app: &AppHandle,
-    job: &Arc<StdMutex<RuntimeDependencyJob>>,
-    profile: &RuntimeDependencySourceProfile,
-) -> Result<String, String> {
-    if !cfg!(windows) {
-        return Err("当前实现只支持在 Windows 上自动安装受管 Python 3.11".into());
-    }
-    let source = profile
-        .python311
-        .as_ref()
-        .ok_or_else(|| "当前下载源没有 Python 3.11 配置".to_string())?;
-    let target = managed_python_dir(app)?;
-    cleanup_stale_current_temp_dirs(&target);
-
-    if source.archive == RuntimeDependencyArchive::WindowsInstaller {
-        let installer = download_binary_source(
-            app,
-            job,
-            source,
-            python_runtime_download_file_name(source.archive),
-        )
-        .await?;
-        let temp = target.with_file_name(format!("current.{}", unique_suffix()));
-        let install_log = downloads_dir(app)?.join("python311-install.log");
-        if temp.exists() {
-            fs::remove_dir_all(&temp).map_err(|e| e.to_string())?;
-        }
-        fs::create_dir_all(&temp).map_err(|e| e.to_string())?;
-        let _ = fs::remove_file(&install_log);
-
-        set_stage(job, "安装 Python 3.11", Some(0.45));
-        if let Ok(mut guard) = job.lock() {
-            push_log(&mut guard, format!("安装日志：{}", install_log.display()));
-        }
-        let installer_args = python_installer_args(&temp, &install_log);
-        let status = hidden_command(&installer)
-            .args(&installer_args)
-            .status()
-            .map_err(|e| format!("安装 Python 3.11 失败：{e}"))?;
-        if !status.success() {
-            let _ = fs::remove_dir_all(&temp);
-            return Err(format!(
-                "安装 Python 3.11 失败：退出码 {:?}，安装日志：{}",
-                status.code(),
-                install_log.display()
-            ));
-        }
-
-        set_stage(job, "验证 Python 3.11", Some(0.85));
-        let (python, version) = match wait_for_usable_managed_python(&temp).await {
-            Ok(result) => result,
-            Err(e) => {
-                let message = format!(
-                    "{e}。安装目录内容：{}；安装日志：{}",
-                    directory_snapshot(&temp),
-                    install_log.display()
-                );
-                let _ = fs::remove_dir_all(&temp);
-                return Err(message);
-            }
-        };
-        let relative_python = python
-            .strip_prefix(&temp)
-            .map(PathBuf::from)
-            .map_err(|e| e.to_string())?;
-        if let Ok(mut guard) = job.lock() {
-            push_log(
-                &mut guard,
-                format!("使用 Python {version} ({})", python.display()),
-            );
-        }
-        replace_dir_with_temp(&temp, &target)?;
-        let _ = fs::remove_file(&installer);
-
-        return Ok(target.join(relative_python).to_string_lossy().into_owned());
-    }
-
-    let archive = download_binary_source(
-        app,
-        job,
-        source,
-        python_runtime_download_file_name(source.archive),
-    )
-    .await?;
-    let extract = downloads_dir(app)?.join(format!("python311-extract-{}", unique_suffix()));
-    set_stage(job, "解压 Python 3.11", Some(0.45));
-    extract_archive(&archive, &extract, source.archive)?;
-    let payload = archive_payload_root(&extract, source.strip_prefix.as_deref())?;
-
-    set_stage(job, "安装 Python 3.11", Some(0.70));
-    let temp = target.with_file_name(format!("current.{}", unique_suffix()));
-    if temp.exists() {
-        fs::remove_dir_all(&temp).map_err(|e| e.to_string())?;
-    }
-    if let Some(parent) = temp.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    fs::rename(&payload, &temp).map_err(|e| {
-        format!(
-            "移动 Python 运行时失败（{} -> {}）：{e}",
-            payload.display(),
-            temp.display()
-        )
-    })?;
-    let _ = fs::remove_dir_all(&extract);
-
-    set_stage(job, "验证 Python 3.11", Some(0.85));
-    let (python, version) = match wait_for_usable_managed_python(&temp).await {
-        Ok(result) => result,
-        Err(e) => {
-            let message = format!("{e}。安装目录内容：{}", directory_snapshot(&temp));
-            let _ = fs::remove_dir_all(&temp);
-            return Err(message);
-        }
-    };
-    let relative_python = python
-        .strip_prefix(&temp)
-        .map(PathBuf::from)
-        .map_err(|e| e.to_string())?;
-    if let Ok(mut guard) = job.lock() {
-        push_log(
-            &mut guard,
-            format!("使用 Python {version} ({})", python.display()),
-        );
-    }
-    replace_dir_with_temp(&temp, &target)?;
-    let _ = fs::remove_file(&archive);
-
-    Ok(target.join(relative_python).to_string_lossy().into_owned())
-}
-
 async fn run_prepare_job(
     app: AppHandle,
     job: Arc<StdMutex<RuntimeDependencyJob>>,
@@ -2079,9 +1537,6 @@ async fn run_prepare_job(
         if let Some(model) = args.model.as_deref() {
             push_log(&mut guard, format!("模型：{model}"));
         }
-        if let Some(profile) = args.profile {
-            push_log(&mut guard, format!("配置档：{profile:?}"));
-        }
         if args.recreate {
             push_log(&mut guard, "将重新创建受管依赖");
         }
@@ -2094,8 +1549,6 @@ async fn run_prepare_job(
         }
         RuntimeDependencyKind::NativeAsrCuda => prepare_native_asr_cuda(&app, &job, &profile).await,
         RuntimeDependencyKind::CrispasrCuda => crispasr::prepare(&app, &job, &profile).await,
-        RuntimeDependencyKind::Python311 => prepare_python311(&app, &job, &profile).await,
-        RuntimeDependencyKind::AsrVenv => Err("ASR 引擎依赖由 ASR 一键配置流程准备".into()),
         RuntimeDependencyKind::LegacyPython => Err("旧版 Python 转录环境仅支持清理".into()),
         RuntimeDependencyKind::AsrModels => Err("ASR 模型由模型管理器按具体引擎和模型下载".into()),
         RuntimeDependencyKind::Downloads => Err("下载缓存不需要准备".into()),
@@ -2183,7 +1636,7 @@ fn legacy_python_targets(deps: &Path) -> Result<Vec<PathBuf>, String> {
                 RuntimeDependencyArchive::WindowsInstaller,
             ]
             .iter()
-            .any(|kind| archive == python_runtime_download_file_name(*kind));
+            .any(|kind| archive == legacy_python_download_file_name(*kind));
             let is_extract = name
                 .strip_prefix("python311-extract-")
                 .is_some_and(|suffix| {
@@ -2296,25 +1749,6 @@ fn safe_remove_dir_under_deps(target: &Path, deps_root: &Path) -> Result<(), Str
     fs::remove_dir_all(&target).map_err(|e| format!("清理失败（{}）：{e}", target.display()))
 }
 
-/// 允许清理：exe 旁 deps 下路径，或源码仓库 `asr-service/.venv`（仅该目录）。
-fn safe_remove_runtime_dependency_dir(target: &Path, deps_root: &Path) -> Result<(), String> {
-    if !target.exists() {
-        return Ok(());
-    }
-    let canonical = target
-        .canonicalize()
-        .map_err(|e| format!("解析清理路径失败（{}）：{e}", target.display()))?;
-    if canonical.file_name().is_some_and(|name| name == ".venv") {
-        if let Some(service_dir) = canonical.parent() {
-            if is_source_checkout_asr_service_dir(service_dir) {
-                return fs::remove_dir_all(&canonical)
-                    .map_err(|e| format!("清理失败（{}）：{e}", canonical.display()));
-            }
-        }
-    }
-    safe_remove_dir_under_deps(target, deps_root)
-}
-
 fn cleanup_target_for_kind(
     app: &AppHandle,
     kind: RuntimeDependencyKind,
@@ -2326,11 +1760,6 @@ fn cleanup_target_for_kind(
         }
         RuntimeDependencyKind::NativeAsrCuda => managed_native_asr_cuda_dir(app),
         RuntimeDependencyKind::CrispasrCuda => Ok(crispasr::managed_root(app)?.join("current")),
-        RuntimeDependencyKind::Python311 => managed_python_dir(app),
-        RuntimeDependencyKind::AsrVenv => {
-            let settings = load_settings(app).unwrap_or_default();
-            Ok(effective_asr_service_dir(app, settings.asr_service_path.as_deref())?.join(".venv"))
-        }
         RuntimeDependencyKind::LegacyPython => Err("旧版 Python 环境需按固定清单清理".into()),
         RuntimeDependencyKind::AsrModels => managed_models_dir(app),
         RuntimeDependencyKind::Downloads => downloads_dir(app),
@@ -2681,8 +2110,6 @@ fn measure_runtime_dependency_storage_inner(
             | RuntimeDependencyKind::AppCache => true,
             RuntimeDependencyKind::NativeAsrCpu
             | RuntimeDependencyKind::CrispasrCpu
-            | RuntimeDependencyKind::Python311
-            | RuntimeDependencyKind::AsrVenv
             | RuntimeDependencyKind::LegacyPython => unreachable!(),
         };
         if kind == RuntimeDependencyKind::Ffmpeg && !managed {
@@ -2932,18 +2359,15 @@ pub async fn cleanup_runtime_dependency(
             return cleanup_legacy_python(&deps);
         }
         if kind == RuntimeDependencyKind::CrispasrCuda {
-            safe_remove_runtime_dependency_dir(&crispasr::managed_root(&app)?, &deps)?;
-            return safe_remove_runtime_dependency_dir(&crispasr::download_dir(&app)?, &deps);
+            safe_remove_dir_under_deps(&crispasr::managed_root(&app)?, &deps)?;
+            return safe_remove_dir_under_deps(&crispasr::download_dir(&app)?, &deps);
         }
         if kind == RuntimeDependencyKind::NativeAsrCuda {
-            safe_remove_runtime_dependency_dir(&managed_native_asr_cuda_root(&app)?, &deps)?;
-            return safe_remove_runtime_dependency_dir(
-                &managed_native_asr_cuda_download_dir(&app)?,
-                &deps,
-            );
+            safe_remove_dir_under_deps(&managed_native_asr_cuda_root(&app)?, &deps)?;
+            return safe_remove_dir_under_deps(&managed_native_asr_cuda_download_dir(&app)?, &deps);
         }
         let target = cleanup_target_for_kind(&app, kind)?;
-        safe_remove_runtime_dependency_dir(&target, &deps)
+        safe_remove_dir_under_deps(&target, &deps)
     })
     .await
     .map_err(|e| format!("清理运行时依赖失败：{e}"))?
@@ -2988,44 +2412,6 @@ mod tests {
     }
 
     #[test]
-    fn python311_candidates_put_user_path_first() {
-        let settings = AppSettings {
-            python_path: Some("C:/Python311/python.exe".into()),
-            ..Default::default()
-        };
-
-        let candidates = python311_candidates(
-            &settings,
-            Some(Path::new("C:/managed/python311/current")),
-            None,
-        );
-
-        assert_eq!(
-            candidates.first().unwrap().program,
-            "C:/Python311/python.exe"
-        );
-    }
-
-    #[test]
-    fn python311_candidates_put_extra_exe_after_system() {
-        let settings = AppSettings::default();
-        let temp = tempfile::tempdir().unwrap();
-        let exe = if cfg!(windows) {
-            temp.path().join("python.exe")
-        } else {
-            temp.path().join("python")
-        };
-        std::fs::write(&exe, "").unwrap();
-
-        let candidates = python311_candidates(&settings, None, Some(&exe));
-        let last = candidates.last().unwrap();
-        assert_eq!(last.program, exe.to_string_lossy());
-        assert!(candidates.iter().any(|cmd| {
-            cmd.program == "python" || cmd.program == "python3" || cmd.program == "py"
-        }));
-    }
-
-    #[test]
     fn dependency_paths_live_under_install_dir() {
         let exe = PathBuf::from("C:/Users/example/AppData/Local/Programs/hikaru-sub")
             .join("hikaru-sub.exe");
@@ -3035,10 +2421,6 @@ mod tests {
             deps,
             PathBuf::from("C:/Users/example/AppData/Local/Programs/hikaru-sub").join("deps")
         );
-        assert!(deps
-            .join("python311")
-            .join("current")
-            .ends_with(Path::new("deps").join("python311").join("current")));
     }
 
     fn write_native_runtime(resource_dir: &Path, artifact_id: &str) -> PathBuf {
@@ -3299,14 +2681,6 @@ mod tests {
         assert_eq!(ready.status, RuntimeDependencyStatus::Available);
         assert_eq!(ready.source.as_deref(), Some("directInstall"));
         assert_eq!(ready.version.as_deref(), Some("revision"));
-
-        let emitted = [
-            RuntimeDependencyKind::Ffmpeg,
-            RuntimeDependencyKind::NativeAsrCpu,
-            ready.kind,
-        ];
-        assert!(!emitted.contains(&RuntimeDependencyKind::Python311));
-        assert!(!emitted.contains(&RuntimeDependencyKind::AsrVenv));
     }
 
     #[test]
@@ -3725,197 +3099,14 @@ mod tests {
     }
 
     #[test]
-    fn managed_python_verification_finds_nested_python_executable() {
-        let root =
-            std::env::temp_dir().join(format!("hikaru_sub_python_install_{}", unique_suffix()));
-        let nested = root.join("Python311");
-        std::fs::create_dir_all(&nested).unwrap();
-        let python = nested.join(exe_name("python"));
-        std::fs::write(&python, b"").unwrap();
-
-        let found = find_managed_python_executable(&root).unwrap();
-
-        assert_eq!(found, python);
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn managed_python_missing_message_includes_install_directory_snapshot() {
-        let root =
-            std::env::temp_dir().join(format!("hikaru_sub_python_missing_{}", unique_suffix()));
-        std::fs::create_dir_all(root.join("logs")).unwrap();
-        std::fs::write(root.join("install.log"), b"").unwrap();
-
-        let message = missing_managed_python_message(&root);
-
-        assert!(message.contains("Python 安装完成后未找到 python.exe"));
-        assert!(message.contains("install.log"));
-        assert!(message.contains("logs/"));
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn python_installer_args_pin_target_dir_and_log_path() {
-        let target = PathBuf::from("F:/Hikaru Sub/deps/python311/current.temp");
-        let log = PathBuf::from("F:/Hikaru Sub/deps/downloads/python311-install.log");
-
-        let args = python_installer_args(&target, &log);
-
-        assert!(args.contains(&"TargetDir=F:/Hikaru Sub/deps/python311/current.temp".into()));
-        assert!(args.contains(
-            &"DefaultJustForMeTargetDir=F:/Hikaru Sub/deps/python311/current.temp".into()
-        ));
-        assert!(args.contains(&"/log".into()));
-        assert!(args.contains(&"F:/Hikaru Sub/deps/downloads/python311-install.log".into()));
-    }
-
-    #[test]
-    fn python_runtime_download_name_matches_archive_type() {
+    fn legacy_python_download_name_matches_archive_type() {
         assert_eq!(
-            python_runtime_download_file_name(RuntimeDependencyArchive::TarGz),
+            legacy_python_download_file_name(RuntimeDependencyArchive::TarGz),
             "python311-runtime.tar.gz"
         );
         assert_eq!(
-            python_runtime_download_file_name(RuntimeDependencyArchive::Zip),
+            legacy_python_download_file_name(RuntimeDependencyArchive::Zip),
             "python311-runtime.zip"
         );
-    }
-
-    #[test]
-    fn archive_payload_root_uses_declared_strip_prefix() {
-        let root =
-            std::env::temp_dir().join(format!("hikaru_sub_python_archive_{}", unique_suffix()));
-        std::fs::create_dir_all(root.join("python")).unwrap();
-        std::fs::write(root.join("python").join(exe_name("python")), b"").unwrap();
-
-        let payload = archive_payload_root(&root, Some("python")).unwrap();
-
-        assert_eq!(payload, root.join("python"));
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn python_prepare_cleans_stale_current_temp_dirs_only() {
-        let root =
-            std::env::temp_dir().join(format!("hikaru_sub_python_stale_{}", unique_suffix()));
-        let target = root.join("current");
-        let stale = root.join("current.123");
-        let unrelated = root.join("other.123");
-        std::fs::create_dir_all(&target).unwrap();
-        std::fs::create_dir_all(&stale).unwrap();
-        std::fs::create_dir_all(&unrelated).unwrap();
-
-        cleanup_stale_current_temp_dirs(&target);
-
-        assert!(target.exists());
-        assert!(!stale.exists());
-        assert!(unrelated.exists());
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn managed_venv_python_uses_platform_layout() {
-        let service = PathBuf::from("deps").join("asr-service");
-        let path = managed_asr_venv_python_path(&service);
-
-        if cfg!(windows) {
-            assert!(path.ends_with(Path::new(".venv").join("Scripts").join("python.exe")));
-        } else {
-            assert!(path.ends_with(Path::new(".venv").join("bin").join("python")));
-        }
-    }
-
-    fn create_fake_repo(root: &Path) {
-        std::fs::create_dir_all(root.join("src-tauri")).unwrap();
-        std::fs::create_dir_all(root.join("asr-service")).unwrap();
-        std::fs::write(root.join("src-tauri").join("tauri.conf.json"), "{}").unwrap();
-        std::fs::write(root.join("package.json"), "{}").unwrap();
-        std::fs::write(root.join("asr-service").join("main.py"), "").unwrap();
-    }
-
-    #[test]
-    fn source_checkout_asr_service_requires_exact_repo_asr_service_path() {
-        let root =
-            std::env::temp_dir().join(format!("hikaru_sub_asr_checkout_exact_{}", unique_suffix()));
-        create_fake_repo(&root);
-
-        let service = root.join("asr-service");
-        assert!(is_source_checkout_asr_service_dir(&service));
-
-        let resources = root.join("src-tauri").join("resources").join("asr-service");
-        std::fs::create_dir_all(&resources).unwrap();
-        std::fs::write(resources.join("main.py"), "").unwrap();
-        assert!(!is_source_checkout_asr_service_dir(&resources));
-
-        let managed = root
-            .join("src-tauri")
-            .join("target")
-            .join("debug")
-            .join("deps")
-            .join("asr-service");
-        std::fs::create_dir_all(&managed).unwrap();
-        std::fs::write(managed.join("main.py"), "").unwrap();
-        assert!(!is_source_checkout_asr_service_dir(&managed));
-
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn effective_asr_service_prefers_source_checkout_in_dev() {
-        let root =
-            std::env::temp_dir().join(format!("hikaru_sub_asr_effective_dev_{}", unique_suffix()));
-        create_fake_repo(&root);
-        let exe = root
-            .join("src-tauri")
-            .join("target")
-            .join("debug")
-            .join("hikaru-sub.exe");
-        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
-
-        let resolved = resolve_effective_asr_service_dir(None, &exe, true, Some(&root)).unwrap();
-
-        assert_eq!(resolved, root.join("asr-service"));
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn effective_asr_service_uses_exe_deps_when_not_preferring_checkout() {
-        let root = std::env::temp_dir().join(format!(
-            "hikaru_sub_asr_effective_release_{}",
-            unique_suffix()
-        ));
-        create_fake_repo(&root);
-        let install = root.join("install");
-        let exe = install.join("hikaru-sub.exe");
-        std::fs::create_dir_all(&install).unwrap();
-
-        let resolved = resolve_effective_asr_service_dir(None, &exe, false, Some(&root)).unwrap();
-
-        assert_eq!(resolved, install.join("deps").join("asr-service"));
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn effective_asr_service_honors_configured_path() {
-        let root = std::env::temp_dir().join(format!(
-            "hikaru_sub_asr_effective_configured_{}",
-            unique_suffix()
-        ));
-        create_fake_repo(&root);
-        let custom = root.join("custom-asr");
-        std::fs::create_dir_all(&custom).unwrap();
-        std::fs::write(custom.join("main.py"), "").unwrap();
-        let exe = root
-            .join("src-tauri")
-            .join("target")
-            .join("debug")
-            .join("hikaru-sub.exe");
-        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
-
-        let resolved =
-            resolve_effective_asr_service_dir(custom.to_str(), &exe, true, Some(&root)).unwrap();
-
-        assert_eq!(resolved, custom);
-        let _ = std::fs::remove_dir_all(root);
     }
 }

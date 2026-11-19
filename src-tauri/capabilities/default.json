@@ -12,10 +12,6 @@
     "dialog:default",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
-    "fs:default",
-    "fs:allow-read-file",
-    "fs:allow-read",
-    "shell:default",
     {
       "identifier": "http:default",
       "allow": [

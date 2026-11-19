@@ -12,7 +12,7 @@ If the machine lacks FFmpeg, Python 3.11, GPU, models, or network, say so in the
 
 ## Safety and Logging
 
-- Treat paths, URLs, playlists, headers, and filenames as untrusted; normalize and bound writes (temp dirs, burn outputs, downloads, asset scope).
+- Treat paths, URLs, playlists, headers, and filenames as untrusted; normalize and bound writes (temp dirs, burn outputs, downloads).
 - Prefer structured argv for FFmpeg/Python/pip — do not shell-concatenate user strings.
 - Diagnostic logs: stages, error codes, timings, necessary paths — **not** secrets, full auth headers, or translation bodies.
 

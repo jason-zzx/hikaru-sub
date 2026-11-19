@@ -21,9 +21,9 @@ describe("ModelManager diagnostics", () => {
     expect(modelManagerSource).toContain("诊断日志：");
   });
 
-  it("keeps legacy-route download polling pinned to the backend that created the job", () => {
-    expect(asrSource).toContain("remember_job_base_url(&state, &job_id, &base).await");
-    expect(asrSource).toContain("known_job_base_url(&state, &job_id).await");
+  it("routes model download and polling through the native model manager", () => {
+    expect(asrSource).toContain("state\n        .native_models\n        .start_download(");
+    expect(asrSource).toContain("state\n        .native_models\n        .job_snapshot(&job_id)");
     expect(asrSource).toContain("get_model_download_progress");
   });
 });

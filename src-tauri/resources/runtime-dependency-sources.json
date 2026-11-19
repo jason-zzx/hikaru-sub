@@ -18,19 +18,6 @@
           "sha256": "9057dabf8da5e868c58de1eb3624729befe20e25c183046584ef122f1281c786",
           "sizeBytes": 571097001
         },
-        "python311": {
-          "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
-          "archive": "tar.gz",
-          "stripPrefix": "python",
-          "sha256": "368474c69f476e7de4adaf50b61d9fcf6ec8b4db88cc43c5f71c860b3cd29c69",
-          "sizeBytes": 41332032
-        },
-        "pipIndexUrl": "https://pypi.org/simple",
-        "pipExtraIndexUrls": [],
-        "pytorchCpuIndexUrl": "https://download.pytorch.org/whl/cpu",
-        "pytorchCudaIndexUrl": "https://download.pytorch.org/whl/cu126",
-        "pytorchCpuFindLinksUrl": null,
-        "pytorchCudaFindLinksUrl": null,
         "huggingfaceEndpoint": null,
         "crispasrCuda": {
           "url": "https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v4.zip",
@@ -54,21 +41,6 @@
           "sha256": "9057dabf8da5e868c58de1eb3624729befe20e25c183046584ef122f1281c786",
           "sizeBytes": 571097001
         },
-        "python311": {
-          "url": "https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download/20240415/cpython-3.11.9%2B20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
-          "archive": "tar.gz",
-          "stripPrefix": "python",
-          "sha256": "368474c69f476e7de4adaf50b61d9fcf6ec8b4db88cc43c5f71c860b3cd29c69",
-          "sizeBytes": 41332032
-        },
-        "pipIndexUrl": "https://pypi.tuna.tsinghua.edu.cn/simple",
-        "pipExtraIndexUrls": [
-          "https://pypi.org/simple"
-        ],
-        "pytorchCpuIndexUrl": null,
-        "pytorchCudaIndexUrl": null,
-        "pytorchCpuFindLinksUrl": "https://mirrors.aliyun.com/pytorch-wheels/cpu/",
-        "pytorchCudaFindLinksUrl": "https://mirrors.aliyun.com/pytorch-wheels/cu126/",
         "huggingfaceEndpoint": "https://hf-mirror.com",
         "crispasrCuda": {
           "url": "https://ghfast.top/https://github.com/jason-zzx/hikaru-sub/releases/download/native-asr-cuda-v1/hikaru-asr-crispasr-windows-x64-cuda-shared-v4.zip",
