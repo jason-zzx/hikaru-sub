@@ -1468,3 +1468,37 @@ Unified duplicated time, path, ASS/style, language, async, FFmpeg status, and wo
 ### Status
 
 [OK] **Completed**
+
+
+## Session 44: Unify UI styling and shadcn components
+<!-- trellis-session: v=2 fp=4fc992befbff680c -->
+
+**Date**: 2026-11-19
+**Task**: Unify UI styling and shadcn components
+**Branch**: `main`
+
+### Summary
+
+Unified Hikaru Sub's React frontend onto shadcn/ui (radix-nova) components and semantic tokens, added missing Tailwind v4 Radix variants and primitives, removed deprecated legacy CSS aliases, and updated frontend component specs.
+
+### Main Changes
+
+- Added Tailwind v4 @custom-variant rules (data-open/closed/horizontal/vertical) in src/styles/index.css, removed legacy color aliases (surface*/text*/danger/accent-muted), and fixed misused accent and hardcoded palette colors across workflow/player/editor views
+- Customized shadcn DialogFooter to seamless layout in src/components/ui/dialog.tsx, refactored ConfirmDialog/HotkeyHelpOverlay/RuntimeDependencyDialog onto standard Dialog, and unified Sidebar/ModeToggle/NavIcons/BrandMark icons
+- Added shadcn textarea, progress, popover, context-menu, sheet, slider, and collapsible primitives and migrated all raw HTML form controls, progress bars, absolute popovers, right-click SubtitleList menu, PlaybackControls slider/buttons, and non-modal StyleManager sheet
+- Updated coupled UI tests and recorded durable frontend UI conventions in .trellis/spec/frontend/component-guidelines.md
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a670ffd` | refactor(ui): unify shadcn components, semantic tokens, and editor controls |
+
+### Testing
+
+- [OK] pnpm test: 119 test files, 961 tests passed (full suite before final polish; 5 affected test files / 112 tests and PlaybackControls.test.tsx re-verified after polish)
+- [OK] pnpm build: tsc && vite build passed
+
+### Status
+
+[OK] **Completed**

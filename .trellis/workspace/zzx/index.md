@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 43
+- **Total Sessions**: 44
 - **Last Active**: 2026-11-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1470 | Active |
+| `journal-1.md` | ~1504 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 44 | 2026-11-19 | Unify UI styling and shadcn components | `a670ffd` | `main` |
 | 43 | 2026-11-19 | Deduplicate shared frontend and Rust helpers | `72e59ed`, `b40fb51` | `main` |
 | 42 | 2026-11-18 | Optimize HLS download throughput and progress UX | `f8473e7` | `main` |
 | 41 | 2026-10-07 | Native ASR optional VAD migration | `d35375b` | `dev-crisp-asr` |
