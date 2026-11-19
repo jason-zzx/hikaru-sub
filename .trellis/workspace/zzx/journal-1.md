@@ -1432,3 +1432,39 @@ Eliminated HTTP/2 single-connection bottleneck, unbuffered per-chunk disk writes
 ### Status
 
 [OK] **Completed**
+
+
+## Session 43: Deduplicate shared frontend and Rust helpers
+<!-- trellis-session: v=2 fp=a1e4eb5801b31ebe -->
+
+**Date**: 2026-11-19
+**Task**: Deduplicate shared frontend and Rust helpers
+**Branch**: `main`
+
+### Summary
+
+Unified duplicated time, path, ASS/style, language, async, FFmpeg status, and workflow form helpers across the frontend while preserving UI appearance/units, and centralized Rust FFmpeg progress parsers in ffmpeg.rs (fixing download.rs out_time_ms microsecond-to-millisecond conversion).
+
+### Main Changes
+
+- Unified BurnView/DownloadView/TranscribeView formatMs via formatDurationSeconds in src/utils/formatTime.ts (fixing >= 1h H:MM:SS in TranscribeView and finite guards in formatPlaybackTime)
+- Added src/utils/path.ts, src/utils/async.ts, src/constants/translation.ts, and src/hooks/useFfmpegStatus.ts to consolidate duplicated workflow, poller, sidebar, and translation helpers
+- Consolidated findAssStyleByName, ASS color/byte helpers (removing assColor.ts), formatAssNumber, COMMON_SUBTITLE_FONTS, and settingsInputClass/SettingsField reuse without altering visual appearance or MB units
+- Centralized parse_hhmmss_ms, parse_duration_line, parse_time_token, and parse_progress_out_time_ms in src-tauri/src/ffmpeg.rs across burn, clip, download, and transcode, fixing download.rs out_time_ms / 1000 unit mismatch
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `72e59ed` | fix(ffmpeg): unify progress parsers and convert download out_time_ms to ms |
+| `b40fb51` | refactor(frontend): unify duplicated time, path, style, and form helpers |
+
+### Testing
+
+- [OK] pnpm test: 119 test files, 961 tests passed
+- [OK] pnpm build: tsc && vite build passed
+- [OK] cargo test --manifest-path src-tauri/Cargo.toml: 282 passed, 0 failed (3 pre-existing manual ignored tests)
+
+### Status
+
+[OK] **Completed**
