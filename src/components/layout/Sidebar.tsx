@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { WorkflowStep } from "../../types";
@@ -14,6 +16,7 @@ import {
 } from "./NavIcons";
 import { ModeToggle } from "../ModeToggle";
 import { BrandMark } from "../brand/BrandMark";
+import { Button } from "../ui/button";
 import { getFileName } from "../../utils/path";
 
 interface NavItem {
@@ -50,9 +53,10 @@ export function Sidebar({ collapsed }: SidebarProps) {
   const renderItem = (item: NavItem) => {
     const active = currentStep === item.step;
     return (
-      <button
+      <Button
         key={item.step}
         type="button"
+        variant="ghost"
         onClick={(event) => {
           if (item.step === "settings") {
             openSettings("runtime");
@@ -62,14 +66,18 @@ export function Sidebar({ collapsed }: SidebarProps) {
           event.currentTarget.blur();
         }}
         title={item.label}
+        aria-label={collapsed ? item.label : undefined}
         data-active={active}
-        className="flex w-full items-center gap-2.5 rounded-md p-2 text-sm ring-sidebar-ring transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground"
+        className={cn(
+          "h-auto w-full gap-2.5 rounded-md p-2 text-sm font-normal text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground",
+          collapsed ? "justify-center" : "justify-start",
+        )}
       >
         <span className="flex shrink-0 items-center justify-center [&_svg]:size-4 [&_svg]:shrink-0">
           {item.icon}
         </span>
         {!collapsed && <span className="truncate">{item.label}</span>}
-      </button>
+      </Button>
     );
   };
 
@@ -79,7 +87,12 @@ export function Sidebar({ collapsed }: SidebarProps) {
         collapsed ? "w-14" : "w-52"
       }`}
     >
-      <div className="flex items-center justify-between border-b border-sidebar-border px-3 py-4">
+      <div
+        className={cn(
+          "flex items-center border-b border-sidebar-border py-4",
+          collapsed ? "justify-center px-2" : "justify-between px-3",
+        )}
+      >
         {!collapsed && (
           <div className="flex min-w-0 items-center gap-2">
             <BrandMark className="size-8" />
@@ -93,15 +106,17 @@ export function Sidebar({ collapsed }: SidebarProps) {
             </div>
           </div>
         )}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={toggleSidebar}
           title="切换侧边栏"
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="text-muted-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2"
           aria-label="切换侧边栏"
         >
-          {collapsed ? "»" : "«"}
-        </button>
+          {collapsed ? <ChevronsRight /> : <ChevronsLeft />}
+        </Button>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 p-2">
@@ -110,7 +125,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
 
       <div className="border-t border-sidebar-border p-2">
         <div className="mb-1 flex flex-col">
-          <ModeToggle />
+          <ModeToggle collapsed={collapsed} />
         </div>
         <div className="flex flex-col gap-1">
           {bottomItems.map(renderItem)}

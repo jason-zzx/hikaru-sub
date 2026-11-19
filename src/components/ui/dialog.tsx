@@ -104,8 +104,9 @@ function DialogFooter({
   return (
     <div
       data-slot="dialog-footer"
+      // 项目统一采用无缝底栏（移除 radix-nova 默认的 border-t / bg-muted/50 割裂条）
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
         className
       )}
       {...props}

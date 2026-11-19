@@ -16,8 +16,8 @@ interface EditorToastProps {
 
 const VARIANT_CLASS: Record<EditorToastVariant, string> = {
   success: "border-success bg-success text-white",
-  error: "border-danger bg-danger text-white",
-  info: "border-border bg-surface-raised text-text",
+  error: "border-destructive bg-destructive text-white",
+  info: "border-border bg-card text-foreground",
 };
 
 export function EditorToast({ message, onClose }: EditorToastProps) {
@@ -43,7 +43,11 @@ export function EditorToast({ message, onClose }: EditorToastProps) {
         variant="ghost"
         size="sm"
         onClick={onClose}
-        className="shrink-0 px-1.5 text-xs opacity-70 hover:opacity-100"
+        className={
+          message.variant === "info"
+            ? "shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+            : "shrink-0 px-1.5 text-xs text-white/85 hover:bg-white/15 hover:text-white"
+        }
       >
         关闭
       </Button>

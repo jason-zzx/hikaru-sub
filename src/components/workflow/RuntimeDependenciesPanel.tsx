@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import type {
   RuntimeDependencyItem,
   RuntimeDependencyKind,
@@ -9,6 +10,12 @@ import type {
   RuntimeDependencyStorageItem,
 } from "../../types";
 import { Button } from "../ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
+import { Progress } from "../ui/progress";
 import { Select } from "../ui/select-adapter";
 import {
   RUNTIME_DEPENDENCY_LABEL,
@@ -39,8 +46,8 @@ function RowShell({
     <div className="py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-text">{title}</span>
-          <span className="text-xs text-text-muted">{status}</span>
+          <span className="font-medium text-foreground">{title}</span>
+          <span className="text-xs text-muted-foreground">{status}</span>
         </div>
         {actions != null && (
           <div className="flex flex-wrap items-center gap-2">{actions}</div>
@@ -143,7 +150,7 @@ export function RuntimeDependenciesPanel({
         return (
           <p
             key={`${field}-${item.kind}`}
-            className={`mt-1 truncate text-xs text-text-muted${
+            className={`mt-1 truncate text-xs text-muted-foreground${
               field === "path" ? " font-mono" : ""
             }`}
             title={display}
@@ -160,42 +167,45 @@ export function RuntimeDependenciesPanel({
     const progress = preparationProgress(preparation);
     const isPreparing = isActivePreparation(preparation);
     return (
-      <div key={kind} className="mt-2 rounded-md border border-border bg-surface-raised px-3 py-2">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+      <div key={kind} className="mt-2 rounded-md border border-border bg-card px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span>{preparation.stage}</span>
           {progress !== null && <span>{progress}%</span>}
           {preparation.status === "completed" && (
             <span className="text-success">已完成</span>
           )}
           {preparation.status === "failed" && (
-            <span className="text-danger">失败</span>
+            <span className="text-destructive">失败</span>
           )}
           {preparation.status === "cancelled" && (
             <span className="text-warning">已取消</span>
           )}
         </div>
         {isPreparing && (
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-overlay">
-            <div
-              className={`h-full rounded-full bg-accent transition-[width] duration-300 ${
-                progress === null ? "w-1/3 animate-pulse" : ""
-              }`}
-              style={progress === null ? undefined : { width: `${progress}%` }}
-            />
-          </div>
+          <Progress value={progress ?? undefined} className="mt-2 h-1.5" />
         )}
         {preparation.error && (
-          <p className="mt-2 text-xs text-danger">{preparation.error}</p>
+          <p className="mt-2 text-xs text-destructive">{preparation.error}</p>
         )}
         {preparation.logTail.length > 0 && (
-          <details open className="mt-2">
-            <summary className="cursor-pointer select-none text-xs font-medium text-text">
-              下载日志
-            </summary>
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-text-muted">
-              {preparation.logTail.join("\n")}
-            </pre>
-          </details>
+          <Collapsible defaultOpen className="mt-2">
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="group -ml-1.5 gap-1 px-1.5 text-xs font-medium text-foreground"
+              >
+                <span>下载日志</span>
+                <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-muted-foreground">
+                {preparation.logTail.join("\n")}
+              </pre>
+            </CollapsibleContent>
+          </Collapsible>
         )}
       </div>
     );
@@ -218,9 +228,9 @@ export function RuntimeDependenciesPanel({
             {canDownload && onPrepareDependency && (
               <Button
                 type="button"
+                size="sm"
                 onClick={() => onPrepareDependency(item.kind)}
                 disabled={isPreparing}
-                className="px-3 py-2 text-sm"
               >
                 {downloadButtonText(preparation)}
               </Button>
@@ -229,8 +239,8 @@ export function RuntimeDependenciesPanel({
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={onConfigureAsr}
-                className="px-3 py-2 text-sm"
               >
                 去配置
               </Button>
@@ -258,7 +268,7 @@ export function RuntimeDependenciesPanel({
         {metaLines(items)}
         <p
           className={`mt-1 text-xs ${
-            available ? "text-text-muted" : "text-danger"
+            available ? "text-muted-foreground" : "text-destructive"
           }`}
         >
           {available
@@ -294,11 +304,11 @@ export function RuntimeDependenciesPanel({
           onPrepareDependency && downloadable.length > 0 ? (
             <Button
               type="button"
+              size="sm"
               onClick={() =>
                 downloadable.forEach((item) => onPrepareDependency(item.kind))
               }
               disabled={anyPreparing}
-              className="px-3 py-2 text-sm"
             >
               {cudaButtonText()}
             </Button>
@@ -315,7 +325,7 @@ export function RuntimeDependenciesPanel({
               </p>
             ),
         )}
-        <p className="mt-1 text-xs text-text-muted">
+        <p className="mt-1 text-xs text-muted-foreground">
           可选受管运行时，不进入安装包；仅使用 NVIDIA 设备 0，模型是否能载入取决于显存。
         </p>
         {items.map((item) => renderPreparation(item.kind))}
@@ -333,6 +343,7 @@ export function RuntimeDependenciesPanel({
           <Button
             type="button"
             variant="destructive"
+            size="sm"
             disabled={cleanupDisabled}
             onClick={() => onCleanup(item.kind)}
           >
@@ -343,7 +354,7 @@ export function RuntimeDependenciesPanel({
     >
       {metaLines([item])}
       {item.kind === "legacyPython" && (
-        <p className="mt-1 text-xs text-text-muted">
+        <p className="mt-1 text-xs text-muted-foreground">
           旧版遗留，当前转录已不再需要；清理不影响模型和当前运行依赖。
         </p>
       )}
@@ -365,6 +376,7 @@ export function RuntimeDependenciesPanel({
                   key={item.kind}
                   type="button"
                   variant="destructive"
+                  size="sm"
                   title={item.path ? formatDependencyPath(item.path) : undefined}
                   disabled={cleanupDisabled}
                   onClick={() => onCleanup(item.kind)}
@@ -383,15 +395,15 @@ export function RuntimeDependenciesPanel({
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <h3 className="text-sm font-semibold text-text">运行时依赖</h3>
-        <p className="mt-0.5 text-xs text-text-muted">
+        <h3 className="text-sm font-semibold text-foreground">运行时依赖</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           下载源与受管依赖状态；磁盘占用需手动计算
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface px-4 py-4">
+      <div className="rounded-lg border border-border bg-background px-4 py-4">
         <div className="flex h-8 flex-nowrap items-center justify-between gap-3">
-          <p className="text-sm font-medium leading-none text-text">下载源</p>
+          <p className="text-sm font-medium leading-none text-foreground">下载源</p>
           <Select
             className="h-8 w-40 shrink-0"
             value={sourceMode}
@@ -418,19 +430,18 @@ export function RuntimeDependenciesPanel({
                 ? renderCudaGroup(row.items)
                 : renderSingleItem(row.items[0]),
           )}
-          {!probe && <p className="py-3 text-sm text-text-muted">检测运行时依赖中…</p>}
+          {!probe && <p className="py-3 text-sm text-muted-foreground">检测运行时依赖中…</p>}
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface px-4 py-4">
+      <div className="rounded-lg border border-border bg-background px-4 py-4">
         <div className="flex h-8 flex-nowrap items-center justify-between gap-3">
-          <p className="text-sm font-medium leading-none text-text">存储空间</p>
+          <p className="text-sm font-medium leading-none text-foreground">存储空间</p>
           <Button
             type="button"
             variant="outline"
             onClick={onMeasureStorage}
             disabled={storageLoading}
-            className="h-8 px-3 text-sm"
           >
             {storageLoading ? "计算中…" : "计算占用空间"}
           </Button>

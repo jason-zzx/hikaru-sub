@@ -76,8 +76,8 @@ export function SettingsAboutPanel() {
       <section className="flex items-start gap-4">
         <BrandMark className="size-14" />
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-text">{APP_DISPLAY_NAME}</h3>
-          <p className="mt-1 text-sm leading-relaxed text-text-muted">
+          <h3 className="text-lg font-semibold text-foreground">{APP_DISPLAY_NAME}</h3>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             {APP_SHORT_DESCRIPTION}
           </p>
         </div>
@@ -85,7 +85,7 @@ export function SettingsAboutPanel() {
 
       <SettingsSection title="版本与更新">
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-sm text-text">
+          <p className="text-sm text-foreground">
             当前版本：
             <span className="font-medium tabular-nums">
               {version ?? "读取中…"}
@@ -109,8 +109,8 @@ export function SettingsAboutPanel() {
               updateMessage.kind === "ok"
                 ? "text-success"
                 : updateMessage.kind === "error"
-                  ? "text-danger"
-                  : "text-text-muted"
+                  ? "text-destructive"
+                  : "text-muted-foreground"
             }`}
           >
             {updateMessage.text}
@@ -121,11 +121,12 @@ export function SettingsAboutPanel() {
       <SettingsSection title="项目信息">
         <dl className="flex flex-col gap-3 text-sm">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
-            <dt className="shrink-0 text-text-muted">GitHub</dt>
+            <dt className="shrink-0 text-muted-foreground">GitHub</dt>
             <dd className="min-w-0">
-              <button
+              <Button
                 type="button"
-                className="text-left text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                variant="link"
+                className="h-auto p-0 text-left font-normal"
                 onClick={() => {
                   void openUrl(APP_GITHUB_URL).catch(() => {
                     setUpdateMessage({
@@ -136,15 +137,16 @@ export function SettingsAboutPanel() {
                 }}
               >
                 {APP_GITHUB_URL.replace(/^https:\/\//, "")}
-              </button>
+              </Button>
             </dd>
           </div>
           <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
-            <dt className="shrink-0 text-text-muted">许可证</dt>
+            <dt className="shrink-0 text-muted-foreground">许可证</dt>
             <dd className="min-w-0">
-              <button
+              <Button
                 type="button"
-                className="text-left text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                variant="link"
+                className="h-auto p-0 text-left font-normal"
                 onClick={() => {
                   void openUrl(APP_GITHUB_LICENSE_URL).catch(() => {
                     setUpdateMessage({
@@ -155,7 +157,7 @@ export function SettingsAboutPanel() {
                 }}
               >
                 {APP_LICENSE_LABEL}
-              </button>
+              </Button>
             </dd>
           </div>
         </dl>

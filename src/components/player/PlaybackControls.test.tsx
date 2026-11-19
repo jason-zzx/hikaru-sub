@@ -26,6 +26,13 @@ const PLAY_SEGMENT_TITLE = formatActionShortcutTitle(
 afterEach(cleanup);
 
 beforeEach(() => {
+  if (typeof globalThis.ResizeObserver === "undefined") {
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  }
   mocks.playSelectedCueSegment.mockReset();
   usePlaybackStore.setState({
     ...usePlaybackStore.getInitialState(),
@@ -35,18 +42,18 @@ beforeEach(() => {
 
 describe("PlaybackControls 用户意图 seek", () => {
   it("进度条与 ±5s 按目标时间发起 seek", () => {
+    usePlaybackStore.setState({ currentTimeMs: 1234 });
     render(<PlaybackControls />);
 
-    const slider = document.querySelector<HTMLInputElement>('input[type="range"]');
-    if (!slider) throw new Error("progress slider missing");
-    fireEvent.change(slider, { target: { value: "1234" } });
-    expect(usePlaybackStore.getState().seekRequest?.ms).toBe(1234);
+    const slider = screen.getByRole("slider", { name: "播放进度" });
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    expect(usePlaybackStore.getState().seekRequest?.ms).toBe(1235);
 
     fireEvent.click(screen.getByTitle("前进 5 秒"));
-    expect(usePlaybackStore.getState().seekRequest?.ms).toBe(6234);
+    expect(usePlaybackStore.getState().seekRequest?.ms).toBe(6235);
 
     fireEvent.click(screen.getByTitle("后退 5 秒"));
-    expect(usePlaybackStore.getState().seekRequest?.ms).toBe(1234);
+    expect(usePlaybackStore.getState().seekRequest?.ms).toBe(1235);
   });
 });
 

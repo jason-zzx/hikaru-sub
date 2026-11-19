@@ -108,6 +108,7 @@ it("carries the optional VAD selection through pending checks, consent, download
   mocks.getAsrProgress.mockResolvedValue({ id: "vad-job", status: "running", progress: 0, processedMs: 0 });
   const user = userEvent.setup();
   const view = render(<TranscribeView />);
+  fireEvent.click(screen.getByRole("button", { name: "VAD 语音检测配置（高级）" }));
   const toggle = screen.getByRole("switch");
   expect(toggle.hasAttribute("disabled")).toBe(true);
   await waitFor(() => expect(toggle.hasAttribute("disabled")).toBe(false));
@@ -157,6 +158,7 @@ it("retains optional VAD settings through CUDA runtime preparation", async () =>
     ...engine, devices: engine.devices?.map(device => ({ ...device, optionalVad: { available: runtimeReady } })),
   })));
   const { user, start } = await mountRoute(routes[0]);
+  fireEvent.click(screen.getByRole("button", { name: "VAD 语音检测配置（高级）" }));
   await user.click(screen.getByRole("switch"));
   await waitFor(() => expect(screen.getByRole("switch").hasAttribute("disabled")).toBe(false));
   const toggle = screen.getByRole("switch");

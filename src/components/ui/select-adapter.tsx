@@ -17,6 +17,7 @@ export interface SelectOption {
  * 以获得无障碍、键盘导航、Portal 与动画支持。跨平台深色样式由语义令牌统一。
  */
 export function Select({
+  id,
   value,
   onChange,
   options,
@@ -24,6 +25,7 @@ export function Select({
   placeholder,
   className,
 }: {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
@@ -36,7 +38,7 @@ export function Select({
   const selected = options.find((o) => o.value === value);
   return (
     <SelectRoot value={value} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger className={className ?? "w-full"}>
+      <SelectTrigger id={id} className={className ?? "w-full"}>
         <SelectValue placeholder={selected ? undefined : (placeholder ?? value)}>
           {selected ? selected.label : (placeholder ?? value)}
         </SelectValue>

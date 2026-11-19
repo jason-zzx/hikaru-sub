@@ -41,8 +41,11 @@ import {
   snapTimeInputCaret,
   TIME_INPUT_TEMPLATE,
 } from "../../utils/timeInput";
-import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Select } from "../ui/select-adapter";
+import { Textarea } from "../ui/textarea";
 import { FontComboBox } from "./FontComboBox";
 import { InlineOverridePanel } from "./InlineOverridePanel";
 import {
@@ -733,9 +736,9 @@ export const SubtitleEditor = forwardRef<
   }));
   if (!selectedCue) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-text-muted">
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
         <p className="text-sm">未选中字幕</p>
-        <Button onClick={handleAdd} className="px-4 py-2">
+        <Button onClick={handleAdd}>
           在当前位置新建字幕
         </Button>
       </div>
@@ -746,8 +749,14 @@ export const SubtitleEditor = forwardRef<
     <div className="flex h-full min-h-0 flex-col gap-2 p-3">
       <div className="flex shrink-0 flex-wrap items-end gap-2">
         <div className="min-w-[7.5rem] flex-1">
-          <label className="mb-1 block text-xs text-text-muted">开始时间</label>
-          <input
+          <Label
+            htmlFor="editor-start-time"
+            className="mb-1 text-xs font-normal text-muted-foreground"
+          >
+            开始时间
+          </Label>
+          <Input
+            id="editor-start-time"
             ref={startTimeRef}
             type="text"
             value={startTime}
@@ -757,12 +766,18 @@ export const SubtitleEditor = forwardRef<
             placeholder={TIME_INPUT_TEMPLATE}
             inputMode="numeric"
             {...{ [HISTORY_COMMAND_ATTR]: "true" }}
-            className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="font-mono"
           />
         </div>
         <div className="min-w-[7.5rem] flex-1">
-          <label className="mb-1 block text-xs text-text-muted">结束时间</label>
-          <input
+          <Label
+            htmlFor="editor-end-time"
+            className="mb-1 text-xs font-normal text-muted-foreground"
+          >
+            结束时间
+          </Label>
+          <Input
+            id="editor-end-time"
             ref={endTimeRef}
             type="text"
             value={endTime}
@@ -772,7 +787,7 @@ export const SubtitleEditor = forwardRef<
             placeholder={TIME_INPUT_TEMPLATE}
             inputMode="numeric"
             {...{ [HISTORY_COMMAND_ATTR]: "true" }}
-            className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="font-mono"
           />
         </div>
         <div className="flex gap-2 pb-px">
@@ -785,10 +800,9 @@ export const SubtitleEditor = forwardRef<
             新建
           </Button>
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
             onClick={handleDelete}
-            className="border-destructive/50 text-destructive hover:bg-destructive/10"
             title={formatActionShortcutTitle("删除字幕", "delete-cue", hotkeys)}
           >
             删除
@@ -798,8 +812,14 @@ export const SubtitleEditor = forwardRef<
 
       <div className="flex shrink-0 flex-wrap items-end gap-2">
         <div className="min-w-[8rem] flex-1">
-          <label className="mb-1 block text-xs text-text-muted">样式</label>
+          <Label
+            htmlFor="editor-cue-style"
+            className="mb-1 text-xs font-normal text-muted-foreground"
+          >
+            样式
+          </Label>
           <Select
+            id="editor-cue-style"
             value={selectedCue.style}
             onChange={handleStyleChange}
             options={styleOptions}
@@ -807,8 +827,14 @@ export const SubtitleEditor = forwardRef<
           />
         </div>
         <div className="min-w-[8rem] flex-[1.2]">
-          <label className="mb-1 block text-xs text-text-muted">字体</label>
+          <Label
+            htmlFor="editor-cue-font"
+            className="mb-1 text-xs font-normal text-muted-foreground"
+          >
+            字体
+          </Label>
           <FontComboBox
+            id="editor-cue-font"
             value={quickFontName}
             onCommit={handleFontChange}
             options={fontNames}
@@ -816,8 +842,14 @@ export const SubtitleEditor = forwardRef<
           />
         </div>
         <div className="w-[4.5rem] shrink-0">
-          <label className="mb-1 block text-xs text-text-muted">字号</label>
-          <input
+          <Label
+            htmlFor="editor-cue-font-size"
+            className="mb-1 text-xs font-normal text-muted-foreground"
+          >
+            字号
+          </Label>
+          <Input
+            id="editor-cue-font-size"
             type="number"
             min="1"
             max="200"
@@ -833,15 +865,15 @@ export const SubtitleEditor = forwardRef<
                 event.currentTarget.blur();
               }
             }}
-            className="h-9 w-full rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
         <div className="flex flex-wrap gap-1.5 pb-px" aria-label="快速样式标签">
           <Button
             type="button"
             variant="outline"
+            size="icon"
             onClick={() => applyToggleTag("{\\b1}", "{\\b0}")}
-            className="h-9 w-9 px-0 font-bold"
+            className="font-bold"
             title="插入粗体标签"
           >
             B
@@ -849,8 +881,9 @@ export const SubtitleEditor = forwardRef<
           <Button
             type="button"
             variant="outline"
+            size="icon"
             onClick={() => applyToggleTag("{\\i1}", "{\\i0}")}
-            className="h-9 w-9 px-0 italic"
+            className="italic"
             title="插入斜体标签"
           >
             I
@@ -858,8 +891,9 @@ export const SubtitleEditor = forwardRef<
           <Button
             type="button"
             variant="outline"
+            size="icon"
             onClick={() => applyToggleTag("{\\u1}", "{\\u0}")}
-            className="h-9 w-9 px-0 underline"
+            className="underline"
             title="插入下划线标签"
           >
             U
@@ -867,8 +901,9 @@ export const SubtitleEditor = forwardRef<
           <Button
             type="button"
             variant="outline"
+            size="icon"
             onClick={() => applyToggleTag("{\\s1}", "{\\s0}")}
-            className="h-9 w-9 px-0 line-through"
+            className="line-through"
             title="插入删除线标签"
           >
             S
@@ -884,8 +919,14 @@ export const SubtitleEditor = forwardRef<
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <label className="mb-1 shrink-0 text-xs text-text-muted">字幕</label>
-        <textarea
+        <Label
+          htmlFor="editor-subtitle-text"
+          className="mb-1 shrink-0 text-xs font-normal text-muted-foreground"
+        >
+          字幕
+        </Label>
+        <Textarea
+          id="editor-subtitle-text"
           ref={textRef}
           value={text}
           onChange={handleTextChange}
@@ -896,7 +937,7 @@ export const SubtitleEditor = forwardRef<
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           {...{ [HISTORY_COMMAND_ATTR]: "true" }}
-          className="h-full min-h-0 w-full flex-1 resize-none rounded border border-input bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="min-h-0 flex-1 resize-none"
         />
       </div>
     </div>

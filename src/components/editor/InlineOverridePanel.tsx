@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { AssStyle } from "@/lib/ass";
 import { ColorPicker } from "./ColorPicker";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 
 type ColorTarget = "primaryColor" | "outlineColor" | "backColor";
 
@@ -61,44 +65,13 @@ export function InlineOverridePanel({
   );
   const outlineBaselineRef = useRef(outlineDraft);
   const shadowBaselineRef = useRef(shadowDraft);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const baseId = useId();
 
   useEffect(() => {
     if (open) return;
     setOutlineDraft(draftForNumber(currentStyle?.outline, 2));
     setShadowDraft(draftForNumber(currentStyle?.shadow, 1));
   }, [currentStyle?.outline, currentStyle?.shadow, open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    let closeTimer: number | null = null;
-    const closeAfterNestedHandlers = () => {
-      if (closeTimer !== null) window.clearTimeout(closeTimer);
-      closeTimer = window.setTimeout(() => {
-        closeTimer = null;
-        setOpen(false);
-      }, 0);
-    };
-
-    const onMouseDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        // Let nested ColorPicker deferChange handlers flush pending color before unmount.
-        closeAfterNestedHandlers();
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeAfterNestedHandlers();
-    };
-
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      if (closeTimer !== null) window.clearTimeout(closeTimer);
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
 
   const currentColor = useMemo(
     () => styleColor(currentStyle, section),
@@ -130,119 +103,145 @@ export function InlineOverridePanel({
     onApplyNumber(kind, normalized);
   };
 
+  const keepOpenForNestedPopover = (event: {
+    target: EventTarget | null;
+    preventDefault: () => void;
+  }) => {
+    if (
+      (event.target as HTMLElement | null)?.closest(
+        '[data-slot="popover-content"]',
+      )
+    ) {
+      event.preventDefault();
+    }
+  };
+
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => setOpen((value) => !value)}
-        className="h-9 px-3"
-        title="更多 ASS 行内标签"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          title="更多 ASS 行内标签"
+        >
+          更多标签
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-72 p-3"
+        onPointerDownOutside={keepOpenForNestedPopover}
+        onFocusOutside={keepOpenForNestedPopover}
+        onInteractOutside={keepOpenForNestedPopover}
       >
-        更多标签
-      </Button>
-
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded border border-border bg-surface-raised p-3 shadow-xl">
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-1">
+        <div className="space-y-3">
+          <Tabs
+            value={section}
+            onValueChange={(value) => setSection(value as ColorTarget)}
+          >
+            <TabsList className="grid w-full grid-cols-3">
               {SECTIONS.map((s) => (
-                <button
-                  key={s.kind}
-                  type="button"
-                  onClick={() => setSection(s.kind)}
-                  className={`rounded border px-2 py-1 text-xs ${
-                    section === s.kind
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-text hover:bg-surface-overlay"
-                  }`}
-                >
+                <TabsTrigger key={s.kind} value={s.kind} className="text-xs">
                   {s.label}
-                </button>
+                </TabsTrigger>
               ))}
-            </div>
+            </TabsList>
+          </Tabs>
 
-            <ColorPicker
-              value={currentColor}
-              onChange={(color) => onApplyColor(section, color)}
-              deferChange
-            />
+          <ColorPicker
+            value={currentColor}
+            onChange={(color) => onApplyColor(section, color)}
+            deferChange
+          />
 
-            {section === "primaryColor" && (
-              <div>
-                <div className="mb-2 text-xs text-text-muted">对齐</div>
-                <div className="grid w-28 grid-cols-3 gap-1">
-                  {ALIGNMENT_VALUES.map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => onApplyAlignment(value)}
-                      className={`h-8 rounded border text-xs ${
-                        effectiveAlignment === value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-text hover:bg-surface-overlay"
-                      }`}
-                      title={`插入 an${value}`}
-                    >
-                      {value}
-                    </button>
-                  ))}
-                </div>
+          {section === "primaryColor" && (
+            <div>
+              <div className="mb-2 text-xs text-muted-foreground">对齐</div>
+              <div className="grid w-28 grid-cols-3 gap-1">
+                {ALIGNMENT_VALUES.map((value) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={effectiveAlignment === value ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => onApplyAlignment(value)}
+                    className={
+                      effectiveAlignment === value
+                        ? "h-8 border-primary bg-primary/10 px-0 text-xs text-primary hover:bg-primary/15"
+                        : "h-8 px-0 text-xs"
+                    }
+                    title={`插入 an${value}`}
+                  >
+                    {value}
+                  </Button>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {section === "outlineColor" && (
-              <label className="flex items-center gap-2">
-                <span className="text-xs text-text-muted">描边粗细</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.5"
-                  value={outlineDraft}
-                  onFocus={() => {
-                    outlineBaselineRef.current = outlineDraft;
-                  }}
-                  onChange={(event) => setOutlineDraft(event.target.value)}
-                  onBlur={() => commitNumber("outline", outlineDraft)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      event.currentTarget.blur();
-                    }
-                  }}
-                  className="h-8 w-20 rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-                />
-              </label>
-            )}
+          {section === "outlineColor" && (
+            <div className="flex items-center gap-2">
+              <Label
+                htmlFor={`${baseId}-outline`}
+                className="text-xs font-normal text-muted-foreground"
+              >
+                描边粗细
+              </Label>
+              <Input
+                id={`${baseId}-outline`}
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                value={outlineDraft}
+                onFocus={() => {
+                  outlineBaselineRef.current = outlineDraft;
+                }}
+                onChange={(event) => setOutlineDraft(event.target.value)}
+                onBlur={() => commitNumber("outline", outlineDraft)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
+                }}
+                className="h-8 w-20"
+              />
+            </div>
+          )}
 
-            {section === "backColor" && (
-              <label className="flex items-center gap-2">
-                <span className="text-xs text-text-muted">阴影距离</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.5"
-                  value={shadowDraft}
-                  onFocus={() => {
-                    shadowBaselineRef.current = shadowDraft;
-                  }}
-                  onChange={(event) => setShadowDraft(event.target.value)}
-                  onBlur={() => commitNumber("shadow", shadowDraft)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      event.currentTarget.blur();
-                    }
-                  }}
-                  className="h-8 w-20 rounded border border-input bg-card px-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-                />
-              </label>
-            )}
-          </div>
+          {section === "backColor" && (
+            <div className="flex items-center gap-2">
+              <Label
+                htmlFor={`${baseId}-shadow`}
+                className="text-xs font-normal text-muted-foreground"
+              >
+                阴影距离
+              </Label>
+              <Input
+                id={`${baseId}-shadow`}
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                value={shadowDraft}
+                onFocus={() => {
+                  shadowBaselineRef.current = shadowDraft;
+                }}
+                onChange={(event) => setShadowDraft(event.target.value)}
+                onBlur={() => commitNumber("shadow", shadowDraft)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
+                }}
+                className="h-8 w-20"
+              />
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

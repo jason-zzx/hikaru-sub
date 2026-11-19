@@ -5,6 +5,7 @@ import { useClipStore } from "../../stores/clipStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { IconFilePlus } from "../layout/NavIcons";
 import { Button } from "../ui/button";
+import { Progress } from "../ui/progress";
 import {
   cancelVideoClip,
   pickVideoFile,
@@ -103,7 +104,7 @@ export function ImportView() {
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
       <header>
         <h2 className="text-xl font-semibold">导入视频</h2>
-        <p className="mt-1 text-sm text-text-muted">
+        <p className="mt-1 text-sm text-muted-foreground">
           选择视频文件，字幕将保存到视频同目录
         </p>
       </header>
@@ -113,28 +114,30 @@ export function ImportView() {
           <span className="text-warning">
             未检测到 FFmpeg，音轨提取与压制将不可用。
           </span>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() =>
               void ffmpegPreparation.requestDependency(async () => {
                 await refreshFfmpeg(true);
               })
             }
-            className="shrink-0 rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
+            className="shrink-0 border-warning/50 text-warning hover:bg-warning/20 hover:text-warning"
           >
             准备 FFmpeg
-          </button>
+          </Button>
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
       {clipError && (
-        <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {clipError}
         </div>
       )}
@@ -146,14 +149,14 @@ export function ImportView() {
       )}
 
       {session && (
-        <div className="rounded-xl border border-border bg-surface-raised p-4">
-          <p className="text-xs uppercase tracking-wider text-text-muted">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
             当前视频
           </p>
-          <p className="mt-1 truncate font-medium text-text" title={session.videoPath}>
+          <p className="mt-1 truncate font-medium text-foreground" title={session.videoPath}>
             {getFileName(session.videoPath)}
           </p>
-          <p className="mt-0.5 truncate font-mono text-xs text-text-muted" title={session.videoPath}>
+          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground" title={session.videoPath}>
             {session.videoPath}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
@@ -178,24 +181,19 @@ export function ImportView() {
           {clipBusy && (
             <div className="mt-4 space-y-3">
               {completedPath && useAsWorkingVideo ? (
-                <p className="text-sm text-text-muted">正在切换工作视频…</p>
+                <p className="text-sm text-muted-foreground">正在切换工作视频…</p>
               ) : completedPath ? (
-                <p className="text-sm text-text-muted">切片完成，正在收尾…</p>
+                <p className="text-sm text-muted-foreground">切片完成，正在收尾…</p>
               ) : clipProgressPercent !== null ? (
                 <>
                   <div className="flex justify-between text-sm">
-                    <span className="text-text-muted">切片进度</span>
-                    <span className="font-mono text-accent">{clipProgressPercent}%</span>
+                    <span className="text-muted-foreground">切片进度</span>
+                    <span className="font-mono text-primary">{clipProgressPercent}%</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-surface">
-                    <div
-                      className="h-full bg-accent transition-all"
-                      style={{ width: `${clipProgressPercent}%` }}
-                    />
-                  </div>
+                  <Progress value={clipProgressPercent} />
                 </>
               ) : (
-                <p className="text-sm text-text-muted">切片中…</p>
+                <p className="text-sm text-muted-foreground">切片中…</p>
               )}
               {snapshot?.fellBackToHard && !completedPath && (
                 <p className="text-sm text-warning">已改为硬切</p>
@@ -215,20 +213,21 @@ export function ImportView() {
       )}
 
       <div className="grid gap-4">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={handleSelectVideo}
           disabled={busy || clipBusy}
-          className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-surface-raised p-10 text-center transition-colors hover:border-accent/50 hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-auto w-full flex-col gap-3 rounded-xl border-dashed bg-card p-10 text-center whitespace-normal hover:border-primary/50 hover:bg-muted"
         >
-          <IconFilePlus className="h-7 w-7 text-accent" />
-          <span className="font-medium text-text">
+          <IconFilePlus className="h-7 w-7 text-primary" />
+          <span className="font-medium text-foreground">
             {busy ? "处理中…" : "选择视频文件"}
           </span>
-          <span className="text-xs text-text-muted">
+          <span className="text-xs font-normal text-muted-foreground">
             打开视频，可切片或转录
           </span>
-        </button>
+        </Button>
       </div>
 
       {session && (

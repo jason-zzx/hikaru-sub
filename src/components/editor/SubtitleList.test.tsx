@@ -66,7 +66,16 @@ function rowFor(text: string): HTMLElement {
 }
 
 describe("SubtitleList", () => {
-  beforeEach(() => resetSelection(["a"]));
+  beforeEach(() => {
+    if (typeof globalThis.ResizeObserver === "undefined") {
+      globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+    }
+    resetSelection(["a"]);
+  });
   afterEach(cleanup);
 
   it("keeps the cue under the playhead highlighted while paused", () => {
@@ -125,7 +134,7 @@ describe("SubtitleList", () => {
     expect(order).toEqual(["commit:a"]);
     expect(usePlaybackStore.getState().selectedCueIds).toEqual(["b"]);
 
-    await user.click(screen.getByRole("button", { name: "平移时间轴" }));
+    await user.click(screen.getByRole("menuitem", { name: "平移时间轴" }));
     expect(onRequestShiftTimes).toHaveBeenCalledWith(["b"]);
     expect(order).toEqual(["commit:a", "request:b"]);
   });
@@ -172,7 +181,7 @@ describe("SubtitleList", () => {
     expect(useProjectStore.getState().cues[0].startMs).toBe(500);
     expect(useProjectStore.getState().history.past).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: "平移时间轴" }));
+    await user.click(screen.getByRole("menuitem", { name: "平移时间轴" }));
     expect(onRequestShiftTimes).toHaveBeenCalledWith(["b"]);
     expect(useProjectStore.getState().history.past).toHaveLength(1);
   });
@@ -180,30 +189,30 @@ describe("SubtitleList", () => {
   it("gates split availability on the strict open interval at menu-open time", () => {
     // splitCueAtTime 要求分割点严格位于 (startMs, endMs)：播放头恰在行首/行尾时
     // 菜单必须禁用（闭区间 activeCueIds 在行首/行尾仍命中，会「可点但必失败」）
-    const splitButton = () =>
-      screen.getByRole("button", {
+    const splitItem = () =>
+      screen.getByRole("menuitem", {
         name: "在当前帧后分割行",
-      }) as HTMLButtonElement;
+      });
 
     usePlaybackStore.setState({ currentTimeMs: 2000, activeCueIds: ["b"] });
     render(<SubtitleList />);
 
     fireEvent.contextMenu(rowFor("B text"), { clientX: 10, clientY: 10 });
-    expect(splitButton().disabled).toBe(true);
+    expect(splitItem().getAttribute("aria-disabled")).toBe("true");
 
     // 严格内部：可用
     act(() => {
       usePlaybackStore.setState({ currentTimeMs: 2500 });
     });
     fireEvent.contextMenu(rowFor("B text"), { clientX: 10, clientY: 10 });
-    expect(splitButton().disabled).toBe(false);
+    expect(splitItem().getAttribute("aria-disabled")).toBeNull();
 
     // 行尾时刻：同样禁用
     act(() => {
       usePlaybackStore.setState({ currentTimeMs: 3000 });
     });
     fireEvent.contextMenu(rowFor("B text"), { clientX: 10, clientY: 10 });
-    expect(splitButton().disabled).toBe(true);
+    expect(splitItem().getAttribute("aria-disabled")).toBe("true");
   });
 
   it("splits the row when the menu was opened strictly inside it", async () => {
@@ -212,7 +221,7 @@ describe("SubtitleList", () => {
     render(<SubtitleList />);
 
     fireEvent.contextMenu(rowFor("B text"), { clientX: 10, clientY: 10 });
-    await user.click(screen.getByRole("button", { name: "在当前帧后分割行" }));
+    await user.click(screen.getByRole("menuitem", { name: "在当前帧后分割行" }));
 
     const nextCues = useProjectStore.getState().cues;
     expect(nextCues).toHaveLength(3);
@@ -231,7 +240,7 @@ describe("SubtitleList", () => {
     act(() => {
       usePlaybackStore.setState({ currentTimeMs: 3200, activeCueIds: [] });
     });
-    await user.click(screen.getByRole("button", { name: "在当前帧后分割行" }));
+    await user.click(screen.getByRole("menuitem", { name: "在当前帧后分割行" }));
 
     const nextCues = useProjectStore.getState().cues;
     expect(nextCues).toHaveLength(3);
@@ -252,7 +261,7 @@ describe("SubtitleList", () => {
     );
 
     fireEvent.contextMenu(rowFor("A text"), { clientX: 10, clientY: 10 });
-    await user.click(screen.getByRole("button", { name: "平移时间轴" }));
+    await user.click(screen.getByRole("menuitem", { name: "平移时间轴" }));
 
     expect(onCommitPendingTimeDraft).not.toHaveBeenCalled();
     expect(onRequestShiftTimes).toHaveBeenCalledWith(["a", "b"]);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   createDefaultDocument,
   PRIMARY_STYLE,
@@ -14,7 +15,13 @@ import {
 import { useTaskStore } from "../../stores/taskStore";
 import { IconCheck } from "../layout/NavIcons";
 import { Button } from "../ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 import { Input } from "../ui/input";
+import { Progress } from "../ui/progress";
 import { Switch } from "../ui/switch";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Select } from "../ui/select-adapter";
@@ -178,13 +185,13 @@ export function TranscribeView() {
       <div className="flex flex-1 flex-col gap-6 p-6">
         <header>
           <h2 className="text-xl font-semibold">日语转录</h2>
-          <p className="mt-1 text-sm text-text-muted">
+          <p className="mt-1 text-sm text-muted-foreground">
             提取音轨并使用本地 ASR 模型生成日语 ASS 字幕
           </p>
         </header>
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface-raised">
-          <p className="text-text-muted">尚未打开视频</p>
-          <Button className="px-4 py-2" onClick={() => setStep("import")}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-border bg-card">
+          <p className="text-muted-foreground">尚未打开视频</p>
+          <Button onClick={() => setStep("import")}>
             前往导入
           </Button>
         </div>
@@ -643,7 +650,7 @@ export function TranscribeView() {
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
       <header>
           <h2 className="text-xl font-semibold">日语转录</h2>
-          <p className="mt-1 text-sm text-text-muted">
+          <p className="mt-1 text-sm text-muted-foreground">
             提取音轨并使用本地 ASR 模型生成日语 ASS 字幕
           </p>
       </header>
@@ -653,13 +660,14 @@ export function TranscribeView() {
           <span className="text-warning">未检测到 FFmpeg，无法提取音轨。</span>
           <Button
             variant="outline"
+            size="sm"
             type="button"
             onClick={() =>
               void ffmpegPreparation.requestDependency(async () => {
                 await refreshFfmpeg(true);
               })
             }
-            className="shrink-0 rounded-md border border-warning/50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning/20"
+            className="shrink-0 border-warning/50 text-warning hover:bg-warning/20 hover:text-warning"
           >
             准备 FFmpeg
           </Button>
@@ -683,7 +691,7 @@ export function TranscribeView() {
           />
         )}
         {extractError && (
-          <p className="text-sm text-danger">{extractError}</p>
+          <p className="text-sm text-destructive">{extractError}</p>
         )}
         <div className="flex items-center gap-3">
           <Button
@@ -691,14 +699,13 @@ export function TranscribeView() {
             type="button"
             onClick={handleExtract}
             disabled={extracting || ffmpegMissing}
-            className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             {extracting ? "提取中…" : audioReady ? "重新提取" : "提取音轨"}
           </Button>
           {!extracting && (
             <span
               className={
-                audioReady ? "text-sm text-success" : "text-sm text-text-muted"
+                audioReady ? "text-sm text-success" : "text-sm text-muted-foreground"
               }
             >
               {audioReady ? "音轨已就绪" : "未提取"}
@@ -740,16 +747,23 @@ export function TranscribeView() {
           </Labeled>
         </div>
         {optionalVadRoute && (
-          <details className="rounded-lg border border-border bg-surface">
-            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-text">
-              VAD 语音检测配置（高级）
-            </summary>
-            <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
+          <Collapsible className="rounded-lg border border-border bg-background">
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="group h-auto w-full justify-between border-0 rounded-[calc(var(--radius-lg)-1px)] px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50 data-[state=open]:rounded-b-none active:translate-y-0"
+              >
+                <span>VAD 语音检测配置（高级）</span>
+                <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex flex-col gap-4 border-t border-border px-4 py-4">
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={useVad} onCheckedChange={setUseVad} disabled={settingsLocked} />
                 启用 VAD 预处理
               </label>
-              <p className="text-xs text-text-muted">
+              <p className="text-xs text-muted-foreground">
                 对 Faster-Whisper 与 Kotoba 引擎生效：先用语音检测切分语音段、跳过无语音区间，再逐段转录，可缓解长音频遗漏。
               </p>
               {selectedUseVad && (
@@ -758,19 +772,19 @@ export function TranscribeView() {
                     <Input type="number" min={0} max={1} step={0.01} value={vadThreshold}
                       onChange={(event) => setVadThreshold(event.target.value)} disabled={settingsLocked}
                       aria-invalid={!thresholdValid} aria-describedby="vad-threshold-help" />
-                    <span id="vad-threshold-help" className="text-xs text-text-muted">阈值越高越严格</span>
+                    <span id="vad-threshold-help" className="text-xs text-muted-foreground">阈值越高越严格</span>
                   </Labeled>
                   <Labeled label="最短静音时长（ms）">
                     <Input type="number" min={0} max={60000} step={1} value={vadMinSilence}
                       onChange={(event) => setVadMinSilence(event.target.value)} disabled={settingsLocked}
                       aria-invalid={!minSilenceValid} aria-describedby="vad-silence-help" />
-                    <span id="vad-silence-help" className="text-xs text-text-muted">连续静音达到该时长后结束语音段（0–60000，整数）</span>
+                    <span id="vad-silence-help" className="text-xs text-muted-foreground">连续静音达到该时长后结束语音段（0–60000，整数）</span>
                   </Labeled>
                 </div>
               )}
-              {!vadConfigValid && <p role="alert" className="text-sm text-danger">请输入 0–1 的语音阈值和 0–60000 ms 的整数静音时长。</p>}
-            </div>
-          </details>
+              {!vadConfigValid && <p role="alert" className="text-sm text-destructive">请输入 0–1 的语音阈值和 0–60000 ms 的整数静音时长。</p>}
+            </CollapsibleContent>
+          </Collapsible>
         )}
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
           <span
@@ -790,10 +804,11 @@ export function TranscribeView() {
           </span>
           <Button
             variant="outline"
+            size="sm"
             type="button"
             onClick={() => void availability.refresh()}
             disabled={settingsLocked || availability.loading}
-            className="rounded-md px-2.5 py-1 text-xs"
+            className="text-xs"
           >
             重新检测可用性
           </Button>
@@ -824,12 +839,12 @@ export function TranscribeView() {
         {asrNotice && (
           <p
             role="status"
-            className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-text"
+            className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground"
           >
             {asrNotice}
           </p>
         )}
-        {asrError && <p className="text-sm text-danger">{asrError}</p>}
+        {asrError && <p className="text-sm text-destructive">{asrError}</p>}
 
         {transcribing && (
           <div className="flex flex-col gap-2">
@@ -846,7 +861,7 @@ export function TranscribeView() {
               }
             />
             {job && (
-              <div className="flex flex-wrap gap-4 text-xs text-text-muted">
+              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                 <span>
                   进度 {formatDurationSeconds(job.processedMs)} /{" "}
                   {formatDurationSeconds(job.durationMs)}
@@ -878,10 +893,9 @@ export function TranscribeView() {
         <div className="flex flex-wrap items-center gap-3">
           {transcribing ? (
             <Button
-              variant="outline"
+              variant="destructive"
               type="button"
               onClick={handleCancel}
-              className="rounded-lg border border-danger/50 px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10"
             >
               取消转录
             </Button>
@@ -903,7 +917,6 @@ export function TranscribeView() {
                 cudaPreparation.open ||
                 confirmDownloadOpen
               }
-              className="rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
             >
               {cancelling
                 ? "取消中…"
@@ -915,14 +928,13 @@ export function TranscribeView() {
             </Button>
           )}
           {!audioReady && !transcribing && (
-            <span className="text-xs text-text-muted">请先提取音轨</span>
+            <span className="text-xs text-muted-foreground">请先提取音轨</span>
           )}
           {resultCount !== null && !transcribing && (
             <Button
               variant="outline"
               type="button"
               onClick={() => setStep("translate")}
-              className="rounded-lg px-4 py-2 text-sm text-text"
             >
               前往翻译
             </Button>
@@ -1013,7 +1025,7 @@ function StepCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-surface-raised p-5">
+    <section className="rounded-xl border border-border bg-card p-5">
       <div className="mb-4 flex items-start gap-3">
         <span
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
@@ -1025,8 +1037,8 @@ function StepCard({
           {done ? <IconCheck className="h-4 w-4" /> : index}
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-text">{title}</h3>
-          {desc && <p className="mt-0.5 text-xs text-text-muted">{desc}</p>}
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          {desc && <p className="mt-0.5 text-xs text-muted-foreground">{desc}</p>}
         </div>
       </div>
       <div className="flex flex-col gap-3 pl-10">{children}</div>
@@ -1043,7 +1055,7 @@ function Labeled({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm text-text-muted">{label}</span>
+      <span className="text-sm text-muted-foreground">{label}</span>
       {children}
     </label>
   );
@@ -1056,18 +1068,10 @@ function ProgressBar({
   percent: number | null;
   label?: string;
 }) {
-  const indeterminate = percent === null;
   return (
     <div className="flex flex-col gap-1">
-      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-overlay">
-        <div
-          className={`h-full rounded-full bg-accent transition-[width] ${
-            indeterminate ? "w-1/3 animate-pulse" : ""
-          }`}
-          style={indeterminate ? undefined : { width: `${percent}%` }}
-        />
-      </div>
-      {label && <span className="text-xs text-text-muted">{label}</span>}
+      <Progress value={percent ?? undefined} />
+      {label && <span className="text-xs text-muted-foreground">{label}</span>}
     </div>
   );
 }

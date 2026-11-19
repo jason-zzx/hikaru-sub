@@ -462,13 +462,15 @@ export function ClipDialog({
                   </Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
+                      <Button
                         type="button"
-                        className="inline-flex text-muted-foreground hover:text-foreground"
+                        variant="ghost"
+                        size="icon-xs"
+                        className="text-muted-foreground hover:text-foreground"
                         aria-label="软切说明"
                       >
-                        <CircleHelp className="size-4" />
-                      </button>
+                        <CircleHelp />
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs">
                       用附近关键帧截取，通常无损且快，起止可能与输入不完全一致
@@ -482,13 +484,15 @@ export function ClipDialog({
                   </Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
+                      <Button
                         type="button"
-                        className="inline-flex text-muted-foreground hover:text-foreground"
+                        variant="ghost"
+                        size="icon-xs"
+                        className="text-muted-foreground hover:text-foreground"
                         aria-label="硬切说明"
                       >
-                        <CircleHelp className="size-4" />
-                      </button>
+                        <CircleHelp />
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs">
                       起止严格按输入，需重编码，较慢

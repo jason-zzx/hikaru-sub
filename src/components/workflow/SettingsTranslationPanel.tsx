@@ -1,8 +1,9 @@
+import { Input } from "../ui/input";
 import { Select } from "../ui/select-adapter";
+import { Textarea } from "../ui/textarea";
 import {
   SettingsField,
   SettingsSection,
-  settingsInputClass,
 } from "./settingsForm";
 import type { AppSettings } from "../../types";
 import { TARGET_LANG_OPTIONS } from "../../constants/translation";
@@ -27,8 +28,7 @@ export function SettingsTranslationPanel({
         desc="供应商连接、认证与模型在「供应商」分类中管理"
       >
         <SettingsField label="每批翻译条数">
-          <input
-            className={settingsInputClass}
+          <Input
             type="number"
             min="5"
             max="50"
@@ -37,13 +37,12 @@ export function SettingsTranslationPanel({
               update("translationBatchSize", Number(e.target.value))
             }
           />
-          <p className="mt-1 text-xs text-text-muted">
+          <p className="mt-1 text-xs text-muted-foreground">
             范围：5-50，批量翻译时每次请求包含的字幕条数
           </p>
         </SettingsField>
         <SettingsField label="额外上下文条数">
-          <input
-            className={settingsInputClass}
+          <Input
             type="number"
             min="1"
             max="10"
@@ -52,13 +51,13 @@ export function SettingsTranslationPanel({
               update("translationContextWindow", Number(e.target.value))
             }
           />
-          <p className="mt-1 text-xs text-text-muted">
+          <p className="mt-1 text-xs text-muted-foreground">
             范围：1-10，每批前后附加的上下文字幕条数，用于提高连贯性
           </p>
         </SettingsField>
         <SettingsField label="自定义 Prompt">
-          <textarea
-            className={`${settingsInputClass} min-h-[80px] resize-y`}
+          <Textarea
+            className="min-h-[80px] resize-y"
             value={settings.translationCustomPrompt ?? ""}
             placeholder="可选，将附加在系统提示词之后"
             onChange={(e) =>
@@ -67,15 +66,15 @@ export function SettingsTranslationPanel({
           />
         </SettingsField>
         <SettingsField label="术语表（Glossary）">
-          <textarea
-            className={`${settingsInputClass} min-h-[100px] resize-y`}
+          <Textarea
+            className="min-h-[100px] resize-y"
             value={settings.translationGlossary ?? ""}
             placeholder="每行一个术语映射，格式：原文 -> 译文&#10;例如：&#10;Kubernetes -> K8s&#10;Machine Learning -> 机器学习"
             onChange={(e) =>
               update("translationGlossary", e.target.value || undefined)
             }
           />
-          <p className="mt-1 text-xs text-text-muted">
+          <p className="mt-1 text-xs text-muted-foreground">
             每行一个术语映射，格式：原文 -&gt; 译文
           </p>
         </SettingsField>

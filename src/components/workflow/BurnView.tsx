@@ -22,10 +22,12 @@ import type {
 } from "../../types";
 import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Progress } from "../ui/progress";
 import { useFfmpegStatus } from "../../hooks/useFfmpegStatus";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
-import { settingsInputClass } from "./settingsForm";
+import { ModeOptionButton } from "./settingsForm";
 
 const HARD_SUB_PRESETS = [
   "ultrafast",
@@ -332,7 +334,7 @@ export function BurnView() {
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
       <header>
         <h2 className="text-xl font-semibold">字幕压制</h2>
-        <p className="mt-1 text-sm text-text-muted">
+        <p className="mt-1 text-sm text-muted-foreground">
           使用 FFmpeg 将字幕硬压或软封到视频
         </p>
       </header>
@@ -343,12 +345,13 @@ export function BurnView() {
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={() =>
               void ffmpegPreparation.requestDependency(async () => {
                 await refreshFfmpeg(true);
               })
             }
-            className="shrink-0 border-warning/50 px-3 text-xs font-medium text-warning hover:bg-warning/20"
+            className="shrink-0 border-warning/50 text-warning hover:bg-warning/20 hover:text-warning"
           >
             准备 FFmpeg
           </Button>
@@ -356,25 +359,25 @@ export function BurnView() {
       )}
 
       {!session ? (
-        <div className="flex flex-1 items-center justify-center rounded-xl border border-border bg-surface-raised">
-          <p className="text-text-muted">请先打开视频</p>
+        <div className="flex flex-1 items-center justify-center rounded-xl border border-border bg-card">
+          <p className="text-muted-foreground">请先打开视频</p>
         </div>
       ) : (
         <div className="min-h-0 flex-1">
-          <section className="w-full rounded-xl border border-border bg-surface-raised p-4">
+          <section className="w-full rounded-xl border border-border bg-card p-4">
             <h3 className="text-sm font-medium">导出设置</h3>
 
             <div className="mt-4 space-y-4">
               <Field label="输出模式">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <ModeButton
+                  <ModeOptionButton
                     active={mode === "hardSubMp4"}
                     onClick={() => setMode("hardSubMp4")}
                     label="硬字幕 MP4"
                     desc="字幕渲染进画面"
                     disabled={busy}
                   />
-                  <ModeButton
+                  <ModeOptionButton
                     active={mode === "softSubMkv"}
                     onClick={() => setMode("softSubMkv")}
                     label="软字幕 MKV"
@@ -386,17 +389,18 @@ export function BurnView() {
 
               <Field label="输出目录">
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     type="text"
                     value={outputDir}
                     onChange={(e) => setOutputDir(e.target.value)}
-                    className={settingsInputClass}
+                    disabled={busy}
                   />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handlePickOutputDir}
-                    className="shrink-0 px-3 text-sm"
+                    disabled={busy}
+                    className="shrink-0"
                   >
                     选择
                   </Button>
@@ -404,7 +408,7 @@ export function BurnView() {
               </Field>
 
               <Field label="输出文件">
-                <p className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-muted">
+                <p className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
                   {outputFileName || "—"}
                 </p>
               </Field>
@@ -433,7 +437,7 @@ export function BurnView() {
                   </Field>
 
                   <Field label="视频码率（kbps）">
-                    <input
+                    <Input
                       type="number"
                       min={100}
                       max={200000}
@@ -444,12 +448,11 @@ export function BurnView() {
                         markCustomStrategy();
                       }}
                       disabled={busy}
-                      className={settingsInputClass}
                     />
                   </Field>
 
                   <Field label="CRF（无视频码率时）">
-                    <input
+                    <Input
                       type="number"
                       min={0}
                       max={51}
@@ -459,7 +462,6 @@ export function BurnView() {
                         markCustomStrategy();
                       }}
                       disabled={busy}
-                      className={settingsInputClass}
                     />
                   </Field>
 
@@ -478,7 +480,7 @@ export function BurnView() {
                     />
                   </Field>
 
-                  <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
+                  <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                     <span>
                       原片码率：{formatBitrate(burnProbe?.videoBitrateKbps)}；自动编码：
                       {burnProbe ? ENCODER_LABELS[burnProbe.preferredEncoder] : "未检测"}。
@@ -486,9 +488,10 @@ export function BurnView() {
                     <Button
                       type="button"
                       variant="outline"
+                      size="sm"
                       onClick={handleProbeBurnVideo}
                       disabled={busy || probingBurnVideo}
-                      className="px-2.5 py-1 text-xs text-text hover:border-accent/50"
+                      className="text-xs text-foreground"
                     >
                       {probingBurnVideo ? "检测中…" : "检测原片参数"}
                     </Button>
@@ -502,18 +505,19 @@ export function BurnView() {
 
                   <Field label="字体目录（可选）">
                     <div className="flex gap-2">
-                      <input
+                      <Input
                         type="text"
                         value={fontDir}
                         onChange={(e) => setFontDir(e.target.value)}
                         placeholder="帮助 libass 找到 ASS 指定字体"
-                        className={settingsInputClass}
+                        disabled={busy}
                       />
                       <Button
                         type="button"
                         variant="outline"
                         onClick={handlePickFontDir}
-                        className="shrink-0 px-3 text-sm"
+                        disabled={busy}
+                        className="shrink-0"
                       >
                         选择
                       </Button>
@@ -523,13 +527,13 @@ export function BurnView() {
               )}
 
               {mode === "hardSubMp4" && (
-                <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
+                <p className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                   硬字幕压制会使用系统字体；如 ASS 指定字体未被 FFmpeg 找到，可在字体目录中补充。
                 </p>
               )}
 
               {busy && (
-                <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-muted">
+                <p className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                   压制在后台进行，可切换到其他页面；底部状态栏会显示进度。
                 </p>
               )}
@@ -541,20 +545,15 @@ export function BurnView() {
               )}
 
               {error && (
-                <p className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+                <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {error}
                 </p>
               )}
 
               {snapshot && (
                 <div className="space-y-2">
-                  <div className="h-2 overflow-hidden rounded-full bg-surface">
-                    <div
-                      className="h-full bg-accent transition-all"
-                      style={{ width: `${progressPercent ?? 0}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-text-muted">
+                  <Progress value={progressPercent ?? undefined} />
+                  <p className="text-xs text-muted-foreground">
                     {progressPercent !== null ? `${progressPercent}%` : "准备中"}
                     {snapshot.durationMs > 0
                       ? ` · ${formatDurationSeconds(snapshot.processedMs)} / ${formatDurationSeconds(snapshot.durationMs)}`
@@ -569,7 +568,7 @@ export function BurnView() {
                     type="button"
                     variant="destructive"
                     onClick={handleCancel}
-                    className="flex-1 px-4 py-2 text-sm"
+                    className="flex-1"
                   >
                     取消
                   </Button>
@@ -579,7 +578,7 @@ export function BurnView() {
                     variant="default"
                     disabled={!canStart}
                     onClick={handleStart}
-                    className="flex-1 px-4 py-2 text-sm font-medium"
+                    className="flex-1"
                   >
                     开始导出
                   </Button>
@@ -589,7 +588,6 @@ export function BurnView() {
                     type="button"
                     variant="outline"
                     onClick={handleReveal}
-                    className="px-4 py-2 text-sm"
                   >
                     打开位置
                   </Button>
@@ -626,40 +624,10 @@ export function BurnView() {
   );
 }
 
-function ModeButton({
-  active,
-  onClick,
-  label,
-  desc,
-  disabled,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  desc: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        active
-          ? "border-accent bg-accent text-accent-foreground ring-2 ring-ring/30"
-          : "border-border hover:border-accent/50 hover:bg-surface-overlay"
-      }`}
-    >
-      <span className="block text-sm font-medium">{label}</span>
-      <span className="mt-1 block text-xs text-text-muted">{desc}</span>
-    </button>
-  );
-}
-
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-text-muted">
+      <span className="mb-1 block text-xs font-medium text-muted-foreground">
         {label}
       </span>
       {children}

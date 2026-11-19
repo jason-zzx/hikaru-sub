@@ -217,7 +217,7 @@ export const SubtitleFindPanel = forwardRef<
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 w-full justify-start rounded-none px-3 text-left text-xs font-normal text-text-muted hover:bg-muted/40"
+            className="h-7 w-full justify-start rounded-none px-3 text-left text-xs font-normal text-muted-foreground hover:bg-muted/40"
             onClick={(e) => {
               if (open) e.currentTarget.blur();
               open ? closePanel() : openAndFocusPanel();
@@ -251,8 +251,11 @@ export const SubtitleFindPanel = forwardRef<
             <TabsContent value="find" className="mt-2 min-w-0 space-y-2.5">
               <div className="grid grid-cols-2 gap-1.5">
                 <div className="space-y-1">
-                  <Label className="text-xs text-text-muted">查找</Label>
+                  <Label htmlFor="find-panel-query" className="text-xs text-muted-foreground">
+                    查找
+                  </Label>
                   <Input
+                    id="find-panel-query"
                     ref={queryRef}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -263,8 +266,11 @@ export const SubtitleFindPanel = forwardRef<
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-text-muted">替换为</Label>
+                  <Label htmlFor="find-panel-replace" className="text-xs text-muted-foreground">
+                    替换为
+                  </Label>
                   <Input
+                    id="find-panel-replace"
                     value={replaceText}
                     onChange={(e) => setReplaceText(e.target.value)}
                     placeholder="替换为…"
@@ -275,8 +281,11 @@ export const SubtitleFindPanel = forwardRef<
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs text-text-muted">样式</Label>
+                <Label htmlFor="find-panel-style" className="text-xs text-muted-foreground">
+                  样式
+                </Label>
                 <Select
+                  id="find-panel-style"
                   value={style}
                   onChange={setStyle}
                   options={styleOptions}
@@ -284,19 +293,28 @@ export const SubtitleFindPanel = forwardRef<
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-xs text-text-muted">
+              <div className="flex items-center gap-2">
                 <Checkbox
+                  id="find-panel-empty-only"
                   checked={emptyOnly}
                   onCheckedChange={(v) => setEmptyOnly(v === true)}
                   aria-label="仅空文本"
                 />
-                仅空文本
-              </label>
+                <Label
+                  htmlFor="find-panel-empty-only"
+                  className="text-xs font-normal text-muted-foreground"
+                >
+                  仅空文本
+                </Label>
+              </div>
 
               <div className="grid grid-cols-2 gap-1.5">
                 <div className="space-y-1">
-                  <Label className="text-xs text-text-muted">时间起</Label>
+                  <Label htmlFor="find-panel-start" className="text-xs text-muted-foreground">
+                    时间起
+                  </Label>
                   <Input
+                    id="find-panel-start"
                     value={startText}
                     onChange={(e) => setStartText(e.target.value)}
                     onBlur={() => blurNormalizeTime("start")}
@@ -307,8 +325,11 @@ export const SubtitleFindPanel = forwardRef<
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-text-muted">时间止</Label>
+                  <Label htmlFor="find-panel-end" className="text-xs text-muted-foreground">
+                    时间止
+                  </Label>
                   <Input
+                    id="find-panel-end"
                     value={endText}
                     onChange={(e) => setEndText(e.target.value)}
                     onBlur={() => blurNormalizeTime("end")}
@@ -320,7 +341,7 @@ export const SubtitleFindPanel = forwardRef<
                 </div>
               </div>
 
-              <p className="text-[11px] leading-snug text-text-muted">
+              <p className="text-[11px] leading-snug text-muted-foreground">
                 命中 {matchIds.length} 处
                 {query.trim() ? "" : "（无关键词时为筛选结果）"}
               </p>
@@ -376,7 +397,7 @@ export const SubtitleFindPanel = forwardRef<
 
             <TabsContent value="qc" className="mt-2 min-w-0">
               {qcIssues.length === 0 ? (
-                <p className="py-4 text-center text-xs text-text-muted">
+                <p className="py-4 text-center text-xs text-muted-foreground">
                   未发现问题
                 </p>
               ) : (
@@ -390,7 +411,7 @@ export const SubtitleFindPanel = forwardRef<
                         className="h-auto w-full items-start justify-start whitespace-normal rounded px-1.5 py-1.5 text-left text-xs font-normal leading-snug text-warning hover:bg-muted/50"
                         onClick={() => locate(issue.cueId)}
                       >
-                        <span className="text-text-muted">
+                        <span className="text-muted-foreground">
                           {QC_RULE_LABELS[issue.rule]}
                         </span>{" "}
                         <span className="break-words">{issue.message}</span>

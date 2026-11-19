@@ -4,10 +4,15 @@
 /* Tailwind v4：启用 class 式深色模式（.dark 挂在 <html> 上） */
 @custom-variant dark (&:is(.dark *));
 
-/* 成功/危险色不随主题翻转，固定取值 */
+/* Radix state / orientation 变体映射（兼容 shadcn v4 data-open / data-closed / data-horizontal / data-vertical） */
+@custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
+@custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
+@custom-variant data-horizontal (&:where([data-orientation="horizontal"], [data-horizontal]));
+@custom-variant data-vertical (&:where([data-orientation="vertical"], [data-vertical]));
+
+/* 成功色不随主题翻转，固定取值 */
 @theme {
   --color-success: oklch(0.72 0.16 155);
-  --color-danger: oklch(0.65 0.18 22);
 }
 
 /* ===== shadcn 语义令牌（亮色，默认）===== */
@@ -123,17 +128,11 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent-muted: var(--primary);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-surface: var(--background);
-  --color-surface-raised: var(--card);
-  --color-surface-overlay: var(--muted);
-  --color-text: var(--foreground);
-  --color-text-muted: var(--muted-foreground);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);

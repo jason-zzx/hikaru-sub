@@ -1,5 +1,12 @@
-import { useEffect } from "react";
 import { Button } from "./button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./dialog";
 
 export interface ConfirmDialogOption {
   label: string;
@@ -27,7 +34,7 @@ const BUTTON_VARIANT: Record<
 };
 
 /**
- * 通用确认对话框：居中模态，支持多选项按钮。
+ * 通用确认对话框：基于标准 shadcn Dialog，支持多选项按钮。
  * 点击遮罩或按 Esc 关闭；由调用方决定如何处理每个选项的 value。
  */
 export function ConfirmDialog({
@@ -38,33 +45,19 @@ export function ConfirmDialog({
   onSelect,
   escValue,
 }: ConfirmDialogProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onSelect(escValue ?? "__close__");
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, escValue, onSelect]);
-
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onSelect(escValue ?? "__close__");
-        }
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onSelect(escValue ?? "__close__");
       }}
     >
-      <div className="w-[440px] max-w-[calc(100vw-32px)] rounded-lg border border-border bg-surface-raised p-5 shadow-xl">
-        <h3 className="mb-2 text-sm font-semibold text-text">{title}</h3>
-        <p className="mb-4 text-sm text-text-muted">{description}</p>
-        <div className="flex justify-end gap-2">
+      <DialogContent showCloseButton={false} className="sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
           {options.map((option) => (
             <Button
               key={option.value}
@@ -75,8 +68,8 @@ export function ConfirmDialog({
               {option.label}
             </Button>
           ))}
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

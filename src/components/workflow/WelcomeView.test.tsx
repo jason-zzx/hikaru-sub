@@ -181,8 +181,8 @@ describe("WelcomeView", () => {
     });
 
     expect(list.className).toContain("overflow-hidden");
-    expect(row?.className).toContain("hover:bg-surface-overlay");
-    expect(fileButton.className).not.toContain("hover:bg-surface-overlay");
+    expect(row?.className).toContain("hover:bg-muted");
+    expect(fileButton.className).not.toContain("hover:bg-muted");
     expect(removeButton.parentElement).toBe(row);
     expect(screen.queryByText("转录")).toBeNull();
     expect(screen.queryByText("译文")).toBeNull();
@@ -196,7 +196,7 @@ describe("WelcomeView", () => {
 
     const path = await screen.findByText("C:/videos");
     expect(path.className).toContain("text-xs");
-    expect(path.className).toContain("text-text-muted");
+    expect(path.className).toContain("text-muted-foreground");
     expect(path.className).toContain("truncate");
     expect(path.getAttribute("title")).toBe(recent.videoPath);
   });

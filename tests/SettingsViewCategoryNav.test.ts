@@ -81,10 +81,10 @@ describe("SettingsView category navigation", () => {
     expect(translateSource).toContain("activeProvider.maxConcurrency");
     expect(translateSource).toContain("activeProvider.requestsPerMinute");
     expect(translateSource).toContain("activeProvider.apiKey");
-    expect(translateSource.indexOf(">目标语言</label>")).toBeLessThan(
-      translateSource.indexOf(">供应商</label>"),
+    expect(translateSource.indexOf(">目标语言</Label>")).toBeLessThan(
+      translateSource.indexOf(">供应商</Label>"),
     );
-    expect(translateSource.indexOf(">供应商</label>")).toBeLessThan(
+    expect(translateSource.indexOf(">供应商</Label>")).toBeLessThan(
       translateSource.indexOf("供应商：</span>"),
     );
     expect(translateSource).toContain("模型：</span>");

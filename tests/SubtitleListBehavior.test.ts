@@ -66,8 +66,8 @@ describe("SubtitleList 时间显示", () => {
     expect(source).not.toContain("useSubtitleMergeMode");
   });
 
-  it("右键菜单项悬停时有明确高亮样式", () => {
-    expect(source).toContain("hover:bg-surface-overlay");
-    expect(source).toContain("hover:text-text");
+  it("使用 shadcn ContextMenu 渲染右键菜单及高亮样式", () => {
+    expect(source).toContain("ContextMenuContent");
+    expect(source).toContain("ContextMenuItem");
   });
 });

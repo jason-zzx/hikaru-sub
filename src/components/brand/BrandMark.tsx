@@ -1,4 +1,4 @@
-import type { SVGProps } from "react";
+import { useId, type SVGProps } from "react";
 import { cn } from "@/lib/utils";
 
 type BrandMarkProps = SVGProps<SVGSVGElement> & {
@@ -11,6 +11,7 @@ export function BrandMark({
   title = "Hikaru Sub",
   ...props
 }: BrandMarkProps) {
+  const gradientId = useId();
   return (
     <svg
       viewBox="0 0 128 128"
@@ -22,7 +23,7 @@ export function BrandMark({
       <title>{title}</title>
       <defs>
         <linearGradient
-          id="brandMarkHGrad"
+          id={gradientId}
           x1="36"
           y1="28"
           x2="92"
@@ -34,7 +35,7 @@ export function BrandMark({
         </linearGradient>
       </defs>
       <path
-        fill="url(#brandMarkHGrad)"
+        fill={`url(#${gradientId})`}
         d="M34 26h18c2.2 0 4 1.8 4 4v22h16V30c0-2.2 1.8-4 4-4h18c2.2 0 4 1.8 4 4v56c0 2.2-1.8 4-4 4H76c-2.2 0-4-1.8-4-4V68H56v18c0 2.2-1.8 4-4 4H34c-2.2 0-4-1.8-4-4V30c0-2.2 1.8-4 4-4z"
       />
       <rect x="32" y="94" width="64" height="12" rx="3" fill="#e2e8f0" />

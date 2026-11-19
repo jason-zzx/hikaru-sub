@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { RgbaColorPicker } from "react-colorful";
 import {
   clampByte,
@@ -7,6 +7,9 @@ import {
   toHexByte,
   type Rgba,
 } from "@/lib/ass";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 interface ColorPickerProps {
   value: string;
@@ -86,12 +89,27 @@ export function ColorPicker({
     colorToChannelDrafts(parseAssColor(value)),
   );
   const [pendingAss, setPendingAss] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const baseId = useId();
   const observedValueRef = useRef(value);
+  const pendingAssRef = useRef<string | null>(null);
+  const deferChangeRef = useRef(deferChange);
+  const onChangeRef = useRef(onChange);
+
+  deferChangeRef.current = deferChange;
+  onChangeRef.current = onChange;
 
   const syncDrafts = useCallback((color: Rgba) => {
     setHexDraft(rgbaToHex(color));
     setChannelDrafts(colorToChannelDrafts(color));
+  }, []);
+
+  const flushPending = useCallback(() => {
+    if (deferChangeRef.current && pendingAssRef.current !== null) {
+      const pending = pendingAssRef.current;
+      pendingAssRef.current = null;
+      setPendingAss(null);
+      onChangeRef.current(pending);
+    }
   }, []);
 
   useEffect(() => {
@@ -101,40 +119,28 @@ export function ColorPicker({
     const next = parseAssColor(value);
     setRgba(next);
     syncDrafts(next);
+    pendingAssRef.current = null;
     setPendingAss(null);
   }, [open, syncDrafts, value]);
 
   useEffect(() => {
-    if (disabled) setOpen(false);
+    if (disabled) {
+      pendingAssRef.current = null;
+      setPendingAss(null);
+      setOpen(false);
+    }
   }, [disabled]);
 
   const closePicker = useCallback(() => {
-    if (deferChange && pendingAss !== null) {
-      onChange(pendingAss);
-      setPendingAss(null);
-    }
+    flushPending();
     setOpen(false);
-  }, [deferChange, onChange, pendingAss]);
+  }, [flushPending]);
 
   useEffect(() => {
-    if (!open) return;
-
-    const onMouseDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        closePicker();
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closePicker();
-    };
-
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
+      flushPending();
     };
-  }, [open, closePicker]);
+  }, [flushPending]);
 
   const emitColor = useCallback(
     (next: Rgba) => {
@@ -149,6 +155,7 @@ export function ColorPicker({
       setRgba(normalized);
       syncDrafts(normalized);
       if (deferChange) {
+        pendingAssRef.current = nextAss;
         setPendingAss(nextAss);
         return;
       }
@@ -194,68 +201,91 @@ export function ColorPicker({
   const currentAss = pendingAss ?? rgbaToAssColor(rgba);
 
   return (
-    <div ref={containerRef} className="relative inline-flex flex-col gap-1">
-      {label && <span className="text-xs text-text-muted">{label}</span>}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => {
+    <div className="inline-flex flex-col gap-1">
+      {label && <span className="text-xs text-muted-foreground">{label}</span>}
+      <Popover
+        open={open && !disabled}
+        onOpenChange={(nextOpen) => {
           if (disabled) return;
-          if (open) {
+          if (!nextOpen) {
             closePicker();
             return;
           }
           setOpen(true);
         }}
-        className="relative h-8 w-14 overflow-hidden rounded border border-border shadow-inner hover:border-accent/60 focus:border-accent/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-        style={CHECKERBOARD_STYLE}
-        title={currentAss}
-        aria-label={label ? `选择${label}` : "选择颜色"}
       >
-        <span
-          aria-hidden
-          className="absolute inset-0"
-          style={{ backgroundColor: rgbaCss(rgba) }}
-        />
-      </button>
-      {open && !disabled && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-border bg-surface-raised p-3 shadow-xl">
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled}
+            className="relative h-8 w-14 overflow-hidden rounded border border-border shadow-inner transition-colors hover:border-primary/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            style={CHECKERBOARD_STYLE}
+            title={currentAss}
+            aria-label={label ? `选择${label}` : "选择颜色"}
+          >
+            <span
+              aria-hidden
+              className="absolute inset-0"
+              style={{ backgroundColor: rgbaCss(rgba) }}
+            />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64 gap-0 p-3">
           <div className="subtitle-color-picker">
             <RgbaColorPicker color={rgba} onChange={handleChange} />
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">
-            {(["r", "g", "b"] as const).map((channel) => (
-              <label key={channel} className="flex flex-col gap-1">
-                <span className="text-xs uppercase text-text-muted">
-                  {channel}
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  max="255"
-                  value={channelDrafts[channel]}
-                  onChange={(event) =>
-                    handleChannelChange(channel, event.target.value)
-                  }
-                  onBlur={resetDrafts}
-                  className="w-full rounded border border-input bg-card px-2 py-1 text-xs text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-                />
-              </label>
-            ))}
+            {(["r", "g", "b"] as const).map((channel) => {
+              const inputId = `${baseId}-${channel}`;
+              return (
+                <div key={channel} className="flex flex-col gap-1">
+                  <Label
+                    htmlFor={inputId}
+                    className="text-xs font-normal uppercase text-muted-foreground"
+                  >
+                    {channel}
+                  </Label>
+                  <Input
+                    id={inputId}
+                    type="number"
+                    min="0"
+                    max="255"
+                    value={channelDrafts[channel]}
+                    onChange={(event) =>
+                      handleChannelChange(channel, event.target.value)
+                    }
+                    onBlur={resetDrafts}
+                    className="h-7 px-2 text-xs"
+                  />
+                </div>
+              );
+            })}
           </div>
           <div className="mt-2 grid grid-cols-[1fr_92px] gap-2">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-text-muted">HEX</span>
-              <input
+            <div className="flex flex-col gap-1">
+              <Label
+                htmlFor={`${baseId}-hex`}
+                className="text-xs font-normal text-muted-foreground"
+              >
+                HEX
+              </Label>
+              <Input
+                id={`${baseId}-hex`}
                 value={hexDraft}
                 onChange={(event) => handleHexChange(event.target.value)}
                 onBlur={resetDrafts}
-                className="w-full rounded border border-input bg-card px-2 py-1 font-mono text-xs text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="h-7 px-2 font-mono text-xs"
               />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-text-muted">透明度 %</span>
-              <input
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label
+                htmlFor={`${baseId}-transparency`}
+                className="text-xs font-normal text-muted-foreground"
+              >
+                透明度 %
+              </Label>
+              <Input
+                id={`${baseId}-transparency`}
                 type="number"
                 min="0"
                 max="100"
@@ -264,15 +294,15 @@ export function ColorPicker({
                   handleChannelChange("transparency", event.target.value)
                 }
                 onBlur={resetDrafts}
-                className="w-full rounded border border-input bg-card px-2 py-1 text-xs text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="h-7 px-2 text-xs"
               />
-            </label>
+            </div>
           </div>
-          <div className="mt-2 rounded border border-border bg-surface px-2 py-1 font-mono text-xs text-text-muted">
+          <div className="mt-2 rounded border border-border bg-muted/40 px-2 py-1 font-mono text-xs text-muted-foreground">
             {currentAss}
           </div>
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

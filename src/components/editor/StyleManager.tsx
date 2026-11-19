@@ -1,10 +1,12 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import {
   assColorToCss,
   createDefaultStyles,
@@ -17,17 +19,28 @@ import {
 } from "../../services/styleLibrary";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
-import { IconPlus, IconTrash, IconX } from "../layout/NavIcons";
 import { Button } from "../ui/button";
+import { Checkbox } from "../ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 import { Select } from "../ui/select-adapter";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "../ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ColorPicker } from "./ColorPicker";
 import { FontComboBox } from "./FontComboBox";
 import { COMMON_SUBTITLE_FONTS } from "../../utils/fontFamilyAliases";
-
-const INPUT_CLASS =
-  "w-full rounded border border-input bg-card px-2 py-1.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
 const COMMON_FONTS = [...COMMON_SUBTITLE_FONTS, "SimHei"];
 
@@ -539,166 +552,183 @@ export function StyleManager() {
         ]
       : ASS_ENCODING_OPTIONS;
 
-  if (!open) return null;
-
   return (
-    <aside className="fixed bottom-0 right-0 top-0 z-40 flex w-[440px] max-w-[calc(100vw-24px)] flex-col border-l border-border bg-surface-raised shadow-2xl">
-      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold text-text">样式管理</h2>
-          <p className="text-xs text-text-muted">
-            {activeTab === "current"
-              ? `${displayStyles.length} 个文档样式`
-              : libraryReady
-                ? `${libraryStyles.length} 个库样式`
-                : "样式库"}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={toggleStyleManager}
-          title="关闭"
-          aria-label="关闭样式管理"
-        >
-          <IconX className="h-4 w-4" />
-        </Button>
-      </header>
-
-      <Tabs
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value as StyleTab)}
-        className="flex min-h-0 flex-1 flex-col gap-0"
+    <>
+      <Sheet
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && open) toggleStyleManager();
+        }}
+        modal={false}
       >
-        <div className="border-b border-border px-4 py-2">
-          <TabsList className="w-full">
-            <TabsTrigger value="current" className="flex-1">
-              当前文档
-            </TabsTrigger>
-            <TabsTrigger value="library" className="flex-1">
-              样式库
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        {libraryError && (
-          <div
-            role="alert"
-            className="mx-4 mt-2 rounded border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <span>{libraryError}</span>
-              {libraryLoadState === "error" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 text-xs"
-                  onClick={retryLibraryLoad}
-                >
-                  重试
-                </Button>
-              )}
+        <SheetContent
+          side="right"
+          showOverlay={false}
+          showCloseButton={false}
+          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => {
+            if (pendingDialog) event.preventDefault();
+          }}
+          className="flex w-[440px] max-w-[calc(100vw-24px)] flex-col gap-0 bg-card p-0 sm:max-w-[440px]"
+        >
+          <SheetHeader className="flex-row items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div>
+              <SheetTitle className="text-sm font-semibold">样式管理</SheetTitle>
+              <SheetDescription className="text-xs">
+                {activeTab === "current"
+                  ? `${displayStyles.length} 个文档样式`
+                  : libraryReady
+                    ? `${libraryStyles.length} 个库样式`
+                    : "样式库"}
+              </SheetDescription>
             </div>
-          </div>
-        )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={toggleStyleManager}
+              title="关闭"
+              aria-label="关闭样式管理"
+            >
+              <X className="size-4" />
+            </Button>
+          </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-auto">
-          <TabsContent value="current" className="mt-0">
-            <StyleListSection
-              styles={displayStyles}
-              selectedName={editingStyleName}
-              onSelect={selectDocStyle}
-              onCreate={handleDocCreate}
-              onDelete={handleDocDelete}
-            />
-            <section className="px-4 py-4">
-              {tempStyle ? (
-                <>
-                  <StyleFields
-                    style={tempStyle}
-                    nameConflict={docNameConflict}
-                    nameEmpty={docNameEmpty}
-                    onPatch={patchDocStyle}
-                    onNameBlur={commitDocNameEdit}
-                    fontOptions={fontOptions}
-                    encodingOptions={encodingOptions}
-                  />
-                  <div className="mt-4">
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as StyleTab)}
+            className="flex min-h-0 flex-1 flex-col gap-0"
+          >
+            <div className="border-b border-border px-4 py-2">
+              <TabsList className="w-full">
+                <TabsTrigger value="current" className="flex-1">
+                  当前文档
+                </TabsTrigger>
+                <TabsTrigger value="library" className="flex-1">
+                  样式库
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {libraryError && (
+              <div
+                role="alert"
+                className="mx-4 mt-2 rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span>{libraryError}</span>
+                  {libraryLoadState === "error" && (
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full"
-                      disabled={!canSaveDocToLibrary}
-                      onClick={() => void handleSaveDocToLibrary()}
+                      size="sm"
+                      className="shrink-0 text-xs"
+                      onClick={retryLibraryLoad}
                     >
-                      保存到样式库
+                      重试
                     </Button>
-                  </div>
-                </>
-              ) : (
-                <EmptyEditor />
-              )}
-            </section>
-          </TabsContent>
+                  )}
+                </div>
+              </div>
+            )}
 
-          <TabsContent value="library" className="mt-0">
-            <StyleListSection
-              styles={libraryStyles}
-              selectedName={librarySelectedName}
-              onSelect={selectLibraryStyle}
-              onCreate={handleLibraryCreate}
-              onDelete={(name) =>
-                setPendingDialog({ kind: "delete-library", name })
-              }
-              disabled={!libraryReady || libraryWritePending}
-              extra={
-                libraryLoadState === "loading" ? (
-                  <p className="text-xs text-text-muted">正在加载样式库…</p>
-                ) : libraryLoadState === "error" ? (
-                  <p className="text-xs text-text-muted">
-                    样式库不可用，当前文档仍可编辑。
-                  </p>
-                ) : libraryStyles.length === 0 ? (
-                  <p className="text-xs text-text-muted">样式库为空</p>
-                ) : null
-              }
-            />
-            <section className="px-4 py-4">
-              {libraryTempStyle ? (
-                <>
-                  <StyleFields
-                    style={libraryTempStyle}
-                    nameConflict={libNameConflict}
-                    nameEmpty={libNameEmpty}
-                    onPatch={patchLibraryStyle}
-                    onNameBlur={commitLibraryNameEdit}
-                    fontOptions={fontOptions}
-                    encodingOptions={encodingOptions}
-                    disabled={libraryWritePending || !libraryReady}
-                  />
-                  <div className="mt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      disabled={!canAddLibraryToDoc}
-                      onClick={handleAddLibraryToDoc}
-                    >
-                      添加到当前文档
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <EmptyEditor />
-              )}
-            </section>
-          </TabsContent>
-        </div>
-      </Tabs>
+            <div className="min-h-0 flex-1 overflow-auto">
+              <TabsContent value="current" className="mt-0">
+                <StyleListSection
+                  styles={displayStyles}
+                  selectedName={editingStyleName}
+                  onSelect={selectDocStyle}
+                  onCreate={handleDocCreate}
+                  onDelete={handleDocDelete}
+                />
+                <section className="px-4 py-4">
+                  {tempStyle ? (
+                    <>
+                      <StyleFields
+                        style={tempStyle}
+                        nameConflict={docNameConflict}
+                        nameEmpty={docNameEmpty}
+                        onPatch={patchDocStyle}
+                        onNameBlur={commitDocNameEdit}
+                        fontOptions={fontOptions}
+                        encodingOptions={encodingOptions}
+                      />
+                      <div className="mt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          disabled={!canSaveDocToLibrary}
+                          onClick={() => void handleSaveDocToLibrary()}
+                        >
+                          保存到样式库
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <EmptyEditor />
+                  )}
+                </section>
+              </TabsContent>
+
+              <TabsContent value="library" className="mt-0">
+                <StyleListSection
+                  styles={libraryStyles}
+                  selectedName={librarySelectedName}
+                  onSelect={selectLibraryStyle}
+                  onCreate={handleLibraryCreate}
+                  onDelete={(name) =>
+                    setPendingDialog({ kind: "delete-library", name })
+                  }
+                  disabled={!libraryReady || libraryWritePending}
+                  extra={
+                    libraryLoadState === "loading" ? (
+                      <p className="text-xs text-muted-foreground">正在加载样式库…</p>
+                    ) : libraryLoadState === "error" ? (
+                      <p className="text-xs text-muted-foreground">
+                        样式库不可用，当前文档仍可编辑。
+                      </p>
+                    ) : libraryStyles.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">样式库为空</p>
+                    ) : null
+                  }
+                />
+                <section className="px-4 py-4">
+                  {libraryTempStyle ? (
+                    <>
+                      <StyleFields
+                        style={libraryTempStyle}
+                        nameConflict={libNameConflict}
+                        nameEmpty={libNameEmpty}
+                        onPatch={patchLibraryStyle}
+                        onNameBlur={commitLibraryNameEdit}
+                        fontOptions={fontOptions}
+                        encodingOptions={encodingOptions}
+                        disabled={libraryWritePending || !libraryReady}
+                      />
+                      <div className="mt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          disabled={!canAddLibraryToDoc}
+                          onClick={handleAddLibraryToDoc}
+                        >
+                          添加到当前文档
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <EmptyEditor />
+                  )}
+                </section>
+              </TabsContent>
+            </div>
+          </Tabs>
+        </SheetContent>
+      </Sheet>
 
       <ConfirmDialog
-        open={pendingDialog?.kind === "doc-rename"}
+        open={open && pendingDialog?.kind === "doc-rename"}
         title="重命名样式"
         description={
           pendingDialog?.kind === "doc-rename"
@@ -706,17 +736,18 @@ export function StyleManager() {
             : ""
         }
         options={[
-          { label: "是，同步更新", value: "yes", variant: "primary" },
-          { label: "否，仅重命名样式", value: "no" },
           { label: "取消重命名", value: "cancel" },
+          { label: "否，仅重命名样式", value: "no" },
+          { label: "是，同步更新", value: "yes", variant: "primary" },
         ]}
         escValue="cancel"
         onSelect={resolveDialog}
       />
       <ConfirmDialog
         open={
-          pendingDialog?.kind === "overwrite-to-library" ||
-          pendingDialog?.kind === "overwrite-to-document"
+          open &&
+          (pendingDialog?.kind === "overwrite-to-library" ||
+            pendingDialog?.kind === "overwrite-to-document")
         }
         title="覆盖样式"
         description={
@@ -726,14 +757,14 @@ export function StyleManager() {
             : ""
         }
         options={[
-          { label: "覆盖样式", value: "overwrite", variant: "primary" },
           { label: "取消", value: "cancel" },
+          { label: "覆盖样式", value: "overwrite", variant: "primary" },
         ]}
         escValue="cancel"
         onSelect={resolveDialog}
       />
       <ConfirmDialog
-        open={pendingDialog?.kind === "delete-library"}
+        open={open && pendingDialog?.kind === "delete-library"}
         title="删除样式"
         description={
           pendingDialog?.kind === "delete-library"
@@ -741,19 +772,19 @@ export function StyleManager() {
             : ""
         }
         options={[
-          { label: "删除样式", value: "delete", variant: "danger" },
           { label: "取消", value: "cancel" },
+          { label: "删除样式", value: "delete", variant: "danger" },
         ]}
         escValue="cancel"
         onSelect={resolveDialog}
       />
-    </aside>
+    </>
   );
 }
 
 function EmptyEditor() {
   return (
-    <div className="rounded border border-dashed border-border px-4 py-8 text-center text-sm text-text-muted">
+    <div className="rounded border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
       选择或新建样式以开始编辑
     </div>
   );
@@ -779,7 +810,7 @@ function StyleListSection({
   return (
     <section className="border-b border-border px-4 py-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           样式列表
         </h3>
         <Button
@@ -788,9 +819,9 @@ function StyleListSection({
           size="sm"
           onClick={onCreate}
           disabled={disabled}
-          className="inline-flex items-center gap-1 text-xs"
+          className="text-xs"
         >
-          <IconPlus className="h-3.5 w-3.5" />
+          <Plus className="size-3.5" />
           新建样式
         </Button>
       </div>
@@ -801,55 +832,80 @@ function StyleListSection({
           return (
             <div
               key={style.name}
-              role="button"
-              tabIndex={disabled ? -1 : 0}
-              onClick={() => {
-                if (!disabled) onSelect(style.name);
-              }}
-              onKeyDown={(event) => {
-                if (disabled) return;
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(style.name);
-                }
-              }}
-              className={`flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1.5 ${
+              className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
                 active
                   ? "border-primary bg-primary/15 ring-1 ring-primary/40"
-                  : "border-border bg-surface hover:bg-surface-overlay"
-              } ${disabled ? "pointer-events-none opacity-60" : ""}`}
+                  : "border-border bg-background hover:bg-muted"
+              } ${disabled ? "opacity-60" : ""}`}
             >
-              <span
-                className="h-4 w-4 shrink-0 rounded border border-border"
-                style={styleSwatch(style)}
-              />
-              <span
-                className={`min-w-0 flex-1 truncate text-left text-sm ${
-                  active ? "font-medium text-primary" : "text-text"
-                }`}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={disabled}
+                onClick={() => onSelect(style.name)}
+                className="h-auto min-w-0 flex-1 justify-start gap-2 px-1 py-0.5 hover:bg-transparent dark:hover:bg-transparent"
               >
-                {style.name}
-              </span>
+                <span
+                  className="size-4 shrink-0 rounded border border-border"
+                  style={styleSwatch(style)}
+                />
+                <span
+                  className={`min-w-0 flex-1 truncate text-left text-sm font-normal ${
+                    active ? "font-medium text-primary" : "text-foreground"
+                  }`}
+                >
+                  {style.name}
+                </span>
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
                 disabled={disabled}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onDelete(style.name);
-                }}
-                className="hover:text-destructive"
+                onClick={() => onDelete(style.name)}
+                className="text-muted-foreground hover:text-destructive"
                 title="删除样式"
                 aria-label={`删除样式 ${style.name}`}
               >
-                <IconTrash className="h-3.5 w-3.5" />
+                <Trash2 className="size-3.5" />
               </Button>
             </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function StyleSection({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Collapsible
+      defaultOpen={defaultOpen}
+      className="rounded-lg border border-border bg-background"
+    >
+      <CollapsibleTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          className="group h-auto w-full justify-between border-0 rounded-[calc(var(--radius-lg)-1px)] px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 data-[state=open]:rounded-b-none active:translate-y-0"
+        >
+          <span>{title}</span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="border-t border-border px-3 py-3">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -872,36 +928,40 @@ function StyleFields({
   encodingOptions: { value: number; label: string }[];
   disabled?: boolean;
 }) {
+  const baseId = useId();
+
   return (
     <fieldset
       disabled={disabled}
       className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0 disabled:opacity-60"
     >
       <div>
-        <label className="mb-1 block text-xs text-text-muted">样式名</label>
-        <input
-          className={`${INPUT_CLASS} ${
-            nameConflict || nameEmpty ? "border-danger" : ""
-          }`}
+        <Label
+          htmlFor={`${baseId}-name`}
+          className="mb-1 text-xs font-normal text-muted-foreground"
+        >
+          样式名
+        </Label>
+        <Input
+          id={`${baseId}-name`}
+          aria-invalid={nameConflict || nameEmpty}
           value={style.name}
           onChange={(event) => onPatch({ name: event.target.value })}
           onBlur={onNameBlur}
           disabled={disabled}
         />
         {(nameConflict || nameEmpty) && (
-          <p className="mt-1 text-xs text-danger">
+          <p className="mt-1 text-xs text-destructive">
             {nameEmpty ? "样式名不能为空" : "样式名已存在"}
           </p>
         )}
       </div>
 
-      <details open className="rounded border border-border bg-surface">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-text">
-          字体
-        </summary>
-        <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
-          <Field label="字体名">
+      <StyleSection title="字体" defaultOpen>
+        <div className="flex flex-col gap-3">
+          <Field label="字体名" htmlFor={`${baseId}-font-name`}>
             <FontComboBox
+              id={`${baseId}-font-name`}
               value={style.fontName}
               options={fontOptions}
               onCommit={(fontName) => onPatch({ fontName })}
@@ -910,9 +970,9 @@ function StyleFields({
           </Field>
 
           <div className="grid grid-cols-2 gap-2">
-            <Field label="字号">
-              <input
-                className={INPUT_CLASS}
+            <Field label="字号" htmlFor={`${baseId}-font-size`}>
+              <Input
+                id={`${baseId}-font-size`}
                 type="number"
                 min="1"
                 max="200"
@@ -924,9 +984,9 @@ function StyleFields({
                 }
               />
             </Field>
-            <Field label="旋转">
-              <input
-                className={INPUT_CLASS}
+            <Field label="旋转" htmlFor={`${baseId}-angle`}>
+              <Input
+                id={`${baseId}-angle`}
                 type="number"
                 min="-360"
                 max="360"
@@ -941,9 +1001,9 @@ function StyleFields({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <Field label="缩放 X (%)">
-              <input
-                className={INPUT_CLASS}
+            <Field label="缩放 X (%)" htmlFor={`${baseId}-scale-x`}>
+              <Input
+                id={`${baseId}-scale-x`}
                 type="number"
                 min="50"
                 max="200"
@@ -955,9 +1015,9 @@ function StyleFields({
                 }
               />
             </Field>
-            <Field label="缩放 Y (%)">
-              <input
-                className={INPUT_CLASS}
+            <Field label="缩放 Y (%)" htmlFor={`${baseId}-scale-y`}>
+              <Input
+                id={`${baseId}-scale-y`}
                 type="number"
                 min="50"
                 max="200"
@@ -971,9 +1031,9 @@ function StyleFields({
             </Field>
           </div>
 
-          <Field label="间距">
-            <input
-              className={INPUT_CLASS}
+          <Field label="间距" htmlFor={`${baseId}-spacing`}>
+            <Input
+              id={`${baseId}-spacing`}
               type="number"
               min="-10"
               max="50"
@@ -1010,13 +1070,10 @@ function StyleFields({
             />
           </div>
         </div>
-      </details>
+      </StyleSection>
 
-      <details open className="rounded border border-border bg-surface">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-text">
-          颜色
-        </summary>
-        <div className="grid grid-cols-2 gap-3 border-t border-border px-3 py-3">
+      <StyleSection title="颜色" defaultOpen>
+        <div className="grid grid-cols-2 gap-3">
           <ColorPicker
             label="主颜色"
             value={style.primaryColor}
@@ -1042,15 +1099,13 @@ function StyleFields({
             disabled={disabled}
           />
         </div>
-      </details>
+      </StyleSection>
 
-      <details className="rounded border border-border bg-surface">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-text">
-          边框与阴影
-        </summary>
-        <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
-          <Field label="边框样式">
+      <StyleSection title="边框与阴影">
+        <div className="flex flex-col gap-3">
+          <Field label="边框样式" htmlFor={`${baseId}-border-style`}>
             <Select
+              id={`${baseId}-border-style`}
               value={String(style.borderStyle)}
               onChange={(value) =>
                 onPatch({
@@ -1065,9 +1120,9 @@ function StyleFields({
             />
           </Field>
           <div className="grid grid-cols-2 gap-2">
-            <Field label="边框宽度">
-              <input
-                className={INPUT_CLASS}
+            <Field label="边框宽度" htmlFor={`${baseId}-outline`}>
+              <Input
+                id={`${baseId}-outline`}
                 type="number"
                 min="0"
                 max="100"
@@ -1080,9 +1135,9 @@ function StyleFields({
                 }
               />
             </Field>
-            <Field label="阴影深度">
-              <input
-                className={INPUT_CLASS}
+            <Field label="阴影深度" htmlFor={`${baseId}-shadow`}>
+              <Input
+                id={`${baseId}-shadow`}
                 type="number"
                 min="0"
                 max="100"
@@ -1097,35 +1152,31 @@ function StyleFields({
             </Field>
           </div>
         </div>
-      </details>
+      </StyleSection>
 
-      <details className="rounded border border-border bg-surface">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-text">
-          位置与边距
-        </summary>
-        <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
-          <Field label="对齐方式">
+      <StyleSection title="位置与边距">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">对齐方式</span>
             <div className="grid w-36 grid-cols-3 gap-1">
               {[7, 8, 9, 4, 5, 6, 1, 2, 3].map((alignment) => (
-                <button
+                <Button
                   key={alignment}
                   type="button"
+                  variant={style.alignment === alignment ? "default" : "outline"}
+                  size="sm"
                   onClick={() => onPatch({ alignment })}
-                  className={`h-8 rounded border text-xs ${
-                    style.alignment === alignment
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card text-text hover:bg-muted"
-                  }`}
+                  className="h-8 px-0 text-xs"
                 >
                   {alignment}
-                </button>
+                </Button>
               ))}
             </div>
-          </Field>
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            <Field label="左边距">
-              <input
-                className={INPUT_CLASS}
+            <Field label="左边距" htmlFor={`${baseId}-margin-l`}>
+              <Input
+                id={`${baseId}-margin-l`}
                 type="number"
                 min="0"
                 max="100"
@@ -1137,9 +1188,9 @@ function StyleFields({
                 }
               />
             </Field>
-            <Field label="右边距">
-              <input
-                className={INPUT_CLASS}
+            <Field label="右边距" htmlFor={`${baseId}-margin-r`}>
+              <Input
+                id={`${baseId}-margin-r`}
                 type="number"
                 min="0"
                 max="100"
@@ -1152,9 +1203,9 @@ function StyleFields({
               />
             </Field>
           </div>
-          <Field label="垂直边距">
-            <input
-              className={INPUT_CLASS}
+          <Field label="垂直边距" htmlFor={`${baseId}-margin-v`}>
+            <Input
+              id={`${baseId}-margin-v`}
               type="number"
               min="0"
               max="100"
@@ -1167,46 +1218,49 @@ function StyleFields({
             />
           </Field>
         </div>
-      </details>
+      </StyleSection>
 
-      <details className="rounded border border-border bg-surface">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-text">
-          高级
-        </summary>
-        <div className="border-t border-border px-3 py-3">
-          <Field label="编码">
-            <Select
-              value={String(style.encoding)}
-              onChange={(value) =>
-                onPatch({
-                  encoding: parseNumber(value, style.encoding),
-                })
-              }
-              disabled={disabled}
-              options={encodingOptions.map((option) => ({
-                value: String(option.value),
-                label: option.label,
-              }))}
-            />
-          </Field>
-        </div>
-      </details>
+      <StyleSection title="高级">
+        <Field label="编码" htmlFor={`${baseId}-encoding`}>
+          <Select
+            id={`${baseId}-encoding`}
+            value={String(style.encoding)}
+            onChange={(value) =>
+              onPatch({
+                encoding: parseNumber(value, style.encoding),
+              })
+            }
+            disabled={disabled}
+            options={encodingOptions.map((option) => ({
+              value: String(option.value),
+              label: option.label,
+            }))}
+          />
+        </Field>
+      </StyleSection>
     </fieldset>
   );
 }
 
 function Field({
   label,
+  htmlFor,
   children,
 }: {
   label: string;
+  htmlFor?: string;
   children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs text-text-muted">{label}</span>
+    <div className="flex flex-col gap-1">
+      <Label
+        htmlFor={htmlFor}
+        className="text-xs font-normal text-muted-foreground"
+      >
+        {label}
+      </Label>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -1219,15 +1273,18 @@ function CheckboxField({
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const id = useId();
   return (
-    <label className="flex items-center gap-2 rounded border border-border bg-surface-raised px-2 py-1.5 text-sm text-text">
-      <input
-        type="checkbox"
+    <Label
+      htmlFor={id}
+      className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm font-normal text-foreground"
+    >
+      <Checkbox
+        id={id}
         checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 accent-accent"
+        onCheckedChange={(value) => onChange(value === true)}
       />
       <span>{label}</span>
-    </label>
+    </Label>
   );
 }

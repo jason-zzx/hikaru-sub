@@ -76,7 +76,7 @@ export function SettingsShortcutsPanel({
   return (
     <SettingsSection title="字幕编辑器快捷键" desc="管理字幕编辑器中的按键组合">
       {conflicts.length > 0 ? (
-        <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           当前快捷键配置存在冲突，请重新设置或恢复默认值后再保存。
         </div>
       ) : null}
@@ -99,7 +99,7 @@ export function SettingsShortcutsPanel({
 
       {[...groups.entries()].map(([category, defs]) => (
         <section key={category} className="flex flex-col gap-2">
-          <h4 className="text-xs font-medium text-text-muted">{category}</h4>
+          <h4 className="text-xs font-medium text-muted-foreground">{category}</h4>
           <div className="divide-y divide-border rounded-md border border-border">
             {defs.map((def) => {
               const hasOverride = overrides.some((item) => item.id === def.id);
@@ -118,9 +118,9 @@ export function SettingsShortcutsPanel({
                   className="grid gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm text-text">{def.description}</p>
+                    <p className="text-sm text-foreground">{def.description}</p>
                     {error ? (
-                      <p className="mt-1 text-xs text-danger" role="alert">
+                      <p className="mt-1 text-xs text-destructive" role="alert">
                         {error}
                       </p>
                     ) : null}

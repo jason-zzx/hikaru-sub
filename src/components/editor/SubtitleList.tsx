@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   type MouseEvent,
-  type ReactNode,
   type RefObject,
 } from "react";
 import {
@@ -34,6 +33,13 @@ import {
   type CueListColumn,
 } from "./cueListColumns";
 import { collectOverlappingCueIds } from "../../utils/subtitleQc";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../ui/context-menu";
 
 type SubtitleListNotify = (variant: EditorToastVariant, text: string) => void;
 
@@ -44,8 +50,6 @@ interface SubtitleListProps {
 }
 
 interface ContextMenuState {
-  x: number;
-  y: number;
   targetId: string;
   selectedCueIds: string[];
   /** 打开菜单时刻的播放头快照：按钮可用性与实际分割点都用它，菜单挂起期间播放继续也不分裂 */
@@ -136,24 +140,6 @@ export function SubtitleList({
     }
   }, [selectedCueId]);
 
-  useEffect(() => {
-    if (!contextMenu) return;
-
-    const closeMenu = () => setContextMenu(null);
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeMenu();
-    };
-
-    window.addEventListener("click", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      window.removeEventListener("click", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [contextMenu]);
-
   const applyCueListResult = (result: CueListActionResult | null): boolean => {
     if (!result) return false;
     replaceCues(result.cues);
@@ -224,10 +210,7 @@ export function SubtitleList({
   );
 
   const handleCueContextMenu = useCallback(
-    (cue: SubtitleCue, event: MouseEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      event.stopPropagation();
-
+    (cue: SubtitleCue) => {
       const isSelected = selectedCueIds.includes(cue.id);
       const menuSelectionIds = isSelected ? selectedCueIds : [cue.id];
       if (!isSelected) {
@@ -240,8 +223,6 @@ export function SubtitleList({
       // 菜单打开是离散事件，直接读即时播放时间做同口径判定即可（无性能问题）。
       const playheadMs = Math.round(usePlaybackStore.getState().currentTimeMs);
       setContextMenu({
-        x: event.clientX,
-        y: event.clientY,
         targetId: cue.id,
         selectedCueIds: menuSelectionIds,
         playheadMs,
@@ -310,7 +291,7 @@ export function SubtitleList({
 
   if (cues.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-text-muted">
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         暂无字幕
       </div>
     );
@@ -320,193 +301,212 @@ export function SubtitleList({
 
   return (
     <div ref={listRef} className="h-full overflow-auto select-none px-2">
-      {/* One shared grid so max-content / fit-content tracks align header + rows. */}
-      <div className="grid gap-x-2" style={{ gridTemplateColumns: gridTemplate }}>
-        {/* Full-span sticky bar so gap-x does not let body content bleed through. */}
-        <div className="sticky top-0 z-10 col-span-full grid grid-cols-subgrid border-b border-border bg-surface-raised">
-          {columns.map((column) => (
-            <div
-              key={`header-${column}`}
-              className={`py-1.5 text-[11px] font-medium uppercase tracking-wide text-text-muted ${
-                isNumericColumn(column) ? "truncate text-center" : "truncate"
-              }`}
-            >
-              {CUE_LIST_COLUMN_LABELS[column]}
-            </div>
-          ))}
-        </div>
-
-        {cues.map((cue, index) => {
-          const isSelected =
-            selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
-          return (
-            <SubtitleRow
-              key={cue.id}
-              cue={cue}
-              index={index}
-              columns={columns}
-              isSelected={isSelected}
-              isOverlap={!isSelected && overlappingIds.has(cue.id)}
-              isPlaybackActive={!isSelected && activeCueIds.includes(cue.id)}
-              styleMissing={
-                assStyles.length > 0 && !knownStyleNames.has(cue.style)
+      <ContextMenu
+        modal={false}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setContextMenu(null);
+        }}
+      >
+        <ContextMenuTrigger asChild>
+          {/* One shared grid so max-content / fit-content tracks align header + rows. */}
+          <div
+            className="grid gap-x-2"
+            style={{ gridTemplateColumns: gridTemplate }}
+            onContextMenu={(event) => {
+              if (
+                !(event.target as HTMLElement | null)?.closest("[data-cue-id]")
+              ) {
+                event.preventDefault();
               }
-              rowRef={cue.id === selectedCueId ? selectedRef : null}
-              onCueClick={handleCueClick}
-              onCueContextMenu={handleCueContextMenu}
-            />
-          );
-        })}
-      </div>
-
-      {contextMenu ? (
-        <div
-          className="fixed z-50 min-w-44 rounded border border-border bg-surface-raised py-1 text-sm text-text shadow-xl"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-          onContextMenu={(event) => event.preventDefault()}
-        >
-          <MenuButton
-            onClick={() =>
-              runMenuAction(
-                () =>
-                  applyCueListResult(
-                    insertCueRelative(cues, contextMenu.targetId, "before"),
-                  ),
-                "无法在该位置插入字幕",
-              )
-            }
-          >
-            插入（之前）
-          </MenuButton>
-          <MenuButton
-            onClick={() =>
-              runMenuAction(
-                () =>
-                  applyCueListResult(
-                    insertCueRelative(cues, contextMenu.targetId, "after"),
-                  ),
-                "无法在该位置插入字幕",
-              )
-            }
-          >
-            插入（之后）
-          </MenuButton>
-          <MenuButton
-            onClick={() =>
-              runMenuAction(
-                () =>
-                  applyCueListResult(duplicateCues(cues, actionSelectionIds)),
-                "无法重复所选字幕",
-              )
-            }
-          >
-            重复行
-          </MenuButton>
-          <MenuButton
-            disabled={!canSplitTarget}
-            onClick={() =>
-              runMenuAction(
-                () =>
-                  applyCueListResult(
-                    splitCueAtTime(cues, contextMenu.targetId, contextMenu.playheadMs),
-                  ),
-                "当前帧不在该字幕范围内",
-              )
-            }
-          >
-            在当前帧后分割行
-          </MenuButton>
-          <MenuButton
-            onClick={() =>
-              runMenuAction(
-                () =>
-                  applyCueListResult(deleteCuesById(cues, actionSelectionIds)),
-                "无法删除所选字幕",
-              )
-            }
-          >
-            删除行
-          </MenuButton>
-
-          <MenuSeparator />
-
-          <MenuButton
-            onClick={() =>
-              runAsyncMenuAction(copySelectedRows, "没有可复制的字幕行")
-            }
-          >
-            复制行
-          </MenuButton>
-          <MenuButton
-            onClick={() =>
-              runAsyncMenuAction(cutSelectedRows, "没有可剪切的字幕行")
-            }
-          >
-            剪切行
-          </MenuButton>
-          <MenuButton
-            onClick={() => runAsyncMenuAction(pasteRows, "没有可粘贴的字幕行")}
-          >
-            粘贴行
-          </MenuButton>
-
-          <MenuSeparator />
-
-          <MenuButton
-            onClick={() => {
-              const selectionSnapshot = [...contextMenu.selectedCueIds];
-              setContextMenu(null);
-              onRequestShiftTimes?.(selectionSnapshot);
             }}
           >
-            平移时间轴
-          </MenuButton>
+            {/* Full-span sticky bar so gap-x does not let body content bleed through. */}
+            <div className="sticky top-0 z-10 col-span-full grid grid-cols-subgrid border-b border-border bg-card">
+              {columns.map((column) => (
+                <div
+                  key={`header-${column}`}
+                  className={`py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${
+                    isNumericColumn(column) ? "truncate text-center" : "truncate"
+                  }`}
+                >
+                  {CUE_LIST_COLUMN_LABELS[column]}
+                </div>
+              ))}
+            </div>
 
-          <MenuSeparator />
+            {cues.map((cue, index) => {
+              const isSelected =
+                selectedCueIds.includes(cue.id) || cue.id === selectedCueId;
+              return (
+                <SubtitleRow
+                  key={cue.id}
+                  cue={cue}
+                  index={index}
+                  columns={columns}
+                  isSelected={isSelected}
+                  isOverlap={!isSelected && overlappingIds.has(cue.id)}
+                  isPlaybackActive={!isSelected && activeCueIds.includes(cue.id)}
+                  styleMissing={
+                    assStyles.length > 0 && !knownStyleNames.has(cue.style)
+                  }
+                  rowRef={cue.id === selectedCueId ? selectedRef : null}
+                  onCueClick={handleCueClick}
+                  onCueContextMenu={handleCueContextMenu}
+                />
+              );
+            })}
+          </div>
+        </ContextMenuTrigger>
 
-          <MenuButton
-            disabled={actionSelectionIds.length !== 2}
-            onClick={() =>
-              runMenuAction(
-                () =>
-                  applyCueListResult(swapSelectedCues(cues, actionSelectionIds)),
-                "互换行需要刚好选中 2 行",
-              )
-            }
-          >
-            互换行
-          </MenuButton>
-          <MenuButton
-            disabled={actionSelectionIds.length < 2}
-            onClick={() =>
-              runMenuAction(
-                () =>
-                  applyCueListResult(
-                    mergeSelectedCues(cues, actionSelectionIds, "concat"),
-                  ),
-                "合并行需要至少选中 2 行",
-              )
-            }
-          >
-            合并（连接）
-          </MenuButton>
-          <MenuButton
-            disabled={actionSelectionIds.length < 2}
-            onClick={() =>
-              runMenuAction(
-                () =>
-                  applyCueListResult(
-                    mergeSelectedCues(cues, actionSelectionIds, "keep-first"),
-                  ),
-                "合并行需要至少选中 2 行",
-              )
-            }
-          >
-            合并（保留首行）
-          </MenuButton>
-        </div>
-      ) : null}
+        {contextMenu ? (
+          <ContextMenuContent className="min-w-44">
+            <ContextMenuItem
+              onSelect={() =>
+                runMenuAction(
+                  () =>
+                    applyCueListResult(
+                      insertCueRelative(cues, contextMenu.targetId, "before"),
+                    ),
+                  "无法在该位置插入字幕",
+                )
+              }
+            >
+              插入（之前）
+            </ContextMenuItem>
+            <ContextMenuItem
+              onSelect={() =>
+                runMenuAction(
+                  () =>
+                    applyCueListResult(
+                      insertCueRelative(cues, contextMenu.targetId, "after"),
+                    ),
+                  "无法在该位置插入字幕",
+                )
+              }
+            >
+              插入（之后）
+            </ContextMenuItem>
+            <ContextMenuItem
+              onSelect={() =>
+                runMenuAction(
+                  () =>
+                    applyCueListResult(duplicateCues(cues, actionSelectionIds)),
+                  "无法重复所选字幕",
+                )
+              }
+            >
+              重复行
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={!canSplitTarget}
+              onSelect={() =>
+                runMenuAction(
+                  () =>
+                    applyCueListResult(
+                      splitCueAtTime(
+                        cues,
+                        contextMenu.targetId,
+                        contextMenu.playheadMs,
+                      ),
+                    ),
+                  "当前帧不在该字幕范围内",
+                )
+              }
+            >
+              在当前帧后分割行
+            </ContextMenuItem>
+            <ContextMenuItem
+              variant="destructive"
+              onSelect={() =>
+                runMenuAction(
+                  () =>
+                    applyCueListResult(deleteCuesById(cues, actionSelectionIds)),
+                  "无法删除所选字幕",
+                )
+              }
+            >
+              删除行
+            </ContextMenuItem>
+
+            <ContextMenuSeparator />
+
+            <ContextMenuItem
+              onSelect={() =>
+                runAsyncMenuAction(copySelectedRows, "没有可复制的字幕行")
+              }
+            >
+              复制行
+            </ContextMenuItem>
+            <ContextMenuItem
+              onSelect={() =>
+                runAsyncMenuAction(cutSelectedRows, "没有可剪切的字幕行")
+              }
+            >
+              剪切行
+            </ContextMenuItem>
+            <ContextMenuItem
+              onSelect={() => runAsyncMenuAction(pasteRows, "没有可粘贴的字幕行")}
+            >
+              粘贴行
+            </ContextMenuItem>
+
+            <ContextMenuSeparator />
+
+            <ContextMenuItem
+              onSelect={() => {
+                const selectionSnapshot = [...contextMenu.selectedCueIds];
+                setContextMenu(null);
+                onRequestShiftTimes?.(selectionSnapshot);
+              }}
+            >
+              平移时间轴
+            </ContextMenuItem>
+
+            <ContextMenuSeparator />
+
+            <ContextMenuItem
+              disabled={actionSelectionIds.length !== 2}
+              onSelect={() =>
+                runMenuAction(
+                  () =>
+                    applyCueListResult(swapSelectedCues(cues, actionSelectionIds)),
+                  "互换行需要刚好选中 2 行",
+                )
+              }
+            >
+              互换行
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={actionSelectionIds.length < 2}
+              onSelect={() =>
+                runMenuAction(
+                  () =>
+                    applyCueListResult(
+                      mergeSelectedCues(cues, actionSelectionIds, "concat"),
+                    ),
+                  "合并行需要至少选中 2 行",
+                )
+              }
+            >
+              合并（连接）
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={actionSelectionIds.length < 2}
+              onSelect={() =>
+                runMenuAction(
+                  () =>
+                    applyCueListResult(
+                      mergeSelectedCues(cues, actionSelectionIds, "keep-first"),
+                    ),
+                  "合并行需要至少选中 2 行",
+                )
+              }
+            >
+              合并（保留首行）
+            </ContextMenuItem>
+          </ContextMenuContent>
+        ) : null}
+      </ContextMenu>
     </div>
   );
 }
@@ -521,7 +521,7 @@ interface SubtitleRowProps {
   styleMissing: boolean;
   rowRef: RefObject<HTMLDivElement | null> | null;
   onCueClick: (cue: SubtitleCue, event: MouseEvent<HTMLDivElement>) => void;
-  onCueContextMenu: (cue: SubtitleCue, event: MouseEvent<HTMLDivElement>) => void;
+  onCueContextMenu: (cue: SubtitleCue) => void;
 }
 
 /**
@@ -544,23 +544,24 @@ const SubtitleRow = memo(function SubtitleRow({
   return (
     <div
       ref={rowRef}
+      data-cue-id={cue.id}
       onClick={(event) => onCueClick(cue, event)}
-      onContextMenu={(event) => onCueContextMenu(cue, event)}
+      onContextMenu={() => onCueContextMenu(cue)}
       className={`col-span-full grid cursor-pointer grid-cols-subgrid items-center rounded py-1 text-sm transition-colors ${
         isSelected
           ? "bg-primary/10"
           : isOverlap
-            ? "bg-danger/10 text-danger hover:bg-danger/15"
+            ? "bg-destructive/10 text-destructive hover:bg-destructive/15"
             : isPlaybackActive
               ? "bg-success/10"
-              : "hover:bg-surface-overlay"
+              : "hover:bg-muted"
       } ${
         isPlaybackActive
           ? "ring-1 ring-inset ring-success/35"
           : isSelected
             ? "ring-1 ring-inset ring-primary/40"
             : isOverlap
-              ? "ring-1 ring-inset ring-danger/35"
+              ? "ring-1 ring-inset ring-destructive/35"
               : ""
       }`}
     >
@@ -579,7 +580,7 @@ const SubtitleRow = memo(function SubtitleRow({
             title={value.trim() === "" ? undefined : value}
             className={`min-w-0 truncate whitespace-nowrap ${
               mono
-                ? `font-mono text-xs ${isOverlap ? "" : "text-text-muted"}`
+                ? `font-mono text-xs ${isOverlap ? "" : "text-muted-foreground"}`
                 : ""
             } ${
               column === "index" ||
@@ -593,9 +594,9 @@ const SubtitleRow = memo(function SubtitleRow({
                 : isOverlap
                   ? ""
                   : column === "text"
-                    ? "text-text"
+                    ? "text-foreground"
                     : column === "style"
-                      ? "text-text-muted"
+                      ? "text-muted-foreground"
                       : ""
             }`}
           >
@@ -606,26 +607,3 @@ const SubtitleRow = memo(function SubtitleRow({
     </div>
   );
 });
-
-interface MenuButtonProps {
-  children: ReactNode;
-  disabled?: boolean;
-  onClick: () => void;
-}
-
-function MenuButton({ children, disabled = false, onClick }: MenuButtonProps) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-overlay hover:text-text focus:bg-surface-overlay focus:text-text disabled:cursor-not-allowed disabled:text-text-muted disabled:hover:bg-transparent"
-    >
-      {children}
-    </button>
-  );
-}
-
-function MenuSeparator() {
-  return <div className="my-1 border-t border-border" />;
-}

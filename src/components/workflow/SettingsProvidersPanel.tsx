@@ -167,9 +167,9 @@ export function SettingsProvidersPanel({
       desc="API Key 必填且仅以明文保存在本机 settings.json 中；清空后保存会使供应商不可用"
     >
       <div className="grid min-h-[420px] grid-cols-1 overflow-hidden rounded-lg border border-border md:grid-cols-[minmax(160px,0.7fr)_minmax(0,1.5fr)]">
-        <div className="flex min-w-0 flex-col border-b border-border bg-surface/40 md:border-r md:border-b-0">
+        <div className="flex min-w-0 flex-col border-b border-border bg-background/40 md:border-r md:border-b-0">
           <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-2">
-            <span className="text-xs font-medium text-text-muted">供应商列表</span>
+            <span className="text-xs font-medium text-muted-foreground">供应商列表</span>
             <Button
               type="button"
               variant="ghost"
@@ -205,7 +205,7 @@ export function SettingsProvidersPanel({
               );
             })}
             {providers.length === 0 ? (
-              <p className="px-2 py-4 text-center text-xs text-text-muted">
+              <p className="px-2 py-4 text-center text-xs text-muted-foreground">
                 暂无供应商
               </p>
             ) : null}
@@ -316,7 +316,7 @@ export function SettingsProvidersPanel({
                   />
                 ) : null}
                 {modelsError ? (
-                  <p className="break-words text-xs text-danger">{modelsError}</p>
+                  <p className="break-words text-xs text-destructive">{modelsError}</p>
                 ) : null}
               </SettingsField>
 
@@ -338,7 +338,7 @@ export function SettingsProvidersPanel({
                     });
                   }}
                 />
-                <p className="text-xs text-text-muted">
+                <p className="text-xs text-muted-foreground">
                   留空使用模型官方默认值；范围：0-{temperatureMax}
                 </p>
               </SettingsField>
@@ -360,7 +360,7 @@ export function SettingsProvidersPanel({
                       })
                     }
                   />
-                  <p className="text-xs text-text-muted">范围：1-50</p>
+                  <p className="text-xs text-muted-foreground">范围：1-50</p>
                 </SettingsField>
                 <SettingsField label="每分钟请求数（RPM）">
                   <Input
@@ -378,12 +378,12 @@ export function SettingsProvidersPanel({
                       })
                     }
                   />
-                  <p className="text-xs text-text-muted">范围：1-100</p>
+                  <p className="text-xs text-muted-foreground">范围：1-100</p>
                 </SettingsField>
               </div>
             </div>
           ) : (
-            <div className="flex h-full min-h-48 items-center justify-center text-sm text-text-muted">
+            <div className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
               新增供应商后可配置连接信息
             </div>
           )}

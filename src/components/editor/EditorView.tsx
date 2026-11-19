@@ -139,9 +139,9 @@ export function EditorView() {
   };
 
   const saveStatus = saving
-    ? { label: "保存中…", className: "border-border text-text-muted" }
+    ? { label: "保存中…", className: "border-border text-muted-foreground" }
     : saveError
-      ? { label: "保存失败", className: "border-danger/50 text-danger" }
+      ? { label: "保存失败", className: "border-destructive/50 text-destructive" }
       : needsSaveTarget
         ? { label: "待保存", className: "border-warning/50 text-warning" }
         : isDirty
@@ -494,8 +494,8 @@ export function EditorView() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-text-muted">请先打开视频</p>
-          <Button className="mt-4 px-4 py-2" onClick={() => setStep("import")}>
+          <p className="text-muted-foreground">请先打开视频</p>
+          <Button className="mt-4" onClick={() => setStep("import")}>
             前往导入
           </Button>
         </div>
@@ -506,10 +506,10 @@ export function EditorView() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* 顶部保存状态与编辑页工具条 */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-3">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-card px-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-sm font-medium text-text">字幕编辑</h2>
-          <span className="text-xs text-text-muted">{cues.length} 条字幕</span>
+          <h2 className="text-sm font-medium text-foreground">字幕编辑</h2>
+          <span className="text-xs text-muted-foreground">{cues.length} 条字幕</span>
         </div>
         <div className="flex items-center gap-2">
           <span
@@ -521,9 +521,9 @@ export function EditorView() {
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={handleSave}
             disabled={saving || !session}
-            className="px-3 py-1.5 text-sm hover:border-accent/50"
             title={formatActionShortcutTitle("保存", "save", editorHotkeys)}
           >
             {saving ? "保存中…" : "保存"}
@@ -531,9 +531,9 @@ export function EditorView() {
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={handleExport}
             disabled={saving || exporting || !session || cues.length === 0}
-            className="px-3 py-1.5 text-sm hover:border-accent/50"
             title="将当前字幕导出为 ASS 或 SRT 副本"
           >
             {exporting ? "导出中…" : "导出字幕"}
@@ -541,26 +541,26 @@ export function EditorView() {
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={handleSelectSubtitleFile}
             disabled={saving}
-            className="px-3 py-1.5 text-sm hover:border-accent/50"
           >
             选择字幕文件
           </Button>
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={handleRevealSubtitleFile}
             disabled={!subtitleFileExists}
-            className="px-3 py-1.5 text-sm hover:border-accent/50"
           >
             在文件夹中显示
           </Button>
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={toggleStyleManager}
-            className="px-3 py-1.5 text-sm hover:border-accent/50"
           >
             样式管理
           </Button>
@@ -580,7 +580,7 @@ export function EditorView() {
           <div className="min-h-0 overflow-hidden bg-muted">
             <VideoPlayer videoPath={session.videoPath} />
           </div>
-          <div className="min-h-0 overflow-hidden bg-surface">
+          <div className="min-h-0 overflow-hidden bg-background">
             <Timeline onCommitPendingTimeDraft={commitPendingTimeDraft} />
           </div>
         </div>
@@ -603,11 +603,11 @@ export function EditorView() {
             finishPaneDrag("vertical", event, false)
           }
           onDoubleClick={resetPaneLayout}
-          className={`group relative z-10 flex cursor-col-resize touch-none select-none justify-center bg-surface-raised transition-colors hover:bg-accent/10 ${draggingBoundary === "vertical" ? "bg-accent/10" : ""}`}
+          className={`group relative z-10 flex cursor-col-resize touch-none select-none justify-center bg-card transition-colors hover:bg-primary/15 ${draggingBoundary === "vertical" ? "bg-primary/15" : ""}`}
         >
           <span
             aria-hidden="true"
-            className={`w-px transition-colors ${draggingBoundary === "vertical" ? "bg-accent" : "bg-border group-hover:bg-accent"}`}
+            className={`w-px transition-colors ${draggingBoundary === "vertical" ? "bg-primary" : "bg-border group-hover:bg-primary"}`}
           />
         </div>
 
@@ -619,10 +619,10 @@ export function EditorView() {
           }}
         >
           {/* 不设 overflow-hidden：查找/质检浮窗需越过下方编辑区绘制 */}
-          <div className="min-h-0 bg-surface-raised">
+          <div className="min-h-0 bg-card">
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-border px-3 py-2">
-                <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   字幕列表 ({cues.length})
                 </h3>
               </div>
@@ -655,15 +655,15 @@ export function EditorView() {
               finishPaneDrag("horizontal", event, false)
             }
             onDoubleClick={resetPaneLayout}
-            className={`group relative z-10 flex cursor-row-resize touch-none select-none items-center bg-surface-raised transition-colors hover:bg-accent/10 ${draggingBoundary === "horizontal" ? "bg-accent/10" : ""}`}
+            className={`group relative z-10 flex cursor-row-resize touch-none select-none items-center bg-card transition-colors hover:bg-primary/15 ${draggingBoundary === "horizontal" ? "bg-primary/15" : ""}`}
           >
             <span
               aria-hidden="true"
-              className={`h-px w-full transition-colors ${draggingBoundary === "horizontal" ? "bg-accent" : "bg-border group-hover:bg-accent"}`}
+              className={`h-px w-full transition-colors ${draggingBoundary === "horizontal" ? "bg-primary" : "bg-border group-hover:bg-primary"}`}
             />
           </div>
 
-          <div className="flex min-h-0 flex-col overflow-hidden bg-surface-raised">
+          <div className="flex min-h-0 flex-col overflow-hidden bg-card">
             <SubtitleEditor
               ref={editorRef}
               onNotify={notify}

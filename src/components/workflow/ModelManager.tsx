@@ -15,6 +15,7 @@ import type { AsrModelStatus, ModelDownloadSnapshot } from "../../types";
 import type { AsrModelRefreshOutcome } from "../../hooks/useAsrAvailability";
 import { sleep } from "../../utils/async";
 import { Button } from "../ui/button";
+import { Progress } from "../ui/progress";
 
 function formatMB(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -186,13 +187,13 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
 
     let statusText: ReactNode;
     if (checking) {
-      statusText = <span className="text-text-muted">检测中…</span>;
+      statusText = <span className="text-muted-foreground">检测中…</span>;
     } else if (checkError) {
-      statusText = <span className="text-danger">检测失败</span>;
+      statusText = <span className="text-destructive">检测失败</span>;
     } else if (status?.disposition === "ready" || (!status?.disposition && status?.downloaded)) {
       statusText = <span className="text-success">模型已就绪</span>;
     } else if (status?.disposition === "supportedMissing" || isDownloadable(status)) {
-      statusText = <span className="text-text-muted">模型未下载</span>;
+      statusText = <span className="text-muted-foreground">模型未下载</span>;
     } else if (status?.disposition === "postMvpUnavailable") {
       statusText = (
         <span className="text-warning">
@@ -212,7 +213,7 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
         </span>
       );
     } else {
-      statusText = <span className="text-text-muted">未检测</span>;
+      statusText = <span className="text-muted-foreground">未检测</span>;
     }
 
     const showDownloadBtn =
@@ -227,9 +228,10 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
               <Button
                 type="button"
                 variant="ghost"
+                size="sm"
                 onClick={() => void refreshStatus()}
                 disabled={disabled || checking}
-                className="text-text-muted hover:text-text"
+                className="text-muted-foreground hover:text-foreground"
               >
                 重新检测
               </Button>
@@ -238,30 +240,28 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => void runDownload()}
                 disabled={disabled}
-                className="px-2.5 py-1 text-sm"
               >
                 下载模型
               </Button>
             )}
-            {downloading && <span className="text-text-muted">下载中…</span>}
+            {downloading && <span className="text-muted-foreground">下载中…</span>}
           </div>
         </div>
 
         {checkError && (
-          <span className="break-all text-xs text-danger">{checkError}</span>
+          <span className="break-all text-xs text-destructive">{checkError}</span>
         )}
 
         {downloading && (
           <div className="flex flex-col gap-1">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface">
-              <div
-                className="h-full rounded-full bg-accent transition-[width] duration-300"
-                style={{ width: percent !== null ? `${percent * 100}%` : "33%" }}
-              />
-            </div>
-            <span className="text-text-muted">
+            <Progress
+              value={percent !== null ? percent * 100 : undefined}
+              className="h-1.5"
+            />
+            <span className="text-muted-foreground">
               {progress && progress.total > 0
                 ? `${formatMB(progress.done)} / ${formatMB(progress.total)}（${Math.round(
                     (percent ?? 0) * 100,
@@ -269,7 +269,7 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
                 : "准备下载…"}
             </span>
             {downloadDiagnostics && (
-              <div className="flex flex-col gap-0.5 text-text-muted">
+              <div className="flex flex-col gap-0.5 text-muted-foreground">
                 <span className="break-all">
                   下载源：{downloadSourceLabel(downloadDiagnostics)}
                 </span>
@@ -284,7 +284,7 @@ export const ModelManager = forwardRef<ModelManagerHandle, ModelManagerProps>(
         )}
 
         {downloadError && (
-          <span className="text-danger">
+          <span className="text-destructive">
             下载失败：{downloadError}
             {downloadDiagnostics?.debugLogPath
               ? `；诊断日志：${downloadDiagnostics.debugLogPath}`

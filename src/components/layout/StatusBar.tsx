@@ -10,7 +10,7 @@ export function StatusBar() {
       : undefined;
 
   return (
-    <footer className="flex h-7 shrink-0 items-center justify-end border-t border-border bg-surface-raised px-3 text-xs text-text-muted">
+    <footer className="flex h-7 shrink-0 items-center justify-end border-t border-border bg-card px-3 text-xs text-muted-foreground">
       <div>
         {runningTask
           ? `${runningTask.label} ${Math.round(runningTask.progress)}%`

@@ -1,10 +1,14 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
 } from "react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 
 export function findMatchingFontIndex(options: string[], query: string): number {
   const normalized = query.trim().toLowerCase();
@@ -36,12 +40,14 @@ export function fontOptionsWithCurrent(value: string, options: string[]): string
 }
 
 export function FontComboBox({
+  id,
   value,
   options,
   onCommit,
   placeholder = "字体",
   disabled = false,
 }: {
+  id?: string;
   value: string;
   options: string[];
   onCommit: (value: string) => void;
@@ -51,7 +57,8 @@ export function FontComboBox({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const fontOptions = useMemo(
@@ -67,10 +74,10 @@ export function FontComboBox({
     if (disabled) setOpen(false);
   }, [disabled]);
 
-  const cancel = () => {
+  const cancel = useCallback(() => {
     setDraft(value);
     setOpen(false);
-  };
+  }, [value]);
 
   useEffect(() => {
     if (!open) return;
@@ -82,18 +89,6 @@ export function FontComboBox({
       }, 0);
     }
   }, [draft, fontOptions, open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onMouseDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        cancel();
-      }
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [open, value]);
 
   const commit = (next: string) => {
     setDraft(next);
@@ -132,60 +127,75 @@ export function FontComboBox({
   };
 
   return (
-    <div ref={rootRef} className="relative">
-      <input
-        value={draft}
-        placeholder={placeholder}
-        disabled={disabled}
-        onFocus={() => {
-          if (!disabled) setOpen(true);
-        }}
-        onBlur={() => {
-          window.setTimeout(() => {
-            if (!rootRef.current?.contains(document.activeElement)) {
+    <Popover
+      open={open && !disabled}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) cancel();
+      }}
+    >
+      <PopoverAnchor asChild>
+        <Input
+          id={id}
+          ref={inputRef}
+          value={draft}
+          placeholder={placeholder}
+          disabled={disabled}
+          onFocus={() => {
+            if (!disabled) setOpen(true);
+          }}
+          onBlur={(event) => {
+            if (!contentRef.current?.contains(event.relatedTarget as Node | null)) {
               cancel();
             }
-          }, 0);
+          }}
+          onChange={(event) => {
+            if (disabled) return;
+            setDraft(event.target.value);
+            setOpen(true);
+          }}
+          onKeyDown={handleKeyDown}
+        />
+      </PopoverAnchor>
+      <PopoverContent
+        ref={contentRef}
+        align="start"
+        sideOffset={4}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onInteractOutside={(event) => {
+          if (inputRef.current?.contains(event.target as Node)) {
+            event.preventDefault();
+          }
         }}
-        onChange={(event) => {
-          if (disabled) return;
-          setDraft(event.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={handleKeyDown}
-        className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60"
-      />
-      {open && !disabled && (
-        <div className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-lg border border-border bg-surface-raised shadow-lg">
-          <div className="max-h-60 overflow-y-auto py-1">
-            {fontOptions.map((fontName, index) => {
-              const active = fontName === value;
-              const highlighted = index === highlightedIndex;
-              return (
-                <button
-                  key={fontName}
-                  ref={(node) => {
-                    optionRefs.current[index] = node;
-                  }}
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => commit(fontName)}
-                  className={`w-full px-3 py-2 text-left text-sm ${
-                    highlighted
-                      ? "bg-accent text-accent-foreground"
-                      : active
-                        ? "font-medium text-primary"
-                        : "text-text hover:bg-surface-overlay"
-                  }`}
-                  style={{ fontFamily: `"${fontName}", sans-serif` }}
-                >
-                  {fontName}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
+        className="max-h-56 w-(--radix-popover-trigger-width) min-w-52 gap-0 overflow-y-auto p-1"
+      >
+        {fontOptions.map((fontName, index) => {
+          const active = fontName === value;
+          const highlighted = index === highlightedIndex;
+          return (
+            <Button
+              key={fontName}
+              ref={(node) => {
+                optionRefs.current[index] = node;
+              }}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => commit(fontName)}
+              className={`h-8 w-full justify-start px-2.5 text-sm font-normal ${
+                highlighted
+                  ? "bg-muted text-foreground"
+                  : active
+                    ? "font-medium text-primary"
+                    : "text-foreground"
+              }`}
+              style={{ fontFamily: `"${fontName}", sans-serif` }}
+            >
+              {fontName}
+            </Button>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -20,8 +20,11 @@ import {
   withDiscardedSubtitleRecovery,
 } from "../../services/subtitleRecovery";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
-import { SettingsField, settingsInputClass } from "./settingsForm";
+import { ModeOptionButton, SettingsField } from "./settingsForm";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Progress } from "../ui/progress";
+import { Textarea } from "../ui/textarea";
 import { formatTransferSpeed } from "../../constants/runtimeDependencies";
 import { formatDurationSeconds } from "../../utils/formatTime";
 
@@ -189,7 +192,7 @@ export function DownloadView() {
     <div className="flex flex-1 flex-col gap-6 overflow-auto p-6">
       <header>
         <h2 className="text-xl font-semibold">视频下载</h2>
-        <p className="mt-1 text-sm text-text-muted">
+        <p className="mt-1 text-sm text-muted-foreground">
           从 m3u8 地址下载音视频，完成后可进入导入页继续转录或切片
         </p>
       </header>
@@ -200,12 +203,13 @@ export function DownloadView() {
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={() =>
               void ffmpegPreparation.requestDependency(async () => {
                 await refreshFfmpeg(true);
               })
             }
-            className="shrink-0 px-3 py-1.5 text-xs text-warning"
+            className="shrink-0 border-warning/50 text-warning hover:bg-warning/20 hover:text-warning"
           >
             准备 FFmpeg
           </Button>
@@ -213,87 +217,86 @@ export function DownloadView() {
       )}
 
       {error && !snapshotFailed && (
-        <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <section className="rounded-xl border border-border bg-surface-raised p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <h3 className="mb-4 font-medium">下载模式</h3>
         <div className="flex flex-wrap gap-3">
-          <ModeButton
+          <ModeOptionButton
             active={mode === "single"}
             onClick={() => setForm({ mode: "single" })}
             label="单 URL"
             desc="音视频合一或纯音频 m3u8"
+            disabled={busy}
+            className="min-w-[10rem]"
           />
-          <ModeButton
+          <ModeOptionButton
             active={mode === "separate"}
             onClick={() => setForm({ mode: "separate" })}
             label="分离音视频"
             desc="并发分片下载，完成后合并"
+            disabled={busy}
+            className="min-w-[10rem]"
           />
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-surface-raised p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <h3 className="mb-4 font-medium">下载参数</h3>
         <div className="flex flex-col gap-4">
           <SettingsField label="下载名称（必填）">
-            <input
+            <Input
               type="text"
               value={name}
               onChange={(e) => setForm({ name: e.target.value })}
               placeholder="例如 episode-01"
-              className={settingsInputClass}
               disabled={busy}
             />
           </SettingsField>
           <SettingsField
             label={separateMode ? "视频 m3u8 URL（必填）" : "媒体 m3u8 URL（必填）"}
           >
-            <input
+            <Input
               type="url"
               value={videoUrl}
               onChange={(e) => setForm({ videoUrl: e.target.value })}
               placeholder="https://example.com/video.m3u8"
-              className={settingsInputClass}
               disabled={busy}
             />
           </SettingsField>
           {separateMode && (
             <SettingsField label="音频 m3u8 URL（必填）">
-              <input
+              <Input
                 type="url"
                 value={audioUrl}
                 onChange={(e) => setForm({ audioUrl: e.target.value })}
                 placeholder="https://example.com/audio.m3u8"
-                className={settingsInputClass}
                 disabled={busy}
               />
             </SettingsField>
           )}
           <SettingsField label="自定义请求头（可选）">
-            <textarea
+            <Textarea
               value={headers}
               onChange={(e) => setForm({ headers: e.target.value })}
               placeholder={"Referer: https://example.com\nUser-Agent: ..."}
               rows={3}
-              className={settingsInputClass}
               disabled={busy}
             />
-            <p className="mt-1 text-xs text-text-muted">
+            <p className="mt-1 text-xs text-muted-foreground">
               每行一条，格式为 Header: Value。
             </p>
           </SettingsField>
           <SettingsField label="保存目录（可选，默认系统「下载」文件夹）">
             <div className="flex gap-2">
-              <input
+              <Input
                 type="text"
                 value={saveDir}
                 onChange={(e) => setForm({ saveDir: e.target.value })}
                 placeholder="留空使用默认下载目录"
-                className={settingsInputClass}
                 disabled={busy}
               />
               <Button
@@ -301,7 +304,7 @@ export function DownloadView() {
                 variant="outline"
                 onClick={handlePickSaveDir}
                 disabled={busy}
-                className="shrink-0 px-3 py-2"
+                className="shrink-0"
               >
                 浏览
               </Button>
@@ -314,7 +317,6 @@ export function DownloadView() {
             type="button"
             onClick={handleStart}
             disabled={!canStart}
-            className="px-4 py-2"
           >
             {busy ? "下载中…" : "开始下载"}
           </Button>
@@ -323,7 +325,6 @@ export function DownloadView() {
               type="button"
               variant="outline"
               onClick={handleCancel}
-              className="px-4 py-2"
             >
               取消下载
             </Button>
@@ -332,7 +333,7 @@ export function DownloadView() {
       </section>
 
       {showProgressCard && (
-        <section className="rounded-xl border border-border bg-surface-raised p-5">
+        <section className="rounded-xl border border-border bg-card p-5">
           <h3 className="mb-4 font-medium">
             {snapshotFailed
               ? "下载失败"
@@ -341,11 +342,11 @@ export function DownloadView() {
                 : "下载进度"}
           </h3>
           {snapshotFailed ? (
-            <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {failureMessage}
             </div>
           ) : snapshotCancelled ? (
-            <p className="text-sm text-text-muted">已取消下载</p>
+            <p className="text-sm text-muted-foreground">已取消下载</p>
           ) : progressPercent !== null ? (
             <>
               <div className="mb-2 flex justify-between text-sm">
@@ -364,12 +365,7 @@ export function DownloadView() {
                   </span>
                 </span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full bg-primary transition-all"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
+              <Progress value={progressPercent} />
               {isMerging && (
                 <p className="mt-2 text-xs font-medium text-foreground/80">
                   下载完成，正在合并封装…
@@ -394,10 +390,10 @@ export function DownloadView() {
       )}
 
       {completedPath && (
-        <section className="rounded-xl border border-border bg-surface-raised p-5">
+        <section className="rounded-xl border border-border bg-card p-5">
           <h3 className="mb-2 font-medium">下载完成</h3>
           <p
-            className="truncate font-mono text-xs text-text-muted"
+            className="truncate font-mono text-xs text-muted-foreground"
             title={completedPath}
           >
             {completedPath}
@@ -407,7 +403,6 @@ export function DownloadView() {
               type="button"
               variant="outline"
               onClick={handleReveal}
-              className="px-4 py-2"
             >
               打开所在文件夹
             </Button>
@@ -415,7 +410,6 @@ export function DownloadView() {
               type="button"
               onClick={handleImport}
               disabled={importing}
-              className="px-4 py-2"
             >
               {importing ? "打开中…" : "下一步"}
             </Button>
@@ -447,32 +441,5 @@ export function DownloadView() {
         onChangeSource={() => openSettings("runtime")}
       />
     </div>
-  );
-}
-
-function ModeButton({
-  active,
-  onClick,
-  label,
-  desc,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  desc: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex min-w-[10rem] flex-col rounded-lg border px-4 py-3 text-left transition-colors ${
-        active
-          ? "border-accent bg-accent text-accent-foreground ring-2 ring-ring/30"
-          : "border-border hover:border-accent/50 hover:bg-surface-overlay"
-      }`}
-    >
-      <span className="text-sm font-medium text-text">{label}</span>
-      <span className="mt-0.5 text-xs text-text-muted">{desc}</span>
-    </button>
   );
 }

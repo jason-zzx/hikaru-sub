@@ -14,6 +14,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import type { PreviewFontFile, VideoPlaybackProbe } from "../../types";
 import { SubtitlePreview } from "./SubtitlePreview";
 import { resolvePausedPreviewCueId } from "./subtitlePreviewModel";
+import { Progress } from "../ui/progress";
 
 interface VideoPlayerProps {
   videoPath: string;
@@ -492,26 +493,21 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       className="relative flex h-full w-full items-center justify-center bg-muted"
     >
       {error ? (
-        <div className="text-center text-red-400">
+        <div className="text-center text-destructive">
           <p className="text-sm">视频加载失败</p>
-          <p className="mt-1 text-xs text-text-muted">{error}</p>
-          <p className="mt-2 text-xs text-text-muted">路径: {videoPath}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{error}</p>
+          <p className="mt-2 text-xs text-muted-foreground">路径: {videoPath}</p>
         </div>
       ) : transcoding ? (
-        <div className="text-center text-text-muted">
+        <div className="text-center text-muted-foreground">
           <div className="mb-4 text-sm">正在转码视频...</div>
-          <div className="mx-auto h-2 w-64 overflow-hidden rounded-full bg-muted-foreground/20">
-            <div
-              className="h-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${transcodePercent}%` }}
-            ></div>
-          </div>
+          <Progress value={transcodePercent} className="mx-auto w-64" />
           <p className="mt-2 text-xs">
             {transcodePercent.toFixed(1)}% - 生成 480p 全关键帧代理视频
           </p>
         </div>
       ) : !videoSrc ? (
-        <div className="text-text-muted">加载中...</div>
+        <div className="text-muted-foreground">加载中...</div>
       ) : (
         <>
           <video

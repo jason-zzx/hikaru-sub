@@ -292,7 +292,7 @@ export function SettingsView() {
 
   if (!settings) {
     return (
-      <div className="flex flex-1 items-center justify-center p-6 text-sm text-text-muted">
+      <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
         加载设置中…
       </div>
     );
@@ -303,7 +303,7 @@ export function SettingsView() {
       <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
         <div>
           <h2 className="text-xl font-semibold">设置</h2>
-          <p className="mt-1 text-sm text-text-muted">{activeMeta.subtitle}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{activeMeta.subtitle}</p>
         </div>
         {activeCategory !== "about" ? (
           <div className="flex items-center gap-3">
@@ -311,7 +311,6 @@ export function SettingsView() {
               type="button"
               onClick={handleSave}
               disabled={saving || !dirty || !shortcutsValid}
-              className="px-4 py-2"
             >
               {saving ? "保存中…" : "保存"}
             </Button>
@@ -327,16 +326,17 @@ export function SettingsView() {
           {SETTINGS_CATEGORIES.map((item) => {
             const active = activeCategory === item.id;
             return (
-              <button
+              <Button
                 key={item.id}
                 type="button"
+                variant="ghost"
                 data-active={active}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setActiveCategory(item.id)}
-                className="rounded-md px-3 py-2 text-left text-sm transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-accent-foreground"
+                className="h-auto w-full justify-start rounded-md px-3 py-2 text-left text-sm font-normal hover:bg-accent hover:text-accent-foreground data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-accent-foreground"
               >
                 {item.label}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -348,7 +348,7 @@ export function SettingsView() {
                 className={`rounded-md border px-3 py-2 text-sm break-words ${
                   message.kind === "ok"
                     ? "border-success/30 bg-success/10 text-success"
-                    : "border-danger/30 bg-danger/10 text-danger"
+                    : "border-destructive/30 bg-destructive/10 text-destructive"
                 }`}
               >
                 {message.text}
@@ -406,10 +406,10 @@ export function SettingsView() {
           if (!open && !cleaning) setCleanupKind(null);
         }}
       >
-        <DialogContent className="gap-5 p-5 sm:max-w-sm" showCloseButton={!cleaning}>
-          <DialogHeader className="gap-2 pr-6">
+        <DialogContent className="sm:max-w-sm" showCloseButton={!cleaning}>
+          <DialogHeader className="pr-6">
             <DialogTitle>确认清理</DialogTitle>
-            <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+            <DialogDescription>
               {cleanupKind === "appCache"
                 ? sessionVideoPath
                   ? "将清理应用缓存中的 workspace、转码代理、预览与切片抽帧（保留当前工作视频相关缓存），是否确认清理"
@@ -421,12 +421,11 @@ export function SettingsView() {
                     : "清理后再次使用需要重新安装依赖，是否确认清理"}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="-mx-0 -mb-0 gap-2 rounded-none border-0 bg-transparent p-0 sm:justify-end">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
               disabled={cleaning}
-              className="px-3"
               onClick={() => setCleanupKind(null)}
             >
               取消
@@ -435,7 +434,6 @@ export function SettingsView() {
               type="button"
               variant="destructive"
               disabled={cleaning}
-              className="px-3"
               onClick={() => {
                 void confirmCleanupDependency();
               }}

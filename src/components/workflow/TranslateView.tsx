@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { parseAss, serializeAss, type SubtitleCue } from "@/lib/ass";
 import { isTranslationProviderReady } from "@/constants/translationProviders";
 import { TARGET_LANG_OPTIONS } from "@/constants/translation";
@@ -11,6 +12,13 @@ import { useTaskStore } from "../../stores/taskStore";
 import { IconAlertTriangle, IconCheck } from "../layout/NavIcons";
 import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
+import { Label } from "../ui/label";
+import { Progress } from "../ui/progress";
 import {
   getSettings,
   loadAssText,
@@ -579,47 +587,48 @@ export function TranslateView() {
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-x-hidden overflow-y-auto p-6">
       <header>
         <h2 className="text-xl font-semibold">AI 翻译</h2>
-        <p className="mt-1 text-sm text-text-muted">
+        <p className="mt-1 text-sm text-muted-foreground">
           通过大模型 API 批量翻译，生成双语 ASS 字幕
         </p>
       </header>
 
       {!sourceLoading && !hasAss && (
-        <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-700 dark:text-yellow-200">
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
           <p className="flex items-center gap-2 font-medium">
             <IconAlertTriangle className="h-4 w-4" />
             <span>未检测到字幕文件</span>
           </p>
-          <p className="mt-1 text-yellow-800/90 dark:text-yellow-300/80">
+          <p className="mt-1 text-warning/90">
             请先完成「转录」步骤生成单语字幕
           </p>
         </div>
       )}
 
       {!sourceLoading && hasAss && sourceCues.length === 0 && (
-        <div className="rounded-lg border border-yellow-600/30 bg-yellow-500/10 p-4 text-sm text-yellow-700 dark:text-yellow-200">
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
           <p className="flex items-center gap-2 font-medium">
             <IconAlertTriangle className="h-4 w-4" />
             <span>字幕为空</span>
           </p>
-          <p className="mt-1 text-yellow-800/90 dark:text-yellow-300/80">
+          <p className="mt-1 text-warning/90">
             当前视频没有字幕条目，请先完成转录
           </p>
         </div>
       )}
 
-      <section className="rounded-xl border border-border bg-surface-raised p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <h3 className="mb-4 font-medium">翻译配置</h3>
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <label className="w-24 text-sm text-text-muted">源语言</label>
-            <div className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-muted">
+            <span className="w-24 shrink-0 text-sm text-muted-foreground">源语言</span>
+            <div className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
               日语
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <label className="w-24 text-sm text-text-muted">目标语言</label>
+            <Label htmlFor="translate-target-lang" className="w-24 shrink-0 font-normal text-muted-foreground">目标语言</Label>
             <Select
+              id="translate-target-lang"
               value={targetLang}
               onChange={setTargetLang}
               options={TARGET_LANG_OPTIONS}
@@ -627,8 +636,9 @@ export function TranslateView() {
             />
           </div>
           <div className="flex items-center gap-4">
-            <label className="w-24 text-sm text-text-muted">供应商</label>
+            <Label htmlFor="translate-provider" className="w-24 shrink-0 font-normal text-muted-foreground">供应商</Label>
             <Select
+              id="translate-provider"
               value={selectedProviderId}
               onChange={setSelectedProviderId}
               options={providerOptions}
@@ -638,14 +648,15 @@ export function TranslateView() {
           </div>
 
           {!settingsLoading && !activeProviderReady && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-700 dark:text-yellow-200">
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
               <IconAlertTriangle className="h-4 w-4 shrink-0" />
               <span>所选供应商配置不完整，请前往「设置」页面配置</span>
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => openSettings("providers")}
-                className="border-yellow-600/50 px-2.5 text-xs text-yellow-700 hover:bg-yellow-500/20 dark:text-yellow-200"
+                className="border-warning/50 text-xs text-warning hover:bg-warning/20 hover:text-warning"
               >
                 前往设置
               </Button>
@@ -653,13 +664,13 @@ export function TranslateView() {
           )}
 
           {activeProvider && (
-            <div className="space-y-2 rounded-md border border-border bg-surface p-3 text-xs text-text-muted">
+            <div className="space-y-2 rounded-md border border-border bg-background p-3 text-xs text-muted-foreground">
               <div>
-                <span className="text-text-dimmed">供应商：</span>{" "}
+                <span className="text-muted-foreground">供应商：</span>{" "}
                 {activeProvider.name.trim() || "未填写"}
               </div>
               <div>
-                <span className="text-text-dimmed">模型：</span>{" "}
+                <span className="text-muted-foreground">模型：</span>{" "}
                 {activeProvider.model.trim() || "未填写"}
               </div>
             </div>
@@ -668,27 +679,22 @@ export function TranslateView() {
       </section>
 
       {(busy || progress || result || error || previousTaskMessage) && (
-        <section className="rounded-xl border border-border bg-surface-raised p-5">
+        <section className="rounded-xl border border-border bg-card p-5">
           <h3 className="mb-4 font-medium">翻译状态</h3>
 
           {translating && (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-text-muted">
+                <span className="text-muted-foreground">
                   {progress?.currentBatch ?? "正在准备翻译"}
                 </span>
                 <span className="font-mono text-primary">
                   {Math.round((progress?.progress ?? 0) * 100)}%
                 </span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-surface">
-                <div
-                  className="h-full bg-primary transition-all"
-                  style={{ width: `${(progress?.progress ?? 0) * 100}%` }}
-                />
-              </div>
+              <Progress value={(progress?.progress ?? 0) * 100} />
               {progress && (
-                <div className="flex justify-between text-xs text-text-muted">
+                <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
                     {progress.completedCues} / {progress.totalCues} 条
                   </span>
@@ -700,11 +706,11 @@ export function TranslateView() {
             </div>
           )}
 
-          {saving && <p className="text-sm text-text-muted">正在保存当前结果...</p>}
+          {saving && <p className="text-sm text-muted-foreground">正在保存当前结果...</p>}
 
           {previousTaskMessage && (
-            <div className="rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
-              <p className="font-medium text-text">上次翻译状态</p>
+            <div className="rounded-md border border-border bg-background p-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">上次翻译状态</p>
               <p className="mt-1 text-xs">{previousTaskMessage}</p>
             </div>
           )}
@@ -714,7 +720,7 @@ export function TranslateView() {
             !error &&
             !result.cancelled &&
             result.failedCount === 0 && (
-            <div className="flex items-center gap-2 text-sm text-green-400">
+            <div className="flex items-center gap-2 text-sm text-success">
               <IconCheck className="h-5 w-5" />
               <span>
                 翻译完成，成功 {result.successCount} 条、失败 0 条
@@ -723,9 +729,9 @@ export function TranslateView() {
           )}
 
           {result && !busy && result.cancelled && (
-            <div className="rounded-md border border-yellow-600/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-200">
+            <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
               <p className="font-medium">翻译已取消</p>
-              <p className="mt-1 text-xs">
+              <p className="mt-1 text-xs text-warning/90">
                 成功 {result.successCount} 条、失败 {result.failedCount} 条
               </p>
             </div>
@@ -736,9 +742,9 @@ export function TranslateView() {
             !result.cancelled &&
             result.successCount > 0 &&
             result.failedCount > 0 && (
-              <div className="rounded-md border border-yellow-600/30 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-200">
+              <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
                 <p className="font-medium">翻译部分完成</p>
-                <p className="mt-1 text-xs">
+                <p className="mt-1 text-xs text-warning/90">
                   成功 {result.successCount} 条、失败 {result.failedCount} 条
                 </p>
               </div>
@@ -749,62 +755,72 @@ export function TranslateView() {
             !result.cancelled &&
             result.successCount === 0 &&
             result.failedCount > 0 && (
-              <div className="rounded-md border border-red-600/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 <p className="font-medium">翻译失败</p>
-                <p className="mt-1 text-xs">
+                <p className="mt-1 text-xs text-destructive/90">
                   成功 0 条、失败 {result.failedCount} 条
                 </p>
               </div>
             )}
 
           {result && incompleteResult && visibleErrors.length > 0 && !busy && (
-            <details className="mt-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-muted">
-              <summary className="cursor-pointer font-medium text-text">
-                查看失败原因
-              </summary>
-              <ul className="mt-2 space-y-1">
-                {visibleErrors.map((message, index) => (
-                  <li key={`${index}-${message}`}>{message}</li>
-                ))}
-              </ul>
-              {result.errors.length > MAX_VISIBLE_ERRORS && (
-                <p className="mt-2 text-text-dimmed">
-                  另有 {result.errors.length - MAX_VISIBLE_ERRORS} 条未显示
-                </p>
-              )}
-            </details>
+            <Collapsible className="mt-3 rounded-lg border border-border bg-background text-xs text-muted-foreground">
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="group h-auto w-full justify-between border-0 rounded-[calc(var(--radius-lg)-1px)] px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50 data-[state=open]:rounded-b-none active:translate-y-0"
+                >
+                  <span>查看失败原因</span>
+                  <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-t border-border px-3 py-2">
+                <ul className="space-y-1">
+                  {visibleErrors.map((message, index) => (
+                    <li key={`${index}-${message}`}>{message}</li>
+                  ))}
+                </ul>
+                {result.errors.length > MAX_VISIBLE_ERRORS && (
+                  <p className="mt-2 text-muted-foreground">
+                    另有 {result.errors.length - MAX_VISIBLE_ERRORS} 条未显示
+                  </p>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
           {error && (
-            <div className="mt-3 rounded-md border border-red-600/30 bg-red-500/10 p-3 text-sm text-red-300">
+            <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <p className="font-medium">操作失败</p>
-              <p className="mt-1 text-xs text-red-400">{error}</p>
+              <p className="mt-1 text-xs text-destructive/90">{error}</p>
             </div>
           )}
         </section>
       )}
 
       {statsCues.length > 0 && (
-        <section className="rounded-xl border border-border bg-surface-raised p-5">
+        <section className="rounded-xl border border-border bg-card p-5">
           <h3 className="mb-4 font-medium">字幕统计</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-2xl font-semibold text-primary">
                 {statsCues.length}
               </div>
-              <div className="mt-1 text-xs text-text-muted">总条数</div>
+              <div className="mt-1 text-xs text-muted-foreground">总条数</div>
             </div>
             <div>
               <div className="text-2xl font-semibold text-primary">
                 {translatedCueCount(statsCues)}
               </div>
-              <div className="mt-1 text-xs text-text-muted">已翻译</div>
+              <div className="mt-1 text-xs text-muted-foreground">已翻译</div>
             </div>
             <div>
               <div className="text-2xl font-semibold text-primary">
                 {statsCues.length - translatedCueCount(statsCues)}
               </div>
-              <div className="mt-1 text-xs text-text-muted">未翻译</div>
+              <div className="mt-1 text-xs text-muted-foreground">未翻译</div>
             </div>
           </div>
         </section>
@@ -814,7 +830,6 @@ export function TranslateView() {
         <Button
           onClick={() => setStep("transcribe")}
           variant="outline"
-          className="text-sm"
           disabled={busy}
         >
           返回转录
@@ -853,7 +868,6 @@ export function TranslateView() {
               onClick={handleTranslate}
               disabled={!canTranslate}
               variant="default"
-              className="px-6 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
             >
               {hasTranslation ? "重新翻译" : "开始翻译"}
             </Button>
@@ -864,7 +878,7 @@ export function TranslateView() {
               onClick={() => setStep("editor")}
               disabled={busy}
               variant="outline"
-              className="border-primary px-6 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
             >
               进入编辑
             </Button>

@@ -764,7 +764,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
 
   if (durationMs === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-text-muted">
+      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
         等待视频加载...
       </div>
     );
@@ -809,7 +809,7 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
           visibility: "hidden",
         }}
       />
-      <div className="pointer-events-none absolute bottom-1 right-2 text-xs text-text-muted">
+      <div className="pointer-events-none absolute bottom-1 right-2 text-xs text-muted-foreground">
         波形区滚轮平移 · Shift+滚轮波形增益 · Ctrl+滚轮缩放
       </div>
     </div>

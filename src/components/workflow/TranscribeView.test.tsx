@@ -154,7 +154,10 @@ async function renderAndStart(useVad = false) {
   const view = render(<TranscribeView />);
   const start = await screen.findByRole("button", { name: "开始转录" });
   await waitFor(() => expect((start as HTMLButtonElement).disabled).toBe(false));
-  if (useVad) await user.click(screen.getByRole("switch"));
+  if (useVad) {
+    await user.click(screen.getByRole("button", { name: "VAD 语音检测配置（高级）" }));
+    await user.click(screen.getByRole("switch"));
+  }
   await user.click(start);
   return { user, view };
 }
@@ -237,6 +240,7 @@ describe("TranscribeView Native ASR flow", () => {
     const view = render(<TranscribeView />);
     const start = screen.getByRole("button", { name: "开始转录" });
     await waitFor(() => expect(start.hasAttribute("disabled")).toBe(false));
+    await user.click(screen.getByRole("button", { name: "VAD 语音检测配置（高级）" }));
     expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
     expect(screen.queryByRole("spinbutton")).toBeNull();
     await user.click(screen.getByRole("switch"));
@@ -269,6 +273,7 @@ describe("TranscribeView Native ASR flow", () => {
     await waitFor(() => expect(mocks.startAsr).toHaveBeenCalledWith(expect.objectContaining({ useVad: false, vadConfig: null })));
     view.unmount();
     render(<TranscribeView />);
+    await user.click(screen.getByRole("button", { name: "VAD 语音检测配置（高级）" }));
     await waitFor(() => expect(screen.getByRole("switch").hasAttribute("disabled")).toBe(false));
     expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
     await user.click(screen.getByRole("switch"));
@@ -279,6 +284,7 @@ describe("TranscribeView Native ASR flow", () => {
   it.each(["qwen3-asr", "parakeet", "reazonspeech-nemo"])("does not apply optional controls to mandatory %s", async (engine) => {
     const user = userEvent.setup();
     render(<TranscribeView />);
+    await user.click(screen.getByRole("button", { name: "VAD 语音检测配置（高级）" }));
     await waitFor(() => expect(screen.getByRole("switch").hasAttribute("disabled")).toBe(false));
     await user.click(screen.getByRole("switch"));
     fireEvent.change(screen.getByRole("spinbutton", { name: /语音阈值/ }), { target: { value: "0.8" } });

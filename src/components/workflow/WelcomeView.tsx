@@ -124,8 +124,8 @@ export function WelcomeView() {
     <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto p-8">
       <div className="flex flex-col items-center text-center">
         <BrandMark className="mb-4 size-16" />
-        <h2 className="text-3xl font-bold text-text">Hikaru Sub</h2>
-        <p className="mt-2 max-w-md text-text-muted">
+        <h2 className="text-3xl font-bold text-foreground">Hikaru Sub</h2>
+        <p className="mt-2 max-w-md text-muted-foreground">
           AI 转录 · AI 翻译 · 字幕编辑 · 一键压制
         </p>
       </div>
@@ -142,19 +142,19 @@ export function WelcomeView() {
             type="button"
             variant="outline"
             onClick={() => setStep(card.step)}
-            className="h-auto flex-col items-start gap-2 whitespace-normal rounded-xl p-5 text-left hover:border-accent/50"
+            className="h-auto flex-col items-start gap-2 whitespace-normal rounded-xl p-5 text-left hover:border-primary/50"
           >
-            <h3 className="text-base font-medium text-text">{card.title}</h3>
-            <p className="text-sm text-text-muted">{card.desc}</p>
+            <h3 className="text-base font-medium text-foreground">{card.title}</h3>
+            <p className="text-sm text-muted-foreground">{card.desc}</p>
           </Button>
         ))}
       </div>
 
       {session && (
-        <div className="w-full max-w-2xl rounded-xl border border-border bg-surface-raised p-5">
-          <h3 className="text-sm font-medium text-text">继续当前工作</h3>
+        <div className="w-full max-w-2xl rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-medium text-foreground">继续当前工作</h3>
           <p
-            className="mt-1 truncate text-sm text-text-muted"
+            className="mt-1 truncate text-sm text-muted-foreground"
             title={session.videoPath}
           >
             {getFileName(session.videoPath)}
@@ -209,28 +209,28 @@ export function WelcomeView() {
 
       {recentEntries.length > 0 && (
         <div className="w-full max-w-2xl">
-          <h3 className="mb-2 text-sm font-medium text-text">最近打开</h3>
-          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface-raised">
+          <h3 className="mb-2 text-sm font-medium text-foreground">最近打开</h3>
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
             {recentEntries.map((entry) => {
               const state = existence[entry.videoPath];
               return (
                 <li
                   key={entry.videoPath}
-                  className="group flex items-center hover:bg-surface-overlay"
+                  className="group flex items-center hover:bg-muted"
                 >
                   <Button
                     type="button"
                     variant="ghost"
                     disabled={opening}
                     onClick={() => void openAndNavigate(entry.videoPath)}
-                    className="h-auto min-w-0 flex-1 justify-start rounded-none px-4 py-3 text-left whitespace-normal hover:bg-transparent"
+                    className="h-auto min-w-0 flex-1 justify-start rounded-none px-4 py-3 text-left whitespace-normal hover:bg-transparent dark:hover:bg-transparent"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-text">
+                      <span className="block truncate text-sm text-foreground">
                         {getFileName(entry.videoPath)}
                       </span>
                       <span
-                        className="block truncate text-xs text-text-muted"
+                        className="block truncate text-xs text-muted-foreground"
                         title={entry.videoPath}
                       >
                         {getParentDir(entry.videoPath, { preserveRoot: true })}
@@ -242,7 +242,7 @@ export function WelcomeView() {
                       </span>
                     )}
                     {state?.transcribed && (
-                      <span className="shrink-0 rounded-md border border-border bg-background px-1.5 py-0.5 text-xs text-text">
+                      <span className="shrink-0 rounded-md border border-border bg-background px-1.5 py-0.5 text-xs text-foreground">
                         已转录
                       </span>
                     )}
@@ -251,7 +251,7 @@ export function WelcomeView() {
                         已翻译
                       </span>
                     )}
-                    <span className="shrink-0 text-xs text-text-muted">
+                    <span className="shrink-0 text-xs text-muted-foreground">
                       {formatRelativeTime(entry.lastOpenedAt)}
                     </span>
                   </Button>
@@ -261,7 +261,7 @@ export function WelcomeView() {
                     size="icon-sm"
                     aria-label="从最近列表移除"
                     onClick={() => handleRemove(entry.videoPath)}
-                    className="mr-2 shrink-0 self-center text-text-muted group-hover:text-text"
+                    className="mr-2 shrink-0 self-center text-muted-foreground group-hover:text-foreground"
                   >
                     <X className="size-4" />
                   </Button>

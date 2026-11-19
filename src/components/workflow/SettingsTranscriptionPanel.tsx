@@ -82,9 +82,10 @@ export function SettingsTranscriptionPanel({
         <Button
           type="button"
           variant="outline"
+          size="sm"
           onClick={() => void availability.refresh()}
           disabled={availability.loading}
-          className="px-2.5 py-1 text-xs"
+          className="text-xs"
         >
           重新检测可用性
         </Button>

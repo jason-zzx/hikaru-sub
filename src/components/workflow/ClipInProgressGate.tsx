@@ -18,7 +18,7 @@ export function ClipInProgressGate({
   if (busy && LOCKED.includes(step)) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-muted-foreground">
           切片进行中，请等待完成，或返回导入页停止切片
         </p>
         <Button type="button" onClick={() => setStep("import")}>

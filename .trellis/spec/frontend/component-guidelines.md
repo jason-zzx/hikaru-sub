@@ -2,10 +2,14 @@
 
 ## UI Stack
 
-- **shadcn/ui first**: buttons, dialogs, selects, inputs, sheets, etc. from `src/components/ui/`.
-- Form controls use semantic tokens (`border-input`, `bg-card`, `focus-visible:ring-ring/50`). Number inputs already hide spinners globally in `src/styles/index.css`.
+- **shadcn/ui first**: buttons, dialogs, selects, inputs, textareas, progress bars, popovers, context menus, sheets, sliders, collapsibles, etc. from `src/components/ui/`. After adding components via `pnpm dlx shadcn@latest add`, strip any Next.js `"use client"` directives and ensure utility imports use `@/lib/utils` (remove any accidental `cn` dependency if the CLI adds one).
+- Tailwind v4 `@custom-variant` rules (`data-open`, `data-closed`, `data-horizontal`, `data-vertical`) are defined in `src/styles/index.css` so Radix state/orientation selectors animate and size properly.
+- Semantic tokens only: `bg-background`, `bg-card`, `bg-muted`, `text-foreground`, `text-muted-foreground`, `primary`, `destructive`, `warning`, `success`. Legacy aliases (`surface*`, `text-text*`, `*-danger`, `accent-muted`) are removed; `accent` is reserved for subtle hover/menu highlight paired with `accent-foreground` (never primary fills, active indicators, or progress bars).
+- `DialogFooter` (`src/components/ui/dialog.tsx`) intentionally uses a seamless layout without a split muted footer bar or top border; confirmation dialogs follow Cancel-left, Confirm/Destructive-right ordering.
+- Prefer Portal-backed `Popover` / `ContextMenu` (avoiding `overflow-hidden` clipping), `Collapsible` (instead of `<details>`), `Slider` (instead of `<input type="range">`), and non-modal `Sheet` (`modal={false}`, `showOverlay={false}`) for side drawers like `StyleManager` that stay open alongside live video/timeline preview.
+- Form controls use semantic tokens (`border-input`, `bg-card`, `focus-visible:ring-ring/50`) and properly bound `<Label htmlFor>` / `id` pairs. Number inputs already hide spinners globally in `src/styles/index.css`.
 - Change appearance via tokens in `src/styles/index.css` (`:root` / `.dark`), not by overriding shadcn internals in business files.
-- Theme: `ThemeProvider` (`src/components/theme-provider.tsx`) — light / dark / system; `ModeToggle` for switching.
+- Theme: `ThemeProvider` (`src/components/theme-provider.tsx`) — light / dark / system; `ModeToggle` for switching (pass `collapsed` in collapsed sidebars).
 
 ## Icons
 
@@ -61,7 +65,10 @@ Examples: `ImportView`, `TranscribeView`, `TranslateView`, `BurnView`, `Settings
 
 ## Anti-Patterns
 
-- New native `<button>` / `<select>` / `<input>` with one-off Tailwind instead of shadcn
+- Raw `<button>` / `<select>` / `<input>` / `<textarea>` / `<details>` or hand-rolled floating menus outside `src/components/ui/`
+- Overriding `DialogFooter` or other shadcn internals in business files instead of adjusting `src/components/ui/`
+- Using `accent` or hardcoded palette colors (`red-*`, `yellow-*`, `green-*`, `blue-*`) instead of semantic tokens (`primary`, `destructive`, `warning`, `success`)
+- Nesting interactive controls (e.g., delete `<Button>` inside a `role="button"` container) or leaving form `<Label>` unbound
 - Cards/panels that reimplement focus rings inconsistently
 - Embedding clip/burn completion side effects only inside a page that can unmount mid-job
 - Using English UI copy for product surfaces (specs are English; the app is Chinese)

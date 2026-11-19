@@ -94,7 +94,7 @@ describe("StyleManager library integration", () => {
     expect(
       screen.getByRole("tab", { name: "当前文档" }).getAttribute("data-state"),
     ).toBe("active");
-    expect(document.querySelector("aside")?.className).toContain("w-[440px]");
+    expect(screen.getByRole("dialog").className).toContain("w-[440px]");
     await waitFor(() => expect(loadStyleLibrary).toHaveBeenCalledTimes(1));
   });
 
@@ -292,7 +292,7 @@ describe("StyleManager library integration", () => {
     expect(
       await screen.findByRole("button", { name: "覆盖样式" }),
     ).toBeTruthy();
-    fireEvent.keyDown(window, { key: "Escape" });
+    await userEvent.keyboard("{Escape}");
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "覆盖样式" })).toBeNull(),
     );
