@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Deduplication rules and traps"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Frontend UI, workflow view, and editor conventions"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend verification and minimal diff standards"}
+{"file": ".trellis/spec/tauri/quality-guidelines.md", "reason": "Rust verification and FFmpeg safety rules"}

@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend check and build criteria"}
+{"file": ".trellis/spec/tauri/quality-guidelines.md", "reason": "Rust cargo test criteria"}
