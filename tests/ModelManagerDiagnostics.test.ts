@@ -22,8 +22,8 @@ describe("ModelManager diagnostics", () => {
   });
 
   it("routes model download and polling through the native model manager", () => {
-    expect(asrSource).toContain("state\n        .native_models\n        .start_download(");
-    expect(asrSource).toContain("state\n        .native_models\n        .job_snapshot(&job_id)");
+    expect(asrSource).toMatch(/\bstate\s*\.native_models\s*\.start_download\(/);
+    expect(asrSource).toMatch(/\bstate\s*\.native_models\s*\.job_snapshot\(&job_id\)/);
     expect(asrSource).toContain("get_model_download_progress");
   });
 });
