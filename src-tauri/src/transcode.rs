@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::dependencies::work_cache_dir;
-use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
+use crate::ffmpeg::{parse_time_token, resolve_ffmpeg, resolve_ffprobe};
 use crate::process::hidden_command;
 use crate::settings::load_settings;
 
@@ -469,29 +469,24 @@ pub async fn start_transcode(app: AppHandle, video_path: String) -> Result<Strin
                     for line in reader.lines() {
                         if let Ok(line_text) = line {
                             // 解析 FFmpeg 进度：time=00:01:23.45
-                            if let Some(time_pos) = line_text.find("time=") {
-                                let time_str = &line_text[time_pos + 5..];
-                                if let Some(end) = time_str.find(' ') {
-                                    let time_token = &time_str[..end];
-                                    if let Some(current) = parse_time_to_seconds(time_token) {
-                                        let percent = if total_duration > 0.0 {
-                                            (current / total_duration * 100.0).min(100.0) as f32
-                                        } else {
-                                            0.0
-                                        };
+                            if let Some(current_ms) = parse_time_token(&line_text) {
+                                let current = current_ms as f64 / 1000.0;
+                                let percent = if total_duration > 0.0 {
+                                    (current / total_duration * 100.0).min(100.0) as f32
+                                } else {
+                                    0.0
+                                };
 
-                                        if let Ok(mut jobs) = jobs_handle.lock() {
-                                            if let Some(job) = jobs.get_mut(&input_path) {
-                                                job.progress = percent;
-                                            }
-                                        }
-
-                                        let _ = app_handle.emit(
-                                            "transcode_progress",
-                                            TranscodeProgressEvent { percent },
-                                        );
+                                if let Ok(mut jobs) = jobs_handle.lock() {
+                                    if let Some(job) = jobs.get_mut(&input_path) {
+                                        job.progress = percent;
                                     }
                                 }
+
+                                let _ = app_handle.emit(
+                                    "transcode_progress",
+                                    TranscodeProgressEvent { percent },
+                                );
                             }
                         }
                     }
@@ -536,18 +531,6 @@ pub async fn start_transcode(app: AppHandle, video_path: String) -> Result<Strin
     });
 
     Ok(cache_path.to_string_lossy().to_string())
-}
-
-fn parse_time_to_seconds(time_str: &str) -> Option<f64> {
-    // 解析 HH:MM:SS.ms 格式
-    let parts: Vec<&str> = time_str.split(':').collect();
-    if parts.len() != 3 {
-        return None;
-    }
-    let hours: f64 = parts[0].parse().ok()?;
-    let minutes: f64 = parts[1].parse().ok()?;
-    let seconds: f64 = parts[2].parse().ok()?;
-    Some(hours * 3600.0 + minutes * 60.0 + seconds)
 }
 
 #[tauri::command]

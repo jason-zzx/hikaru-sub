@@ -1,5 +1,5 @@
 use crate::dependencies::work_cache_dir;
-use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
+use crate::ffmpeg::{parse_progress_out_time_ms, parse_time_token, resolve_ffmpeg, resolve_ffprobe};
 use crate::media_server::MediaServer;
 use crate::process::hidden_command;
 use crate::settings::load_settings;
@@ -292,40 +292,6 @@ pub(crate) fn validate_clip_range(
         return Err("切片结束时间不能超过视频时长".into());
     }
     Ok(())
-}
-
-fn parse_hhmmss_ms(input: &str) -> Option<i64> {
-    let s = input.trim();
-    let (hms, frac) = s.split_once('.').unwrap_or((s, "0"));
-    let mut parts = hms.split(':');
-    let h: i64 = parts.next()?.trim().parse().ok()?;
-    let m: i64 = parts.next()?.trim().parse().ok()?;
-    let sec: i64 = parts.next()?.trim().parse().ok()?;
-    if parts.next().is_some() {
-        return None;
-    }
-    let mut frac3 = String::with_capacity(3);
-    frac3.push_str(frac);
-    while frac3.len() < 3 {
-        frac3.push('0');
-    }
-    let ms: i64 = frac3.get(0..3)?.parse().ok()?;
-    Some(((h * 60 + m) * 60 + sec) * 1000 + ms)
-}
-
-pub(crate) fn parse_progress_out_time_ms(line: &str) -> Option<i64> {
-    let rest = line.trim().strip_prefix("out_time_ms=")?;
-    rest.trim().parse::<i64>().ok().map(|us| us / 1000)
-}
-
-fn parse_time_token(line: &str) -> Option<i64> {
-    let idx = line.find("time=")?;
-    let rest = &line[idx + "time=".len()..];
-    let token = rest.split_whitespace().next()?;
-    if token.starts_with("N/A") {
-        return None;
-    }
-    parse_hhmmss_ms(token)
 }
 
 fn parse_video_bitrate_kbps(output: &str) -> Option<u32> {

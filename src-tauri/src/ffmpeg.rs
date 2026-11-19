@@ -112,8 +112,8 @@ pub fn check_ffmpeg(app: AppHandle) -> FfmpegStatus {
     ffmpeg_status(&app)
 }
 
-/// 解析 `HH:MM:SS.cc` 为毫秒。
-fn parse_hhmmss_ms(input: &str) -> Option<i64> {
+/// 解析 `HH:MM:SS.cc` / `HH:MM:SS.mmm` 为毫秒。
+pub fn parse_hhmmss_ms(input: &str) -> Option<i64> {
     let s = input.trim();
     let (hms, frac) = s.split_once('.').unwrap_or((s, "0"));
     let mut parts = hms.split(':');
@@ -123,7 +123,7 @@ fn parse_hhmmss_ms(input: &str) -> Option<i64> {
     if parts.next().is_some() {
         return None;
     }
-    // ffmpeg 输出为厘秒（2 位），补足到毫秒
+    // ffmpeg 输出通常为厘秒（2 位）或毫秒（3 位），补足或截断到 3 位毫秒
     let mut frac3 = String::with_capacity(3);
     frac3.push_str(frac);
     while frac3.len() < 3 {
@@ -133,8 +133,8 @@ fn parse_hhmmss_ms(input: &str) -> Option<i64> {
     Some(((h * 60 + m) * 60 + sec) * 1000 + ms)
 }
 
-/// 从 ffmpeg stderr 行中提取 `Duration:` 时长。
-fn parse_duration_line(line: &str) -> Option<i64> {
+/// 从 ffmpeg stderr 行中提取 `Duration:` 时长（毫秒）。
+pub fn parse_duration_line(line: &str) -> Option<i64> {
     let idx = line.find("Duration:")?;
     let rest = &line[idx + "Duration:".len()..];
     let token = rest.split(',').next()?.trim();
@@ -144,8 +144,8 @@ fn parse_duration_line(line: &str) -> Option<i64> {
     parse_hhmmss_ms(token)
 }
 
-/// 从 ffmpeg 进度行中提取 `time=` 已处理时长。
-fn parse_time_token(line: &str) -> Option<i64> {
+/// 从 ffmpeg 进度行中提取 `time=` 已处理时长（毫秒）。
+pub fn parse_time_token(line: &str) -> Option<i64> {
     let idx = line.find("time=")?;
     let rest = &line[idx + "time=".len()..];
     let token = rest.split_whitespace().next()?;
@@ -153,6 +153,12 @@ fn parse_time_token(line: &str) -> Option<i64> {
         return None;
     }
     parse_hhmmss_ms(token)
+}
+
+/// 解析 ffmpeg `-progress` 输出中的 `out_time_ms=` 行（ffmpeg 实际以微秒输出），转为毫秒。
+pub fn parse_progress_out_time_ms(line: &str) -> Option<i64> {
+    let rest = line.trim().strip_prefix("out_time_ms=")?;
+    rest.trim().parse::<i64>().ok().map(|us| us / 1000)
 }
 
 /// 提取音轨为 16kHz 单声道 PCM WAV（兼容 Whisper 系模型），过程中推送进度事件。
@@ -635,5 +641,18 @@ mod tests {
             "脉冲应落在桶 900±1，实际 {hit}"
         );
         assert_eq!(peaks.iter().filter(|&&p| p > 0.0).count(), 1);
+    }
+
+    #[test]
+    fn parses_ffmpeg_duration_time_and_out_time_ms() {
+        assert_eq!(parse_duration_line("  Duration: 00:02:03.45, start: 0.0"), Some(123_450));
+        assert_eq!(parse_duration_line("  Duration: N/A, bitrate: N/A"), None);
+        assert_eq!(
+            parse_time_token("frame=1 time=00:01:02.50 bitrate=1kbits/s"),
+            Some(62_500)
+        );
+        assert_eq!(parse_time_token("time=N/A"), None);
+        assert_eq!(parse_progress_out_time_ms("out_time_ms=12345000"), Some(12_345));
+        assert_eq!(parse_progress_out_time_ms("progress=continue"), None);
     }
 }

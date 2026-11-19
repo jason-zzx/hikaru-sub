@@ -1,4 +1,7 @@
-use crate::ffmpeg::{resolve_ffmpeg, resolve_ffprobe};
+use crate::ffmpeg::{
+    parse_duration_line, parse_progress_out_time_ms, parse_time_token, resolve_ffmpeg,
+    resolve_ffprobe,
+};
 use crate::hls_download::{
     build_hls_http_client, download_hls_pair_with_client,
     download_hls_single_or_master_with_client, remove_hls_temp_dir, HlsSingleDownloadResult,
@@ -288,52 +291,6 @@ pub fn parse_stream_codec_types(stdout: &str) -> (bool, bool) {
         }
     }
     (has_video, has_audio)
-}
-
-fn parse_hhmmss_ms(input: &str) -> Option<i64> {
-    let s = input.trim();
-    let (hms, frac) = s.split_once('.').unwrap_or((s, "0"));
-    let mut parts = hms.split(':');
-    let h: i64 = parts.next()?.trim().parse().ok()?;
-    let m: i64 = parts.next()?.trim().parse().ok()?;
-    let sec: i64 = parts.next()?.trim().parse().ok()?;
-    if parts.next().is_some() {
-        return None;
-    }
-    let mut frac3 = String::with_capacity(3);
-    frac3.push_str(frac);
-    while frac3.len() < 3 {
-        frac3.push('0');
-    }
-    let ms: i64 = frac3.get(0..3)?.parse().ok()?;
-    Some(((h * 60 + m) * 60 + sec) * 1000 + ms)
-}
-
-fn parse_duration_line(line: &str) -> Option<i64> {
-    let idx = line.find("Duration:")?;
-    let rest = &line[idx + "Duration:".len()..];
-    let token = rest.split(',').next()?.trim();
-    if token.starts_with("N/A") {
-        return None;
-    }
-    parse_hhmmss_ms(token)
-}
-
-fn parse_time_token(line: &str) -> Option<i64> {
-    let idx = line.find("time=")?;
-    let rest = &line[idx + "time=".len()..];
-    let token = rest.split_whitespace().next()?;
-    if token.starts_with("N/A") {
-        return None;
-    }
-    parse_hhmmss_ms(token)
-}
-
-/// 解析 `-progress` 输出中的 `out_time_ms=` 行。
-pub fn parse_progress_out_time_ms(line: &str) -> Option<i64> {
-    let trimmed = line.trim();
-    let rest = trimmed.strip_prefix("out_time_ms=")?;
-    rest.trim().parse().ok()
 }
 
 /// 解析 `-progress` 输出中的 `total_size=` 行（字节数）。
@@ -2028,7 +1985,7 @@ mod tests {
 
     #[test]
     fn parse_progress_out_time_ms_works() {
-        assert_eq!(parse_progress_out_time_ms("out_time_ms=12345"), Some(12345));
+        assert_eq!(parse_progress_out_time_ms("out_time_ms=12345000"), Some(12345));
         assert_eq!(parse_progress_out_time_ms("progress=continue"), None);
     }
 
