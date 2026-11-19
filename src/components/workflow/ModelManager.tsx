@@ -13,9 +13,8 @@ import {
 } from "../../services/tauri";
 import type { AsrModelStatus, ModelDownloadSnapshot } from "../../types";
 import type { AsrModelRefreshOutcome } from "../../hooks/useAsrAvailability";
+import { sleep } from "../../utils/async";
 import { Button } from "../ui/button";
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function formatMB(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;

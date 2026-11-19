@@ -7,27 +7,25 @@ import { useTaskStore } from "../../stores/taskStore";
 import { useUiStore } from "../../stores/uiStore";
 import {
   cancelBurn,
-  checkFfmpeg,
-  invalidateFfmpegStatus,
   pickDirectory,
   probeBurnVideo,
   saveAssText,
   startBurnSubtitles,
 } from "../../services/tauri";
 import { resolveAssDocumentForSave } from "../../utils/assDocument";
+import { formatDurationSeconds } from "../../utils/formatTime";
+import { getFileStem, getParentDir } from "../../utils/path";
 import type {
   BurnMode,
   BurnVideoEncoder,
   BurnVideoProbe,
-  FfmpegStatus,
 } from "../../types";
 import { Select } from "../ui/select-adapter";
 import { Button } from "../ui/button";
+import { useFfmpegStatus } from "../../hooks/useFfmpegStatus";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
-
-const INPUT_CLASS =
-  "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
+import { settingsInputClass } from "./settingsForm";
 
 const HARD_SUB_PRESETS = [
   "ultrafast",
@@ -95,31 +93,8 @@ function parseBitrateInput(value: string): number | null {
   return clampVideoBitrate(parsed);
 }
 
-function formatMs(ms: number): string {
-  if (!ms || ms < 0) return "0:00";
-  const total = Math.round(ms / 1000);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  }
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function pathDir(path: string): string {
-  const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return idx >= 0 ? path.slice(0, idx) : "";
-}
-
-function pathStem(path: string): string {
-  const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  const name = idx >= 0 ? path.slice(idx + 1) : path;
-  return name.replace(/\.[^.]+$/, "") || "output";
-}
-
 function defaultOutputFileName(videoPath: string, mode: BurnMode): string {
-  const stem = pathStem(videoPath);
+  const stem = getFileStem(videoPath, "output");
   return `${stem}${mode === "hardSubMp4" ? ".burned.mp4" : ".subbed.mkv"}`;
 }
 
@@ -143,7 +118,7 @@ export function BurnView() {
   const resetForStart = useBurnStore((s) => s.resetForStart);
   const clearAfterCancel = useBurnStore((s) => s.clearAfterCancel);
 
-  const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+  const { ffmpeg, refreshFfmpeg } = useFfmpegStatus();
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
   const [mode, setMode] = useState<BurnMode>("hardSubMp4");
   const [outputDir, setOutputDir] = useState("");
@@ -216,20 +191,9 @@ export function BurnView() {
     applyStrategyPreset(strategy);
   };
 
-  const refreshFfmpeg = async (force = false) => {
-    if (force) invalidateFfmpegStatus();
-    const next = await checkFfmpeg({ force });
-    setFfmpeg(next);
-    return next;
-  };
-
-  useEffect(() => {
-    refreshFfmpeg().catch(() => setFfmpeg(null));
-  }, []);
-
   useEffect(() => {
     if (!session) return;
-    setOutputDir((current) => current || pathDir(session.videoPath));
+    setOutputDir((current) => current || getParentDir(session.videoPath));
   }, [session]);
 
   useEffect(() => {
@@ -426,7 +390,7 @@ export function BurnView() {
                     type="text"
                     value={outputDir}
                     onChange={(e) => setOutputDir(e.target.value)}
-                    className={INPUT_CLASS}
+                    className={settingsInputClass}
                   />
                   <Button
                     type="button"
@@ -480,7 +444,7 @@ export function BurnView() {
                         markCustomStrategy();
                       }}
                       disabled={busy}
-                      className={INPUT_CLASS}
+                      className={settingsInputClass}
                     />
                   </Field>
 
@@ -495,7 +459,7 @@ export function BurnView() {
                         markCustomStrategy();
                       }}
                       disabled={busy}
-                      className={INPUT_CLASS}
+                      className={settingsInputClass}
                     />
                   </Field>
 
@@ -543,7 +507,7 @@ export function BurnView() {
                         value={fontDir}
                         onChange={(e) => setFontDir(e.target.value)}
                         placeholder="帮助 libass 找到 ASS 指定字体"
-                        className={INPUT_CLASS}
+                        className={settingsInputClass}
                       />
                       <Button
                         type="button"
@@ -593,7 +557,7 @@ export function BurnView() {
                   <p className="text-xs text-text-muted">
                     {progressPercent !== null ? `${progressPercent}%` : "准备中"}
                     {snapshot.durationMs > 0
-                      ? ` · ${formatMs(snapshot.processedMs)} / ${formatMs(snapshot.durationMs)}`
+                      ? ` · ${formatDurationSeconds(snapshot.processedMs)} / ${formatDurationSeconds(snapshot.durationMs)}`
                       : ""}
                   </p>
                 </div>

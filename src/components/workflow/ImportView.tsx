@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useUiStore } from "../../stores/uiStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useClipStore } from "../../stores/clipStore";
@@ -7,15 +7,14 @@ import { IconFilePlus } from "../layout/NavIcons";
 import { Button } from "../ui/button";
 import {
   cancelVideoClip,
-  checkFfmpeg,
-  invalidateFfmpegStatus,
   pickVideoFile,
   startVideoClip,
 } from "../../services/tauri";
-import type { FfmpegStatus } from "../../types";
+import { useFfmpegStatus } from "../../hooks/useFfmpegStatus";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import { openVideoSession } from "../../services/openVideo";
+import { getFileName } from "../../utils/path";
 import { ClipDialog } from "./ClipDialog";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
 
@@ -40,24 +39,11 @@ export function ImportView() {
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
-  const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+  const { ffmpeg, refreshFfmpeg } = useFfmpegStatus();
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clipOpen, setClipOpen] = useState(false);
-
-  const refreshFfmpeg = async (force = false) => {
-    if (force) invalidateFfmpegStatus();
-    const next = await checkFfmpeg({ force });
-    setFfmpeg(next);
-    return next;
-  };
-
-  useEffect(() => {
-    refreshFfmpeg().catch(() => setFfmpeg(null));
-  }, []);
-
-  const fileName = (path: string) => path.split(/[/\\]/).pop() ?? path;
 
   const handleSelectVideo = async () => {
     setError(null);
@@ -165,7 +151,7 @@ export function ImportView() {
             当前视频
           </p>
           <p className="mt-1 truncate font-medium text-text" title={session.videoPath}>
-            {fileName(session.videoPath)}
+            {getFileName(session.videoPath)}
           </p>
           <p className="mt-0.5 truncate font-mono text-xs text-text-muted" title={session.videoPath}>
             {session.videoPath}

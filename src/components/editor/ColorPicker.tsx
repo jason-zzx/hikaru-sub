@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RgbaColorPicker } from "react-colorful";
-import { assToRgba, rgbaToAss, type RGBA } from "../../utils/assColor";
+import {
+  clampByte,
+  parseAssColor,
+  rgbaToAssColor,
+  toHexByte,
+  type Rgba,
+} from "@/lib/ass";
 
 interface ColorPickerProps {
   value: string;
@@ -22,23 +28,15 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function toByte(value: number): number {
-  return clamp(Math.round(value), 0, 255);
+function rgbaCss(color: Rgba) {
+  return `rgba(${clampByte(color.r)}, ${clampByte(color.g)}, ${clampByte(color.b)}, ${clamp(color.a, 0, 1)})`;
 }
 
-function toHexByte(value: number): string {
-  return toByte(value).toString(16).toUpperCase().padStart(2, "0");
-}
-
-function rgbaCss(color: RGBA) {
-  return `rgba(${toByte(color.r)}, ${toByte(color.g)}, ${toByte(color.b)}, ${clamp(color.a, 0, 1)})`;
-}
-
-function rgbaToHex(color: RGBA): string {
+function rgbaToHex(color: Rgba): string {
   return `#${toHexByte(color.r)}${toHexByte(color.g)}${toHexByte(color.b)}`;
 }
 
-function parseHex(value: string): Pick<RGBA, "r" | "g" | "b"> | null {
+function parseHex(value: string): Pick<Rgba, "r" | "g" | "b"> | null {
   let hex = value.trim().replace(/^#/, "");
   if (hex.length === 3) {
     hex = hex
@@ -54,11 +52,11 @@ function parseHex(value: string): Pick<RGBA, "r" | "g" | "b"> | null {
   };
 }
 
-function colorToChannelDrafts(color: RGBA) {
+function colorToChannelDrafts(color: Rgba) {
   return {
-    r: String(toByte(color.r)),
-    g: String(toByte(color.g)),
-    b: String(toByte(color.b)),
+    r: String(clampByte(color.r)),
+    g: String(clampByte(color.g)),
+    b: String(clampByte(color.b)),
     transparency: String(Math.round((1 - clamp(color.a, 0, 1)) * 100)),
   };
 }
@@ -82,16 +80,16 @@ export function ColorPicker({
   disabled = false,
 }: ColorPickerProps) {
   const [open, setOpen] = useState(false);
-  const [rgba, setRgba] = useState<RGBA>(() => assToRgba(value));
-  const [hexDraft, setHexDraft] = useState(() => rgbaToHex(assToRgba(value)));
+  const [rgba, setRgba] = useState<Rgba>(() => parseAssColor(value));
+  const [hexDraft, setHexDraft] = useState(() => rgbaToHex(parseAssColor(value)));
   const [channelDrafts, setChannelDrafts] = useState(() =>
-    colorToChannelDrafts(assToRgba(value)),
+    colorToChannelDrafts(parseAssColor(value)),
   );
   const [pendingAss, setPendingAss] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const observedValueRef = useRef(value);
 
-  const syncDrafts = useCallback((color: RGBA) => {
+  const syncDrafts = useCallback((color: Rgba) => {
     setHexDraft(rgbaToHex(color));
     setChannelDrafts(colorToChannelDrafts(color));
   }, []);
@@ -100,7 +98,7 @@ export function ColorPicker({
     if (value === observedValueRef.current) return;
     observedValueRef.current = value;
     if (open) return;
-    const next = assToRgba(value);
+    const next = parseAssColor(value);
     setRgba(next);
     syncDrafts(next);
     setPendingAss(null);
@@ -139,14 +137,14 @@ export function ColorPicker({
   }, [open, closePicker]);
 
   const emitColor = useCallback(
-    (next: RGBA) => {
+    (next: Rgba) => {
       const normalized = {
-        r: toByte(next.r),
-        g: toByte(next.g),
-        b: toByte(next.b),
+        r: clampByte(next.r),
+        g: clampByte(next.g),
+        b: clampByte(next.b),
         a: clamp(next.a, 0, 1),
       };
-      const nextAss = rgbaToAss(normalized);
+      const nextAss = rgbaToAssColor(normalized);
 
       setRgba(normalized);
       syncDrafts(normalized);
@@ -159,7 +157,7 @@ export function ColorPicker({
     [deferChange, onChange, syncDrafts],
   );
 
-  const handleChange = (next: RGBA) => {
+  const handleChange = (next: Rgba) => {
     emitColor(next);
   };
 
@@ -193,7 +191,7 @@ export function ColorPicker({
     syncDrafts(rgba);
   };
 
-  const currentAss = pendingAss ?? rgbaToAss(rgba);
+  const currentAss = pendingAss ?? rgbaToAssColor(rgba);
 
   return (
     <div ref={containerRef} className="relative inline-flex flex-col gap-1">

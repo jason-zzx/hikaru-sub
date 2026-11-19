@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createDefaultDocument,
   PRIMARY_STYLE,
@@ -23,22 +23,23 @@ import { defaultAsrModel } from "../../constants/asr";
 import { useAsrAvailability } from "../../hooks/useAsrAvailability";
 import {
   cancelAsr,
-  checkFfmpeg,
   extractAudio,
   getAsrProgress,
   getSettings,
   getVideoInfo,
-  invalidateFfmpegStatus,
   onAudioExtractProgress,
   pathExists,
   saveAssText,
   startAsr,
 } from "../../services/tauri";
-import type { AsrJobSnapshot, FfmpegStatus, StartAsrArgs } from "../../types";
+import type { AsrJobSnapshot, StartAsrArgs } from "../../types";
+import { useFfmpegStatus } from "../../hooks/useFfmpegStatus";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
+import { sleep } from "../../utils/async";
+import { formatDurationSeconds } from "../../utils/formatTime";
 
 type TranscribeAttempt = {
   args: StartAsrArgs;
@@ -50,22 +51,12 @@ const ASR_POLL_INTERVAL_MS = 700;
 const ASR_PROGRESS_RETRY_LIMIT = 90;
 const ASR_PROGRESS_RETRY_MAX_DELAY_MS = 3000;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 function progressRetryDelay(attempt: number): number {
   return Math.min(ASR_PROGRESS_RETRY_MAX_DELAY_MS, ASR_POLL_INTERVAL_MS + attempt * 200);
 }
 
 function isMissingJobError(message: string): boolean {
   return message.includes("转录任务不存在") || message.includes("HTTP 404");
-}
-
-function formatMs(ms: number): string {
-  if (!ms || ms < 0) return "0:00";
-  const total = Math.round(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 export function TranscribeView() {
@@ -79,7 +70,7 @@ export function TranscribeView() {
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
-  const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+  const { ffmpeg, refreshFfmpeg } = useFfmpegStatus();
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
 
   // 音轨提取
@@ -135,17 +126,6 @@ export function TranscribeView() {
   useEffect(() => {
     setAsrNotice(null);
   }, [session?.videoPath, engine, model, device, selectedUseVad]);
-
-  const refreshFfmpeg = useCallback(async (force = false) => {
-    if (force) invalidateFfmpegStatus();
-    const next = await checkFfmpeg({ force });
-    setFfmpeg(next);
-    return next;
-  }, []);
-
-  useEffect(() => {
-    refreshFfmpeg().catch(() => setFfmpeg(null));
-  }, [refreshFfmpeg]);
 
   // 初始化配置 + 检测已有音轨
   useEffect(() => {
@@ -868,7 +848,8 @@ export function TranscribeView() {
             {job && (
               <div className="flex flex-wrap gap-4 text-xs text-text-muted">
                 <span>
-                  进度 {formatMs(job.processedMs)} / {formatMs(job.durationMs)}
+                  进度 {formatDurationSeconds(job.processedMs)} /{" "}
+                  {formatDurationSeconds(job.durationMs)}
                 </span>
                 <span>已生成 {job.segmentCount} 段</span>
                 {job.detectedLanguage && (

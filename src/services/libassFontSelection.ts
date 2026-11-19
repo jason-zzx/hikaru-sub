@@ -1,4 +1,5 @@
 import {
+  findAssStyleByName,
   getCueDisplay,
   parseAssTextLines,
   SECONDARY_STYLE,
@@ -156,17 +157,6 @@ export function findBestPreviewFontFile(
   );
 }
 
-function findStyle(styles: AssStyle[], styleName?: string): AssStyle | null {
-  if (!styleName) return styles[0] ?? null;
-  return (
-    styles.find(
-      (style) => style.name.toLowerCase() === styleName.toLowerCase(),
-    ) ??
-    styles[0] ??
-    null
-  );
-}
-
 function isCjkCapableFontName(fontName: string): boolean {
   return isKnownCjkFontName(fontName);
 }
@@ -260,7 +250,7 @@ function collectCueFontNames(
   const collectText = (text: string, baseStyle: AssStyle | null) => {
     if (!baseStyle) return;
     const lines = parseAssTextLines(text, baseStyle, {
-      resolveStyle: (name) => findStyle(styles, name) ?? undefined,
+      resolveStyle: (name) => findAssStyleByName(styles, name) ?? undefined,
     });
     for (const line of lines) {
       for (const run of line.runs) {
@@ -275,10 +265,10 @@ function collectCueFontNames(
   for (const cue of cues) {
     const display = getCueDisplay(cue, mergeMode);
     if (display.mode === "single") {
-      collectText(display.text, findStyle(styles, cue.style));
+      collectText(display.text, findAssStyleByName(styles, cue.style));
     } else {
-      collectText(display.primaryText, findStyle(styles, cue.style));
-      collectText(display.secondaryText, findStyle(styles, SECONDARY_STYLE));
+      collectText(display.primaryText, findAssStyleByName(styles, cue.style));
+      collectText(display.secondaryText, findAssStyleByName(styles, SECONDARY_STYLE));
     }
   }
 

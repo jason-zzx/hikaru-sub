@@ -4,6 +4,7 @@ import { useClipStore } from "../stores/clipStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useTaskStore } from "../stores/taskStore";
 import { withDiscardedSubtitleRecovery } from "../services/subtitleRecovery";
+import { sleep } from "../utils/async";
 
 const POLL_INTERVAL_MS = 700;
 
@@ -121,7 +122,7 @@ export function useClipJobPoller() {
           finishJob();
           break;
         }
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        await sleep(POLL_INTERVAL_MS);
       }
     };
 

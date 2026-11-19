@@ -1,4 +1,5 @@
 import type { SubtitleCue } from "../../types";
+import { TRANSLATION_LANG_NAMES } from "../../constants/translation";
 import { GenerationError } from "./http";
 import { RequestScheduler } from "./requestScheduler";
 import type {
@@ -508,18 +509,6 @@ export abstract class TranslationProvider {
   }
 
   protected getLangName(langCode: string): string {
-    const langMap: Record<string, string> = {
-      ja: "日语",
-      en: "英语",
-      zh: "中文",
-      "zh-CN": "简体中文",
-      "zh-TW": "繁体中文",
-      ko: "韩语",
-      fr: "法语",
-      de: "德语",
-      es: "西班牙语",
-      ru: "俄语",
-    };
-    return langMap[langCode] || langCode;
+    return TRANSLATION_LANG_NAMES[langCode] || langCode;
   }
 }

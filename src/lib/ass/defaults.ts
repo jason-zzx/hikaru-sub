@@ -84,3 +84,17 @@ export function createDefaultDocument(title = "Hikaru-Sub", resX?: number, resY?
     cues: [],
   };
 }
+
+/** 大小写不敏感按名称查找 ASS 样式；无匹配或未指定名称时回退首条样式，空列表返回 null。 */
+export function findAssStyleByName(
+  styles: readonly AssStyle[],
+  styleName?: string,
+): AssStyle | null {
+  if (!styleName) return styles[0] ?? null;
+  const target = styleName.toLowerCase();
+  return (
+    styles.find((style) => style.name.toLowerCase() === target) ??
+    styles[0] ??
+    null
+  );
+}

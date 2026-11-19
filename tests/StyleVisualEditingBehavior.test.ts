@@ -43,8 +43,8 @@ describe("editor style visual editing integration", () => {
     const source = readSource("src/components/editor/ColorPicker.tsx");
 
     expect(source).toContain("RgbaColorPicker");
-    expect(source).toContain("assToRgba");
-    expect(source).toContain("rgbaToAss");
+    expect(source).toContain("parseAssColor");
+    expect(source).toContain("rgbaToAssColor");
     expect(source).toContain("hexDraft");
     expect(source).toContain("透明度");
     expect(source).toContain("if (open) return");

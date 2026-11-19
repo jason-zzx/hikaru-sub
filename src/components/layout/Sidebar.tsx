@@ -14,6 +14,7 @@ import {
 } from "./NavIcons";
 import { ModeToggle } from "../ModeToggle";
 import { BrandMark } from "../brand/BrandMark";
+import { getFileName } from "../../utils/path";
 
 interface NavItem {
   step: WorkflowStep;
@@ -119,7 +120,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
             className="mt-2 truncate px-3 text-xs text-muted-foreground"
             title={session.videoPath}
           >
-            {session.videoPath.split(/[/\\]/).pop()}
+            {getFileName(session.videoPath)}
           </p>
         )}
       </div>

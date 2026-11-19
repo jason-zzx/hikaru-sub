@@ -13,6 +13,7 @@ import {
   pickDirectory,
 } from "../../services/tauri";
 import { formatPlaybackTime } from "../../utils/formatTime";
+import { getFileStem, getParentDir } from "../../utils/path";
 import {
   applyTimeInputKey,
   formatTimeInput,
@@ -69,17 +70,6 @@ const EMPTY_FRAME: FramePreviewState = {
   loading: false,
 };
 
-function pathDir(path: string): string {
-  const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return idx >= 0 ? path.slice(0, idx) : "";
-}
-
-function pathStem(path: string): string {
-  const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  const name = idx >= 0 ? path.slice(idx + 1) : path;
-  return name.replace(/\.[^.]+$/, "") || "video";
-}
-
 /** 与后端 default_clip_file_name 对齐：HHMMSS（秒级） */
 function formatClipTimeToken(ms: number): string {
   const bounded = Math.max(0, Math.floor(ms));
@@ -95,7 +85,7 @@ function defaultClipFileName(
   startMs: number,
   endMs: number,
 ): string {
-  return `${pathStem(videoPath)}-${formatClipTimeToken(startMs)}-${formatClipTimeToken(endMs)}.mp4`;
+  return `${getFileStem(videoPath, "video")}-${formatClipTimeToken(startMs)}-${formatClipTimeToken(endMs)}.mp4`;
 }
 
 /** 片尾精确时刻常抽不到帧，预览时略微前移 */
@@ -177,7 +167,7 @@ export function ClipDialog({
 
     setMode("hard");
     setUseAsWorkingVideo(true);
-    setSaveDir(pathDir(videoPath));
+    setSaveDir(getParentDir(videoPath));
     setStartText(formatTimeInput(0));
     setEndText(formatTimeInput(0));
     const initialName = defaultClipFileName(videoPath, 0, 0);

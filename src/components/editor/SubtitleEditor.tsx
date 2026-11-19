@@ -27,10 +27,12 @@ import {
   applyToggleOverrideTag,
   colorOverrideStartTag,
   findEffectiveAlignment,
+  formatAssNumber,
   restoreTagForStyle,
   type AttributeOverrideKind,
   type ColorOverrideKind,
 } from "../../utils/assOverrideTags";
+import { COMMON_SUBTITLE_FONTS } from "../../utils/fontFamilyAliases";
 import {
   applyTimeInputKey,
   formatTimeInput,
@@ -51,15 +53,6 @@ import {
   type HotkeyDef,
 } from "./hotkeys";
 import type { SubtitleCue } from "../../types";
-
-const QUICK_FONT_OPTIONS = [
-  "Arial",
-  "Noto Sans CJK JP",
-  "Noto Sans SC",
-  "Microsoft YaHei",
-  "Meiryo",
-  "Yu Gothic",
-];
 
 type EditorNotify = (variant: "success" | "error" | "info", text: string) => void;
 type TimeField = "start" | "end";
@@ -151,7 +144,7 @@ export const SubtitleEditor = forwardRef<
   const timeDraftDirtyRef = useRef(false);
 
   const fontNames = usePreviewFontNames([
-    ...QUICK_FONT_OPTIONS,
+    ...COMMON_SUBTITLE_FONTS,
     ...assStyles.map((style) => style.fontName),
   ]);
 
@@ -464,12 +457,8 @@ export const SubtitleEditor = forwardRef<
   };
 
   const handleInlineNumber = (kind: "outline" | "shadow", value: number) => {
-    const rounded = Math.round(value * 10) / 10;
-    const formatted = Number.isInteger(rounded)
-      ? String(rounded)
-      : rounded.toFixed(1);
     const command = kind === "outline" ? "bord" : "shad";
-    applyAttributeTag(kind, `{\\${command}${formatted}}`);
+    applyAttributeTag(kind, `{\\${command}${formatAssNumber(value)}}`);
   };
 
   const handleInlineAlignment = (alignment: number) => {

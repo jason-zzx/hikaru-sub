@@ -5,14 +5,7 @@ import {
   settingsInputClass,
 } from "./settingsForm";
 import type { AppSettings } from "../../types";
-
-const TARGET_LANGS = [
-  { value: "zh-CN", label: "简体中文" },
-  { value: "zh-TW", label: "繁体中文" },
-  { value: "en", label: "英语" },
-  { value: "ja", label: "日语" },
-  { value: "ko", label: "韩语" },
-];
+import { TARGET_LANG_OPTIONS } from "../../constants/translation";
 
 interface SettingsTranslationPanelProps {
   settings: AppSettings;
@@ -123,7 +116,7 @@ export function SettingsTranslationPanel({
           <Select
             value={settings.defaultTargetLang}
             onChange={(v) => update("defaultTargetLang", v)}
-            options={TARGET_LANGS}
+            options={TARGET_LANG_OPTIONS}
           />
         </SettingsField>
       </SettingsSection>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseAss, serializeAss, type SubtitleCue } from "@/lib/ass";
 import { isTranslationProviderReady } from "@/constants/translationProviders";
+import { TARGET_LANG_OPTIONS } from "@/constants/translation";
 import { useUiStore } from "../../stores/uiStore";
 import {
   captureProjectDocumentGuard,
@@ -28,14 +29,6 @@ import {
 import { withDiscardedSubtitleRecovery } from "../../services/subtitleRecovery";
 import type { AppSettings } from "../../types";
 import { mergeRetryResult, translatedCueCount } from "./translationResult";
-
-const TARGET_LANGS = [
-  { value: "zh-CN", label: "简体中文" },
-  { value: "zh-TW", label: "繁体中文" },
-  { value: "en", label: "英语" },
-  { value: "ja", label: "日语" },
-  { value: "ko", label: "韩语" },
-];
 
 const MAX_VISIBLE_ERRORS = 20;
 
@@ -629,7 +622,7 @@ export function TranslateView() {
             <Select
               value={targetLang}
               onChange={setTargetLang}
-              options={TARGET_LANGS}
+              options={TARGET_LANG_OPTIONS}
               disabled={busy}
             />
           </div>

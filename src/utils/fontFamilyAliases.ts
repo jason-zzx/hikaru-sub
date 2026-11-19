@@ -1,3 +1,13 @@
+/** 样式与快速格式面板共用的基础常用字体列表。 */
+export const COMMON_SUBTITLE_FONTS: readonly string[] = [
+  "Arial",
+  "Noto Sans CJK JP",
+  "Noto Sans SC",
+  "Microsoft YaHei",
+  "Meiryo",
+  "Yu Gothic",
+];
+
 const FONT_STYLE_SUFFIX =
   /[-_\s](regular|bold|italic|bolditalic|bold-italic|medium|semibold|semi-bold|light|thin|black|heavy|demibold|demi-bold|book|oblique)$/i;
 const FONT_FILE_EXTENSION = /\.(ttf|otf|ttc|otc)$/i;

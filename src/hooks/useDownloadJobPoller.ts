@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { getVideoDownloadProgress } from "../services/tauri";
 import { useDownloadStore } from "../stores/downloadStore";
 import { useTaskStore } from "../stores/taskStore";
+import { sleep } from "../utils/async";
 
 const POLL_INTERVAL_MS = 700;
 
@@ -58,7 +59,7 @@ export function useDownloadJobPoller() {
           finishJob();
           break;
         }
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        await sleep(POLL_INTERVAL_MS);
       }
     };
 

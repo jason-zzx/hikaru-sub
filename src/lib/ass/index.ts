@@ -15,6 +15,8 @@ export { parseAssTime, formatAssTime } from "./time";
 
 export {
   type Rgba,
+  clampByte,
+  toHexByte,
   parseAssColor,
   rgbaToAssColor,
   assColorToCss,
@@ -30,6 +32,7 @@ export {
   createDefaultStyles,
   createDefaultScriptInfo,
   createDefaultDocument,
+  findAssStyleByName,
 } from "./defaults";
 
 export {

@@ -10,10 +10,9 @@ import type {
   RuntimeDependencySnapshot,
 } from "../types";
 import { RUNTIME_SOURCE_MODE_LABEL } from "../constants/runtimeDependencies";
+import { sleep } from "../utils/async";
 
 const POLL_INTERVAL_MS = 800;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function useRuntimeDependencyPreparation(kind: RuntimeDependencyKind) {
   const [probe, setProbe] = useState<RuntimeDependencyProbe | null>(null);

@@ -6,6 +6,7 @@ import {
   type AssDocument,
   type SubtitleCue,
 } from "@/lib/ass";
+import { getFileName } from "./path";
 
 export interface ExternalSubtitlePlayRes {
   width: number;
@@ -19,7 +20,7 @@ export interface ParseExternalSubtitleDocumentArgs {
 }
 
 function extensionOf(path: string): string {
-  const filename = path.split(/[\\/]/).pop() ?? path;
+  const filename = getFileName(path);
   const dot = filename.lastIndexOf(".");
   return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : "";
 }

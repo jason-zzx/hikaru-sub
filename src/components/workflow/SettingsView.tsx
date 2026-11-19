@@ -38,10 +38,9 @@ import type {
 import { RUNTIME_DEPENDENCY_LABEL } from "../../constants/runtimeDependencies";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
+import { sleep } from "../../utils/async";
 
 const RUNTIME_PREPARATION_POLL_MS = 800;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type RuntimePreparationSnapshots = Partial<
   Record<RuntimeDependencyKind, RuntimeDependencySnapshot>

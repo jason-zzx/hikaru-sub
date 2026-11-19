@@ -86,7 +86,7 @@ export type AttributeOverrideKind =
   | "shadow"
   | "alignment";
 
-function formatAssNumber(value: number): string {
+export function formatAssNumber(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }

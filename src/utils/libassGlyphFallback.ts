@@ -1,4 +1,9 @@
-import { SECONDARY_STYLE, type AssStyle, type SubtitleCue } from "@/lib/ass";
+import {
+  findAssStyleByName,
+  SECONDARY_STYLE,
+  type AssStyle,
+  type SubtitleCue,
+} from "@/lib/ass";
 import { normalizeFontLookupName } from "./fontFamilyAliases";
 
 const CJK_SEQUENCE_RE =
@@ -41,17 +46,6 @@ function fontTag(fontName: string): string {
   return `{\\fn${sanitizeFontName(fontName)}}`;
 }
 
-function findStyle(styles: AssStyle[], styleName?: string): AssStyle | null {
-  if (!styleName) return styles[0] ?? null;
-  return (
-    styles.find(
-      (style) => style.name.toLowerCase() === styleName.toLowerCase(),
-    ) ??
-    styles[0] ??
-    null
-  );
-}
-
 function updateStateFromOverrideBlock(
   block: string,
   state: TextFallbackState,
@@ -66,7 +60,7 @@ function updateStateFromOverrideBlock(
 
     if (/^r/i.test(tag)) {
       state.currentStyle =
-        findStyle(styles, tag.slice(1)) ?? state.dialogueStyle;
+        findAssStyleByName(styles, tag.slice(1)) ?? state.dialogueStyle;
       state.inlineFontName = undefined;
       continue;
     }
@@ -234,7 +228,7 @@ export function collectLibassGlyphFontChecks({
   for (const cue of cues) {
     collectTextChecks(
       cue.primaryText,
-      findStyle(styles, cue.style),
+      findAssStyleByName(styles, cue.style),
       styles,
       fallback,
       checks,
@@ -243,8 +237,8 @@ export function collectLibassGlyphFontChecks({
       collectTextChecks(
         cue.secondaryText,
         mergeMode === "separate"
-          ? findStyle(styles, SECONDARY_STYLE)
-          : findStyle(styles, cue.style),
+          ? findAssStyleByName(styles, SECONDARY_STYLE)
+          : findAssStyleByName(styles, cue.style),
         styles,
         fallback,
         checks,
@@ -269,9 +263,11 @@ export function applyLibassGlyphFallbackToCues({
   if (!fallback) return cues;
 
   return cues.map((cue) => {
-    const primaryStyle = findStyle(styles, cue.style);
+    const primaryStyle = findAssStyleByName(styles, cue.style);
     const secondaryStyle =
-      mergeMode === "separate" ? findStyle(styles, SECONDARY_STYLE) : primaryStyle;
+      mergeMode === "separate"
+        ? findAssStyleByName(styles, SECONDARY_STYLE)
+        : primaryStyle;
 
     return {
       ...cue,

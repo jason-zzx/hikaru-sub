@@ -24,19 +24,12 @@ import { Select } from "../ui/select-adapter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ColorPicker } from "./ColorPicker";
 import { FontComboBox } from "./FontComboBox";
+import { COMMON_SUBTITLE_FONTS } from "../../utils/fontFamilyAliases";
 
 const INPUT_CLASS =
   "w-full rounded border border-input bg-card px-2 py-1.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
-const COMMON_FONTS = [
-  "Arial",
-  "Noto Sans CJK JP",
-  "Noto Sans SC",
-  "Microsoft YaHei",
-  "Meiryo",
-  "Yu Gothic",
-  "SimHei",
-];
+const COMMON_FONTS = [...COMMON_SUBTITLE_FONTS, "SimHei"];
 
 const ASS_ENCODING_OPTIONS = [
   { value: 0, label: "0 - ANSI" },

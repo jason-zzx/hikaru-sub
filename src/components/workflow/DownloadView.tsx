@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { useState } from "react";
 import { message } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useUiStore } from "../../stores/uiStore";
@@ -7,14 +7,12 @@ import { useTaskStore } from "../../stores/taskStore";
 import { useDownloadStore } from "../../stores/downloadStore";
 import {
   cancelVideoDownload,
-  checkFfmpeg,
   getVideoDownloadProgress,
-  invalidateFfmpegStatus,
   pickDirectory,
   prepareVideoSession,
   startVideoDownload,
 } from "../../services/tauri";
-import type { FfmpegStatus } from "../../types";
+import { useFfmpegStatus } from "../../hooks/useFfmpegStatus";
 import { useRuntimeDependencyPreparation } from "../../hooks/useRuntimeDependencyPreparation";
 import { confirmDiscardUnsavedChanges } from "../../services/unsavedChanges";
 import {
@@ -22,23 +20,10 @@ import {
   withDiscardedSubtitleRecovery,
 } from "../../services/subtitleRecovery";
 import { RuntimeDependencyDialog } from "./RuntimeDependencyDialog";
+import { SettingsField, settingsInputClass } from "./settingsForm";
 import { Button } from "../ui/button";
 import { formatTransferSpeed } from "../../constants/runtimeDependencies";
-
-const INPUT_CLASS =
-  "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
-
-function formatMs(ms: number): string {
-  if (!ms || ms < 0) return "0:00";
-  const total = Math.round(ms / 1000);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  }
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { formatDurationSeconds } from "../../utils/formatTime";
 
 export function DownloadView() {
   const setStep = useUiStore((s) => s.setStep);
@@ -47,7 +32,7 @@ export function DownloadView() {
   const upsertTask = useTaskStore((s) => s.upsertTask);
   const updateTask = useTaskStore((s) => s.updateTask);
 
-  const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+  const { ffmpeg, refreshFfmpeg } = useFfmpegStatus();
   const ffmpegPreparation = useRuntimeDependencyPreparation("ffmpeg");
   const {
     mode,
@@ -68,17 +53,6 @@ export function DownloadView() {
     finishJob,
   } = useDownloadStore();
   const [importing, setImporting] = useState(false);
-
-  const refreshFfmpeg = async (force = false) => {
-    if (force) invalidateFfmpegStatus();
-    const next = await checkFfmpeg({ force });
-    setFfmpeg(next);
-    return next;
-  };
-
-  useEffect(() => {
-    refreshFfmpeg().catch(() => setFfmpeg(null));
-  }, []);
 
   const ffmpegMissing = ffmpeg !== null && !ffmpeg.available;
   const separateMode = mode === "separate";
@@ -265,17 +239,17 @@ export function DownloadView() {
       <section className="rounded-xl border border-border bg-surface-raised p-5">
         <h3 className="mb-4 font-medium">下载参数</h3>
         <div className="flex flex-col gap-4">
-          <Field label="下载名称（必填）">
+          <SettingsField label="下载名称（必填）">
             <input
               type="text"
               value={name}
               onChange={(e) => setForm({ name: e.target.value })}
               placeholder="例如 episode-01"
-              className={INPUT_CLASS}
+              className={settingsInputClass}
               disabled={busy}
             />
-          </Field>
-          <Field
+          </SettingsField>
+          <SettingsField
             label={separateMode ? "视频 m3u8 URL（必填）" : "媒体 m3u8 URL（必填）"}
           >
             <input
@@ -283,43 +257,43 @@ export function DownloadView() {
               value={videoUrl}
               onChange={(e) => setForm({ videoUrl: e.target.value })}
               placeholder="https://example.com/video.m3u8"
-              className={INPUT_CLASS}
+              className={settingsInputClass}
               disabled={busy}
             />
-          </Field>
+          </SettingsField>
           {separateMode && (
-            <Field label="音频 m3u8 URL（必填）">
+            <SettingsField label="音频 m3u8 URL（必填）">
               <input
                 type="url"
                 value={audioUrl}
                 onChange={(e) => setForm({ audioUrl: e.target.value })}
                 placeholder="https://example.com/audio.m3u8"
-                className={INPUT_CLASS}
+                className={settingsInputClass}
                 disabled={busy}
               />
-            </Field>
+            </SettingsField>
           )}
-          <Field label="自定义请求头（可选）">
+          <SettingsField label="自定义请求头（可选）">
             <textarea
               value={headers}
               onChange={(e) => setForm({ headers: e.target.value })}
               placeholder={"Referer: https://example.com\nUser-Agent: ..."}
               rows={3}
-              className={INPUT_CLASS}
+              className={settingsInputClass}
               disabled={busy}
             />
             <p className="mt-1 text-xs text-text-muted">
               每行一条，格式为 Header: Value。
             </p>
-          </Field>
-          <Field label="保存目录（可选，默认系统「下载」文件夹）">
+          </SettingsField>
+          <SettingsField label="保存目录（可选，默认系统「下载」文件夹）">
             <div className="flex gap-2">
               <input
                 type="text"
                 value={saveDir}
                 onChange={(e) => setForm({ saveDir: e.target.value })}
                 placeholder="留空使用默认下载目录"
-                className={INPUT_CLASS}
+                className={settingsInputClass}
                 disabled={busy}
               />
               <Button
@@ -332,7 +306,7 @@ export function DownloadView() {
                 浏览
               </Button>
             </div>
-          </Field>
+          </SettingsField>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -376,8 +350,8 @@ export function DownloadView() {
             <>
               <div className="mb-2 flex justify-between text-sm">
                 <span className="text-foreground/80">
-                  {formatMs(snapshot?.processedMs ?? 0)} /{" "}
-                  {formatMs(snapshot?.durationMs ?? 0)}
+                  {formatDurationSeconds(snapshot?.processedMs ?? 0)} /{" "}
+                  {formatDurationSeconds(snapshot?.durationMs ?? 0)}
                 </span>
                 <span className="flex items-center gap-3 font-mono">
                   {speedLabel && (
@@ -408,7 +382,7 @@ export function DownloadView() {
                 ? "下载完成，正在合并封装…"
                 : isPreparing
                   ? "正在解析播放列表…"
-                  : `下载中… 已处理 ${formatMs(snapshot?.processedMs ?? 0)}${snapshot?.durationMs ? ` / ${formatMs(snapshot.durationMs)}` : ""}`}
+                  : `下载中… 已处理 ${formatDurationSeconds(snapshot?.processedMs ?? 0)}${snapshot?.durationMs ? ` / ${formatDurationSeconds(snapshot.durationMs)}` : ""}`}
               {!isMerging && !isPreparing && speedLabel ? (
                 <span className="ml-2 font-mono font-medium text-foreground">
                   {speedLabel}
@@ -500,20 +474,5 @@ function ModeButton({
       <span className="text-sm font-medium text-text">{label}</span>
       <span className="mt-0.5 text-xs text-text-muted">{desc}</span>
     </button>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm text-text-muted">{label}</span>
-      {children}
-    </label>
   );
 }

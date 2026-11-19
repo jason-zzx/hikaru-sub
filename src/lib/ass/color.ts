@@ -12,11 +12,11 @@ export interface Rgba {
   a: number;
 }
 
-function clampByte(n: number): number {
+export function clampByte(n: number): number {
   return Math.max(0, Math.min(255, Math.round(n)));
 }
 
-function toHexByte(n: number): string {
+export function toHexByte(n: number): string {
   return clampByte(n).toString(16).toUpperCase().padStart(2, "0");
 }
 

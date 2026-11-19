@@ -12,14 +12,7 @@ import {
   removeRecentVideo,
   type RecentVideoEntry,
 } from "../../services/recentVideos";
-
-const fileName = (path: string) => path.split(/[/\\]/).pop() ?? path;
-
-function parentPath(path: string): string {
-  const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  if (separator < 0) return "";
-  return separator === 0 ? path[0] : path.slice(0, separator);
-}
+import { getFileName, getParentDir } from "../../utils/path";
 
 function formatRelativeTime(timestamp: number): string {
   const minutes = Math.floor((Date.now() - timestamp) / 60000);
@@ -164,7 +157,7 @@ export function WelcomeView() {
             className="mt-1 truncate text-sm text-text-muted"
             title={session.videoPath}
           >
-            {fileName(session.videoPath)}
+            {getFileName(session.videoPath)}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {canEditCurrentSession && (
@@ -234,13 +227,13 @@ export function WelcomeView() {
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-text">
-                        {fileName(entry.videoPath)}
+                        {getFileName(entry.videoPath)}
                       </span>
                       <span
                         className="block truncate text-xs text-text-muted"
                         title={entry.videoPath}
                       >
-                        {parentPath(entry.videoPath)}
+                        {getParentDir(entry.videoPath, { preserveRoot: true })}
                       </span>
                     </span>
                     {state && !state.video && (
