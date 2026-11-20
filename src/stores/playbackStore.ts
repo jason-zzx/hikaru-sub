@@ -75,19 +75,25 @@ interface PlaybackState {
    * 用户意图 seek：同步写 currentTimeMs、退出段播并递增 seq；保持播放状态不变。
    */
   requestSeek: (ms: number) => void;
+  resetForDocument: (nextCues?: readonly SubtitleCue[]) => void;
+  resetForSession: () => void;
 }
 
-export const usePlaybackStore = create<PlaybackState>((set) => ({
+const initialPlaybackState = {
   currentTimeMs: 0,
   durationMs: 0,
   isPlaying: false,
-  selectedCueId: null,
-  selectedCueIds: [],
-  fps: null,
-  segmentPlayback: null,
-  segmentStop: null,
-  activeCueIds: [],
-  seekRequest: null,
+  selectedCueId: null as string | null,
+  selectedCueIds: [] as string[],
+  fps: null as number | null,
+  segmentPlayback: null as SegmentStop | null,
+  segmentStop: null as SegmentStop | null,
+  activeCueIds: [] as string[],
+  seekRequest: null as PlaybackSeekRequest | null,
+};
+
+export const usePlaybackStore = create<PlaybackState>((set) => ({
+  ...initialPlaybackState,
   // 停点上的等值回写（rAF cleanup / 暂停后 timeupdate）保留驻留标记；移动即清除
   setCurrentTime: (ms) =>
     set((state) => {
@@ -160,4 +166,24 @@ export const usePlaybackStore = create<PlaybackState>((set) => ({
       segmentStop: null,
       seekRequest: { ms, seq: (state.seekRequest?.seq ?? 0) + 1 },
     })),
+  resetForDocument: (nextCues = []) =>
+    set((state) => {
+      const validIds = new Set(nextCues.map((cue) => cue.id));
+      const selectedCueIds = state.selectedCueIds.filter((id) =>
+        validIds.has(id),
+      );
+      const selectedCueId =
+        state.selectedCueId && validIds.has(state.selectedCueId)
+          ? state.selectedCueId
+          : (selectedCueIds[selectedCueIds.length - 1] ?? null);
+      return {
+        isPlaying: false,
+        selectedCueId,
+        selectedCueIds,
+        segmentPlayback: null,
+        segmentStop: null,
+        activeCueIds: [],
+      };
+    }),
+  resetForSession: () => set(initialPlaybackState),
 }));

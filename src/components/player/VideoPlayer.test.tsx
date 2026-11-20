@@ -10,6 +10,7 @@ import {
 import { playSelectedCueSegment } from "@/services/playbackActions";
 import { getPreviewFonts } from "../../services/previewFontDiscovery";
 import { getVideoInfo } from "../../services/tauri";
+import { useEditorViewStore } from "../../stores/editorViewStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { VideoPlayer } from "./VideoPlayer";
@@ -139,6 +140,7 @@ async function setupSegmentPlayer(options: { dispatchPause?: boolean } = {}) {
 
 beforeEach(() => {
   previewProps.current = null;
+  useEditorViewStore.setState({ ...useEditorViewStore.getInitialState() });
   usePlaybackStore.setState({ ...usePlaybackStore.getInitialState() });
   useProjectStore.setState({ ...useProjectStore.getInitialState() });
   vi.mocked(invoke).mockImplementation(async (cmd) => {
@@ -405,5 +407,170 @@ describe("VideoPlayer segment playback stop point", () => {
     expect(pb.activeCueIds).toEqual(["a"]);
     expect(previewProps.current?.activeCueId).toBe("a");
     expect(previewProps.current?.currentTimeMs).toBe(1000);
+  });
+});
+
+describe("VideoPlayer state preservation and media caching", () => {
+  it("pauses on unmount and syncs exact currentTime when readyState >= 1, without overwriting with 0 when readyState === 0", async () => {
+    const { media } = await setupSegmentPlayer();
+    act(() => {
+      usePlaybackStore.getState().setSegmentPlayback({ cueId: "a", stopMs: 5000 });
+      usePlaybackStore.getState().setPlaying(true);
+    });
+    media.timeSec = 2.345;
+
+    cleanup();
+
+    const pbAfterReadyUnmount = usePlaybackStore.getState();
+    expect(pbAfterReadyUnmount.isPlaying).toBe(false);
+    expect(pbAfterReadyUnmount.segmentPlayback).toBeNull();
+    expect(pbAfterReadyUnmount.currentTimeMs).toBe(2345);
+
+    // Second mount where video has not reached readyState >= 1 yet
+    const second = await renderPlayer();
+    Object.defineProperty(second.video, "readyState", {
+      configurable: true,
+      get: () => 0,
+    });
+    Object.defineProperty(second.video, "currentTime", {
+      configurable: true,
+      get: () => 0,
+      set: () => {},
+    });
+    Object.defineProperties(second.video, {
+      play: { configurable: true, value: () => Promise.resolve() },
+      pause: { configurable: true, value: () => {} },
+    });
+    act(() => {
+      usePlaybackStore.setState({ currentTimeMs: 2345, isPlaying: true });
+    });
+
+    second.unmount();
+
+    expect(usePlaybackStore.getState().isPlaying).toBe(false);
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(2345);
+  });
+
+  it("reuses videoPlaybackCache and videoFpsCache across remounts, ignores pre-metadata timeupdate, and seeks to preserved time", async () => {
+    const first = await renderPlayer();
+    const firstMedia = installMediaStubs(first.video);
+    Object.defineProperties(first.video, {
+      duration: { configurable: true, get: () => 60 },
+      play: { configurable: true, value: () => Promise.resolve() },
+      pause: { configurable: true, value: () => {} },
+    });
+    act(() => {
+      first.video.dispatchEvent(new Event("loadedmetadata"));
+      usePlaybackStore.getState().requestSeek(8750);
+    });
+    expect(firstMedia.timeSec).toBe(8.75);
+    expect(usePlaybackStore.getState().fps).toBe(30);
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(getVideoInfo).toHaveBeenCalledTimes(1);
+
+    first.unmount();
+    vi.mocked(invoke).mockClear();
+    vi.mocked(getVideoInfo).mockClear();
+
+    // Remount same videoPath
+    const second = render(<VideoPlayer videoPath="C:/video.mp4" />);
+    const secondVideo = second.container.querySelector("video");
+    if (!secondVideo) throw new Error("cached video element should render immediately");
+    expect(secondVideo.getAttribute("src")).toBe("http://127.0.0.1:9999/media/test-token");
+    expect(invoke).not.toHaveBeenCalled();
+    expect(getVideoInfo).not.toHaveBeenCalled();
+    expect(usePlaybackStore.getState().fps).toBe(30);
+
+    let readyState = 0;
+    let mediaTimeSec = 0;
+    Object.defineProperty(secondVideo, "readyState", {
+      configurable: true,
+      get: () => readyState,
+    });
+    Object.defineProperty(secondVideo, "currentTime", {
+      configurable: true,
+      get: () => mediaTimeSec,
+      set: (value: number) => {
+        mediaTimeSec = value;
+      },
+    });
+    Object.defineProperty(secondVideo, "duration", {
+      configurable: true,
+      get: () => 60,
+    });
+
+    // Pre-metadata timeupdate at 0 must NOT overwrite preserved currentTimeMs
+    act(() => {
+      secondVideo.dispatchEvent(new Event("timeupdate"));
+    });
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(8750);
+
+    // Metadata arrives: video seeks to preserved 8.75s
+    readyState = 1;
+    act(() => {
+      secondVideo.dispatchEvent(new Event("loadedmetadata"));
+    });
+    expect(mediaTimeSec).toBe(8.75);
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(8750);
+  });
+
+  it("invalidates direct cache on code 3 decode error, falls back to transcode, and caches the proxy URL", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd) => {
+      if (cmd === "probe_video_playback") {
+        return { videoCodec: "hevc", formatName: "mkv", needsTranscode: false };
+      }
+      if (cmd === "register_media_playback") {
+        const calls = vi
+          .mocked(invoke)
+          .mock.calls.filter(([c]) => c === "register_media_playback").length;
+        return calls === 1
+          ? "http://127.0.0.1:9999/media/direct-token"
+          : "http://127.0.0.1:9999/media/proxy-token";
+      }
+      if (cmd === "start_transcode") {
+        return "C:/cache/transcode/proxy.mp4";
+      }
+      if (cmd === "check_transcode_progress") {
+        return {
+          ready: true,
+          failed: false,
+          error: "",
+          cachePath: "C:/cache/transcode/proxy.mp4",
+        };
+      }
+      throw new Error(`unexpected invoke: ${String(cmd)}`);
+    });
+
+    const first = await renderPlayer();
+    expect(first.video.getAttribute("src")).toBe(
+      "http://127.0.0.1:9999/media/direct-token",
+    );
+    expect(useEditorViewStore.getState().videoPlaybackCache?.usedTranscode).toBe(false);
+
+    Object.defineProperty(first.video, "error", {
+      configurable: true,
+      get: () => ({ code: 3, message: "PIPELINE_ERROR_DECODE" }),
+    });
+    await act(async () => {
+      first.video.dispatchEvent(new Event("error"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const cachedAfterFallback = useEditorViewStore.getState().videoPlaybackCache;
+    expect(cachedAfterFallback?.usedTranscode).toBe(true);
+    expect(cachedAfterFallback?.videoSrc).toBe(
+      "http://127.0.0.1:9999/media/proxy-token",
+    );
+
+    first.unmount();
+    vi.mocked(invoke).mockClear();
+
+    const second = render(<VideoPlayer videoPath="C:/video.mp4" />);
+    const secondVideo = second.container.querySelector("video");
+    expect(secondVideo?.getAttribute("src")).toBe(
+      "http://127.0.0.1:9999/media/proxy-token",
+    );
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

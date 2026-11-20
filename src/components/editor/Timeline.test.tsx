@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { extractWaveform } from "../../services/tauri";
+import { useEditorViewStore } from "../../stores/editorViewStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { SubtitleCue, WaveformData } from "../../types";
@@ -64,6 +65,7 @@ function cue(id: string, startMs: number, endMs: number): SubtitleCue {
 
 function reset(selectedIds: string[] = ["a"]) {
   const cues = [cue("a", 1000, 2000), cue("b", 4000, 5000)];
+  useEditorViewStore.setState({ ...useEditorViewStore.getInitialState() });
   useProjectStore.setState({
     ...useProjectStore.getInitialState(),
     cues,
@@ -637,5 +639,77 @@ describe("Timeline pointer gestures", () => {
 
     expect(usePlaybackStore.getState().currentTimeMs).toBe(1200);
     expect(updateCue).not.toHaveBeenCalled();
+  });
+});
+
+describe("Timeline in-app viewport and waveform cache", () => {
+  it("restores viewStartMs, msPerPixel, waveformGain, lane scroll, and cached waveform across remounts", async () => {
+    vi.mocked(extractWaveform).mockClear();
+    vi.mocked(extractWaveform).mockResolvedValueOnce({
+      peaks: [0.3, 0.9, 0.3, 0.9],
+      coveredMs: 60_000,
+    });
+    useProjectStore.setState({ videoPath: "C:/cached.mp4" });
+    usePlaybackStore.setState({ durationMs: 60_000, currentTimeMs: 0 });
+
+    const first = renderTimeline();
+    await act(async () => {});
+    expect(extractWaveform).toHaveBeenCalledTimes(1);
+
+    // Adjust gain, zoom, pan, and lane vertical scroll
+    fireEvent.wheel(first.fixed, { shiftKey: true, deltaY: -100 });
+    fireEvent.wheel(first.fixed, { ctrlKey: true, deltaY: -100, clientX: 200 });
+    fireEvent.wheel(first.fixed, { deltaY: 300 });
+    const laneViewport = first.lane.parentElement as HTMLElement;
+    fireEvent.wheel(laneViewport, { deltaY: 42 });
+
+    const expectedState = {
+      viewStartMs: useEditorViewStore.getState().timelineViewStartMs,
+      msPerPixel: useEditorViewStore.getState().timelineMsPerPixel,
+      waveformGain: useEditorViewStore.getState().timelineWaveformGain,
+      laneScrollTop: useEditorViewStore.getState().timelineLaneScrollTop,
+    };
+    expect(expectedState.viewStartMs).toBeGreaterThan(0);
+    expect(expectedState.msPerPixel).toBe(8);
+    expect(expectedState.waveformGain).toBe(1.25);
+    expect(expectedState.laneScrollTop).toBe(42);
+
+    first.unmount();
+    vi.mocked(extractWaveform).mockClear();
+
+    const second = renderTimeline();
+    await act(async () => {});
+
+    expect(extractWaveform).not.toHaveBeenCalled();
+    expect(second.fixedCtx.beginPath).toHaveBeenCalled();
+    expect(second.fixedCtx.fillText).toHaveBeenCalledWith(
+      "×1.3",
+      expect.any(Number),
+      expect.any(Number),
+    );
+    expect((second.lane.parentElement as HTMLElement).scrollTop).toBe(42);
+    expect(useEditorViewStore.getState().timelineViewStartMs).toBe(
+      expectedState.viewStartMs,
+    );
+    expect(useEditorViewStore.getState().timelineMsPerPixel).toBe(8);
+  });
+
+  it("reveals an offscreen initial playhead when timelineViewStartMs is null", () => {
+    usePlaybackStore.setState({
+      durationMs: 60_000,
+      currentTimeMs: 25_000,
+    });
+    expect(useEditorViewStore.getState().timelineViewStartMs).toBeNull();
+
+    const { container } = renderTimeline();
+    const playhead = container.querySelector<HTMLDivElement>(
+      '[data-testid="timeline-playhead"]',
+    );
+    if (!playhead) throw new Error("playhead div missing");
+
+    // 1000px * 10ms/px = 10000ms viewport -> centered at 25000 - 5000 = 20000
+    expect(useEditorViewStore.getState().timelineViewStartMs).toBe(20_000);
+    expect(playhead.style.visibility).toBe("visible");
+    expect(playhead.style.transform).toBe("translateX(499px)");
   });
 });

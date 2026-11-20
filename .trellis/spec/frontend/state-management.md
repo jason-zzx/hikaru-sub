@@ -12,6 +12,7 @@ Zustand stores under `src/stores/`. Session subtitle edits use Immer (`produce`)
 | UI navigation | `uiStore.ts` | Current workflow step, sidebar collapse, busy/nav locks as used by gates; `openSettings(category?)` deep-links Settings categories (`runtime` / `transcription` / `providers` / `translation`) |
 | Tasks (status bar) | `taskStore.ts` | Lightweight `Record` of task id → status/progress/message |
 | Playback | `playbackStore.ts` | Player timing / selection coupling |
+| Editor view cache | `editorViewStore.ts` | Document-scoped editor viewport/scroll/anchor (`initializedDocumentEpoch`, `timelineViewStartMs`, `timelineLaneScrollTop`, `listScrollTop`, `selectionAnchorId`) and session-scoped timeline zoom/gain & media caches (`waveformCache`, `videoPlaybackCache`, `videoFpsCache`); `SubtitleFindPanel` stays component-local |
 | Clip job | `clipStore.ts` | Clip `jobId`, snapshot, options (`useAsWorkingVideo`), success/error messages |
 | Burn job | `burnStore.ts` | Burn job lifecycle mirroring clip |
 | Download job | `downloadStore.ts` | Download form draft (`mode`, URLs, headers, saveDir), `jobId`, snapshot, error, `completedPath`, `busy` |
@@ -52,6 +53,17 @@ useEffect(() => usePlaybackStore.subscribe((s, prev) => {
   if (s.currentTimeMs !== prev.currentTimeMs) positionPlayhead(s.currentTimeMs);
 }), []);
 ```
+
+## Editor View & Media Cache
+
+Editor subcomponents unmount when switching workflow steps in `AppLayout`, so cross-page editor position and media caches live in `editorViewStore.ts` + `playbackStore.ts` with explicit lifecycle reset boundaries driven by `projectStore`:
+
+- **Two-tier lifecycle resets**:
+  - Session replacement (`setSession`, `clearSession`) invokes `playbackStore.resetForSession()` and `editorViewStore.resetForSession()`, clearing `currentTimeMs`, `durationMs`, `fps`, selection, segment state, timeline zoom/gain, and all media caches.
+  - Document replacement (`loadAssDocument`, `setCues`) invokes `playbackStore.resetForDocument(nextCues)` and `editorViewStore.resetForDocument()`, resetting `initializedDocumentEpoch`, `timelineViewStartMs`, `timelineLaneScrollTop`, `listScrollTop`, `selectionAnchorId`, `isPlaying`, segment state, and `activeCueIds`. `resetForDocument(nextCues)` drops stale IDs while keeping cue IDs reused in `nextCues` so standalone `SubtitleEditor` reloads on `documentEpoch` still preserve selection; same-video `durationMs`, `fps`, `timelineMsPerPixel`, `timelineWaveformGain`, and media caches stay intact.
+- **`EditorView` initialization**: `EditorView` initializes selection (`selectCueAndSeek(cues[0])`, or `clearCueSelection()` when empty) only when `initializedDocumentEpoch !== documentEpoch`. Returning to the same `documentEpoch` preserves `currentTimeMs`, `selectedCueId`/`selectedCueIds`, and `segmentStop`, filtering only deleted cue IDs via `setSelectedCueIds` (a no-op when selection is unchanged so `segmentStop` stays intact).
+- **`VideoPlayer` unmount & cache contracts**: Declare the unmount pause effect **after** the rAF effect so rAF cleanup records exact `video.currentTime` before `setPlaying(false)` runs. Guard `timeupdate` and rAF time writes with `video.readyState >= 1` so remounting does not overwrite preserved `currentTimeMs` with `0` before `loadedmetadata` seeks. Clear `videoPlaybackCache` on decode fallback (`code 3/4`) or terminal playback error so stale direct URLs are not reused.
+- **Store consumption & test isolation**: Read/write high-frequency or non-rendered fields (`listScrollTop`, `timelineLaneScrollTop`, `selectionAnchorId`, media caches) imperatively via `getState()` / `setState()` without React subscriptions. `Timeline` subscribes directly to `timelineViewStartMs`, `timelineMsPerPixel`, and `timelineWaveformGain` instead of mirroring them into local `useState`. Tests that reset `projectStore`/`playbackStore` directly in `beforeEach` must also reset `useEditorViewStore`.
 
 ## History
 
@@ -100,3 +112,5 @@ Capture the snapshot in the same uninterrupted synchronous section as the payloa
 - Calling boolean-only `markSaved()` after save without pairing the written payload to a `RevisionToken`
 - Recording one history entry per keystroke, or treating whole focus sessions as the only text undo unit
 - Putting ASS style-library edits, video playhead, or transient UI drafts into cue history
+- Unconditionally calling `selectCueAndSeek(cues[0])` on `EditorView` mount regardless of `initializedDocumentEpoch` (clobbers preserved playback position and selection on page return)
+- Mirroring `editorViewStore` timeline viewport fields (`timelineViewStartMs`, `timelineMsPerPixel`, `timelineWaveformGain`) into local component `useState` instead of subscribing directly

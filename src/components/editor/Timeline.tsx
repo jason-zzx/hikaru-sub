@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { extractWaveform } from "../../services/tauri";
+import { useEditorViewStore } from "../../stores/editorViewStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import {
@@ -40,6 +41,11 @@ const STRONG_SNAP_THRESHOLD_PX = 12;
 const FRAME_SNAP_THRESHOLD_PX = 4;
 
 const EMPTY_WAVEFORM: WaveformData = { peaks: [], coveredMs: 0 };
+
+function computeWaveformSamples(durationMs: number): number {
+  // 10ms/桶，分辨率与时长解耦；短素材保底 4000 桶，超长素材封顶 720k
+  return Math.min(Math.max(4000, Math.ceil(durationMs / 10)), 720_000);
+}
 
 type GestureGeometry = {
   viewStartMs: number;
@@ -114,20 +120,9 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
   const playheadRef = useRef<HTMLDivElement>(null);
   const containerWidthRef = useRef(0);
 
-  const [waveform, setWaveform] = useState<WaveformData>(EMPTY_WAVEFORM);
-  // 容器宽度 state：驱动两层 canvas 在面板 resize 后重绘；瞬态播放头继续读 ref
-  const [containerWidth, setContainerWidth] = useState(0);
-  // 手动纵向增益：会话级（组件 state），不写入设置
-  const [waveformGain, setWaveformGain] = useState(1);
-  const [viewStartMs, setViewStartMs] = useState(0);
-  const [msPerPixel, setMsPerPixel] = useState(10);
-  const [dragPreviewState, setDragPreviewState] = useState<DragPreview | null>(null);
-  const [snapTargetMs, setSnapTargetMs] = useState<number | null>(null);
-  const [laneCursorClass, setLaneCursorClass] = useState("cursor-pointer");
-  const [themeVersion, setThemeVersion] = useState(0);
-
   const cues = useProjectStore((s) => s.cues);
   const videoPath = useProjectStore((s) => s.videoPath);
+  const documentEpoch = useProjectStore((s) => s.documentEpoch);
   const updateCue = useProjectStore((s) => s.updateCue);
   const durationMs = usePlaybackStore((s) => s.durationMs);
   const selectedCueId = usePlaybackStore((s) => s.selectedCueId);
@@ -135,19 +130,66 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
   const requestSeek = usePlaybackStore((s) => s.requestSeek);
   const setSelectedCueId = usePlaybackStore((s) => s.setSelectedCueId);
 
+  const storedViewStartMs = useEditorViewStore((s) => s.timelineViewStartMs);
+  const msPerPixel = useEditorViewStore((s) => s.timelineMsPerPixel);
+  const waveformGain = useEditorViewStore((s) => s.timelineWaveformGain);
+  const viewStartMs = storedViewStartMs ?? 0;
+
+  const [waveform, setWaveform] = useState<WaveformData>(() => {
+    const cached = useEditorViewStore.getState().waveformCache;
+    if (
+      cached &&
+      videoPath &&
+      durationMs > 0 &&
+      cached.videoPath === videoPath &&
+      cached.samples === computeWaveformSamples(durationMs)
+    ) {
+      return cached.data;
+    }
+    return EMPTY_WAVEFORM;
+  });
+  // 容器宽度 state：驱动两层 canvas 在面板 resize 后重绘；瞬态播放头继续读 ref
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [dragPreviewState, setDragPreviewState] = useState<DragPreview | null>(null);
+  const [snapTargetMs, setSnapTargetMs] = useState<number | null>(null);
+  const [laneCursorClass, setLaneCursorClass] = useState("cursor-pointer");
+  const [themeVersion, setThemeVersion] = useState(0);
+
+  const restoredLaneScrollRef = useRef(false);
+
   const ready = durationMs > 0;
 
   useEffect(() => {
+    restoredLaneScrollRef.current = false;
+    if (laneViewportRef.current) {
+      laneViewportRef.current.scrollTop =
+        useEditorViewStore.getState().timelineLaneScrollTop;
+    }
+  }, [videoPath, documentEpoch]);
+
+  useEffect(() => {
+    if (!videoPath || durationMs <= 0) {
+      setWaveform(EMPTY_WAVEFORM);
+      return;
+    }
+    const samples = computeWaveformSamples(durationMs);
+    const cached = useEditorViewStore.getState().waveformCache;
+    if (cached && cached.videoPath === videoPath && cached.samples === samples) {
+      setWaveform(cached.data);
+      return;
+    }
     // 进入效应先重置：换视频后不残留上一支视频的波形（新请求返回前显示空白）
     setWaveform(EMPTY_WAVEFORM);
-    if (!videoPath || durationMs <= 0) return;
-    // 10ms/桶，分辨率与时长解耦；短素材保底 4000 桶，超长素材封顶 720k
-    const samples = Math.min(Math.max(4000, Math.ceil(durationMs / 10)), 720_000);
     // 快速换片时旧请求可能后完成：cleanup 置 stale，迟到响应直接丢弃
     let stale = false;
     extractWaveform(videoPath, samples)
       .then((data) => {
-        if (!stale) setWaveform(data);
+        if (!stale) {
+          useEditorViewStore.setState({
+            waveformCache: { videoPath, samples, data },
+          });
+          setWaveform(data);
+        }
       })
       .catch(console.error);
     return () => {
@@ -214,7 +256,18 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       playhead.style.transform = `translateX(${x - 1}px)`;
     };
 
-    positionPlayhead(usePlaybackStore.getState().currentTimeMs);
+    const currentTimeMs = usePlaybackStore.getState().currentTimeMs;
+    if (storedViewStartMs === null && containerWidth > 0) {
+      const revealed = revealTimelineTime(
+        0,
+        containerWidth,
+        msPerPixel,
+        currentTimeMs,
+      );
+      useEditorViewStore.setState({ timelineViewStartMs: revealed });
+    }
+
+    positionPlayhead(currentTimeMs);
 
     return usePlaybackStore.subscribe((state, prev) => {
       const timeChanged = state.currentTimeMs !== prev.currentTimeMs;
@@ -231,10 +284,12 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
         msPerPixel,
         state.currentTimeMs,
       );
-      if (nextViewStartMs !== viewStartMs) setViewStartMs(nextViewStartMs);
+      if (nextViewStartMs !== viewStartMs) {
+        useEditorViewStore.setState({ timelineViewStartMs: nextViewStartMs });
+      }
     });
     // containerWidth：resize 后立即按新宽度重定位/恢复可见性（每帧读取仍走 ref）
-  }, [ready, viewStartMs, msPerPixel, containerWidth]);
+  }, [ready, storedViewStartMs, viewStartMs, msPerPixel, containerWidth]);
 
   // fixed 层（刻度+波形+增益标签）：不依赖 activeCueIds / cues / 拖拽预览。
   // 字幕边界或 cue 高亮变化绝不触发波形逐像素聚合循环重绘。
@@ -304,6 +359,14 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
     const laneCtx = prepareCanvas(laneCanvas, width, laneCanvasHeight);
     if (!laneCtx) return;
 
+    if (!restoredLaneScrollRef.current) {
+      restoredLaneScrollRef.current = true;
+      const savedLaneScroll = useEditorViewStore.getState().timelineLaneScrollTop;
+      if (savedLaneScroll > 0) {
+        laneViewport.scrollTop = savedLaneScroll;
+      }
+    }
+
     const viewEndMs = viewStartMs + width * msPerPixel;
     cueRectsRef.current = laneItems
       .filter((item) => item.cue.endMs >= viewStartMs && item.cue.startMs <= viewEndMs)
@@ -359,8 +422,10 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       const zoomFactor = deltaY > 0 ? 1.2 : 0.8;
       const newMsPerPixel = Math.max(1, Math.min(100, msPerPixel * zoomFactor));
       const newViewStart = mouseTimeMs - mouseX * newMsPerPixel;
-      setMsPerPixel(newMsPerPixel);
-      setViewStartMs(Math.max(0, Math.min(newViewStart, durationMs)));
+      useEditorViewStore.setState({
+        timelineMsPerPixel: newMsPerPixel,
+        timelineViewStartMs: Math.max(0, Math.min(newViewStart, durationMs)),
+      });
     };
 
     const handleFixedWheel = (e: WheelEvent) => {
@@ -374,12 +439,19 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
         // Shift+滚轮：波形纵向增益，不触发平移（部分平台会把 deltaY 折到 deltaX）
         const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
         if (delta !== 0) {
-          setWaveformGain((gain) => stepWaveformGain(gain, delta < 0 ? 1 : -1));
+          useEditorViewStore.setState((state) => ({
+            timelineWaveformGain: stepWaveformGain(
+              state.timelineWaveformGain,
+              delta < 0 ? 1 : -1,
+            ),
+          }));
         }
         return;
       }
       const scrollAmount = e.deltaY * msPerPixel * 0.5;
-      setViewStartMs(Math.max(0, Math.min(viewStartMs + scrollAmount, durationMs)));
+      useEditorViewStore.setState({
+        timelineViewStartMs: Math.max(0, Math.min(viewStartMs + scrollAmount, durationMs)),
+      });
     };
 
     const handleLaneWheel = (e: WheelEvent) => {
@@ -390,6 +462,9 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
         return;
       }
       laneViewport.scrollTop += e.deltaY;
+      useEditorViewStore.setState({
+        timelineLaneScrollTop: laneViewport.scrollTop,
+      });
     };
 
     const handleContainerWheel = (e: WheelEvent) => {
@@ -787,6 +862,11 @@ export function Timeline({ onCommitPendingTimeDraft }: TimelineProps) {
       />
       <div
         ref={laneViewportRef}
+        onScroll={(e) =>
+          useEditorViewStore.setState({
+            timelineLaneScrollTop: e.currentTarget.scrollTop,
+          })
+        }
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
       >
         <canvas

@@ -13,6 +13,7 @@ import {
   type CueTimeShiftTarget,
 } from "../../services/editorActions";
 import { importExternalSubtitle } from "../../services/openVideo";
+import { useEditorViewStore } from "../../stores/editorViewStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -80,6 +81,7 @@ export function EditorView() {
   const activeSubtitlePath = useProjectStore((s) => s.activeSubtitlePath);
   const activeSubtitleKind = useProjectStore((s) => s.activeSubtitleKind);
   const cues = useProjectStore((s) => s.cues);
+  const documentEpoch = useProjectStore((s) => s.documentEpoch);
   const isDirty = useProjectStore((s) => s.isDirty);
   // Subscribe to stack lengths so undo/redo buttons re-render.
   const pastLen = useProjectStore((s) => s.history.past.length);
@@ -182,23 +184,37 @@ export function EditorView() {
     };
   }, [currentSubtitlePath]);
 
-  // 进入编辑页时强制选中第一条并 seek（空列表跳过）
+  // 仅在新文档首次进入编辑页时选中第一条并 seek；切页返回同一文档时保留位置与选中
   useEffect(() => {
     const { cues } = useProjectStore.getState();
-    if (cues.length > 0) {
-      selectCueAndSeek(cues[0]);
+    if (useEditorViewStore.getState().initializedDocumentEpoch !== documentEpoch) {
+      useEditorViewStore.setState({ initializedDocumentEpoch: documentEpoch });
+      if (cues.length > 0) {
+        selectCueAndSeek(cues[0]);
+      } else {
+        usePlaybackStore.getState().clearCueSelection();
+      }
+      return;
     }
-  }, []);
 
-  // Accept text session/group whenever the active cue changes.
+    const pb = usePlaybackStore.getState();
+    const validIds = new Set(cues.map((cue) => cue.id));
+    pb.setSelectedCueIds(pb.selectedCueIds.filter((id) => validIds.has(id)));
+  }, [documentEpoch]);
+
+  // Accept text session/group whenever the active cue changes or EditorView unmounts.
   useEffect(() => {
     let prev = usePlaybackStore.getState().selectedCueId;
-    return usePlaybackStore.subscribe((state) => {
+    const unsubscribe = usePlaybackStore.subscribe((state) => {
       if (state.selectedCueId !== prev) {
         prev = state.selectedCueId;
         acceptTextSession();
       }
     });
+    return () => {
+      unsubscribe();
+      acceptTextSession();
+    };
   }, [acceptTextSession]);
 
   const commitPendingTimeDraft = useCallback(() => {
@@ -364,7 +380,8 @@ export function EditorView() {
       }
       setSubtitleFileExists(false);
       setSaveError(null);
-      const { cues } = useProjectStore.getState();
+      const { cues, documentEpoch: nextEpoch } = useProjectStore.getState();
+      useEditorViewStore.setState({ initializedDocumentEpoch: nextEpoch });
       if (cues.length > 0) {
         selectCueAndSeek(cues[0]);
       }

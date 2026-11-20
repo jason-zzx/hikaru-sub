@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultStyles, formatAssTime } from "@/lib/ass";
+import { useEditorViewStore } from "../../stores/editorViewStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { SubtitleCue } from "../../types";
@@ -46,6 +47,7 @@ const cues: SubtitleCue[] = [
 ];
 
 function resetSelection(ids: string[]) {
+  useEditorViewStore.setState({ ...useEditorViewStore.getInitialState() });
   useProjectStore.setState({
     ...useProjectStore.getInitialState(),
     cues,
@@ -265,6 +267,92 @@ describe("SubtitleList", () => {
 
     expect(onCommitPendingTimeDraft).not.toHaveBeenCalled();
     expect(onRequestShiftTimes).toHaveBeenCalledWith(["a", "b"]);
+    expect(usePlaybackStore.getState().selectedCueIds).toEqual(["a", "b"]);
+  });
+
+  it("persists and restores scrollTop across remount without auto-scrolling unchanged selection", () => {
+    const scrollIntoViewMock = vi.fn();
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
+    const rectSpy = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: Element) {
+        if (this.hasAttribute("data-cue-id")) {
+          return {
+            x: 0,
+            y: 300,
+            top: 300,
+            bottom: 330,
+            left: 0,
+            right: 200,
+            width: 200,
+            height: 30,
+            toJSON: () => ({}),
+          };
+        }
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          bottom: 100,
+          left: 0,
+          right: 200,
+          width: 200,
+          height: 100,
+          toJSON: () => ({}),
+        };
+      });
+
+    try {
+      const first = render(<SubtitleList />);
+      const scrollContainer = first.container.firstElementChild as HTMLElement;
+      fireEvent.scroll(scrollContainer, { target: { scrollTop: 185 } });
+      expect(useEditorViewStore.getState().listScrollTop).toBe(185);
+      scrollIntoViewMock.mockClear();
+
+      first.unmount();
+
+      const second = render(<SubtitleList />);
+      const remountedContainer = second.container
+        .firstElementChild as HTMLElement;
+      expect(remountedContainer.scrollTop).toBe(185);
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+      act(() => {
+        usePlaybackStore.getState().setSelectedCueId("b");
+      });
+      expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    } finally {
+      rectSpy.mockRestore();
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
+  it("preserves selectionAnchorId across remount for Shift+Click range selection", () => {
+    const threeCues: SubtitleCue[] = [
+      ...cues,
+      {
+        id: "c",
+        startMs: 4000,
+        endMs: 5000,
+        primaryText: "C text",
+        style: "Primary",
+        layer: 0,
+      },
+    ];
+    useProjectStore.setState({ cues: threeCues });
+
+    const first = render(<SubtitleList />);
+    fireEvent.click(rowFor("A text"));
+    // Move active cue externally without clicking a row so selectionAnchorId ("a") diverges from selectedCueId ("c")
+    act(() => {
+      usePlaybackStore.getState().setSelectedCueId("c");
+    });
+    expect(useEditorViewStore.getState().selectionAnchorId).toBe("a");
+    first.unmount();
+
+    render(<SubtitleList />);
+    fireEvent.click(rowFor("B text"), { shiftKey: true });
     expect(usePlaybackStore.getState().selectedCueIds).toEqual(["a", "b"]);
   });
 });

@@ -10,6 +10,7 @@ import {
   usePlaybackStore,
   type SegmentStop,
 } from "@/stores/playbackStore";
+import { useEditorViewStore } from "../../stores/editorViewStore";
 import { useProjectStore } from "../../stores/projectStore";
 import type { PreviewFontFile, VideoPlaybackProbe } from "../../types";
 import { SubtitlePreview } from "./SubtitlePreview";
@@ -21,9 +22,14 @@ interface VideoPlayerProps {
 }
 
 export function VideoPlayer({ videoPath }: VideoPlayerProps) {
+  const cachedPlayback = useEditorViewStore.getState().videoPlaybackCache;
+  const initialPlayback =
+    cachedPlayback?.videoPath === videoPath ? cachedPlayback : null;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const transcodeFallbackRef = useRef(false);
+  const transcodeFallbackRef = useRef(initialPlayback?.usedTranscode ?? false);
+  const unmountedRef = useRef(false);
   const recoverAttemptRef = useRef(0);
   const isSeekingRef = useRef(false);
   /**
@@ -36,7 +42,9 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   /** 「播放当前句」到点时记录终点，供 rAF cleanup 使用该精确值而非 frame-snap 后的视频时间 */
   const segmentEndRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [videoSrc, setVideoSrc] = useState<string>("");
+  const [videoSrc, setVideoSrc] = useState<string>(
+    () => initialPlayback?.videoSrc ?? "",
+  );
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const [transcoding, setTranscoding] = useState(false);
   const [transcodePercent, setTranscodePercent] = useState(0);
@@ -117,11 +125,24 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     videoSrc,
   );
 
-  const loadHttpVideo = useCallback(async (path: string) => {
-    const url = await invoke<string>("register_media_playback", { path });
-    console.log("Media HTTP URL:", url);
-    setVideoSrc(url);
-  }, []);
+  const loadHttpVideo = useCallback(
+    async (
+      path: string,
+      cacheEntry?: { videoPath: string; usedTranscode: boolean },
+      isCancelled?: () => boolean,
+    ) => {
+      const url = await invoke<string>("register_media_playback", { path });
+      if (isCancelled?.()) return;
+      console.log("Media HTTP URL:", url);
+      if (cacheEntry) {
+        useEditorViewStore.setState({
+          videoPlaybackCache: { ...cacheEntry, videoSrc: url },
+        });
+      }
+      setVideoSrc(url);
+    },
+    [],
+  );
 
   const setVideoNode = useCallback((node: HTMLVideoElement | null) => {
     videoRef.current = node;
@@ -178,7 +199,11 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
           console.log("Transcode ready, using cache:", progress.cachePath);
           setTranscoding(false);
           if (isCancelled?.()) return;
-          await loadHttpVideo(progress.cachePath);
+          await loadHttpVideo(
+            progress.cachePath,
+            { videoPath: sourcePath, usedTranscode: true },
+            isCancelled,
+          );
           return;
         }
 
@@ -206,15 +231,41 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
   useEffect(() => {
     if (!videoPath) return;
     const { setFps } = usePlaybackStore.getState();
+    const cachedFps = useEditorViewStore.getState().videoFpsCache;
+    if (cachedFps && cachedFps.videoPath === videoPath) {
+      setFps(cachedFps.fps);
+      return;
+    }
+    let cancelled = false;
     setFps(null);
     getVideoInfo(videoPath)
-      .then((info) => setFps(info.fps ?? null))
-      .catch(() => setFps(null));
+      .then((info) => {
+        if (cancelled) return;
+        const fps = info.fps ?? null;
+        useEditorViewStore.setState({ videoFpsCache: { videoPath, fps } });
+        setFps(fps);
+      })
+      .catch(() => {
+        if (!cancelled) setFps(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [videoPath]);
 
   // 通过本地 HTTP 服务加载视频（Linux WebKit 无法经 asset 协议播放音视频）
   useEffect(() => {
     if (!videoPath) return;
+
+    const cached = useEditorViewStore.getState().videoPlaybackCache;
+    if (cached && cached.videoPath === videoPath) {
+      transcodeFallbackRef.current = cached.usedTranscode;
+      setError(null);
+      setTranscoding(false);
+      setTranscodePercent(0);
+      setVideoSrc(cached.videoSrc);
+      return;
+    }
 
     let cancelled = false;
     transcodeFallbackRef.current = false;
@@ -239,7 +290,11 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
         }
 
         console.log("Codec/container supported, using local HTTP media server");
-        await loadHttpVideo(videoPath);
+        await loadHttpVideo(
+          videoPath,
+          { videoPath, usedTranscode: false },
+          () => cancelled,
+        );
       })
       .catch((err) => {
         if (cancelled) return;
@@ -288,15 +343,20 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       return;
     }
 
+    if (useEditorViewStore.getState().videoPlaybackCache?.videoPath === videoPath) {
+      useEditorViewStore.setState({ videoPlaybackCache: null });
+    }
+
     // MEDIA_ERR_DECODE / MEDIA_ERR_SRC_NOT_SUPPORTED：探测遗漏或过早 seek 时回退代理转码
     // WebView2 对 HEVC 等常以 code 3（音频包解码失败）而非 code 4 报错
     if ((code === 3 || code === 4) && !transcodeFallbackRef.current) {
       transcodeFallbackRef.current = true;
       try {
         setError(null);
-        await waitForTranscodedVideo(videoPath);
+        await waitForTranscodedVideo(videoPath, () => unmountedRef.current);
         return;
       } catch (err) {
+        if (unmountedRef.current) return;
         console.error("Transcode fallback failed:", err);
         setError(`视频无法播放，转码回退失败: ${String(err)}`);
         return;
@@ -328,7 +388,7 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
     isSeekingRef.current = false;
 
     const handleTimeUpdate = () => {
-      if (isSeekingRef.current) return;
+      if (isSeekingRef.current || video.readyState < 1) return;
       recoverAttemptRef.current = 0;
       // 「播放当前句」到点：timeupdate 可能先于下一帧 rAF 越界，必须走与 rAF
       // 分支相同的收尾（精确 snap + 驻留标记），且不得把 overshoot 时间写进 store
@@ -391,12 +451,13 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       // 避免选择在播放中变化后把停点驻留错误绑定到另一句。
       if (
         segmentPlayback !== null &&
+        video.readyState >= 1 &&
         video.currentTime * 1000 >= segmentPlayback.stopMs
       ) {
         completeSegmentStop(video, segmentPlayback);
         return;
       }
-      if (!isSeekingRef.current) {
+      if (!isSeekingRef.current && video.readyState >= 1) {
         setCurrentTime(Math.floor(video.currentTime * 1000));
       }
       rafId = requestAnimationFrame(tick);
@@ -411,11 +472,24 @@ export function VideoPlayer({ videoPath }: VideoPlayerProps) {
       if (segmentEnd !== null) {
         setCurrentTime(segmentEnd);
         segmentEndRef.current = null;
-      } else if (!isSeekingRef.current) {
+      } else if (!isSeekingRef.current && video.readyState >= 1) {
         setCurrentTime(Math.floor(video.currentTime * 1000));
       }
     };
   }, [isPlaying, videoSrc, setCurrentTime, completeSegmentStop]);
+
+  // 离开编辑页卸载播放器时自动暂停；声明在 rAF effect 之后以先保存精确时间再置暂停态
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      const video = videoRef.current;
+      if (video && !video.paused) {
+        video.pause();
+      }
+      usePlaybackStore.getState().setPlaying(false);
+    };
+  }, []);
 
   // 外部跳转到指定时间（拖动进度条 / 时间轴 / 进入编辑页选首条）——由显式
   // seekRequest 驱动，播放回写（rAF/timeupdate）不再触发本效应的每帧重执行。

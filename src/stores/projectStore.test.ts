@@ -4,6 +4,7 @@ import {
   captureProjectDocumentGuard,
   useProjectStore,
 } from "./projectStore";
+import { useEditorViewStore } from "./editorViewStore";
 import { usePlaybackStore } from "./playbackStore";
 import type { SubtitleCue } from "../types";
 import { makeTextOp } from "../services/editorTextHistory";
@@ -32,6 +33,9 @@ function resetStore(partial: Record<string, unknown> = {}) {
     ...useProjectStore.getInitialState(),
     assStyles: createDefaultStyles(),
     ...partial,
+  });
+  useEditorViewStore.setState({
+    ...useEditorViewStore.getInitialState(),
   });
   usePlaybackStore.setState({
     ...usePlaybackStore.getInitialState(),
@@ -741,5 +745,185 @@ describe("projectStore unified history", () => {
     const after = useProjectStore.getState().history;
     expect(after.cueRevision).toBe(before.cueRevision);
     expect(after.nonHistoryRevision).toBe(before.nonHistoryRevision);
+  });
+});
+
+describe("projectStore lifecycle playback and editorView resets", () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  function seedPlaybackAndViewCaches() {
+    usePlaybackStore.setState({
+      currentTimeMs: 4250,
+      durationMs: 90000,
+      isPlaying: true,
+      selectedCueId: "a",
+      selectedCueIds: ["a", "b"],
+      fps: 23.976,
+      segmentPlayback: { cueId: "a", stopMs: 2000 },
+      segmentStop: { cueId: "a", stopMs: 2000 },
+      activeCueIds: ["a"],
+      seekRequest: { ms: 4250, seq: 7 },
+    });
+    useEditorViewStore.setState({
+      initializedDocumentEpoch: 3,
+      timelineViewStartMs: 1500,
+      timelineMsPerPixel: 5,
+      timelineWaveformGain: 1.5,
+      timelineLaneScrollTop: 48,
+      listScrollTop: 220,
+      selectionAnchorId: "a",
+      waveformCache: {
+        videoPath: "C:/v.mp4",
+        samples: 4000,
+        data: { peaks: [0.2, 0.8], coveredMs: 90000 },
+      },
+      videoPlaybackCache: {
+        videoPath: "C:/v.mp4",
+        videoSrc: "http://127.0.0.1:9999/media/abc",
+        usedTranscode: false,
+      },
+      videoFpsCache: {
+        videoPath: "C:/v.mp4",
+        fps: 23.976,
+      },
+    });
+  }
+
+  it("resets all playback and editor view caches on setSession and clearSession", () => {
+    seedPlaybackAndViewCaches();
+    useProjectStore.getState().setSession({
+      videoPath: "C:/other.mp4",
+      workspacePath: "C:/w",
+      audioPath: "C:/w/a.wav",
+      transcribedAssPath: "C:/other.transcribed.ass",
+      translatedAssPath: "C:/other.translated.ass",
+      burnAssPath: "C:/w/burn.ass",
+      sourceLang: "ja",
+    });
+
+    const pbAfterSet = usePlaybackStore.getState();
+    expect(pbAfterSet.currentTimeMs).toBe(0);
+    expect(pbAfterSet.durationMs).toBe(0);
+    expect(pbAfterSet.isPlaying).toBe(false);
+    expect(pbAfterSet.selectedCueId).toBeNull();
+    expect(pbAfterSet.selectedCueIds).toEqual([]);
+    expect(pbAfterSet.fps).toBeNull();
+    expect(pbAfterSet.segmentPlayback).toBeNull();
+    expect(pbAfterSet.segmentStop).toBeNull();
+    expect(pbAfterSet.activeCueIds).toEqual([]);
+    expect(pbAfterSet.seekRequest).toBeNull();
+
+    const viewAfterSet = useEditorViewStore.getState();
+    expect(viewAfterSet.initializedDocumentEpoch).toBeNull();
+    expect(viewAfterSet.timelineViewStartMs).toBeNull();
+    expect(viewAfterSet.timelineMsPerPixel).toBe(10);
+    expect(viewAfterSet.timelineWaveformGain).toBe(1);
+    expect(viewAfterSet.timelineLaneScrollTop).toBe(0);
+    expect(viewAfterSet.listScrollTop).toBeNull();
+    expect(viewAfterSet.selectionAnchorId).toBeNull();
+    expect(viewAfterSet.waveformCache).toBeNull();
+    expect(viewAfterSet.videoPlaybackCache).toBeNull();
+    expect(viewAfterSet.videoFpsCache).toBeNull();
+
+    seedPlaybackAndViewCaches();
+    useProjectStore.getState().clearSession();
+
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(0);
+    expect(usePlaybackStore.getState().durationMs).toBe(0);
+    expect(usePlaybackStore.getState().selectedCueId).toBeNull();
+    expect(useEditorViewStore.getState().waveformCache).toBeNull();
+    expect(useEditorViewStore.getState().videoPlaybackCache).toBeNull();
+    expect(useEditorViewStore.getState().videoFpsCache).toBeNull();
+  });
+
+  it("resets document-scoped state while preserving video caches on loadAssDocument and setCues", () => {
+    seedPlaybackAndViewCaches();
+    useProjectStore.getState().loadAssDocument({
+      scriptInfo: {
+        title: "doc",
+        scriptType: "v4.00+",
+        playResX: 1920,
+        playResY: 1080,
+        wrapStyle: 0,
+        scaledBorderAndShadow: true,
+        extra: {},
+      },
+      styles: createDefaultStyles(),
+      cues: [cue("x", 0, 1000)],
+    });
+
+    const pbAfterLoad = usePlaybackStore.getState();
+    expect(pbAfterLoad.isPlaying).toBe(false);
+    expect(pbAfterLoad.selectedCueId).toBeNull();
+    expect(pbAfterLoad.selectedCueIds).toEqual([]);
+    expect(pbAfterLoad.segmentPlayback).toBeNull();
+    expect(pbAfterLoad.segmentStop).toBeNull();
+    expect(pbAfterLoad.activeCueIds).toEqual([]);
+    expect(pbAfterLoad.durationMs).toBe(90000);
+    expect(pbAfterLoad.fps).toBe(23.976);
+    expect(pbAfterLoad.currentTimeMs).toBe(4250);
+    expect(pbAfterLoad.seekRequest).toEqual({ ms: 4250, seq: 7 });
+
+    const viewAfterLoad = useEditorViewStore.getState();
+    expect(viewAfterLoad.initializedDocumentEpoch).toBeNull();
+    expect(viewAfterLoad.timelineViewStartMs).toBeNull();
+    expect(viewAfterLoad.timelineLaneScrollTop).toBe(0);
+    expect(viewAfterLoad.listScrollTop).toBeNull();
+    expect(viewAfterLoad.selectionAnchorId).toBeNull();
+    expect(viewAfterLoad.timelineMsPerPixel).toBe(5);
+    expect(viewAfterLoad.timelineWaveformGain).toBe(1.5);
+    expect(viewAfterLoad.waveformCache?.videoPath).toBe("C:/v.mp4");
+    expect(viewAfterLoad.videoPlaybackCache?.videoPath).toBe("C:/v.mp4");
+    expect(viewAfterLoad.videoFpsCache?.videoPath).toBe("C:/v.mp4");
+
+    seedPlaybackAndViewCaches();
+    useProjectStore.getState().setCues([cue("y", 500, 1500)]);
+
+    const pbAfterSetCues = usePlaybackStore.getState();
+    expect(pbAfterSetCues.isPlaying).toBe(false);
+    expect(pbAfterSetCues.selectedCueId).toBeNull();
+    expect(pbAfterSetCues.selectedCueIds).toEqual([]);
+    expect(pbAfterSetCues.segmentPlayback).toBeNull();
+    expect(pbAfterSetCues.segmentStop).toBeNull();
+    expect(pbAfterSetCues.durationMs).toBe(90000);
+    expect(pbAfterSetCues.fps).toBe(23.976);
+
+    const viewAfterSetCues = useEditorViewStore.getState();
+    expect(viewAfterSetCues.initializedDocumentEpoch).toBeNull();
+    expect(viewAfterSetCues.timelineViewStartMs).toBeNull();
+    expect(viewAfterSetCues.timelineLaneScrollTop).toBe(0);
+    expect(viewAfterSetCues.listScrollTop).toBeNull();
+    expect(viewAfterSetCues.selectionAnchorId).toBeNull();
+    expect(viewAfterSetCues.timelineMsPerPixel).toBe(5);
+    expect(viewAfterSetCues.timelineWaveformGain).toBe(1.5);
+    expect(viewAfterSetCues.waveformCache?.videoPath).toBe("C:/v.mp4");
+    expect(viewAfterSetCues.videoPlaybackCache?.videoPath).toBe("C:/v.mp4");
+    expect(viewAfterSetCues.videoFpsCache?.videoPath).toBe("C:/v.mp4");
+
+    // Reused cue ID remains selectable across document reload while segment/view state still resets
+    seedPlaybackAndViewCaches();
+    useProjectStore.getState().loadAssDocument({
+      scriptInfo: {
+        title: "reused-id",
+        scriptType: "v4.00+",
+        playResX: 1920,
+        playResY: 1080,
+        wrapStyle: 0,
+        scaledBorderAndShadow: true,
+        extra: {},
+      },
+      styles: createDefaultStyles(),
+      cues: [cue("a", 0, 1000, "fresh")],
+    });
+    const pbReused = usePlaybackStore.getState();
+    expect(pbReused.selectedCueId).toBe("a");
+    expect(pbReused.selectedCueIds).toEqual(["a"]);
+    expect(pbReused.isPlaying).toBe(false);
+    expect(pbReused.segmentPlayback).toBeNull();
+    expect(pbReused.segmentStop).toBeNull();
+    expect(pbReused.activeCueIds).toEqual([]);
+    expect(useEditorViewStore.getState().initializedDocumentEpoch).toBeNull();
   });
 });

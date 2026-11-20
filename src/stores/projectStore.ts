@@ -9,6 +9,7 @@ import {
   type TextOp,
   type TextSelection,
 } from "../services/editorTextHistory";
+import { useEditorViewStore } from "./editorViewStore";
 import { usePlaybackStore } from "./playbackStore";
 
 type TextSelectionSnapshot = {
@@ -229,11 +230,14 @@ function applyPlaybackContext(context: EditorContextSnapshot): void {
   });
 }
 
-function clearPlaybackDocumentContext(): void {
-  usePlaybackStore.setState({
-    segmentPlayback: null,
-    segmentStop: null,
-  });
+function resetPlaybackAndViewForSession(): void {
+  usePlaybackStore.getState().resetForSession();
+  useEditorViewStore.getState().resetForSession();
+}
+
+function resetPlaybackAndViewForDocument(nextCues: readonly SubtitleCue[]): void {
+  usePlaybackStore.getState().resetForDocument(nextCues);
+  useEditorViewStore.getState().resetForDocument();
 }
 
 function isDirtyFrom(h: HistoryRuntime): boolean {
@@ -456,7 +460,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     documentEpoch: 0,
 
     setSession: (session) => {
-      clearPlaybackDocumentContext();
+      resetPlaybackAndViewForSession();
       set((state) => ({
         session,
         activeSubtitlePath: null,
@@ -477,7 +481,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }),
 
     clearSession: () => {
-      clearPlaybackDocumentContext();
+      resetPlaybackAndViewForSession();
       set((state) => ({
         session: null,
         activeSubtitlePath: null,
@@ -492,7 +496,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     },
 
     loadAssDocument: (doc, active) => {
-      clearPlaybackDocumentContext();
+      resetPlaybackAndViewForDocument(doc.cues);
       set((state) => ({
         cues: doc.cues,
         assScriptInfo: doc.scriptInfo,
@@ -513,7 +517,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }),
 
     setCues: (cues) => {
-      clearPlaybackDocumentContext();
+      resetPlaybackAndViewForDocument(cues);
       set((state) => {
         const accepted = acceptEditingState(state);
         const revision = accepted.history.nextCueRevision;

@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,6 +23,7 @@ import {
   cutCuesToSystemClipboard,
   pasteCuesFromSystemClipboard,
 } from "../../services/subtitleClipboard";
+import { useEditorViewStore } from "../../stores/editorViewStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePlaybackStore } from "../../stores/playbackStore";
 import { formatAssTime } from "@/lib/ass";
@@ -125,9 +127,23 @@ export function SubtitleList({
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
+  const skipNextAutoScrollRef = useRef(false);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const savedScrollTop = useEditorViewStore.getState().listScrollTop;
+    if (list && savedScrollTop !== null) {
+      list.scrollTop = savedScrollTop;
+      skipNextAutoScrollRef.current = true;
+    }
+  }, []);
 
   useEffect(() => {
+    if (skipNextAutoScrollRef.current) {
+      skipNextAutoScrollRef.current = false;
+      return;
+    }
+
     if (selectedRef.current && listRef.current) {
       const list = listRef.current;
       const item = selectedRef.current;
@@ -154,7 +170,8 @@ export function SubtitleList({
 
   const selectCueRange = useCallback(
     (targetId: string): string[] | null => {
-      const anchorId = selectionAnchorId ?? selectedCueId;
+      const anchorId =
+        useEditorViewStore.getState().selectionAnchorId ?? selectedCueId;
       const anchorIndex = anchorId
         ? cues.findIndex((cue) => cue.id === anchorId)
         : -1;
@@ -166,7 +183,7 @@ export function SubtitleList({
       const range = cues.slice(startIndex, endIndex + 1).map((cue) => cue.id);
       return targetIndex >= anchorIndex ? range : range.reverse();
     },
-    [cues, selectedCueId, selectionAnchorId],
+    [cues, selectedCueId],
   );
 
   // 行回调保持稳定标识（不依赖 activeCueIds），memo Row 在边界重渲染时才能 bail out
@@ -181,7 +198,7 @@ export function SubtitleList({
           setSelectedCueIds(range);
         } else {
           setSelectedCueId(cue.id);
-          setSelectionAnchorId(cue.id);
+          useEditorViewStore.setState({ selectionAnchorId: cue.id });
         }
       } else if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
@@ -192,10 +209,10 @@ export function SubtitleList({
           selectedSet.add(cue.id);
         }
         setSelectedCueIds([...selectedSet]);
-        setSelectionAnchorId(cue.id);
+        useEditorViewStore.setState({ selectionAnchorId: cue.id });
       } else {
         setSelectedCueId(cue.id);
-        setSelectionAnchorId(cue.id);
+        useEditorViewStore.setState({ selectionAnchorId: cue.id });
       }
 
       requestSeek(cue.startMs);
@@ -217,7 +234,7 @@ export function SubtitleList({
         onCommitPendingTimeDraft?.();
         setSelectedCueId(cue.id);
       }
-      setSelectionAnchorId(cue.id);
+      useEditorViewStore.setState({ selectionAnchorId: cue.id });
       // 分割动作（splitCueAtTime）要求分割点严格位于 (startMs, endMs) 开区间；
       // activeCueIds 是闭区间命中口径，播放头恰在行首/行尾时会「可点但必失败」。
       // 菜单打开是离散事件，直接读即时播放时间做同口径判定即可（无性能问题）。
@@ -300,7 +317,15 @@ export function SubtitleList({
   const { columns, gridTemplate } = columnVisibility;
 
   return (
-    <div ref={listRef} className="h-full overflow-auto select-none px-2">
+    <div
+      ref={listRef}
+      onScroll={(event) =>
+        useEditorViewStore.setState({
+          listScrollTop: event.currentTarget.scrollTop,
+        })
+      }
+      className="h-full overflow-auto select-none px-2"
+    >
       <ContextMenu
         modal={false}
         onOpenChange={(nextOpen) => {
